@@ -148,9 +148,11 @@ class AssignmentInputs:
                 turn_cost_name = "_" + turn_cost_name
         self.skim_layout = SkimLayout(time_field, turn_cost_name)
         self.skimming = SkimmingContext(links, link_fields=fields, cost_name=cost_label, turn_cost_name=turn_cost_name)
-        selections = {
-            name: np.asarray(indices)[np.asarray(indices) != links] for name, indices in selected_links.items()
-        }
+        # A selected link removed by compression can never be used by a path.
+        selections = {}
+        for name, indices in selected_links.items():
+            indices = np.asarray(indices)
+            selections[name] = indices[indices != links]
         self.selection = SelectLinkContext(links, selections)
         self.driver = PreparedAoN(
             self.routing,
@@ -193,6 +195,14 @@ class PreparedTrafficClass:
         self.congested_time = np.array([])
         self.congested_skims = None
         self._selected_links = self.graph.selected_links(configuration.select_link_sets)
+
+    @property
+    def _id(self):
+        return self.configuration.name
+
+    @property
+    def pce(self):
+        return self.configuration.pce
 
     def skim_congested(self, skim_fields=None):
         """Compute additional skims without rebuilding routing graph."""

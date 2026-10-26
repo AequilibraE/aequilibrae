@@ -138,10 +138,10 @@ class LinearApproximation(WorkerThread):
         abs_w = np.zeros(self.vdf_der.shape, dtype=np.float64)
 
         for c in self.traffic_classes:
-            stp_dir = self.step_direction[c.configuration.name]
-            prev_dir_minus_current_sol = c.configuration.pce * (stp_dir.total_link_loads - c.results.total_link_loads)
-            aon_minus_current_sol = c.configuration.pce * (c._aon_results.total_link_loads - c.results.total_link_loads)
-            aon_minus_prev_dir = c.configuration.pce * (c._aon_results.total_link_loads - stp_dir.total_link_loads)
+            stp_dir = self.step_direction[c._id]
+            prev_dir_minus_current_sol = c.pce * (stp_dir.total_link_loads - c.results.total_link_loads)
+            aon_minus_current_sol = c.pce * (c._aon_results.total_link_loads - c.results.total_link_loads)
+            aon_minus_prev_dir = c.pce * (c._aon_results.total_link_loads - stp_dir.total_link_loads)
 
             u += prev_dir_minus_current_sol
             v += aon_minus_current_sol
@@ -204,16 +204,16 @@ class LinearApproximation(WorkerThread):
         abs_w = np.zeros(self.vdf_der.shape, dtype=np.float64)
 
         for c in self.traffic_classes:
-            sd = self.step_direction[c.configuration.name].total_link_loads
-            psd = self.previous_step_direction[c.configuration.name].total_link_loads
+            sd = self.step_direction[c._id].total_link_loads
+            psd = self.previous_step_direction[c._id].total_link_loads
             ll = c.results.total_link_loads
 
-            class_x = c.configuration.pce * (sd * self.stepsize + psd * (1.0 - self.stepsize) - ll)
-            class_z = c.configuration.pce * (sd - ll)
-            class_w = c.configuration.pce * (psd - sd)
+            class_x = c.pce * (sd * self.stepsize + psd * (1.0 - self.stepsize) - ll)
+            class_z = c.pce * (sd - ll)
+            class_w = c.pce * (psd - sd)
 
             x_ += class_x
-            y_ += c.configuration.pce * (c._aon_results.total_link_loads - ll)
+            y_ += c.pce * (c._aon_results.total_link_loads - ll)
             z_ += class_z
             w_ += class_w
             abs_x += np.abs(class_x)
@@ -454,31 +454,28 @@ class LinearApproximation(WorkerThread):
 
         self.step_direction_flow = np.zeros_like(self.total_flow)
         for c in self.traffic_classes:
-            current = self.step_direction[c.configuration.name]
+            current = self.step_direction[c._id]
             aon = c._aon_results.output
             if self.current_direction == "fw":
                 current.output.copy_from(aon)
             else:
-                spare = self.spare_direction[c.configuration.name]
+                spare = self.spare_direction[c._id]
                 if self.current_direction == "cfw":
                     spare.output.blend_cfw(aon, current.output, self.conjugate_stepsize, **self.blend_options)
                 else:
-                    previous = self.previous_step_direction[c.configuration.name]
+                    previous = self.previous_step_direction[c._id]
                     spare.output.blend_bfw(aon, current.output, previous.output, self.betas, **self.blend_options)
-                self.__rotate_direction_buffers(c.configuration.name)
+                self.__rotate_direction_buffers(c._id)
                 current = spare
 
             current.update_totals()
-            self.step_direction_flow += c.configuration.pce * current.total_link_loads
+            self.step_direction_flow += c.pce * current.total_link_loads
 
         if self.preload is not None:
             self.step_direction_flow += self.preload
 
     def _direction_turn_cost(self):
-        return sum(
-            c.configuration.pce * self.step_direction[c.configuration.name].output.turn_cost_total
-            for c in self.traffic_classes
-        )
+        return sum(c.pce * self.step_direction[c._id].output.turn_cost_total for c in self.traffic_classes)
 
     def __rotate_direction_buffers(self, c_id: str):
         """Make the spare current, keeping only the history the method needs."""
@@ -530,20 +527,16 @@ class LinearApproximation(WorkerThread):
                 skim_fields=c.configuration.skimming,
                 cost_name=c.configuration.cost,
             )
-            self.inputs[c.configuration.name] = inputs
+            self.inputs[c._id] = inputs
             for results in (c.results, c._aon_results):
                 results.bind(inputs.make_state(self.elementwise_cores, self.threading_threshold), inputs.class_names)
 
             if self.algorithm != "all-or-nothing":
-                self.step_direction[c.configuration.name] = inputs.make_state(
-                    self.elementwise_cores, self.threading_threshold
-                )
+                self.step_direction[c._id] = inputs.make_state(self.elementwise_cores, self.threading_threshold)
             if self.algorithm in ("cfw", "bfw"):
-                self.spare_direction[c.configuration.name] = inputs.make_state(
-                    self.elementwise_cores, self.threading_threshold
-                )
+                self.spare_direction[c._id] = inputs.make_state(self.elementwise_cores, self.threading_threshold)
             if self.algorithm == "bfw":
-                self.previous_step_direction[c.configuration.name] = inputs.make_state(
+                self.previous_step_direction[c._id] = inputs.make_state(
                     self.elementwise_cores, self.threading_threshold
                 )
 
@@ -587,17 +580,17 @@ class LinearApproximation(WorkerThread):
             aon_flows = []
 
             for c in self.traffic_classes:  # type: PreparedTrafficClass
-                msg = f"All-or-Nothing - Traffic Class: {c.configuration.name}"
+                msg = f"All-or-Nothing - Traffic Class: {c._id}"
                 self.signal.emit(["set_text", msg])
-                inputs = self.inputs[c.configuration.name]
+                inputs = self.inputs[c._id]
                 inputs.update_costs(self.congested_time, c.fixed_cost)
                 inputs.driver.run(c._aon_results.output)
                 c._aon_results.state.update_totals()
-                aon_flows.append(c.configuration.pce * c._aon_results.total_link_loads)
+                aon_flows.append(c.pce * c._aon_results.total_link_loads)
                 if c._aon_results.unassigned_demand:
                     logger.warning(
                         "Class %s, iteration %s: %g demand could not be assigned",
-                        c.configuration.name,
+                        c._id,
                         self.iter,
                         c._aon_results.unassigned_demand,
                     )
@@ -605,9 +598,7 @@ class LinearApproximation(WorkerThread):
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             # Accumulate AoN turn penalty costs from all traffic classes.
-            self.aon_total_turn_cost = sum(
-                c.configuration.pce * c._aon_results.total_turn_penalty for c in self.traffic_classes
-            )
+            self.aon_total_turn_cost = sum(c.pce * c._aon_results.total_turn_penalty for c in self.traffic_classes)
 
             converged = self.check_convergence() if self.iter > 1 else False
             if converged:
@@ -632,17 +623,12 @@ class LinearApproximation(WorkerThread):
                     c.results.output.copy_from(c._aon_results.output)
                 else:
                     c.results.output.blend_result(
-                        self.step_direction[c.configuration.name].output,
-                        c.results.output,
-                        self.stepsize,
-                        **self.blend_options,
+                        self.step_direction[c._id].output, c.results.output, self.stepsize, **self.blend_options
                     )
                 c.results.state.update_totals()
-                flows += c.configuration.pce * c.results.total_link_loads
+                flows += c.pce * c.results.total_link_loads
 
-            self.fw_total_turn_cost = sum(
-                c.configuration.pce * c.results.total_turn_penalty for c in self.traffic_classes
-            )
+            self.fw_total_turn_cost = sum(c.pce * c.results.total_turn_penalty for c in self.traffic_classes)
             self._apply_assigned_flow(flows)
 
             if self.algorithm == "all-or-nothing":
@@ -698,12 +684,12 @@ class LinearApproximation(WorkerThread):
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
                 c.fixed_cost,
-                self.step_direction[c.configuration.name].total_link_loads,
+                self.step_direction[c._id].total_link_loads,
                 c.results.total_link_loads,
                 self.elementwise_cores,
                 self.threading_threshold,
             )
-            class_specific_term += c.configuration.pce * class_link_costs
+            class_specific_term += c.pce * class_link_costs
         return class_specific_term
 
     def __clip_stepsize(self, stepsize: float) -> float:
@@ -754,12 +740,9 @@ class LinearApproximation(WorkerThread):
                     derivative_scale += float(
                         np.sum(
                             np.abs(
-                                c.configuration.pce
+                                c.pce
                                 * c.fixed_cost
-                                * (
-                                    self.step_direction[c.configuration.name].total_link_loads
-                                    - c.results.total_link_loads
-                                )
+                                * (self.step_direction[c._id].total_link_loads - c.results.total_link_loads)
                             )
                         )
                     )
@@ -892,15 +875,14 @@ class LinearApproximation(WorkerThread):
             for c in self.traffic_classes:
                 unit = congested + np.asarray(c.fixed_cost, dtype=np.float64)
                 violation = float(
-                    c.configuration.pce
-                    * (np.sum(unit * c._aon_results.total_link_loads) - np.sum(unit * c.results.total_link_loads))
+                    c.pce * (np.sum(unit * c._aon_results.total_link_loads) - np.sum(unit * c.results.total_link_loads))
                 )
                 if violation > worst_amount:
-                    worst_id, worst_amount = c.configuration.name, violation
+                    worst_id, worst_amount = c._id, violation
                 negative = int((unit < 0).sum())
                 if negative:
                     detail.append(
-                        f"CAUSE: class '{c.configuration.name}' has {negative} link(s) with negative total cost "
+                        f"CAUSE: class '{c._id}' has {negative} link(s) with negative total cost "
                         f"(minimum {unit.min():.6g}). Shortest-path search assumes non-negative "
                         f"arc costs, so its solution is not a lower bound."
                     )
@@ -933,8 +915,8 @@ class LinearApproximation(WorkerThread):
         aon_cost = self.aon_total_turn_cost
         current_cost = self.fw_total_turn_cost
         for c in self.traffic_classes:
-            aon_class_flow = c.configuration.pce * c._aon_results.total_link_loads
-            current_class_flow = c.configuration.pce * c.results.total_link_loads
+            aon_class_flow = c.pce * c._aon_results.total_link_loads
+            current_class_flow = c.pce * c.results.total_link_loads
 
             aon_cost += np.sum((self.congested_time + c.fixed_cost) * aon_class_flow)
             current_cost += np.sum((self.congested_time + c.fixed_cost) * current_class_flow)
