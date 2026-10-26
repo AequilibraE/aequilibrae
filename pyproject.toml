@@ -88,7 +88,8 @@ tests = [
 ]
 
 dev = [
-  "aequilibrae[tests, docs, create]"
+  "aequilibrae[tests, docs, create]",
+  "scipy-stubs",
 ]
 
 [tool.uv.extra-build-dependencies]

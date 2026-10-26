@@ -34,7 +34,7 @@ from uuid import uuid4
 
 from scipy.sparse import csr_array
 
-from aequilibrae.matrix import from_scipy
+from aequilibrae.matrix import from_dict
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.create_example import create_example
@@ -87,7 +87,7 @@ demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 # Copy the named matrices into sparse float64 storage. In practise these would
 # be stored in the sparse OMX extension rather than as a dense matrix, then
 # converted to a sparse format.
-demand = from_scipy(
+demand = from_dict(
     {name: csr_array(values, dtype="float64") for name, values in demand.items()},
     index=demand.index,
 )

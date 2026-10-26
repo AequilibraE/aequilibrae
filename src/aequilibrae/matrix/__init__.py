@@ -5,7 +5,6 @@ from .aequilibrae_matrix import (
     from_df,
     from_dict,
     from_file,
-    from_scipy,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "from_df",
     "from_dict",
     "from_file",
-    "from_scipy",
 ]

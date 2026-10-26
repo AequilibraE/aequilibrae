@@ -14,7 +14,6 @@ from aequilibrae.matrix import (
     from_df,
     from_dict,
     from_file,
-    from_scipy,
 )
 
 
@@ -167,42 +166,29 @@ def test_invalid_assignment_preserves_values(matrix, index, data, metadata, inva
     assert_matrix(matrix, index, data, metadata=metadata)
 
 
-@pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
-def test_from_dict_accepts_array_like(tmp_path, manage, index, data, store):
-    kwargs = {"path": tmp_path / "lists.omx"} if store else {}
-    matrix = manage(from_dict({name: values.tolist() for name, values in data.items()}, index, store=store, **kwargs))
+def test_from_dict_accepts_array_like(index, data):
+    matrix = from_dict({name: values.tolist() for name, values in data.items()}, index)
     assert_matrix(matrix, index, data, index_name="main_index")
 
 
-def test_from_dict(index, data, metadata):
-    matrix = from_dict(data, index, index_name="zones", metadata=metadata)
+def test_from_dict(index, data):
+    matrix = from_dict(data, index, index_name="zones")
     assert isinstance(matrix, AequilibraeMatrix)
-    assert_matrix(matrix, index, data, metadata=metadata)
+    assert_matrix(matrix, index, data)
+    assert matrix.metadata == {}
 
 
-def test_from_dict_store_persists_data(tmp_path, index, data, metadata):
+def test_store_update_persists_data(tmp_path, index, data, metadata):
     path = tmp_path / "demand.omx"
-    with from_dict(data, index, index_name="zones", metadata=metadata, path=path, store=True) as store:
-        assert isinstance(store, MatrixStore)
+    with MatrixStore(path, index, index_name="zones", mode="x") as store:
+        store.update(data)
+        store.metadata.update(metadata)
     assert_matrix(from_file(path, index_name="zones"), index, data, metadata=metadata)
 
 
-def test_from_dict_copies_metadata(index):
-    periods = np.array([1, 2, 3])
-    matrix = from_dict({}, index, metadata={"periods": periods})
-    periods[0] = 9
-    np.testing.assert_array_equal(matrix.metadata["periods"], [1, 2, 3])
-
-
-@pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
-def test_from_dict_ignores_omx_attributes(tmp_path, manage, index, data, store):
-    attributes = {"OMX_VERSION": "ignored", "OMX_CREATED_WITH": "ignored", "SHAPE": [99, 99], "TITLE": "ignored"}
-    kwargs = {"path": tmp_path / "demand.omx"} if store else {}
-    matrix = manage(from_dict(data, index, metadata=attributes, store=store, **kwargs))
-    np.testing.assert_array_equal(matrix.metadata.get("SHAPE", matrix.shape), matrix.shape)
-    assert matrix.metadata.get("OMX_VERSION") != "ignored"
-    assert matrix.metadata.get("OMX_CREATED_WITH") != "ignored"
-    assert "TITLE" not in matrix.metadata
+def test_from_dict_rejects_metadata(index, data):
+    with pytest.raises(TypeError, match="unexpected keyword argument 'metadata'"):
+        from_dict(data, index, metadata={"year": 2030})
 
 
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
@@ -279,64 +265,39 @@ def test_store_load_rejects_subset(omx_path):
         from_file(omx_path, index_name="zones", store=True, subset=["car"])
 
 
-def test_from_dict_store_requires_path(index, data):
-    with pytest.raises(ValueError):
-        from_dict(data, index, store=True)
+@pytest.mark.parametrize("kwargs", [{"store": True}, {"store": False}, {"path": "unused.omx"}, {"mode": "x"}])
+def test_from_dict_rejects_store_options(index, data, kwargs):
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        from_dict(data, index, **kwargs)
 
 
-def test_from_dict_memory_rejects_path(tmp_path, index, data):
-    with pytest.raises(ValueError):
-        from_dict(data, index, path=tmp_path / "demand.omx")
-
-
-def test_from_dict_memory_rejects_mode(index, data):
-    with pytest.raises(ValueError, match="in-memory matrix cannot have a mode"):
-        from_dict(data, index, mode="x")
-
-
-@pytest.mark.parametrize("mode", ["r", "invalid"])
-def test_from_dict_store_rejects_invalid_modes(tmp_path, index, data, mode):
-    path = tmp_path / "invalid.omx"
-    with pytest.raises(ValueError, match="from_dict stores only support modes"):
-        from_dict(data, index, path=path, mode=mode, store=True)
-    assert not path.exists()
-
-
-def test_from_dict_store_does_not_overwrite_by_default(omx_path, index, data, metadata):
-    with pytest.raises(FileExistsError):
-        from_dict(data, [809, 0, 801], path=omx_path, index_name="zones", store=True)
-
-    assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
-
-
-@pytest.mark.parametrize("mode", ["r+", "a", "w"])
 @pytest.mark.parametrize("invalid_values", [np.zeros((2, 2)), np.zeros((3, 3), dtype=object)])
-def test_from_dict_checks_values_before_changing_file(omx_path, index, data, metadata, mode, invalid_values):
+def test_from_dict_rejects_invalid_values(index, invalid_values):
     with pytest.raises((TypeError, ValueError)):
-        from_dict({"car": invalid_values}, [809, 0, 801], path=omx_path, index_name="zones", mode=mode, store=True)
-    assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
+        from_dict({"car": invalid_values}, index)
 
 
-def test_from_dict_checks_names_before_creating_file(tmp_path, index, data):
-    path = tmp_path / "invalid.omx"
+def test_from_dict_checks_names(index, data):
     with pytest.raises(ValueError, match="not a path"):
-        from_dict({"mode/car": data["car"]}, index, path=path, store=True)
-    assert not path.exists()
+        from_dict({"mode/car": data["car"]}, index)
 
 
-def test_from_dict_closes_store_after_failed_metadata_write(tmp_path, index, data):
+def test_store_context_closes_after_failed_metadata_write(tmp_path, index, data):
     path = tmp_path / "invalid_metadata.omx"
     with pytest.raises(TypeError) as error:
-        from_dict(data, index, path=path, store=True, metadata={"bad": {"nested": "value"}})
+        with MatrixStore(path, index, mode="x") as store:
+            store.update(data)
+            store.metadata.update({"bad": {"nested": "value"}})
     # The traceback still holds the failed call's local variables.
     assert error.traceback
     with omx.open_file(path, "r") as file:
         assert file.mode == "r"
 
 
-def test_from_dict_store_allows_explicit_update(omx_path, index):
+def test_store_allows_explicit_update(omx_path, index):
     values = np.ones((3, 3))
-    with from_dict({"car": values}, index, path=omx_path, index_name="zones", mode="r+", store=True) as store:
+    with MatrixStore(omx_path, index, index_name="zones", mode="r+") as store:
+        store.update({"car": values})
         np.testing.assert_array_equal(store["car"], values)
 
 
@@ -387,7 +348,7 @@ def test_save_creates_new_file(memory_matrix, tmp_path, index, data, mode):
 
 @pytest.mark.parametrize("mode", ["x", "w-"])
 def test_save_create_mode_rejects_existing_file(omx_path, index, data, metadata, mode):
-    matrix = from_dict({}, index, index_name="zones")
+    matrix = AequilibraeMatrix(index, index_name="zones")
     with pytest.raises(FileExistsError):
         matrix.save_as_omx(omx_path, mode=mode)
     assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
@@ -409,7 +370,8 @@ def test_save_rejects_invalid_modes(memory_matrix, tmp_path, mode):
 
 
 def test_save_write_mode_replaces_entire_file(omx_path):
-    matrix = from_dict({"new": np.ones((2, 2))}, [10, 20], metadata={"description": "New file"})
+    matrix = from_dict({"new": np.ones((2, 2))}, [10, 20])
+    matrix.metadata["description"] = "New file"
     matrix.save_as_omx(omx_path, "w")
     loaded = from_file(omx_path)
     assert_matrix(loaded, [10, 20], {"new": np.ones((2, 2))}, index_name="main_index")
@@ -613,7 +575,8 @@ def test_save_merges_file_metadata(memory_matrix, omx_path, metadata):
 )
 def test_save_accepts_unchanged_metadata(tmp_path, value):
     path = tmp_path / "metadata.omx"
-    matrix = from_dict({"car": np.ones((2, 2))}, [10, 20], metadata={"value": value})
+    matrix = from_dict({"car": np.ones((2, 2))}, [10, 20])
+    matrix.metadata["value"] = value
     matrix.save_as_omx(path)
     matrix["bus"] = np.zeros((2, 2))
     matrix.save_as_omx(path, mode="r+", subset=["bus"])
@@ -625,7 +588,8 @@ def test_save_accepts_unchanged_metadata(tmp_path, value):
 @pytest.mark.parametrize("replacement", [[1, 3], [1], [1, np.nan]])
 def test_save_updates_metadata_arrays(tmp_path, replacement):
     path = tmp_path / "metadata.omx"
-    matrix = from_dict({"car": np.ones((2, 2))}, [10, 20], metadata={"values": [1, 2]})
+    matrix = from_dict({"car": np.ones((2, 2))}, [10, 20])
+    matrix.metadata["values"] = [1, 2]
     matrix.save_as_omx(path)
     matrix.metadata["values"] = replacement
     matrix["bus"] = np.zeros((2, 2))
@@ -635,7 +599,8 @@ def test_save_updates_metadata_arrays(tmp_path, replacement):
 
 def test_save_writes_supplied_metadata_dtype(tmp_path):
     path = tmp_path / "metadata_dtype.omx"
-    matrix = from_dict({}, [10, 20], metadata={"year": np.int16(2030)})
+    matrix = AequilibraeMatrix([10, 20])
+    matrix.metadata["year"] = np.int16(2030)
     matrix.save_as_omx(path)
     matrix.metadata["year"] = np.int32(2030)
     matrix.save_as_omx(path, mode="r+")
@@ -1181,11 +1146,9 @@ def test_invalid_index_name_does_not_overwrite_file(omx_path, index, data, metad
     assert_matrix(from_file(omx_path, index_name="zones"), index, data, metadata=metadata)
 
 
-def test_from_dict_checks_index_name_before_creating_file(tmp_path, index, data):
-    path = tmp_path / "invalid.omx"
+def test_from_dict_checks_index_name(index, data):
     with pytest.raises(ValueError, match="index name"):
-        from_dict(data, index, index_name="nested/zones", path=path, store=True)
-    assert not path.exists()
+        from_dict(data, index, index_name="nested/zones")
 
 
 @pytest.mark.parametrize("store", [False, True], ids=["memory", "store"])
@@ -1676,16 +1639,16 @@ def test_from_df_accepts_nullable_integer_ids():
 @pytest.mark.parametrize(
     "array_type", [sparse.coo_array, sparse.csr_array, sparse.csc_array], ids=["coo", "csr", "csc"]
 )
-def test_from_scipy(index, data, array_type):
-    matrix = from_scipy({name: array_type(values) for name, values in data.items()}, index, index_name="zones")
+def test_from_dict_sparse(index, data, array_type):
+    matrix = from_dict({name: array_type(values) for name, values in data.items()}, index, index_name="zones")
     assert isinstance(matrix, AequilibraeSparseMatrix)
     assert_matrix(matrix, index, data)
     assert all(isinstance(value, array_type) for value in matrix.values())
 
 
 @pytest.mark.parametrize("dtype", [np.int32, np.float32])
-def test_from_scipy_preserves_dtype(index, dtype):
+def test_from_dict_sparse_preserves_dtype(index, dtype):
     values = np.arange(9, dtype=dtype).reshape(3, 3)
-    matrix = from_scipy({"car": sparse.csr_array(values)}, index)
+    matrix = from_dict({"car": sparse.csr_array(values)}, index)
     assert matrix["car"].dtype == np.dtype(dtype)
     np.testing.assert_array_equal(matrix["car"].toarray(), values)

@@ -94,18 +94,6 @@ def _validate_name_available(file: OMXFile, name: str, group: str) -> None:
         )
 
 
-def _validate_store_destination(
-    path: str | os.PathLike, mode: str | None, data: Mapping[str, np.ndarray | sparray]
-) -> None:
-    if mode not in ("a", "r+") or not os.path.exists(path):
-        return
-
-    # Check existing storage types before opening for updates or changing the index.
-    with omx.open_file(path, mode="r") as file:
-        for name, value in data.items():
-            _validate_name_available(file, name, "sparse" if isinstance(value, sparray) else "data")
-
-
 def _query_matrices(
     matrices: Mapping[str, Any],
     subset: Sequence[str | dict[str, Any]],
@@ -224,14 +212,6 @@ def _sparse_values(value: sparray, shape: tuple[int, int]) -> sparray:
         raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
 
     return value
-
-
-def _store_values(value: ArrayLike | sparray, shape: tuple[int, int]) -> np.ndarray | sparray:
-    if isinstance(value, sparray):
-        value = _sparse_values(value, shape).tocsr()
-        value.check_format(full_check=True)
-        return value
-    return _matrix_values(value, shape)
 
 
 def _read_sparse_matrix(group: h5py.Group, expected_shape: tuple[int, int]) -> scipy.sparse.csr_array:
@@ -730,7 +710,8 @@ class _Matrix(MutableMapping[str, _ArrayT]):
 
         The zone index and file-level metadata are kept.
 
-        >>> demand = from_dict({"car": [[0]]}, index=[101], metadata={"year": 2030})
+        >>> demand = from_dict({"car": [[0]]}, index=[101])
+        >>> demand.metadata["year"] = 2030
         >>> demand.clear()
         >>> list(demand), demand.index.tolist(), demand.metadata["year"]
         ([], [101], 2030)
@@ -1706,137 +1687,81 @@ def from_dict(
     data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
-    path: None = None,
-    mode: None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[False] = False,
 ) -> AequilibraeMatrix: ...
 
 
 @overload
 def from_dict(
-    data: Mapping[str, ArrayLike | sparray],
+    data: Mapping[str, sparray],
     index: ArrayLike,
     *,
-    path: str | os.PathLike,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[True],
-) -> MatrixStore: ...
+) -> AequilibraeSparseMatrix: ...
 
 
 def from_dict(
-    data: Mapping[str, ArrayLike | sparray],
+    data: Mapping[str, ArrayLike] | Mapping[str, sparray],
     index: ArrayLike,
     *,
-    path: str | os.PathLike | None = None,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: bool = False,
-) -> AequilibraeMatrix | MatrixStore:
+) -> AequilibraeMatrix | AequilibraeSparseMatrix:
     """
     Create named square matrices from a mapping of names to array-like values.
 
-    The result is an in-memory :class:`AequilibraeMatrix` unless you pass
-    ``store=True``. Arrays are copied with their original dtypes. File metadata
-    is also copied, apart from attributes managed by OMX.
+    The result is an in-memory :class:`AequilibraeMatrix` or
+    :class:`AequilibraeSparseMatrix`, inferred from the first value. All values
+    must have the same storage type. Mixed dense and sparse inputs will raise a
+    ``ValueError``. The mapping must contain at least one matrix.
 
-    To create a :class:`MatrixStore`, pass ``store=True`` and a file path.  The
-    default mode is ``"x"``, which raises an error if the file already
-    exists. Close the store when finished, or use a ``with`` block. Stores
-    accept both dense and sparse values. In-memory matrices do not accept
-    ``path`` or ``mode`` and only accept dense arrays, use ``from_scipy``
-    instead.
+    Arrays are copied with their original dtypes. Each sparse array keeps its
+    format. Its shape must match the number of zones in ``index``, which sets
+    the row and column order.
 
     :Arguments:
 
-        **data** (mapping of :obj:`str` to array-like): Named square matrices
-            matching the index length.  Values must have integer, float,
-            boolean or complex dtypes.
+        **data** (mapping of :obj:`str` to array-like or SciPy sparse arrays):
+            Non-empty collection of named square matrices matching the index
+            length. Values must all be dense or all be sparse, with integer,
+            float, boolean or complex dtypes.
 
         **index** (array-like): One-dimensional sequence of unique integer zone
             IDs from ``0`` to ``2**64 - 1`` in row and column order.
 
-        **path** (:obj:`str` or :obj:`os.PathLike`, *Optional*): Destination
-            OMX file. Required when ``store=True`` and not accepted
-            otherwise. Defaults to ``None``.
-
-        **mode** (:obj:`str`, *Optional*): Writable store mode: ``"x"``,
-            ``"w-"``, ``"w"``, ``"r+"`` or ``"a"``. Defaults to ``None``, which
-            uses ``"x"`` for stores. Must be omitted for in-memory matrices.
-
         **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
           ``"main_index"``.
 
-        **metadata** (:obj:`Mapping`, *Optional*): File-level attributes to
-            copy, excluding OMX-managed attributes. Defaults to ``None``.
-
-        **store** (:obj:`bool`, *Optional*): Write to an OMX file and return an
-            open :class:`MatrixStore` instead of an in-memory
-            :class:`AequilibraeMatrix`. Defaults to ``False``.
-
     >>> demand = from_dict(
     ...     {"car": [[0, 12], [10, 0]], "bus": [[0, 2], [2, 0]]},
-    ...     index=[101, 205], index_name="zones", metadata={"year": 2030},
+    ...     index=[101, 205], index_name="zones",
     ... )
-    >>> demand["car"].tolist(), demand.metadata["year"]
-    ([[0, 12], [10, 0]], 2030)
-    >>> from pathlib import Path
-    >>> from tempfile import TemporaryDirectory
-    >>> with TemporaryDirectory() as directory:
-    ...     with from_dict(
-    ...         {"car": demand["car"]}, index=demand.index,
-    ...         path=Path(directory) / "demand.omx", store=True,
-    ...     ) as store:
-    ...         print(store["car"].tolist())
+    >>> demand["car"].tolist()
     [[0, 12], [10, 0]]
+    >>> from scipy.sparse import csr_array
+    >>> demand = from_dict(
+    ...     {"car": csr_array([[0, 12], [10, 0]])},
+    ...     index=[101, 205], index_name="zones",
+    ... )
+    >>> demand["car"].toarray().tolist()
+    [[0, 12], [10, 0]]
+    >>> demand.index.tolist()
+    [101, 205]
     """
-    mat: AequilibraeMatrix | MatrixStore
-    if store:
-        if path is None:
-            raise ValueError("a matrix store must have a path")
+    if not data:
+        raise ValueError("data must contain at least one matrix")
 
-        if mode is not None and mode not in ("w", "a", "r+", "w-", "x"):
-            raise ValueError("from_dict stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
-
-        # Check names, shapes and dtypes before opening a file or changing its index.
-        validated_index = AequilibraeMatrix(index=index, index_name=index_name).index
-        prepared = {}
-        for name, value in data.items():
-            _validate_matrix_key(name)
-            prepared[name] = _store_values(value, (len(validated_index), len(validated_index)))
-
-        data = prepared
-        _validate_store_destination(path, mode, data)
-
-        mat = MatrixStore(
-            path=path,
-            index=validated_index,
-            index_name=index_name,
-            mode=mode if mode is not None else "x",
+    sparse = isinstance(next(iter(data.values())), sparray)
+    mismatches = [name for name, value in data.items() if isinstance(value, sparray) != sparse]
+    if mismatches:
+        expected = "sparse" if sparse else "dense"
+        raise ValueError(
+            f"expected {expected} matrices (inferred from the first value). The mismatched matrices are: {mismatches}"
         )
-    else:
-        if path is not None:
-            raise ValueError("an in-memory matrix cannot have a path")
 
-        if mode is not None:
-            raise ValueError("an in-memory matrix cannot have a mode")
-        mat = AequilibraeMatrix(index=index, index_name=index_name)
-
-    try:
-        for name, value in data.items():
-            mat[name] = value
-        if metadata is not None:
-            mat.metadata.update(_copy_file_metadata(metadata))
-
-    except Exception:
-        if isinstance(mat, MatrixStore):
-            mat.close()
-        raise
-
+    matrix_type = AequilibraeSparseMatrix if sparse else AequilibraeMatrix
+    mat = matrix_type(index=index, index_name=index_name)
+    for name, value in data.items():
+        mat[name] = value
     return mat
 
 
@@ -1968,128 +1893,4 @@ def from_df(
 
         mat[name] = values_matrix
 
-    return mat
-
-
-@overload
-def from_scipy(
-    data: Mapping[str, sparray],
-    index: ArrayLike,
-    *,
-    path: None = None,
-    mode: None = None,
-    index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[False] = False,
-) -> AequilibraeSparseMatrix: ...
-
-
-@overload
-def from_scipy(
-    data: Mapping[str, ArrayLike | sparray],
-    index: ArrayLike,
-    *,
-    path: str | os.PathLike,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
-    index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[True],
-) -> MatrixStore: ...
-
-
-def from_scipy(
-    data: Mapping[str, ArrayLike | sparray],
-    index: ArrayLike,
-    *,
-    path: str | os.PathLike | None = None,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
-    index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: bool = False,
-) -> AequilibraeSparseMatrix | MatrixStore:
-    """
-    Copy named SciPy sparse arrays to sparse in-memory matrices or a store.
-
-    Each in-memory sparse array keeps its format and dtype. Its shape must
-    match the number of zones in ``index``, which sets the row and column order.
-
-    Pass ``store=True`` and a file path to write arrays to a MatrixStore,
-    keeping their dtypes. The default mode is ``"x"``, which raises an error if
-    the file exists. Close the store when finished, or use a ``with`` block.
-    Stores accept both dense and sparse values; sparse values are written as
-    CSR. In-memory matrices do not accept ``path`` or ``mode`` and only accept
-    sparse values.
-
-    :Arguments:
-
-        **data** (mapping of :obj:`str` to :obj:`scipy.sparse.sparray`): Named
-            square sparse arrays.  Each array's shape must match the index
-            length.
-
-        **index** (array-like): One-dimensional sequence of unique integer zone
-            IDs from ``0`` to ``2**64 - 1`` in row and column order.
-
-        **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
-          ``"main_index"``.
-
-        **path** (:obj:`str` or :obj:`os.PathLike`, *Optional*): Destination OMX
-            file. Required when ``store=True`` and not accepted otherwise.
-
-        **mode** (:obj:`str`, *Optional*): Writable store mode: ``"x"``, ``"w-"``,
-            ``"w"``, ``"r+"`` or ``"a"``. Defaults to ``"x"`` for stores.
-            Must be omitted for in-memory matrices.
-
-        **metadata** (:obj:`Mapping`, *Optional*): File-level attributes to
-            copy, excluding OMX-managed attributes. Defaults to ``None``.
-
-        **store** (:obj:`bool`, *Optional*): Return an open MatrixStore
-            instead of in-memory matrices. Defaults to ``False``.
-
-    >>> from scipy.sparse import csr_array
-    >>> demand = from_scipy(
-    ...     {"car": csr_array([[0, 12], [10, 0]])},
-    ...     index=[101, 205], index_name="zones",
-    ... )
-    >>> demand["car"].toarray().tolist()
-    [[0, 12], [10, 0]]
-    >>> demand.index.tolist()
-    [101, 205]
-    """
-    mat: AequilibraeSparseMatrix | MatrixStore
-    if store:
-        if path is None:
-            raise ValueError("a matrix store must have a path")
-        if mode is not None and mode not in ("w", "a", "r+", "w-", "x"):
-            raise ValueError("from_scipy stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
-
-        # Check names, shapes and dtypes before opening a file or changing its index.
-        validated_index = AequilibraeSparseMatrix(index=index, index_name=index_name).index
-        prepared = {}
-        for name, value in data.items():
-            _validate_matrix_key(name)
-            prepared[name] = _store_values(value, (len(validated_index), len(validated_index)))
-
-        data = prepared
-        _validate_store_destination(path, mode, data)
-        mat = MatrixStore(
-            path=path,
-            index=validated_index,
-            index_name=index_name,
-            mode=mode if mode is not None else "x",
-        )
-    else:
-        if path is not None:
-            raise ValueError("an in-memory matrix cannot have a path")
-        if mode is not None:
-            raise ValueError("an in-memory matrix cannot have a mode")
-        mat = AequilibraeSparseMatrix(index=index, index_name=index_name)
-
-    try:
-        mat.update(data)
-        if metadata is not None:
-            mat.metadata.update(_copy_file_metadata(metadata))
-    except Exception:
-        if isinstance(mat, MatrixStore):
-            mat.close()
-        raise
     return mat
