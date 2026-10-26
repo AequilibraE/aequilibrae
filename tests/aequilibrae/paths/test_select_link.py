@@ -7,14 +7,14 @@ import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, NetworkData, Graph, PathResults
 from aequilibrae.paths.vdf import bpr
-from aequilibrae.matrix import AequilibraeMatrix, from_file
+from aequilibrae.matrix import AequilibraeMatrix
 
 
 @pytest.fixture
 def select_link_setup(sioux_falls_single_class):
     project = sioux_falls_single_class
     network = project.network.build(modes=["c"])
-    matrix = project.matrices.get_matrix("demand_omx")
+    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
     def make(links=None, algorithm="msa"):
         traffic = TrafficClass(
@@ -37,7 +37,6 @@ def select_link_setup(sioux_falls_single_class):
         )
 
     yield {"project": project, "matrix": matrix, "make": make}
-    matrix.close()
 
 
 @pytest.mark.parametrize(
@@ -56,8 +55,13 @@ def test_selected_demand_and_loads_match_paths(select_link_setup, links, single_
     assignment = select_link_setup["make"](links)
     assignment.execute(max_iterations=1, cores=1)
     state = assignment._class_states[0]
-    for key in state._selected_links:
-        od_mask, link_loading = create_od_mask(matrix, state.graph, state._selected_links[key])
+    graph = (
+        select_link_setup["project"]
+        .network.build(modes=["c"])
+        .build_graph("c", "free_flow_time", block_centroid_flows=False)
+    )
+    for key, members in state.configuration.select_link_sets.items():
+        od_mask, link_loading = create_od_mask(matrix, graph, members)
         np.testing.assert_allclose(state.results.select_link_od.matrices[key][:, :, 0], od_mask)
         np.testing.assert_allclose(state.results.select_link_loading[key], link_loading)
     assignment.save_select_link_results("select_link_analysis")
@@ -100,7 +104,8 @@ def test_kaitang(test_data_path, tmp_path):
     net = link_df.copy()
 
     net["modes"] = "a"
-    aem_mat = from_file(os.path.join(tmp_path, "demand_a.aem"))
+    aem_mat = AequilibraeMatrix(index=centroids_array)
+    aem_mat["a"] = np.ones((len(centroids_array), len(centroids_array)))
     traffic = TrafficClass(
         name="class_a",
         mode="a",
@@ -154,9 +159,11 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
 
     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
     sl_links = []
-    for i in range(len(sl)):
-        node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
-        sl_links.append(node_pair)
+    for link_id, direction in sl:
+        rows = graph.graph[graph.graph.link_id == link_id]
+        if direction:
+            rows = rows[rows.direction == direction]
+        sl_links.extend((row.a_node + 1, row.b_node + 1) for row in rows.itertuples())
     mask = {}
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):

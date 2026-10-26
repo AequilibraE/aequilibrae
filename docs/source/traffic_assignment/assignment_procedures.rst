@@ -2,7 +2,7 @@ Traffic Assignment Procedure
 ============================
 
 Traffic assignment starts with a network snapshot and a set of traffic class configurations.
-The constructor validates the configuration. Execution prepares the graphs and runs the assignment.
+The constructor validates the configuration. Execution prepares routing contexts and runs the assignment.
 
 Network data
 ------------
@@ -94,7 +94,10 @@ The ``max_iterations``, ``rgap``, and ``cores`` arguments apply to each executio
 Zero cores uses all available cores. A negative value leaves that many cores unused.
 ``bfw_conjugacy="exact"`` selects the exact BFW conjugacy calculation.
 
-Each execution creates fresh graphs and result buffers.
+Each execution creates a network snapshot and fresh result buffers.
+Classes share compact graph arrays when their mode, centroid order, and centroid-blocking policy match.
+Turn restrictions and U-turn policy come from the snapshot.
+Each class owns its routing costs and skims. Assignment does not construct public ``Graph`` objects.
 The returned DataFrame contains link results.
 ``assig.report()`` returns the convergence report.
 ``assig.info()`` returns configuration information before or after execution.
@@ -123,6 +126,10 @@ Results remain in demand units. The optimizer applies PCE when it combines class
     >>> saved_skims = assig.save_skims("assignment_skims", which_ones="all")
 
 Fields in ``TrafficClass.skimming`` produce skims during assignment.
+The time-field skim includes congestion and turn delay. It excludes fixed monetary costs.
+A separately named class-cost skim includes the generalized assignment cost.
+If cost and time use the same field name, the skim reports travel time.
+``skim_congested()`` also returns the generalized cost as ``__assignment_cost__``.
 Without skimming fields, the path search can exit early for sparse demand.
 ``skim_congested()`` computes additional skims from the accepted final costs.
 
@@ -137,3 +144,6 @@ Assignment cost also includes fixed costs and the class cost adjustment.
 
 For VDF formulas and custom functions, see :ref:`volume_delay_functions`.
 For a sparse demand example, see :ref:`example_assign_sparse`.
+
+Selected OD matrices use the sorted union of the participating class centroids during export.
+The exporter reorders each matrix by external centroid ID and fills absent centroid pairs with zero.

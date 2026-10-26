@@ -6,14 +6,13 @@ from aequilibrae.paths.vdf import bpr
 
 @pytest.fixture
 def assignment_setup(sioux_falls_example):
-    classes, matrices = [], []
+    classes = []
     for name, mode, core, pce in (
         ("car", "c", "car", 1.0),
         ("truck", "T", "trucks", 2.5),
         ("motorcycle", "M", "motorcycle", 0.2),
     ):
         matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=[core])
-        matrices.append(matrix)
         classes.append(
             TrafficClass(
                 name=name,
@@ -35,8 +34,6 @@ def assignment_setup(sioux_falls_example):
         algorithm="bfw",
         project=sioux_falls_example,
     )
-    for matrix in matrices:
-        matrix.close()
 
 
 def test_execute_and_save_results(assignment_setup):

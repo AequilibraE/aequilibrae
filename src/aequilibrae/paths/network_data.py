@@ -39,19 +39,36 @@ class NetworkData:
             | {c[:-3] for c in columns if c.endswith("_ab") and c[:-3] + "_ba" in columns}
         )
 
+    def _directed_indices(self):
+        direction = self.links.direction.to_numpy()
+        ab = np.flatnonzero(direction != -1)
+        ba = np.flatnonzero(direction != 1)
+        rows = np.concatenate([ab, ba])
+        directions = np.concatenate([np.ones(len(ab), dtype=np.int8), -np.ones(len(ba), dtype=np.int8)])
+        order = np.lexsort((directions, self.links.link_id.to_numpy(dtype=np.int64)[rows]))
+        return rows[order], directions[order]
+
     def field_values(self, field):
-        """Return numeric directed values, without constructing a graph."""
+        """Return numeric values in ascending link-ID and direction order."""
+        return self._field_values(field, *self._directed_indices())
+
+    def _field_values(self, field, rows, directions):
         if field not in self.fields:
             raise ValueError(f"'{field}' not in network")
-        values = []
+        values = np.empty(len(rows), dtype=np.float64)
         for direction, suffix in ((1, "_ab"), (-1, "_ba")):
             column = field + suffix if field + suffix in self.links else field
-            data = self.links.loc[self.links.direction != -direction, column]
+            mask = directions == direction
             try:
-                values.append(pd.to_numeric(data, errors="raise").to_numpy(dtype=np.float64))
+                values[mask] = pd.to_numeric(self.links.iloc[rows[mask]][column], errors="raise").to_numpy(
+                    dtype=np.float64
+                )
             except (TypeError, ValueError) as exc:
                 raise ValueError(f"Field {field} must contain numeric values") from exc
-        return np.concatenate(values)
+        return values
+
+    def _prepare(self):
+        return _PreparedNetwork(self)
 
     def validate_mode(self, mode):
         if mode not in self.modes:
@@ -86,7 +103,8 @@ class NetworkData:
                 mask = restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)
                 restrictions = restrictions[mask].copy()
             graph._turn_restrictions = restrictions
-        graph.prepare_graph(centroids)
+        graph._allow_path_uturns = self.allow_uturns
+        graph.prepare_graph(centroids, allow_uturns_everywhere=self.allow_uturns)
         graph.set_blocked_centroid_flows(block_centroid_flows)
         if self.lonlat is not None:
             graph.lonlat_index = self.lonlat.loc[graph.all_nodes]
@@ -95,3 +113,43 @@ class NetworkData:
         graph.set_graph(cost)
         graph.set_skimming(list(skimming or []))
         return graph
+
+
+class _PreparedNetwork:
+    """One execution's attribute snapshot and shared graph cache."""
+
+    def __init__(self, network):
+        self.data = NetworkData(
+            network.links,
+            modes=network.modes,
+            centroids=network.centroids,
+            turn_restrictions=network.turn_restrictions,
+            allow_uturns=network.allow_uturns,
+        )
+        self._rows, self.directions = self.data._directed_indices()
+        self.link_ids = self.data.links.link_id.to_numpy(dtype=np.int64)[self._rows].copy()
+        self._fields = {}
+        self._graphs = {}
+
+    def field_values(self, field):
+        if field not in self._fields:
+            values = self.data._field_values(field, self._rows, self.directions)
+            values.flags.writeable = False
+            self._fields[field] = values
+        return self._fields[field]
+
+    def graph(self, configuration):
+        from aequilibrae.paths.graph import prepare_assignment_graph
+
+        # Turn restrictions and U-turn policy belong to this execution's snapshot.
+        key = (configuration.mode, tuple(configuration.demand.index), configuration.block_centroid_flows)
+        if key not in self._graphs:
+            self._graphs[key] = prepare_assignment_graph(
+                self.data.links,
+                configuration.mode,
+                configuration.demand.index,
+                self.data.turn_restrictions,
+                configuration.block_centroid_flows,
+                self.data.allow_uturns,
+            )
+        return self._graphs[key]

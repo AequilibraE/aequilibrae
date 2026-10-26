@@ -526,7 +526,9 @@ class LinearApproximation(WorkerThread):
                 self.cores,
                 heap=c.results._heap,
                 select_link_od=c.configuration.select_link_od,
-                cost_name=c.configuration.cost if c.configuration.cost in c.graph.skim_fields else None,
+                field_values=c.network.field_values,
+                skim_fields=c.configuration.skimming,
+                cost_name=c.configuration.cost,
             )
             self.inputs[c.configuration.name] = inputs
             for results in (c.results, c._aon_results):
@@ -546,16 +548,13 @@ class LinearApproximation(WorkerThread):
                 )
 
             c.congested_skims = None
-            c.fixed_cost.fill(0)
-            c.fixed_cost[inputs.mapping.graph_ids] = (
-                c.graph.graph[c.configuration.cost].to_numpy() - c.graph.graph[self.time_field].to_numpy()
-            )
+            c.fixed_cost[:] = c.network.field_values(c.configuration.cost) - self.free_flow_tt
             if c.configuration.fixed_cost_field:
-                values = c.graph.graph[c.configuration.fixed_cost_field].to_numpy()
-                c.fixed_cost[inputs.mapping.graph_ids] += (
-                    values * c.configuration.fixed_cost_multiplier / c.configuration.vot
+                c.fixed_cost += (
+                    c.network.field_values(c.configuration.fixed_cost_field)
+                    * c.configuration.fixed_cost_multiplier
+                    / c.configuration.vot
                 )
-                c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
     def execute(self):
         self.__start_time = time.perf_counter()
@@ -655,8 +654,10 @@ class LinearApproximation(WorkerThread):
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["set_text", msg])
 
+        congested_time = self.congested_time.copy()
+        congested_time.flags.writeable = False
         for c in self.traffic_classes:
-            c.congested_time = self.congested_time.copy()
+            c.congested_time = congested_time
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

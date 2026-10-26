@@ -7,7 +7,7 @@ from aequilibrae.paths.vdf import bpr
 @pytest.fixture
 def configuration(sioux_falls_example):
     project = sioux_falls_example
-    demand = project.matrices.get_matrix("demand_omx")
+    demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return {
         "network": project.network.build(modes=["c"]),
         "classes": [

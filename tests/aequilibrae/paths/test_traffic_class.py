@@ -8,7 +8,7 @@ from aequilibrae.paths import TrafficClass
 
 @pytest.fixture
 def tc(sioux_falls_example):
-    matrix = sioux_falls_example.matrices.get_matrix("demand_omx")
+    matrix = sioux_falls_example.matrices.get_matrix("demand_omx", subset=["matrix"])
     return TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix)
 
 

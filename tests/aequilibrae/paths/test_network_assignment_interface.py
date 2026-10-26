@@ -33,7 +33,6 @@ def demand():
     matrix = AequilibraeMatrix(index=[1, 3])
     matrix["demand"] = [[0.0, 10.0], [0.0, 0.0]]
     yield matrix
-    matrix.close()
 
 
 def assignment(network, classes, **kwargs):
@@ -48,24 +47,31 @@ def assignment(network, classes, **kwargs):
     )
 
 
-def test_deferred_graphs_and_repeat_execution(network, demand, monkeypatch):
+def test_deferred_graph_and_repeat_execution(network, demand, monkeypatch):
+    from aequilibrae.paths import Graph, graph
+
     traffic = TrafficClass(mode="c", cost="time", demand=demand, skimming=["time"])
-    build_graph = network.build_graph
+    prepare = graph.prepare_assignment_graph
     calls = []
 
     def build(*args, **kwargs):
         calls.append(args)
-        return build_graph(*args, **kwargs)
+        return prepare(*args, **kwargs)
 
-    monkeypatch.setattr(network, "build_graph", build)
+    def reject_graph(*args, **kwargs):
+        pytest.fail("Assignment must not construct or retain a public Graph")
+
+    monkeypatch.setattr(graph, "prepare_assignment_graph", build)
+    monkeypatch.setattr(Graph, "__init__", reject_graph)
     assig = assignment(network, [traffic])
     assert calls == []
     assert not hasattr(traffic, "graph")
     assert assig.assignment is None
-    assert assig.info()["Classes"]["c"]["network mode"] == "c"
     result = assig.execute(max_iterations=1, rgap=1e-4, cores=1)
     assert len(calls) == 1
-    assert not hasattr(traffic, "graph")
+    state = assig._class_states[0]
+    assert not any(isinstance(value, Graph) for value in vars(state).values())
+    assert not any(isinstance(value, pd.DataFrame) for value in vars(state.graph).values())
     np.testing.assert_allclose(assig.class_results[traffic.name].total_link_loads, [0, 10, 0, 10, 0, 0])
     np.testing.assert_allclose(assig.class_results[traffic.name].skims.matrices["time"][0, 1], 2)
     pd.testing.assert_frame_equal(result, assig.execute(cores=1))
@@ -120,12 +126,12 @@ def test_invalid_configuration_fails_before_execution(network, demand, changes, 
 
 
 def test_demand_centroid_order_and_invalid_nodes(network, demand):
-    demand.index[:] = [3, 1]
+    demand.index = [3, 1]
     traffic = TrafficClass(mode="c", cost="time", demand=demand)
     assig = assignment(network, [traffic])
     assig.execute(cores=1)
-    np.testing.assert_array_equal(assig._class_states[0].graph.centroids, [3, 1])
-    demand.index[:] = [1, 99]
+    np.testing.assert_array_equal(assig._class_states[0].graph.mapping.centroids, [3, 1])
+    demand.index = [1, 99]
     with pytest.raises(ValueError, match="centroids"):
         assignment(network, [traffic])
 
@@ -158,7 +164,7 @@ def test_project_build_and_independent_paths(sioux_falls_example):
 @pytest.mark.parametrize("algorithm", ["msa", "bfw"])
 def test_equilibrium_mapping_and_repeat_execution(sioux_falls_example, algorithm):
     project = sioux_falls_example
-    demand = project.matrices.get_matrix("demand_omx")
+    demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     network = project.network.build(modes=["c"])
     traffic = TrafficClass(
         mode="c",
@@ -204,3 +210,142 @@ def test_results_require_execution(network, demand, method):
     assig = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
     with pytest.raises(RuntimeError, match="Run the assignment"):
         getattr(assig, method)()
+
+
+def test_same_mode_classes_share_graph_but_not_costs(network, demand):
+    from dataclasses import replace
+
+    first = TrafficClass(name="time", mode="c", cost="time", demand=demand, skimming=["time"])
+    second = replace(first, name="cost", cost="cost", skimming=["time", "cost"])
+    assig = assignment(network, [first, second])
+    assig.execute(cores=1)
+    a, b = assig._class_states
+    assert a.graph is b.graph
+    assert a.network is b.network
+    assert a.congested_time is b.congested_time
+    assert not a.congested_time.flags.writeable
+    inputs_a, inputs_b = assig.assignment.inputs["time"], assig.assignment.inputs["cost"]
+    assert np.shares_memory(inputs_a.routing.fs, inputs_b.routing.fs)
+    assert not np.shares_memory(inputs_a.routing.costs, inputs_b.routing.costs)
+    assert not np.shares_memory(inputs_a.time_skim, inputs_b.time_skim)
+    np.testing.assert_allclose(a.results.total_link_loads, [0, 10, 0, 10, 0, 0])
+    np.testing.assert_allclose(b.results.total_link_loads, [0, 0, 0, 0, 0, 10])
+
+
+@pytest.mark.parametrize("changed", ["mode", "centroids", "blocking"])
+def test_graph_sharing_respects_routing_policy(network, demand, changed):
+    from types import SimpleNamespace
+
+    prepared = network._prepare()
+    base = SimpleNamespace(mode="c", demand=demand, block_centroid_flows=True)
+    alternative = SimpleNamespace(**vars(base))
+    if changed == "mode":
+        alternative.mode = "h"
+    elif changed == "centroids":
+        alternative.demand = SimpleNamespace(index=np.array([3, 1]))
+    else:
+        alternative.block_centroid_flows = False
+    assert prepared.graph(base) is not prepared.graph(alternative)
+
+
+@pytest.mark.parametrize("fields", [["time"], ["time", "cost"]])
+@pytest.mark.parametrize("turn_delay", [0.0, 0.5])
+def test_time_skim_is_independent_of_requested_cost_skim(network, demand, fields, turn_delay):
+    network.links["cost"] = [2.0, 2.0, 20.0]
+    if turn_delay:
+        network.turn_restrictions = pd.DataFrame(
+            {
+                "from_node": [1],
+                "via_node": [2],
+                "to_node": [3],
+                "penalty": [turn_delay],
+            }
+        )
+    traffic = TrafficClass(mode="c", cost="cost", demand=demand, skimming=fields)
+    assig = assignment(network, [traffic])
+    assig.execute(cores=1)
+    skims = assig.class_results["c"].skims
+    assert set(skims.matrices) == set(fields)
+    assert skims.matrices["time"][0, 1] == pytest.approx(2.0 + turn_delay)
+    if "cost" in fields:
+        assert skims.matrices["cost"][0, 1] == pytest.approx(4.0 + turn_delay)
+    assert assig.class_results["c"].skims is skims
+    assig.class_results["c"].reset()
+    assert np.isinf(skims.skims).all()
+
+
+def test_numeric_text_time_field_is_normalized(network, demand):
+    network.links["time"] = network.links.time.astype(str)
+    traffic = TrafficClass(mode="c", cost="cost", demand=demand, skimming=["time", "cost"])
+    assig = assignment(network, [traffic])
+    assig.execute(cores=1)
+    assert assig.class_results["c"].skims.matrices["time"][0, 1] == 10.0
+
+
+def test_congested_skims_use_execution_attribute_snapshot(network, demand):
+    traffic = TrafficClass(mode="c", cost="time", demand=demand)
+    assig = assignment(network, [traffic])
+    assig.execute(cores=1)
+    network.links["cost"] = 999.0
+    skims = assig.skim_congested(["cost"], return_matrices=True)["c"]
+    assert skims.matrices["cost"][0, 1] == 4.0
+
+
+def test_selected_od_export_reindexes_class_centroids(network, demand, tmp_path):
+    from types import SimpleNamespace
+    import openmatrix as omx
+
+    matrices = [demand]
+    for index, trips in (([3, 1], 20.0), ([1, 2], 30.0)):
+        matrix = AequilibraeMatrix(index=index)
+        matrix["demand"] = [[0.0, trips], [0.0, 0.0]]
+        matrices.append(matrix)
+    classes = [
+        TrafficClass(name=name, mode="c", cost="time", demand=matrix, select_link_sets={"screen": [1]})
+        for name, matrix in zip(("forward", "reverse", "subset"), matrices, strict=True)
+    ]
+    assig = assignment(network, classes)
+    assig.execute(cores=1)
+    project = SimpleNamespace(matrices=SimpleNamespace(folder=tmp_path, get=lambda *args, **kwargs: None))
+    assig.save_select_link_matrices("selected", project=project)
+    with omx.open_file(str(tmp_path / "selected.omx"), "r") as output:
+        assert output.mapping("main_index") == {1: 0, 2: 1, 3: 2}
+        for name, origin, destination, trips in (
+            ("forward", 0, 2, 10),
+            ("reverse", 2, 0, 20),
+            ("subset", 0, 1, 30),
+        ):
+            expected = np.zeros((3, 3))
+            expected[origin, destination] = trips
+            np.testing.assert_array_equal(output[f"screen_{name}_demand"][:], expected)
+
+
+def test_directional_fields_and_preloads_share_network_order(demand):
+    # Source row order and link IDs differ from routing node order.
+    network = NetworkData(
+        pd.DataFrame(
+            {
+                "link_id": [23, 9],
+                "a_node": [1, 2],
+                "b_node": [2, 3],
+                "direction": [0, 0],
+                "modes": ["c", "c"],
+                "time_ab": [1.0, 2.0],
+                "time_ba": [4.0, 5.0],
+                "capacity_ab": [100.0, 200.0],
+                "capacity_ba": [300.0, 400.0],
+            }
+        )
+    )
+    demand["demand"][1, 0] = 20.0
+    traffic = TrafficClass(mode="c", cost="time", demand=demand, skimming=["time"])
+    preload = pd.DataFrame({"link_id": [23], "direction": [-1], "preload": [5.0]})
+    assig = assignment(network, [traffic], name_mapping={"alpha": 0.0, "beta": 4.0}, preload=preload)
+    results = assig.execute(cores=1)
+    np.testing.assert_allclose(assig.class_results["c"].total_link_loads, [20, 10, 20, 10])
+    assert assig.class_results["c"].skims.matrices["time"][0, 1] == 3.0
+    assert assig.class_results["c"].skims.matrices["time"][1, 0] == 9.0
+    np.testing.assert_allclose(results.loc[[9, 23], "Congested_Time_AB"], [2, 1])
+    np.testing.assert_allclose(results.loc[[9, 23], "Congested_Time_BA"], [5, 4])
+    np.testing.assert_allclose(results.loc[[9, 23], "Preload_BA"], [0, 5])
+    np.testing.assert_allclose(results.loc[[9, 23], "PCE_BA"], [20, 25])

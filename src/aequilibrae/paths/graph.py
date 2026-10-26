@@ -17,15 +17,18 @@ import pandas as pd
 
 from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
+from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+from aequilibrae.paths.routing_context import make_routing_context
 
 if TYPE_CHECKING:
     from aequilibrae.paths import PathResults
+    from aequilibrae.paths.cython.context import GraphContext
 
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class NetworkGraphIndices:
     network_ab_idx: np.ndarray
     network_ba_idx: np.ndarray
@@ -33,16 +36,14 @@ class NetworkGraphIndices:
     graph_ba_idx: np.ndarray
 
 
-def _get_graph_to_network_mapping(lids, direcs):
-    num_uncompressed_links = int(np.unique(lids).shape[0])
-    indexing = np.zeros(int(lids.max()) + 1, np.uint64)
-    indexing[np.unique(lids)[:]] = np.arange(num_uncompressed_links)
-
-    graph_ab_idx = direcs > 0
-    graph_ba_idx = direcs < 0
-    network_ab_idx = indexing[lids[graph_ab_idx]]
-    network_ba_idx = indexing[lids[graph_ba_idx]]
-    return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+def _get_graph_to_network_mapping(link_ids, directions):
+    # Dense link-ID lookup arrays waste memory when external IDs are sparse.
+    _, inverse = np.unique(link_ids, return_inverse=True)
+    ab, ba = directions > 0, directions < 0
+    values = (inverse[ab], inverse[ba], ab, ba)
+    for value in values:
+        value.flags.writeable = False
+    return NetworkGraphIndices(*values)
 
 
 class GraphBase(ABC):  # noqa: B024
@@ -1522,3 +1523,94 @@ class NewTransitGraph:
     @property
     def block_centroid_flows(self) -> bool:
         return False
+
+
+class AssignmentMapping:
+    """Map compact assignment loads to full-network reporting order.
+
+    This is separate from GraphMapping, whose IDs describe only context links.
+    """
+
+    def __init__(self, centroids, link_ids, directions, crosswalk, compact_link_count):
+        self.centroids = np.array(centroids, copy=True)
+        self.link_ids = np.array(link_ids, dtype=np.int64, copy=True)
+        self.directions = np.array(directions, dtype=np.int8, copy=True)
+        self.crosswalk = np.array(crosswalk, dtype=np.int64, copy=True)
+        self.network_indices = _get_graph_to_network_mapping(self.link_ids, self.directions)
+        self.link_count = len(self.link_ids)
+        self.compact_link_count = compact_link_count
+        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact_link_count):
+            raise ValueError("Invalid compact link mapping")
+        for values in (self.centroids, self.link_ids, self.directions, self.crosswalk):
+            values.flags.writeable = False
+
+    def aggregate_costs(self, full_costs: np.ndarray, compact_costs: np.ndarray) -> None:
+        aggregate_link_costs(full_costs, compact_costs, self.crosswalk)
+
+    def project_loads(
+        self, compact: np.ndarray, output: np.ndarray, cores: int = 1, threading_threshold: int = 10000
+    ) -> None:
+        if cores < 1:
+            raise ValueError("cores must be positive")
+        if output.ndim != 2 or compact.ndim != 2:
+            raise ValueError("compact and output must be two-dimensional")
+        if output.shape[0] != self.link_count or compact.shape[0] != self.compact_link_count:
+            raise ValueError("projection link counts must match the assignment context")
+        if output.shape[1] != compact.shape[1]:
+            raise ValueError("projection class counts must match")
+        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact.shape[0]):
+            raise ValueError("crosswalk contains an invalid compact link")
+
+        project_link_loads(output, compact, self.crosswalk, cores, threading_threshold)
+
+    def full_loads(self, compact: np.ndarray) -> np.ndarray:
+        """Make a reporting snapshot in supernetwork order."""
+        output = np.empty((self.link_count, compact.shape[1]), dtype=np.float64)
+        self.project_loads(compact, output)
+        output.flags.writeable = False
+        return output
+
+
+@dataclasses.dataclass(frozen=True)
+class PreparedGraph:
+    """Compact routing arrays and the mapping back to network links."""
+
+    routing: GraphContext
+    mapping: AssignmentMapping
+
+    def selected_links(self, selections):
+        mapping = self.mapping
+        result = {}
+        for name, members in selections.items():
+            indices = set()
+            for link, direction in members:
+                mask = mapping.link_ids == link
+                if direction:
+                    mask &= mapping.directions == direction
+                indices.update(mapping.crosswalk[mask])
+            indices.discard(mapping.compact_link_count)
+            result[name] = np.array(sorted(indices), dtype=np.int64)
+        return result
+
+
+def prepare_assignment_graph(links, mode, centroids, restrictions, block_centroid_flows, allow_uturns):
+    """Use temporary graph tables to prepare shared compact assignment arrays."""
+    graph = GraphBase()
+    graph.network = links[["link_id", "a_node", "b_node", "direction"]].copy()
+    forbidden = ~links.modes.fillna("").astype(str).str.contains(mode, regex=False)
+    graph.network.loc[forbidden, "b_node"] = graph.network.loc[forbidden, "a_node"]
+    graph.block_centroid_flows = block_centroid_flows
+    graph._allow_path_uturns = allow_uturns
+    if restrictions is not None:
+        if "modes" in restrictions:
+            restrictions = restrictions[restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)]
+        graph._turn_restrictions = restrictions.copy()
+        graph._turn_restrictions["penalty"] = restrictions.penalty.apply(graph._normalise_turn_penalty)
+    graph.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)
+    links = graph.graph.sort_values("__supernet_id__")
+    mapping = AssignmentMapping(
+        graph.centroids, links.link_id, links.direction, links.__compressed_id__, graph.compact_num_links
+    )
+    costs = np.zeros(graph.compact_num_links, dtype=np.float64)
+    costs.flags.writeable = False
+    return PreparedGraph(make_routing_context(graph, costs, compact=True), mapping)

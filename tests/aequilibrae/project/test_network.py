@@ -65,38 +65,34 @@ def test_build_without_polygons(sioux_falls_test):
     assert list(g.centroids) == list(range(1, 25))
 
 
-def test_build_graphs_applies_project_uturn_setting_without_turns(sioux_falls_example):
+def test_build_applies_project_uturn_setting_without_turns(sioux_falls_example):
     assert len(sioux_falls_example.network.turn_restrictions) == 0
     sioux_falls_example.about.update(infoname="allow_uturns", infovalue=1)
 
-    sioux_falls_example.network.build_graphs(modes=["c"])
-
-    graph = sioux_falls_example.network.graphs["c"]
+    graph = sioux_falls_example.network.build(modes=["c"]).build_graph("c", "distance")
     assert graph.allow_uturns_everywhere
     assert graph.allow_path_uturns
     assert not graph.has_turn_restrictions
 
 
-def test_build_graphs_filters_turns_by_mode(sioux_falls_example):
+def test_build_filters_turns_by_mode(sioux_falls_example):
     network = sioux_falls_example.network
     kept = network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="w")
 
-    network.build_graphs(modes=["c"])
+    graph = network.build(modes=["c"]).build_graph("c", "distance")
 
-    assert network.graphs["c"]._turn_restrictions.restriction_id.tolist() == [kept]
+    assert graph._turn_restrictions.restriction_id.tolist() == [kept]
 
 
-def test_build_graphs_filters_turns_by_area(sioux_falls_example):
+def test_build_filters_turns_by_area(sioux_falls_example):
     network = sioux_falls_example.network
     kept = network.turn_restrictions.insert(from_node=5, via_node=9, to_node=10, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="c")
     network.turn_restrictions.insert(from_node=4, via_node=5, to_node=9, penalty=9.0, modes="c")
     polygon = Polygon(((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50)))
 
-    network.build_graphs(modes=["c"], limit_to_area=polygon)
-
-    graph = network.graphs["c"]
+    graph = network.build(modes=["c"], limit_to_area=polygon).build_graph("c", "distance")
     assert graph._turn_restrictions.restriction_id.tolist() == [kept]
     assert 1 not in graph.all_nodes
     # All three nodes remain, but the incoming leg 4 -> 5 is outside the selection.
@@ -105,9 +101,9 @@ def test_build_graphs_filters_turns_by_area(sioux_falls_example):
     assert not incoming.any()
 
 
-def test_build_graphs_rejects_nonexistent_directed_turn_leg(sioux_falls_example):
+def test_build_rejects_nonexistent_directed_turn_leg(sioux_falls_example):
     network = sioux_falls_example.network
     network.turn_restrictions.insert(from_node=1, via_node=4, to_node=5, penalty=5.0, modes="c")
 
     with pytest.raises(ValueError, match="missing directed legs from_node -> via_node"):
-        network.build_graphs(modes=["c"])
+        network.build(modes=["c"]).build_graph("c", "distance")

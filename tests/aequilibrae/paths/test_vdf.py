@@ -29,7 +29,7 @@ def project(sioux_falls_example):
 
 @pytest.fixture
 def make_assignment(project):
-    demand = project.matrices.get_matrix("demand_omx")
+    demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand)
     network = project.network.build(modes=["c"])
 

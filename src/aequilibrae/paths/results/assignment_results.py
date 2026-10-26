@@ -5,7 +5,6 @@ import pandas as pd
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.graph import _get_graph_to_network_mapping
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
 from aequilibrae.utils.core_setter import resolve_threading_threshold
 
@@ -83,7 +82,7 @@ class AssignmentResults(AssignmentResultsBase):
 
     @property
     def skims(self):
-        return self.output.skimming
+        return self.state.skims
 
     @property
     def select_link_od(self):
@@ -104,8 +103,7 @@ class AssignmentResults(AssignmentResultsBase):
         return self.output.unassigned_demand
 
     def reset(self):
-        self.output.reset()
-        self.state.update_totals()
+        self.state.reset()
 
     def set_heap(self, heap):
         if heap not in available_heaps():
@@ -117,13 +115,12 @@ class AssignmentResults(AssignmentResultsBase):
         return available_heaps()
 
     def get_graph_to_network_mapping(self):
-        mapping = self.state.mapping
-        return _get_graph_to_network_mapping(mapping.link_ids, mapping.directions)
+        return self.state.mapping.network_indices
 
     def _load_frame(self, compact, prefix=""):
         mapping = self.state.mapping
         network = self.get_graph_to_network_mapping()
-        loads = mapping.full_loads(compact)[mapping.graph_ids]
+        loads = mapping.full_loads(compact)
         link_ids = np.unique(mapping.link_ids)
         columns = {}
         for index, name in enumerate(self.classes["names"]):

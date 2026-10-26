@@ -10,7 +10,7 @@ from aequilibrae.paths.vdf import bpr
 @pytest.mark.parametrize("heap", available_heaps())
 def test_assignment_accepts_available_heaps(sioux_falls_single_class, heap):
     project = sioux_falls_single_class
-    matrix = project.matrices.get_matrix("demand_omx")
+    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix, heap=heap)
     assignment = TrafficAssignment(
         network=project.network.build(modes=["c"]),
@@ -25,4 +25,3 @@ def test_assignment_accepts_available_heaps(sioux_falls_single_class, heap):
     assert not hasattr(assignment, "set_save_path_files")
     with pytest.raises(TypeError):
         assignment.execute(save_path_files=True)
-    matrix.close()

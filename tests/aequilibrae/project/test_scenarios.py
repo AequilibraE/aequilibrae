@@ -43,7 +43,6 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     )
     assignment.execute(max_iterations=5, cores=1)
     assert len(assignment.class_results["car"].total_link_loads) > 0
-    mat.close()
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])

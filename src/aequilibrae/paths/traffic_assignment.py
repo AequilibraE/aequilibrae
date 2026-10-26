@@ -125,8 +125,9 @@ class TrafficAssignment(AssignmentBase):
     """Traffic assignment class.
 
     The constructor validates the network fields, modes, demand, and VDF parameters.
-    ``execute()`` prepares one graph for each traffic class and returns link results.
-    Class configurations remain independent of these graphs.
+    ``execute()`` prepares compact routing contexts and returns link results.
+    Classes with matching routing policies share graph and reporting mappings.
+    Each class owns its costs, demand, skims, and output buffers.
 
     .. code-block:: python
 
@@ -329,16 +330,11 @@ class TrafficAssignment(AssignmentBase):
         self.bfw_conjugacy = bfw_conjugacy
         self.steps_below_needed_to_terminate = steps_below_needed_to_terminate
         self.cores = resolve_cores(self.parameters["system"]) if cores is None else clamp_cores(cores)
+        network = self.network._prepare()
+        self._prepared_network = network
         states = []
         for cls in self.classes:
-            graph = self.network.build_graph(
-                cls.mode,
-                cls.cost,
-                centroids=cls.demand.index,
-                skimming=cls.skimming,
-                block_centroid_flows=cls.block_centroid_flows,
-            )
-            state = PreparedTrafficClass(cls, graph)
+            state = PreparedTrafficClass(cls, network)
             for results in (state.results, state._aon_results):
                 results.set_cores(self.cores, threading_threshold, elementwise_cores)
             states.append(state)
@@ -346,12 +342,12 @@ class TrafficAssignment(AssignmentBase):
         first = states[0]
         self.elementwise_cores = first.results.elementwise_cores
         self.threading_threshold = first.results.threading_threshold
-        self.free_flow_tt = self._graph_field(self.time_field)
-        self.capacity = self._graph_field(self.capacity_field)
+        self.free_flow_tt = self._network_field(self.time_field)
+        self.capacity = self._network_field(self.capacity_field)
         self.total_flow = np.zeros_like(self.free_flow_tt)
         self.congested_time = self.free_flow_tt.copy()
         self.vdf_parameters = {
-            name: self._graph_field(value) if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
+            name: self._network_field(value) if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
             for name, value in self._vdf_sources.items()
         }
         self.assignment = LinearApproximation(self, self.algorithm, project=self.project)
@@ -367,18 +363,18 @@ class TrafficAssignment(AssignmentBase):
         self.total_flow = self.assignment.total_flow.copy()
         return self.results()
 
-    def _graph_field(self, field):
-        graph = self._class_states[0].graph
-        values = np.empty(graph.num_links, dtype=np.float64)
-        values[graph.graph.__supernet_id__] = graph.graph[field].to_numpy(dtype=np.float64)
-        return values
+    def _network_field(self, field):
+        # VDF callables receive writable memoryviews. Keep their buffers separate
+        # from the immutable attributes shared by class routing inputs.
+        return self._prepared_network.field_values(field).copy()
 
     def _prepare_preload(self):
         if self.preload is None:
             return None
         if not isinstance(self.preload, pd.DataFrame):
             return self.preload.copy()
-        directed = self._class_states[0].graph.graph.sort_values("__supernet_id__")[["link_id", "direction"]]
+        network = self._prepared_network
+        directed = pd.DataFrame({"link_id": network.link_ids, "direction": network.directions})
         return directed.merge(self.preload, on=["link_id", "direction"], how="left")["preload"].fillna(0).to_numpy()
 
     def _validate_vdf_arrays(self, vdf_link_attributes):
@@ -473,17 +469,16 @@ class TrafficAssignment(AssignmentBase):
 
         if self.assignment is None:
             raise RuntimeError("Run the assignment before requesting its results")
-        idx = self._class_states[0].graph.graph.__supernet_id__
         assig_results = [cls.results.get_load_results() for cls in self._class_states]
 
         class1 = self._class_states[0]
         res1 = assig_results[0]
 
-        tot_flow = self.assignment.total_flow[idx]
+        tot_flow = self.assignment.total_flow
         capacity = self.capacity
-        voc = tot_flow / capacity[idx]
-        congested_time = self.congested_time[idx]
-        free_flow_tt = self.free_flow_tt[idx]
+        voc = tot_flow / capacity
+        congested_time = self.congested_time
+        free_flow_tt = self.free_flow_tt
         if self.assignment.preload is None:
             preload = np.full(len(tot_flow), np.nan)
         else:
@@ -648,7 +643,7 @@ class TrafficAssignment(AssignmentBase):
                 output_matrices.update({f"{core}_final": values for core, values in last_skims.items()})
             if which_ones in ["blended", "all"]:
                 output_matrices.update({f"{core}_blended": values for core, values in avg_skims.items()})
-            out_skims = AequilibraeMatrix(index=cls.graph.centroids)
+            out_skims = AequilibraeMatrix(index=cls.graph.mapping.centroids)
             out_skims.update(output_matrices)
             description = f"Skimming for assignment procedure. Class {cls.configuration.name}"
             out_skims.metadata["description"] = description
@@ -736,20 +731,28 @@ class TrafficAssignment(AssignmentBase):
         if mats.get(matrix_name, default=False):
             raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
+        selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
+        if not selected_classes:
+            return
+        centroids = np.unique(np.concatenate([cls.graph.mapping.centroids for cls in selected_classes]))
         matrices = {}
-        for cls in self._class_states:
-            selected = cls.results.select_link_od
-            if selected is None:
-                continue
-            for name, values in selected.matrices.items():
+        for cls in selected_classes:
+            source_centroids = cls.graph.mapping.centroids
+            positions = np.searchsorted(centroids, source_centroids)
+            for name, values in cls.results.select_link_od.matrices.items():
                 for column, class_name in enumerate(cls.results.classes["names"]):
                     key = f"{name}_{cls.configuration.name}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    matrices[key] = values[:, :, column]
+                    if np.array_equal(source_centroids, centroids):
+                        matrices[key] = values[:, :, column]
+                    else:
+                        matrix = np.zeros((len(centroids), len(centroids)), dtype=np.float64)
+                        matrix[np.ix_(positions, positions)] = values[:, :, column]
+                        matrices[key] = matrix
         if not matrices:
             return
-        out_skims = AequilibraeMatrix(index=self._class_states[0].graph.centroids)
+        out_skims = AequilibraeMatrix(index=centroids)
         out_skims.update(matrices)
         out_skims.metadata["description"] = f"Select link matrix from procedure ID {self.procedure_id}_sl."
         out_skims.save_as_omx(export_name)
