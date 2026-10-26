@@ -405,7 +405,7 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
     project.matrices.update_database()
 
     skims = project.matrices.get_matrix("new_skims_cars")
-    selected = project.matrices.get_matrix("new_selected_omx")
+    selected = project.matrices.get_matrix("new_selected_omx", sparse=True)
     try:
         for name, values in traffic.results.skims.matrices.items():
             np.testing.assert_array_equal(skims[f"{name}_blended"], values)
