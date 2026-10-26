@@ -87,11 +87,8 @@ with project.db_connection as conn:
 # %%
 # Let's perform a traffic assignment in this scenario with lowered capacity
 
-# Build the network graph
+# Load the network snapshot
 network = project.network.build(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
-graph = network.build_graph(mode="c", cost="distance")
-graph.set_graph("distance")
-graph.set_blocked_centroid_flows(False)
 
 # Get the demand matrix
 mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])

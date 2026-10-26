@@ -78,7 +78,6 @@ if centroid_count == 0:
 
 # %%
 # We set the graph for computation
-graph.set_graph("distance")
 graph.set_skimming("distance")
 
 # %%

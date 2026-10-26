@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
@@ -80,4 +81,26 @@ def test_info_and_execution_options(configuration):
     assert assignment.info()["Maximum iterations"] == 3
     assert assignment.info()["Target RGap"] == 1e-3
     assert assignment.cores == 1
-    assert set(assignment.algorithms_available()) == {"all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"}
+    assert set(assignment.algorithms_available()) == {"all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"}
+
+
+@pytest.mark.parametrize("algorithm", ["fw", "FW", "frank-wolfe"])
+def test_frank_wolfe_alias(configuration, algorithm):
+    assignment = TrafficAssignment(**(configuration | {"algorithm": algorithm}))
+    assignment.execute(max_iterations=2, cores=1)
+    assert assignment.algorithm == assignment.assignment.algorithm == "frank-wolfe"
+
+
+def test_vdf_defaults_do_not_depend_on_matching_network_fields(configuration):
+    network = configuration["network"]
+    network.links["alpha"] = 0.8
+    network.links["beta"] = 2.0
+    assignment = TrafficAssignment(**(configuration | {"name_mapping": None}))
+    assignment.execute(max_iterations=1, cores=1)
+    np.testing.assert_array_equal(assignment.vdf_parameters["alpha"], 0.15)
+    np.testing.assert_array_equal(assignment.vdf_parameters["beta"], 4.0)
+
+    mapped = TrafficAssignment(**(configuration | {"name_mapping": {"alpha": "alpha", "beta": "beta"}}))
+    mapped.execute(max_iterations=1, cores=1)
+    np.testing.assert_array_equal(mapped.vdf_parameters["alpha"], 0.8)
+    np.testing.assert_array_equal(mapped.vdf_parameters["beta"], 2.0)

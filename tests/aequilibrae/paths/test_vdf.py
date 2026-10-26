@@ -50,8 +50,10 @@ def make_assignment(project):
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
-        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        ("inrets", {"alpha": "b"}),
+        ("inrets", {"alpha": 0.15}),
         ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
         ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
         ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
@@ -64,15 +66,16 @@ def test_assignment_vdf_parameters(
 ):
     function, derivative = FUNCTION_MAP[vdf_name]
     vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
-    make_assignment(vdf, {name: value for name, value in name_mapping.items() if name in vdf.spec})
+    make_assignment(vdf, name_mapping)
 
 
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": -1, "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
-        *[(k, {"alpha": -1, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": -1, "beta": "power"}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        *[(k, {"alpha": -1, "beta": 4.0}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
         ("akcelik", {"alpha": -1, "tau": "power", "length": "distance"}),
+        ("inrets", {"alpha": -1}),
         ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
@@ -84,7 +87,7 @@ def test_check_bounds_of_vdfs_inclusive(
     function, derivative = FUNCTION_MAP[vdf_name]
     vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
     with pytest.raises(ValueError, match="At least one alpha is less than 0.0"):
-        make_assignment(vdf, {name: value for name, value in name_mapping.items() if name in vdf.spec})
+        make_assignment(vdf, name_mapping)
 
 
 def test_check_bounds_of_vdfs_exclusive(

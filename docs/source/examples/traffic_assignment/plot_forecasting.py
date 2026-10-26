@@ -62,9 +62,6 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 network = project.network.build()
 
-
-# Sioux Falls requires paths through centroids because every node is a centroid.
-
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
@@ -84,17 +81,11 @@ assigclass = TrafficClass(
     cost="free_flow_time",
     demand=demand,
     skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
     block_centroid_flows=False,
 )
 
-
-# Setting the volume delay function and its parameters
-
-
-# The free flow travel times as they exist in the graph
-
-
-# we then execute the assignment
+# Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     classes=[assigclass],
@@ -317,14 +308,9 @@ assigclass = TrafficClass(
     cost="free_flow_time",
     demand=demand,
     skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
     block_centroid_flows=False,
 )
-
-
-# Set the volume delay function and its parameters
-
-# Set the capacity and free flow travel times as they exist in the graph
-
 
 # %%
 # Now we select two sets of links to execute select link analysis.
@@ -352,7 +338,7 @@ select_links = {
 # We call this command on the class we are analyzing with our dictionary of values
 assigclass = replace(assigclass, select_link_sets=select_links)
 
-# we then execute the assignment
+# Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     classes=[assigclass],

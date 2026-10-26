@@ -64,9 +64,6 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
 
 network = project.network.build()
 
-
-# Sioux Falls requires paths through centroids because every node is a centroid.
-
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
@@ -86,9 +83,9 @@ assigclass = TrafficClass(
     cost="free_flow_time",
     demand=demand,
     skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
     block_centroid_flows=False,
 )
-
 
 from aequilibrae.paths.cython.vdf_core import (
     akcelik,
@@ -109,8 +106,7 @@ bpr_spec = {
 }
 vdf = VDF("bpr_example", bpr, bpr_spec, delta_bpr)
 
-
-# we then execute the assignment
+# Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     classes=[assigclass],
@@ -148,7 +144,6 @@ from math import floor, log10
 
 import matplotlib.pyplot as plt
 
-
 # %%
 def plot_tlfd(demand, skim, name):
     plt.clf()
@@ -166,7 +161,6 @@ def plot_tlfd(demand, skim, name):
     plt.ylabel("Probability")
     plt.title(f"Trip-length frequency distribution for {name}")
     return plt
-
 
 # %%
 # Calibration
@@ -337,17 +331,15 @@ assigclass = TrafficClass(
     cost="free_flow_time",
     demand=demand,
     skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
     block_centroid_flows=False,
 )
-
 
 def quadratic(congested_time, link_flows, fftime, capacity, cores, a, b):
     congested_time[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
 
-
 def quadratic_derivative(delta, link_flows, fftime, capacity, cores, a, b):
     delta[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
-
 
 vdf = VDF(
     "quadratic",
@@ -355,7 +347,6 @@ vdf = VDF(
     {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
     quadratic_derivative,
 )
-
 
 # %%
 # Now we select two sets of links to execute select link analysis.
@@ -383,7 +374,7 @@ select_links = {
 # We call this command on the class we are analyzing with our dictionary of values
 assigclass = replace(assigclass, select_link_sets=select_links)
 
-# we then execute the assignment
+# Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     classes=[assigclass],

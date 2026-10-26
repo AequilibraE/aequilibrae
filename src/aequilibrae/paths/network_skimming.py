@@ -27,7 +27,6 @@ class NetworkSkimming(WorkerThread):
         >>> network = project.network.build(modes=["c"])
 
         >>> graph = network.build_graph(mode='c', cost="distance")
-        >>> graph.set_graph("distance")
         >>> graph.set_skimming("distance")
 
         >>> skm = NetworkSkimming(graph)

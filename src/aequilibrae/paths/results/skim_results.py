@@ -18,10 +18,9 @@ class SkimResults:
           >>> network = project.network.build()
 
           # Mode c is car in this project
-          >>> car_graph = network.build_graph(mode='c', cost="distance")
+          >>> car_graph = network.build_graph(mode='c', cost="free_flow_time")
 
           # minimize travel time
-          >>> car_graph.set_graph('free_flow_time')
 
           # Skims travel time and distance
           >>> car_graph.set_skimming(['free_flow_time', 'distance'])

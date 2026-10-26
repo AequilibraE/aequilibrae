@@ -1593,20 +1593,29 @@ class PreparedGraph:
         return result
 
 
-def prepare_assignment_graph(links, mode, centroids, restrictions, block_centroid_flows, allow_uturns):
-    """Use temporary graph tables to prepare shared compact assignment arrays."""
-    graph = GraphBase()
-    graph.network = links[["link_id", "a_node", "b_node", "direction"]].copy()
-    forbidden = ~links.modes.fillna("").astype(str).str.contains(mode, regex=False)
+def _prepare_network_graph(graph, mode, centroids, restrictions, block_centroid_flows, allow_uturns):
+    """Apply network routing policy before preparing full and compact topology."""
+    graph.mode = mode
+    forbidden = ~graph.network.modes.fillna("").astype(str).str.contains(mode, regex=False)
     graph.network.loc[forbidden, "b_node"] = graph.network.loc[forbidden, "a_node"]
     graph.block_centroid_flows = block_centroid_flows
     graph._allow_path_uturns = allow_uturns
     if restrictions is not None:
+        required = {"from_node", "via_node", "to_node", "penalty"}
+        if missing := required - set(restrictions.columns):
+            raise ValueError(f"Turn restrictions DataFrame missing required columns: {missing}")
         if "modes" in restrictions:
             restrictions = restrictions[restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)]
         graph._turn_restrictions = restrictions.copy()
         graph._turn_restrictions["penalty"] = restrictions.penalty.apply(graph._normalise_turn_penalty)
     graph.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)
+
+
+def prepare_assignment_graph(links, mode, centroids, restrictions, block_centroid_flows, allow_uturns):
+    """Use temporary graph tables to prepare shared compact assignment arrays."""
+    graph = GraphBase()
+    graph.network = links[["link_id", "a_node", "b_node", "direction", "modes"]].copy()
+    _prepare_network_graph(graph, mode, centroids, restrictions, block_centroid_flows, allow_uturns)
     links = graph.graph.sort_values("__supernet_id__")
     mapping = AssignmentMapping(
         graph.centroids, links.link_id, links.direction, links.__compressed_id__, graph.compact_num_links

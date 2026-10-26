@@ -62,20 +62,17 @@ basic_config()
 import numpy as np
 
 # %%
-# Let's build all graphs
+# Load the network snapshot
 network = project.network.build()
 # We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars
+# Build the car graph with distance as the cost field.
 graph = network.build_graph(mode="c", cost="distance")
 
-# we also see what graphs are available
+# Available network modes:
 network.modes
-
-# let's say we want to minimize the distance
-graph.set_graph("distance")
 
 # And will skim distance while we are at it, other fields like ``free_flow_time`` or ``travel_time`` 
 # can be added here as well

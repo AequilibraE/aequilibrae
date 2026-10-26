@@ -34,13 +34,12 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# We build all graphs and get the car graph.
+# Load the network snapshot and get the car graph.
 network = project.network.build()
 graph = network.build_graph(mode="c", cost="distance")
 
 # %%
 # We set the cost field and disable centroid-flow blocking for this demonstration.
-graph.set_graph("distance")
 graph.set_blocked_centroid_flows(False)
 
 # %%

@@ -79,7 +79,7 @@ def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
     )
 
 
-def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, cores=1, iterations=8, **options):
+def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, **options):
     links = graph.network.assign(modes="c")
     network = NetworkData(links, centroids=graph.centroids, turn_restrictions=graph._turn_restrictions)
     traffic = TrafficClass(
@@ -102,7 +102,6 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, core
         name_mapping={"alpha": 0.15, "beta": 1.0},
         algorithm=algorithm,
     )
-    # The caller supplies execution options at the execution boundary.
     return assignment, traffic
 
 
@@ -110,7 +109,7 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, core
 @pytest.mark.parametrize("turn", [False, True])
 def test_assignment_uses_selected_heap(heap, turn):
     assignment, traffic = assignment_for(diamond(turn), heap=heap)
-    assignment.execute(cores=1)
+    assignment.execute(max_iterations=8, rgap=0.0, cores=1, elementwise_cores=1)
     assert assignment.class_results[traffic.name].get_heaps() == available_heaps()
     assert assignment.class_results[traffic.name]._heap == assignment._class_states[0]._aon_results._heap == heap
     assert assignment.class_results[traffic.name].get_load_results().loc[71, "work_ab"] == 8.0
@@ -120,7 +119,7 @@ def test_assignment_uses_selected_heap(heap, turn):
 @pytest.mark.parametrize("cores", [1, 2])
 def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
     graph = diamond(turn)
-    assignment, traffic = assignment_for(graph, cores=cores)
+    assignment, traffic = assignment_for(graph)
     original = {name: values.copy() for name, values in traffic.demand.items()}
     graph_costs = graph.compact_cost.copy()
     graph_skims = graph.compact_skims.copy()
@@ -154,7 +153,7 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
 
 @pytest.mark.parametrize("algorithm", ["msa", "frank-wolfe", "cfw", "bfw"])
 def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
-    assignment, traffic = assignment_for(diamond(True), algorithm=algorithm, iterations=12)
+    assignment, traffic = assignment_for(diamond(True), algorithm=algorithm)
     assignment.execute(max_iterations=12, rgap=0.0, cores=1, elementwise_cores=1)
     results = assignment.class_results[traffic.name]
     upper = results.get_load_results().loc[71, "work_tot"] + results.get_load_results().loc[71, "other_tot"]
@@ -214,7 +213,7 @@ def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(c
     matrix["other"][3, 0] = 7.0
     matrix["work"][3, 3] = 100.0
     matrix["other"][3, 3] = 200.0
-    assignment, traffic = assignment_for(graph, matrix, cores=cores)
+    assignment, traffic = assignment_for(graph, matrix)
     assignment.execute(max_iterations=8, rgap=0.0, cores=cores, elementwise_cores=1)
     assert assignment.class_results[traffic.name].unassigned_demand == 10.0
     assert assignment._class_states[0]._aon_results.unassigned_demand == 10.0
@@ -384,7 +383,7 @@ def test_translation_preserves_existing_centroid_blocking_branch(turn):
 
 
 def test_core_settings_can_change_after_algorithm_selection():
-    assignment, traffic = assignment_for(diamond(), cores=1)
+    assignment, traffic = assignment_for(diamond())
     assignment.execute(max_iterations=8, rgap=0.0, cores=2, elementwise_cores=2, threading_threshold=-1)
     optimizer = assignment.assignment
     assert optimizer.cores == optimizer.elementwise_cores == 2
@@ -436,8 +435,8 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
 
 def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields():
     graph = diamond(True)
-    assignment, traffic = assignment_for(graph, algorithm="msa", iterations=4)
-    assignment.execute(max_iterations=8, rgap=0.0, cores=1, elementwise_cores=1)
+    assignment, traffic = assignment_for(graph, algorithm="msa")
+    assignment.execute(max_iterations=4, rgap=0.0, cores=1, elementwise_cores=1)
     original_fields = graph.skim_fields.copy()
     original_skims = assignment._class_states[0]._aon_results.skims
     original_values = original_skims.skims.copy()

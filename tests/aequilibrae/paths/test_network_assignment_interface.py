@@ -349,3 +349,28 @@ def test_directional_fields_and_preloads_share_network_order(demand):
     np.testing.assert_allclose(results.loc[[9, 23], "Congested_Time_BA"], [5, 4])
     np.testing.assert_allclose(results.loc[[9, 23], "Preload_BA"], [0, 5])
     np.testing.assert_allclose(results.loc[[9, 23], "PCE_BA"], [20, 25])
+
+
+@pytest.mark.parametrize("blocking", [False, True])
+@pytest.mark.parametrize("penalty", [0.5, None])
+def test_public_and_assignment_graphs_share_routing_policy(network, demand, blocking, penalty):
+    network.turn_restrictions = pd.DataFrame(
+        {"from_node": [1], "via_node": [2], "to_node": [3], "penalty": [penalty], "modes": ["c"]}
+    )
+    traffic = TrafficClass(mode="c", cost="time", demand=demand, block_centroid_flows=blocking)
+    public = network.build_graph("c", "time", block_centroid_flows=blocking)
+    assig = assignment(network, [traffic])
+    assig.execute(cores=1)
+    path = public.compute_path(1, 3)
+    expected = np.zeros(len(network.field_values("time")))
+    mapping = assig.class_results["c"].state.mapping
+    for link, direction in zip(path.path, path.path_link_directions, strict=True):
+        expected[(mapping.link_ids == link) & (mapping.directions == direction)] = 10.0
+    np.testing.assert_array_equal(assig.class_results["c"].total_link_loads, expected)
+
+
+def test_network_mutation_is_revalidated_before_execution(network, demand):
+    assig = assignment(network, [TrafficClass(mode="c", cost="time", demand=demand)])
+    network.links["capacity"] = 0.0
+    with pytest.raises(ValueError, match="positive finite"):
+        assig.execute(cores=1)

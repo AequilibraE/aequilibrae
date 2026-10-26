@@ -43,3 +43,25 @@ def test_copies_skims_and_selections(tc):
 def test_old_class_constructor_is_removed(tc):
     with pytest.raises(TypeError):
         TrafficClass("car", None, tc.demand)
+
+
+def test_rejects_demand_with_wrong_type(tc):
+    core = next(iter(tc.demand))
+    tc.demand[core] = tc.demand[core].astype(np.int32)
+    with pytest.raises(TypeError, match="float64"):
+        replace(tc)
+
+
+def test_fixed_cost_configuration(tc):
+    assert tc.fixed_cost_multiplier == 1.0
+    configured = replace(tc, fixed_cost_field="distance", fixed_cost_multiplier=3.0)
+    assert configured.fixed_cost_field == "distance"
+    assert configured.fixed_cost_multiplier == 3.0
+    assert tc.fixed_cost_field is None
+    assert tc.fixed_cost_multiplier == 1.0
+
+
+@pytest.mark.parametrize("value", [-1, np.nan, np.inf, -np.inf, True, False, "not a number"])
+def test_rejects_invalid_fixed_cost_multiplier(tc, value):
+    with pytest.raises(ValueError, match="nonnegative and finite"):
+        replace(tc, fixed_cost_multiplier=value)

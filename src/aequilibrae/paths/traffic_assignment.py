@@ -3,6 +3,7 @@ import logging
 import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
+from functools import cache
 from os import path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
@@ -152,7 +153,7 @@ class TrafficAssignment(AssignmentBase):
 
     """
 
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
     all_bfw_conjugacies = ["approximate", "exact"]
 
     def __init__(
@@ -171,7 +172,7 @@ class TrafficAssignment(AssignmentBase):
         """Validate a complete assignment configuration without preparing graphs.
 
         ``name_mapping`` maps VDF parameter names to network fields or constants.
-        Without a mapping, matching network fields or VDF defaults supply values.
+        Without a mapping, VDF defaults supply values.
         Preload arrays use directed links in ascending link-ID and direction order.
         """
         super().__init__(project=project)
@@ -191,13 +192,13 @@ class TrafficAssignment(AssignmentBase):
         self.time_field = time_field
         self.capacity_field = capacity_field
         self.vdf = vdf
-        self.algorithm = algorithm.lower()
+        self.algorithm = "frank-wolfe" if algorithm.lower() == "fw" else algorithm.lower()
         self._vdf_sources = dict(name_mapping or {})
         if self._vdf_sources.keys() - vdf.spec.keys():
             raise ValueError("name_mapping contains unknown VDF parameters")
         for name, settings in vdf.spec.items():
             if name not in self._vdf_sources:
-                self._vdf_sources[name] = name if name in network.fields else settings.get("fill_NA")
+                self._vdf_sources[name] = settings.get("fill_NA")
         self.preload = (
             None
             if preload is None
@@ -231,10 +232,15 @@ class TrafficAssignment(AssignmentBase):
     def get_skim_results(self):
         return {name: results.skims for name, results in self.class_results.items()}
 
-    def _validate_network_configuration(self):
-        network = self.network
+    def _validate_network_configuration(self, prepared=None):
+        network = self.network if prepared is None else prepared.data
+        if prepared is None:
+            rows, directions = network._directed_indices()
+            field_values = cache(lambda field: network._field_values(field, rows, directions))
+        else:
+            field_values = prepared.field_values
         for field in (self.time_field, self.capacity_field):
-            values = network.field_values(field)
+            values = field_values(field)
             if not np.isfinite(values).all() or np.any(values <= 0):
                 raise ValueError(f"Field {field} must contain positive finite values")
         for cls in self.classes:
@@ -242,11 +248,11 @@ class TrafficAssignment(AssignmentBase):
             network.validate_centroids(cls.demand.index)
             validate_assignment_demand(cls.demand, cls.demand.index)
             for field in [cls.cost, *cls.skimming]:
-                values = network.field_values(field)
+                values = field_values(field)
                 if not np.isfinite(values).all() or np.any(values < 0):
                     raise ValueError(f"Field {field} must contain nonnegative finite values")
             if cls.fixed_cost_field:
-                values = network.field_values(cls.fixed_cost_field)
+                values = field_values(cls.fixed_cost_field)
                 if not np.isfinite(values).all() or np.any(values < 0):
                     raise ValueError("Fixed costs must be nonnegative and finite")
             for members in cls.select_link_sets.values():
@@ -265,12 +271,11 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"{name} should exist in the set of parameters provided")
             if not isinstance(value, str) and np.ndim(value) != 0:
                 raise ValueError(f"VDF parameter {name} requires a field name or numeric constant")
-            arrays[name] = network.field_values(value) if isinstance(value, str) else np.array([value], dtype=float)
+            arrays[name] = field_values(value) if isinstance(value, str) else np.array([value], dtype=float)
         self._validate_vdf_arrays(arrays)
-        self._validate_network_preload()
+        self._validate_network_preload(network)
 
-    def _validate_network_preload(self):
-        network = self.network
+    def _validate_network_preload(self, network):
         preload = self.preload
         if preload is not None:
             if isinstance(preload, pd.DataFrame):
@@ -324,13 +329,13 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("steps_below_needed_to_terminate must be a positive integer")
         if isinstance(cores, bool):
             raise ValueError("cores must be an integer")
-        self._validate_network_configuration()
+        network = self.network._prepare()
+        self._validate_network_configuration(network)
         self.max_iter = max_iterations
         self.rgap_target = float(rgap)
         self.bfw_conjugacy = bfw_conjugacy
         self.steps_below_needed_to_terminate = steps_below_needed_to_terminate
         self.cores = resolve_cores(self.parameters["system"]) if cores is None else clamp_cores(cores)
-        network = self.network._prepare()
         self._prepared_network = network
         states = []
         for cls in self.classes:

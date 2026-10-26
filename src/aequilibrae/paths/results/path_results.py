@@ -24,7 +24,6 @@ class PathResults:
         >>> project = create_example(project_path)
         >>> network = project.network.build()
         >>> graph = network.build_graph(mode='c', cost="distance")
-        >>> graph.set_graph('distance')
         >>> graph.set_skimming(['distance', 'free_flow_time'])
         >>> res = PathResults(graph, 1, 17)
         >>> res.update_trace(9)

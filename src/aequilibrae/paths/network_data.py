@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, _prepare_network_graph
 
 
 class NetworkData:
@@ -87,29 +87,19 @@ class NetworkData:
     def build_graph(self, mode, cost, *, centroids=None, skimming=None, block_centroid_flows=True):
         """Prepare an independent graph for a mode, cost and centroid order."""
         self.validate_mode(mode)
-        for field in [cost, *(skimming or [])]:
-            self.field_values(field)
+        rows, directions = self._directed_indices()
+        for field in dict.fromkeys([cost, *(skimming or [])]):
+            self._field_values(field, rows, directions)
         centroids = self.centroids if centroids is None else centroids
         if centroids is not None:
             self.validate_centroids(centroids)
         graph = Graph()
-        graph.mode = mode
         graph.network = self.links.copy(deep=True)
-        forbidden = ~graph.network.modes.fillna("").astype(str).str.contains(mode, regex=False)
-        graph.network.loc[forbidden, "b_node"] = graph.network.loc[forbidden, "a_node"]
-        restrictions = self.turn_restrictions
-        if restrictions is not None:
-            if "modes" in restrictions:
-                mask = restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)
-                restrictions = restrictions[mask].copy()
-            graph._turn_restrictions = restrictions
-        graph._allow_path_uturns = self.allow_uturns
-        graph.prepare_graph(centroids, allow_uturns_everywhere=self.allow_uturns)
-        graph.set_blocked_centroid_flows(block_centroid_flows)
+        _prepare_network_graph(
+            graph, mode, centroids, self.turn_restrictions, block_centroid_flows, self.allow_uturns
+        )
         if self.lonlat is not None:
             graph.lonlat_index = self.lonlat.loc[graph.all_nodes]
-        if restrictions is not None:
-            graph.set_turn_restrictions(restrictions, allow_path_uturns=self.allow_uturns)
         graph.set_graph(cost)
         graph.set_skimming(list(skimming or []))
         return graph

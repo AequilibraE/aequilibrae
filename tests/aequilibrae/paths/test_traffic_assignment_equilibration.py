@@ -122,6 +122,14 @@ def test_line_search_is_exact_and_uncapped(configuration, algorithm):
     assert np.isfinite(assignment.assignment.rgap)
 
 
+def test_bfw_conjugacy_defaults_to_approximate(configuration):
+    assignment = TrafficAssignment(**configuration)
+    assignment.execute(max_iterations=2, cores=1)
+    assert assignment.bfw_conjugacy == "approximate"
+    assert assignment.assignment.bfw_conjugacy == "approximate"
+    assert assignment._config["BFW conjugacy"] == "approximate"
+
+
 @pytest.mark.parametrize("bad", ["biconjugate", "", 2, None])
 def test_bfw_conjugacy_rejects_unknown_methods(configuration, bad):
     assignment = TrafficAssignment(**configuration)

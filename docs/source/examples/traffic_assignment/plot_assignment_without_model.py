@@ -110,8 +110,6 @@ assigclass = TrafficClass(
     name="car", mode="c", cost="free_flow_time", demand=aem, skimming=["free_flow_time"], block_centroid_flows=False
 )
 
-
-
 assig = TrafficAssignment(
     network=network_data,
     classes=[assigclass],

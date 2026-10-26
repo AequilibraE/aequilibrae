@@ -59,9 +59,6 @@ basic_config()
 # %%
 network = project.network.build()
 
-
-# Sioux Falls requires paths through centroids because every node is a centroid.
-
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
@@ -79,13 +76,7 @@ assigclass = TrafficClass(
     name="car", mode="c", cost="free_flow_time", demand=demand, skimming=[], block_centroid_flows=False
 )
 
-
-# Setting the volume delay function and its parameters
-
-
-# Let's set parameters that make this example run very fast
-
-# we then execute the assignment
+# Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     classes=[assigclass],

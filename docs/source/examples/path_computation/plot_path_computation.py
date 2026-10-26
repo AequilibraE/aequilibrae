@@ -43,22 +43,20 @@ basic_config()
 # ----------------
 
 # %%
-# We build all graphs
+# Load the network snapshot
 network = project.network.build()
 # We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars,
+# Build the car graph with distance as the cost field.
 graph = network.build_graph(mode="c", cost="distance")
 
 # %%
-# we'll also see what graphs are available.
+# Available network modes:
 network.modes
 
 # %%
-# Let's say we want to minimise the distance,
-graph.set_graph("distance")
 
 # %%
 # and will skim time and distance while we are at it.

@@ -61,7 +61,6 @@ mode = "c"
 network = project.network
 network = network.build(modes=[mode])
 graph = network.build_graph(mode=mode, cost="distance")
-graph.set_graph("distance")
 graph.set_skimming("distance")
 graph.set_blocked_centroid_flows(False)
 
