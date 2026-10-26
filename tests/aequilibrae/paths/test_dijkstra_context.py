@@ -297,7 +297,7 @@ def test_query_borrows_mask_and_has_one_full_search_representation():
     assert query.target_count == 1
     query.origin = np.uint64(1)
     assert query.origin == 1
-    with pytest.raises(ValueError, match="use None"):
+    with pytest.raises(ValueError, match="Use None"):
         SearchQuery(2, 0, np.zeros(2, dtype=bool))
     for bad in (np.ones(3, dtype=bool), np.ones(4, dtype=bool)[::2], np.ones(2), [False, True]):
         with pytest.raises((TypeError, ValueError)):
