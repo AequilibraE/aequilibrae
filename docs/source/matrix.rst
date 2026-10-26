@@ -1,28 +1,27 @@
 Working with matrices
 =====================
 
-AequilibraE provides four objects for working with named matrices:
+AequilibraE provides three objects for working with named matrices:
 
 * ``AequilibraeMatrix`` holds matrices in memory and is backed by a dictionary.
   Prefer this object for dense calculations and other in-memory work.
 * ``AequilibraeSparseMatrix`` holds SciPy sparse arrays in memory and keeps
   their sparse formats and dtypes.
 * ``MatrixStore`` is backed by an OMX file. Use it to read and update dense
-  matrices on disk through a similar interface to the in-memory object.
-* ``SparseMatrixStore`` reads and writes whole sparse matrices using a CSR
-  extension to OMX.
+  and sparse matrices on disk through a similar interface to the in-memory
+  objects. Sparse matrices use a CSR extension to OMX.
 
-All four objects associate names with square matrices. All matrices in an object
+All three objects associate names with square matrices. All matrices in an object
 share the same zone index, which gives the zone IDs in row and column order.
-Use the ``from_file()``, ``from_dict()``, ``from_df()`` and ``from_scipy()``
+Use the ``from_file()``, ``from_dict()`` and ``from_df()``
 functions to create the appropriate object from your source data, or the
 ``AequilibraeMatrix`` constructor directly.
 
 These objects replace the previous ``AequilibraeMatrix`` which mixed both
 roles. For a migration guide, see :doc:`matrix_api_migration`.
 
-``AequilibraeMatrix``, ``AequilibraeSparseMatrix``, ``MatrixStore`` and
-``SparseMatrixStore`` implement the ``MutableMapping`` protocol and behave
+``AequilibraeMatrix``, ``AequilibraeSparseMatrix`` and ``MatrixStore``
+implement the ``MutableMapping`` protocol and behave
 very similarly to a dictionary. You can use mapping operations including
 ``.keys()``, ``.values()``, ``.items()`` and ``.update()``.
 
@@ -30,12 +29,18 @@ Create an in-memory working set
 -------------------------------
 
 The recommended workflow is to open an OMX file with ``from_file(...,
-subset=[...])``, which returns an ``AequilibraeMatrix``. If you don't know
+subset=[...])``, which returns an ``AequilibraeMatrix`` or an
+``AequilibraeSparseMatrix``. If you don't know
 which matrices you need ahead of time, provide ``store=True`` to ``from_file``
 instead of ``subset`` to obtain a ``MatrixStore``. Inspect the file, then use
 its ``subset()`` method to select the matrices needed for a calculation. It
-returns a new, independent ``AequilibraeMatrix``. Work on that object in memory,
-then save the result when needed.
+returns a new, independent in-memory collection of one storage type. Work on
+that object in memory, then save the result when needed.
+
+Both ``from_file()`` and ``MatrixStore.subset()`` infer the storage type from
+the first selected matrix when ``sparse=None`` (the default). Pass
+``sparse=True`` or ``False`` to require sparse or dense matrices. This option
+does not filter or convert matrices.
 
 The following example assumes that ``demand.omx`` contains matrices named
 ``car`` and ``bus`` and a zone mapping named ``zones``. ``index_name`` is
@@ -95,10 +100,13 @@ Use ``from_dict()`` when arrays are already available:
         {"car": car, "bus": bus},
         index=index,
         index_name="zones",
-        metadata={"description": "Morning demand", "year": 2030},
     )
+    demand.metadata.update({"description": "Morning demand", "year": 2030})
 
-Metadata supplied to ``from_dict()`` is also copied.
+Dense array-likes, including nested lists, are accepted. Sparse inputs return
+an ``AequilibraeSparseMatrix`` and keep each array's format and dtype. Use an
+``AequilibraeMatrix`` or ``AequilibraeSparseMatrix`` constructor to get an
+empty version.
 
 Alternatively, start with no named matrices and add them using ``AequilibraeMatrix`` directly:
 
@@ -200,14 +208,14 @@ whole matrix and require its full shape. Assignments to selections such as
 ``demand.mat["car", :, :] = 0`` use the backend's broadcasting rules.
 
 When working with an ``AequilibraeMatrix``, selections follow NumPy
-indexing. When working with a ``MatrixStore``, selections follow the indexing
+indexing. For dense matrices in a ``MatrixStore``, selections follow the indexing
 supported by the OMX (and h5py) library, which may have different restrictions
 on fancy selections. Selections are passed to the underlying object after
 translating zone IDs, so support for a selection depends on that object.  This
 allows for partial reads and writes to and from matrices both in memory and on
 disk. Assignments to a selection keep the matrix's dtype and use NumPy or h5py
-conversion rules. ``SparseMatrixStore`` only supports whole-matrix reads and
-writes. Selections through ``mat`` or ``imat`` raise ``NotImplementedError``.
+conversion rules. Sparse matrices in a ``MatrixStore`` only support whole-matrix
+reads and writes. Selections through ``mat`` or ``imat`` raise ``NotImplementedError``.
 
 Whole-matrix reads and basic slices of an ``AequilibraeMatrix`` may share its
 memory, fancy NumPy selections may return copies. If an independent array is
@@ -265,16 +273,19 @@ separate ``save_as_omx()`` call is needed.  ``store["car"][:, 2] = ...`` would
 only change the returned array, not the file.  Use ``store.imat["car", :, 2] =
 ...`` instead.
 
-Use ``from_dict(..., store=True)`` with a path and index to create a store from
-arrays. The default ``mode="x"`` prevents replacement of an existing file:
+Open a ``MatrixStore`` with a path, index and writable mode, then use
+``update()`` to populate it from arrays. ``mode="x"`` prevents replacement
+of an existing file:
 
 .. code-block:: python
 
-    with from_dict(
-        {"car": car, "bus": bus}, index=index, index_name="zones",
-        path="new_demand.omx", mode="x", store=True,
-    ) as store:
+    from aequilibrae.matrix import MatrixStore
+
+    with MatrixStore("new_demand.omx", index=index, index_name="zones", mode="x") as store:
+        store.update({"car": car, "bus": bus})
         print(list(store))
+
+``update()`` accepts both dense and sparse arrays.
 
 A store must stay open while it is being used. If a ``with`` block is not
 suitable, close it explicitly with ``store.close()``. An ``AequilibraeMatrix``
@@ -423,23 +434,23 @@ recommend to provide an explicit index in-order to include zones with no
 trips. All origin and destination IDs must be present in that index. These IDs
 must follow the zone-ID rules above, whether the index is supplied or inferred.
 
-Use ``from_scipy()`` when the input is a collection of SciPy sparse arrays:
+Use ``from_dict()`` when the input is a collection of SciPy sparse arrays:
 
 .. code-block:: python
 
     from scipy.sparse import csr_array
-    from aequilibrae.matrix import from_scipy
+    from aequilibrae.matrix import from_dict
 
-    demand_from_sparse = from_scipy(
+    demand_from_sparse = from_dict(
         {"car": csr_array(car)}, index=index, index_name="zones"
     )
 
-``from_df()`` returns an ``AequilibraeMatrix``. By default, ``from_scipy()`` returns
-an ``AequilibraeSparseMatrix`` and copies the sparse arrays without changing their
-formats or dtypes. You can also create an empty sparse collection with
-``AequilibraeSparseMatrix(index=index)`` and assign named sparse arrays.
-Whole-matrix reads return the stored sparse array. Selections through ``mat``
-and ``imat`` follow that sparse format's SciPy indexing rules.
+``from_df()`` returns an ``AequilibraeMatrix`` by default. For sparse inputs,
+``from_dict()`` returns an ``AequilibraeSparseMatrix`` and copies the arrays
+without changing their formats or dtypes. You can also create an empty sparse
+collection with ``AequilibraeSparseMatrix(index=index)`` and assign named
+sparse arrays.  Whole-matrix reads return the stored sparse array. Selections
+through ``mat`` and ``imat`` follow that sparse format's SciPy indexing rules.
 
 ``save_as_omx()`` converts sparse arrays to CSR for storage without changing
 them in memory. Each matrix uses a group at ``/sparse/<name>`` with datasets
@@ -449,40 +460,43 @@ them in memory. Each matrix uses a group at ``/sparse/<name>`` with datasets
 these sparse matrices.
 
 Load these files with ``AequilibraeSparseMatrix.from_omx()`` or
-``from_file(..., sparse=True)``. These only read ``/sparse`` and ignore dense
-matrices in ``/data``. Dense and sparse matrices may not have the same name.
+``from_file(..., sparse=True)``. The class method only reads ``/sparse`` and
+ignores dense matrices in ``/data``.
 
 Work with sparse matrices on disk
 --------------------------------
 
-Use ``SparseMatrixStore`` or ``from_file(..., sparse=True, store=True)`` to
-work with sparse matrices without loading the whole collection. Each matrix
-read returns an independent CSR array. Assign the whole array back to save
-changes. Partial reads and writes are not supported.
+Use ``MatrixStore`` or ``from_file(..., store=True)`` to work with dense and
+sparse matrices without loading the whole collection. Each sparse matrix read
+returns an independent CSR array. Assign the whole array back to save
+changes. Partial reads and writes are not supported for stored sparse matrices.
+An existing matrix cannot change storage type so you should delete it before
+assigning values of the other type. ``save_as_omx()`` can save mixed
+selections, preserving each matrix's storage type.
 
 .. code-block:: python
 
-    from aequilibrae.matrix import from_file, from_scipy
+    from aequilibrae.matrix import MatrixStore, from_file
 
-    with from_scipy(
-        {"car": csr_array(car)}, index=index, index_name="zones",
-        path="sparse_demand.omx", store=True,
-    ) as store:
+    with MatrixStore("sparse_demand.omx", index=index, index_name="zones", mode="x") as store:
+        store.update({"car": csr_array(car)})
         store.matrix_metadata("car")["mode"] = "car"
 
-    with from_file("sparse_demand.omx", sparse=True, store=True, mode="r+") as store:
+    with from_file("sparse_demand.omx", store=True, mode="r+") as store:
         values = store["car"]
         values *= 2
         store["car"] = values
         working = store.subset([{"mode": "car"}])
 
-``from_scipy(..., store=True)`` writes CSR arrays and keeps their dtypes. Its
-file mode defaults to ``"x"``, which fails if the file already exists.
+``MatrixStore.update()`` writes sparse arrays as CSR and keeps their dtypes.
+It accepts mixed dense and sparse values. Open a store with ``mode="x"`` to
+create a new file and fail if the file already exists.
 ``from_file(..., store=True)`` opens read-only unless ``mode="r+"`` is supplied.
 
-Sparse stores share the file metadata and zone mappings with dense stores. A
-store's ``subset()`` returns an independent ``AequilibraeSparseMatrix`` which
-can be used after the store closes.
+Dense and sparse matrices share the store's file metadata and zone mapping. A
+store's ``subset()`` returns an independent ``AequilibraeSparseMatrix`` when
+selecting one or more sparse matrices, or an ``AequilibraeMatrix`` for dense or
+empty selections. The result can be used after the store closes.
 
 Native sparse buffers
 ---------------------
