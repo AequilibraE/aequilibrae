@@ -54,7 +54,6 @@ mode = "c"
 
 # %%
 network = project.network
-network = network.build(modes=[mode])
 graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
@@ -62,9 +61,6 @@ graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], b
 # as well as the compact number of links and nodes used for computation.
 
 project.run["graph_summary"](graph)
-
-# %%
-# The graph is an explicit argument to the summary function.
 
 # %%
 # Let's add a ``create_delaunay`` function to our ``run/__init__.py`` file.

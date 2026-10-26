@@ -306,7 +306,7 @@ understand, and then we'll perform the assignment.
     from quetzal.model import stepmodel
 
     from aequilibrae.matrix import AequilibraeMatrix, from_file
-    from aequilibrae.paths import Graph, NetworkData, TrafficAssignment
+    from aequilibrae.paths import Graph, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
     from aequilibrae.paths.vdf import bpr
 
@@ -625,7 +625,7 @@ understand, and then we'll perform the assignment.
 
 
     def assign_aeq(g: Graph, mat: AequilibraeMatrix, method: str) -> TrafficAssignment:
-        network = NetworkData(g.network.assign(modes="c"), centroids=g.centroids)
+        network = Graph(network=g.network.assign(modes="c"), centroids=g.centroids)
         traffic = TrafficClass(
             name="car", mode="c", cost="free_flow_time", demand=mat,
             fixed_cost_field="toll" if "toll" in g.network else None,

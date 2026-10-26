@@ -1,15 +1,23 @@
 Traffic Assignment Procedure
 ============================
 
-Traffic assignment starts with a network snapshot and a set of traffic class configurations.
-The constructor validates the configuration. Execution prepares routing contexts and runs the assignment.
+Traffic assignment starts with a project network or an in-memory graph and a set of traffic class configurations.
+The constructor checks the configuration without reading network tables.
+Execution loads and validates network values, prepares routing contexts, and runs the assignment.
+For an example of a regional assignment procedure, see [1]_.
 
 Network data
 ------------
 
-``project.network`` manages the network database. Its ``build()`` method returns a
-``NetworkData`` snapshot with link fields, available modes, centroids, and turn restrictions.
-``NetworkData`` also accepts a DataFrame for workflows without a project.
+``project.network`` manages the network database and can be passed directly to ``TrafficAssignment``.
+Assignment derives the required modes and fields from its configuration.
+No network build is necessary before assignment.
+
+For workflows without a project, ``Graph(network=links)`` accepts an in-memory link DataFrame.
+The table requires ``link_id``, ``a_node``, ``b_node``, and ``direction`` columns.
+A ``modes`` column limits which classes can use each link.
+Without this column, all assignment modes can use all links.
+``Graph`` also accepts ``turn_restrictions`` and ``allow_uturns`` for in-memory assignments.
 
 .. testsetup::
 
@@ -22,15 +30,15 @@ Network data
 .. doctest::
 
     >>> from aequilibrae.utils.create_example import create_example
-    >>> from aequilibrae.paths import TrafficClass, TrafficAssignment, NetworkData
+    >>> from aequilibrae.paths import TrafficClass, TrafficAssignment, Graph
     >>> from aequilibrae.paths.vdf import bpr
     >>> project = create_example(project_path)
-    >>> network = project.network.build(modes=["c", "T"])
+    >>> network = project.network
 
-The ``fields`` argument limits the loaded fields. A directional field such as
-``capacity`` loads both ``capacity_ab`` and ``capacity_ba``.
 For standalone paths, ``network.build_graph(mode="c", cost="free_flow_time")``
-returns a graph for that mode and cost field.
+loads and prepares a graph for that mode and cost field.
+Its optional ``fields`` argument limits the loaded fields.
+A directional field such as ``capacity`` loads both ``capacity_ab`` and ``capacity_ba``.
 
 Traffic classes
 ---------------
@@ -98,7 +106,11 @@ The ``max_iterations``, ``rgap``, and ``cores`` arguments apply to each executio
 Zero cores uses all available cores. A negative value leaves that many cores unused.
 ``bfw_conjugacy="exact"`` selects the exact BFW conjugacy calculation.
 
-Each execution creates a network snapshot and fresh result buffers.
+Each execution reads the current network and creates fresh routing contexts and result buffers.
+Network edits before execution are included in that run.
+The project must remain open until execution loads its inputs.
+Network edits after execution do not change the results or additional skims from that run.
+The execution retains numeric network attributes for additional skims.
 The returned DataFrame contains link results.
 ``assig.report()`` returns the convergence report.
 ``assig.info()`` returns configuration information before or after execution.
@@ -185,8 +197,9 @@ Volume-delay function
 
 AequilibraE supports five Volume Delay Functions (VDFs): BPR, BPR2, Conical, INRETS, and Akcelik.
 Each VDF has distinct characteristics that make it suitable for different modeling scenarios.
+The conical formulation follows Spiess [2]_.
 
-For detailed information on VDF formulations, parameter guidance, and usage recommendations, 
+For detailed information on VDF formulations, parameter guidance, and usage recommendations,
 see the dedicated :ref:`volume_delay_functions` page, which includes:
 
 * Mathematical formulas and technical descriptions
@@ -199,19 +212,19 @@ see the dedicated :ref:`volume_delay_functions` page, which includes:
 
 * **BPR**: Standard highway assignment (α=0.15, β=4.0)
 * **BPR2**: Enhanced over-capacity penalty (α=0.15, β=4.0)
-* **Conical**: Smooth theoretical function (α=0.15, β=4.0)
+* **Conical**: Smooth theoretical function (α=2.0, β=1.5)
 * **INRETS**: Urban arterials (α=1.0)
 * **Akcelik**: Signalized intersections (α=0.25, τ=0.8)
 
 References
 ----------
 
-.. [1] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
+.. [1] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020).
        Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
 
 .. [2] Spiess, H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158.
        Available in: https://doi.org/10.1287/trsc.24.2.153
 
-.. [3] Zill, J., Camargo, P., Veitch, T., Daisy, N. (2019) "Toll Choice and Stochastic User Equilibrium: 
-       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
+.. [3] Zill, J., Camargo, P., Veitch, T., Daisy, N. (2019) "Toll Choice and Stochastic User Equilibrium:
+       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940.
        Available in: https://doi.org/10.1177%2F0361198119837496

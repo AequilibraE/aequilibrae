@@ -44,7 +44,7 @@ basic_config()
 
 # %%
 # Load the network snapshot
-network = project.network.build()
+network = project.network
 # We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
@@ -53,10 +53,8 @@ network = project.network.build()
 graph = network.build_graph(mode="c", cost="distance")
 
 # %%
-# Available network modes:
-network.modes
-
-# %%
+# we'll also see what graphs are available.
+network.list_modes()
 
 # %%
 # and will skim time and distance while we are at it.

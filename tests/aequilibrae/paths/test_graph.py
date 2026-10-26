@@ -16,7 +16,7 @@ def test_graph(test_data_path):
 
 
 def graph_for_project(project):
-    return project.network.build(modes=["c"]).build_graph(mode="c", cost="distance")
+    return project.network.build_graph(mode="c", cost="distance")
 
 
 def sample_turn_from_path(graph, origin, destination):
@@ -661,7 +661,7 @@ def test_dead_end_removal(compressed_graph):
 def test_turn_restrictions_match_networkx(coquimbo_example):
     nx = pytest.importorskip("networkx")
 
-    graph = coquimbo_example.network.build(modes=["c"]).build_graph(mode="c", cost="distance")
+    graph = coquimbo_example.network.build_graph(mode="c", cost="distance")
     graph.prepare_graph()
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)

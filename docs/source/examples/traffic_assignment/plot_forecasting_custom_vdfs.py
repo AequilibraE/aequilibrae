@@ -62,7 +62,7 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
 
 # %%
 
-network = project.network.build()
+network = project.network
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
@@ -86,6 +86,7 @@ assigclass = TrafficClass(
     # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
     block_centroid_flows=False,
 )
+
 
 from aequilibrae.paths.cython.vdf_core import (
     akcelik,
@@ -144,6 +145,7 @@ from math import floor, log10
 
 import matplotlib.pyplot as plt
 
+
 # %%
 def plot_tlfd(demand, skim, name):
     plt.clf()
@@ -161,6 +163,7 @@ def plot_tlfd(demand, skim, name):
     plt.ylabel("Probability")
     plt.title(f"Trip-length frequency distribution for {name}")
     return plt
+
 
 # %%
 # Calibration
@@ -335,11 +338,14 @@ assigclass = TrafficClass(
     block_centroid_flows=False,
 )
 
+
 def quadratic(congested_time, link_flows, fftime, capacity, cores, a, b):
     congested_time[:] = fftime * (a * (link_flows / capacity) ** 2 + b * (link_flows / capacity) + 1)
 
+
 def quadratic_derivative(delta, link_flows, fftime, capacity, cores, a, b):
     delta[:] = fftime * (2 * a * (link_flows / capacity) + b) / capacity
+
 
 vdf = VDF(
     "quadratic",
@@ -347,6 +353,7 @@ vdf = VDF(
     {"a": {"fill_NA": 0.15, "bounds": (0, float("inf"))}, "b": {"fill_NA": 0.1}},
     quadratic_derivative,
 )
+
 
 # %%
 # Now we select two sets of links to execute select link analysis.
@@ -384,7 +391,7 @@ assig = TrafficAssignment(
     capacity_field="capacity",
     algorithm="bfw",
 )
-assig.execute(max_iterations=500, rgap=1e-05)
+assig.execute(max_iterations=500, rgap=0.00001)
 
 # %%
 # To save our select link results, all we need to do is provide it with a name.

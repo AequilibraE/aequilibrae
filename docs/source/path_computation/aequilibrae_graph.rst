@@ -95,7 +95,7 @@ result in simplification beyond pure topological simplification.
 .. code-block:: python
 
     >>> project = create_example(project_path, "coquimbo")
-    >>> network = project.network.build()
+    >>> network = project.network
     >>> graph = network.build_graph(mode='c', cost="distance")
     >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
 
@@ -108,7 +108,7 @@ or when using AequilibraE in anger, as much of the setup is done by default.
 
 .. code-block:: python
 
-    >>> network = project.network.build() # We build the graph for all modes
+    >>> network = project.network
     >>> graph = network.build_graph(mode='c', cost="distance") # we grab the graph for cars
 
 Manipulating graphs in memory
@@ -130,7 +130,7 @@ index search, which is very fast but not accurate.
 .. code-block:: python
 
     >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
-    >>> network = project.network.build(limit_to_area=polygon) # doctest: +SKIP
+    >>> graph = project.network.build_graph(mode="c", cost="distance", limit_to_area=polygon) # doctest: +SKIP
 
 More sophisticated graph editing is also possible, but it is recommended that
 changes to be made in the network DataFrame. For example:

@@ -9,9 +9,9 @@ import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
-from aequilibrae import Graph, NetworkData, TrafficAssignment, TrafficClass
+from aequilibrae import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths import available_heaps
-from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
+from aequilibrae.paths.assignment_context import AssignmentInputs, _AssignmentNetwork, assignment_demand
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 
@@ -63,7 +63,7 @@ def matrix_for(graph, demand=None):
 
 
 def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
-    network = NetworkData(graph.network.assign(modes="c"), turn_restrictions=graph._turn_restrictions)._prepare()
+    network = _AssignmentNetwork(graph.network.assign(modes="c"), turn_restrictions=graph._turn_restrictions)
     prepared = network.graph(
         SimpleNamespace(mode="c", demand=matrix, block_centroid_flows=graph.block_centroid_flows)
     )
@@ -79,9 +79,9 @@ def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
     )
 
 
-def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, **options):
+def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, name_mapping=None, **options):
     links = graph.network.assign(modes="c")
-    network = NetworkData(links, centroids=graph.centroids, turn_restrictions=graph._turn_restrictions)
+    network = Graph(network=links, centroids=graph.centroids, turn_restrictions=graph._turn_restrictions)
     traffic = TrafficClass(
         name="cars",
         mode="c",
@@ -99,7 +99,7 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, **op
         time_field="time",
         capacity_field="capacity",
         vdf=bpr,
-        name_mapping={"alpha": 0.15, "beta": 1.0},
+        name_mapping={"alpha": 0.15, "beta": 1.0} if name_mapping is None else name_mapping,
         algorithm=algorithm,
     )
     return assignment, traffic
@@ -344,7 +344,7 @@ def test_unassigned_total_is_copied_blended_and_reset_with_output_group():
 def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
     graph = diamond()
     graph.network.loc[graph.network.link_id == 71, "toll"] = 10.0
-    network = NetworkData(graph.network.assign(modes="c"), centroids=graph.centroids)
+    network = Graph(network=graph.network.assign(modes="c"), centroids=graph.centroids)
     cars = TrafficClass(
         name="cars", mode="c", cost="time", demand=matrix_for(graph), pce=0.5, block_centroid_flows=False
     )
@@ -355,6 +355,7 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
         time_field="time",
         capacity_field="capacity",
         vdf=bpr,
+        name_mapping={"alpha": 0.15, "beta": 1.0},
         algorithm="all-or-nothing",
     )
     assignment.execute(cores=2, elementwise_cores=1)
@@ -483,7 +484,9 @@ def test_assignment_time_and_cost_skims_have_separate_meanings(turn):
 def test_congested_time_excludes_tolls_but_keeps_turn_delay(turn):
     graph = diamond(turn)
     graph.network.loc[graph.network.link_id == 71, "toll"] = 2.0
-    assignment, traffic = assignment_for(graph, fixed_cost_field="toll", vot=2.0)
+    assignment, traffic = assignment_for(
+        graph, fixed_cost_field="toll", vot=2.0, name_mapping={"alpha": 0.0, "beta": 1.0}
+    )
     assignment.execute(max_iterations=8, rgap=0.0, cores=1, elementwise_cores=1)
 
     output = assignment.skim_congested("distance", return_matrices=True)[traffic.name]

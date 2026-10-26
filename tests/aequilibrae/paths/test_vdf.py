@@ -31,10 +31,10 @@ def project(sioux_falls_example):
 def make_assignment(project):
     demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand)
-    network = project.network.build(modes=["c"])
+    network = project.network
 
     def make(vdf, name_mapping):
-        return TrafficAssignment(
+        assignment = TrafficAssignment(
             network=network,
             classes=[traffic],
             time_field="free_flow_time",
@@ -43,6 +43,8 @@ def make_assignment(project):
             name_mapping=name_mapping,
             algorithm="msa",
         )
+        assignment.execute(max_iterations=1, cores=1)
+        return assignment
 
     return make
 

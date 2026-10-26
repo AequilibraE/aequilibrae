@@ -1,14 +1,15 @@
-import os
-import time
 from os.path import join
+import os
+
+from aequilibrae.transit import Transit
+from aequilibrae.project.project import Project
 
 import numpy as np
 import pandas as pd
-
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.project.project import Project
-from aequilibrae.transit import Transit
+
+import time
 
 
 def run_example(from_model, zones):

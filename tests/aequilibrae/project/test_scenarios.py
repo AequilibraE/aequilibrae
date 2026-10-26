@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def test_traffic_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    network = scenario_example.network.build(fields=["distance", "capacity"], modes=["c"])
+    network = scenario_example.network
 
     try:
         mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
@@ -109,7 +109,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 def test_route_choice_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    graph = scenario_example.network.build(fields=["distance"], modes=["c"]).build_graph(mode="c", cost="distance")
+    graph = scenario_example.network.build_graph(mode="c", cost="distance", fields=["distance"])
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
 
@@ -176,7 +176,7 @@ def test_network_scenarios(scenario_example, scenario):
     links1 = network.links.data
     nodes1 = network.nodes.data
 
-    graph1 = network.build(fields=["distance"], modes=["c"]).build_graph(mode="c", cost="distance")
+    graph1 = network.build_graph(mode="c", cost="distance", fields=["distance"])
 
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
@@ -187,7 +187,7 @@ def test_network_scenarios(scenario_example, scenario):
         links2 = network.links.data
         nodes2 = network.nodes.data
 
-        graph2 = network.build(fields=["distance"], modes=["c"]).build_graph(mode="c", cost="distance")
+        graph2 = network.build_graph(mode="c", cost="distance", fields=["distance"])
 
         # Pandas doesn't have a good way to assert frames not equal
         try:

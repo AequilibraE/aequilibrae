@@ -41,7 +41,7 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
 
 def _prepare_graph(model_path: Path, mode: str):
     project = Project.from_path(model_path)
-    network = project.network.build(modes=[mode])
+    network = project.network
     graph = network.build_graph(mode=mode, cost="distance")
 
     centroids = np.asarray(graph.centroids, dtype=np.int64)

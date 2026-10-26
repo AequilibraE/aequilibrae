@@ -1225,7 +1225,7 @@ class GraphBase(ABC):  # noqa: B024
 
             >>> project = create_example(project_path)
 
-            >>> network = project.network.build()
+            >>> network = project.network
 
             >>> graph = network.build_graph(mode='c', cost="distance")
             >>> graph.prepare_graph(np.arange(1,25))
@@ -1251,8 +1251,20 @@ class GraphBase(ABC):  # noqa: B024
 
 
 class Graph(GraphBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args, network=None, centroids=None, turn_restrictions=None, allow_uturns=False, lonlat=None, **kwargs
+    ):
+        """Create a graph, optionally with in-memory source tables and no routing preparation."""
         super().__init__(*args, **kwargs)
+        if network is not None:
+            self.network = network.copy(deep=True)
+        if centroids is not None:
+            self.centroids = np.array(centroids, copy=True)
+        if turn_restrictions is not None:
+            self._turn_restrictions = turn_restrictions.copy(deep=True)
+        self._allow_path_uturns = self._allow_uturns_everywhere = allow_uturns
+        if lonlat is not None:
+            self.lonlat_index = lonlat.copy(deep=True)
 
 
 class TransitGraph(GraphBase):

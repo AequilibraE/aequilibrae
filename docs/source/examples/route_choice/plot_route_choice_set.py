@@ -47,7 +47,7 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Load the network snapshot
-network = project.network.build()
+network = project.network
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
@@ -56,7 +56,7 @@ network = project.network.build()
 graph = network.build_graph(mode="c", cost="distance")
 
 # Available network modes:
-network.modes
+network.list_modes()
 
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
 graph.prepare_graph(np.array(nodes_of_interest))

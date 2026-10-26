@@ -33,7 +33,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import NetworkData
+from aequilibrae.paths import Graph
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
 # sphinx_gallery_thumbnail_path = '../source/_images/assignment_plot.png'
@@ -98,7 +98,7 @@ geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set
 # Create the network snapshot from the link table.
 
 # %%
-network_data = NetworkData(network.assign(modes="c"), centroids=index, lonlat=geom)
+graph = Graph(network=network.assign(modes="c"), centroids=index, lonlat=geom)
 
 # %%
 # The named matrix is ready to use in the assignment.
@@ -111,15 +111,15 @@ assigclass = TrafficClass(
 )
 
 assig = TrafficAssignment(
-    network=network_data,
+    network=graph,
     classes=[assigclass],
     vdf=bpr,
     name_mapping={"alpha": "b", "beta": "power"},
     time_field="free_flow_time",
     capacity_field="capacity",
-    algorithm="frank-wolfe",
+    algorithm="fw",
 )
-assig.execute(max_iterations=100, rgap=1e-06)
+assig.execute(max_iterations=100, rgap=1e-6)
 # %%
 # Now let's take a look at the Assignment results
 assig.results()

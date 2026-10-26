@@ -1,6 +1,6 @@
 def test_connectivity_analysis(sioux_falls_example):
     network = sioux_falls_example.network
-    graph = network.build().build_graph(mode="c", cost="distance")
+    graph = network.build_graph(mode="c", cost="distance")
 
     graph.block_centroid_flows = False
 

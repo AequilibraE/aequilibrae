@@ -44,14 +44,17 @@ from aequilibrae.utils.create_example import create_example
 
 
 def run_assignment(network, matrix):
-    """Assign a network snapshot and return link loads."""
-    traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix,
-                           block_centroid_flows=False)
+    """Runs a single-class traffic assignment and returns link flow results."""
+    traffic_class = TrafficClass(
+        name="car", mode="c", cost="free_flow_time", demand=matrix, block_centroid_flows=False
+    )
     assignment = TrafficAssignment(
-        network=network, classes=[traffic], time_field="free_flow_time", capacity_field="capacity",
+        network=network, classes=[traffic_class], time_field="free_flow_time", capacity_field="capacity",
         vdf=bpr, name_mapping={"alpha": "b", "beta": "power"}, algorithm="bfw",
     )
-    return assignment.execute(max_iterations=100, rgap=1e-2)
+    assignment.execute(max_iterations=100, rgap=1e-2)
+
+    return assignment.results()
 
 
 # %%
@@ -61,7 +64,7 @@ project = create_example(fldr, "sioux_falls")
 
 # %%
 # Build graphs and load demand matrix.
-network = project.network.build()
+network = project.network
 
 
 matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
@@ -83,12 +86,12 @@ turn_restrictions = pd.DataFrame(
         "penalty": [5.0, np.nan],  # 5.0 minutes penalty, and one prohibited turn
     }
 )
-network.turn_restrictions = turn_restrictions
-network.allow_uturns = True
+graph = network.build_graph("c", "free_flow_time", block_centroid_flows=False)
+graph.set_turn_restrictions(turn_restrictions, allow_path_uturns=True)
 
 # %%
 # Assignment with custom turn controls.
-restricted_flows = run_assignment(network, matrix)
+restricted_flows = run_assignment(graph, matrix)
 
 # %%
 # Plot flows for both cases and the difference.

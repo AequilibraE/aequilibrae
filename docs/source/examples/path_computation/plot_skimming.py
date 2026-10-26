@@ -63,7 +63,7 @@ import numpy as np
 
 # %%
 # Load the network snapshot
-network = project.network.build()
+network = project.network
 # We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
@@ -72,7 +72,7 @@ network = project.network.build()
 graph = network.build_graph(mode="c", cost="distance")
 
 # Available network modes:
-network.modes
+network.list_modes()
 
 # And will skim distance while we are at it, other fields like ``free_flow_time`` or ``travel_time`` 
 # can be added here as well

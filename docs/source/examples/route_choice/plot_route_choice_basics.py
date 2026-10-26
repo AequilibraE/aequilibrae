@@ -68,13 +68,13 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Let's build all graphs
-network = project.network.build()
+network = project.network
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
 # We also see what graphs are available
-network.modes
+network.list_modes()
 
 # %%
 # We grab the graph for cars

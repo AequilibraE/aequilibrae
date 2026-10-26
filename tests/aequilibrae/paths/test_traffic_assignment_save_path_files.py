@@ -13,7 +13,7 @@ def test_assignment_accepts_available_heaps(sioux_falls_single_class, heap):
     matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix, heap=heap)
     assignment = TrafficAssignment(
-        network=project.network.build(modes=["c"]),
+        network=project.network,
         classes=[traffic],
         time_field="free_flow_time",
         capacity_field="capacity",

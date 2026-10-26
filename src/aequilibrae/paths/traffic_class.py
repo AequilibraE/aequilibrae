@@ -25,7 +25,6 @@ class TransportClassBase(ABC):  # noqa: B024
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
-
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("Matrix must be an AequilibraeMatrix")
         if not np.array_equal(matrix.index, graph.centroids):

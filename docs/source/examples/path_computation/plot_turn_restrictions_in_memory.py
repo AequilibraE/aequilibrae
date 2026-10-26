@@ -35,7 +35,7 @@ project = create_example(fldr, "coquimbo")
 
 # %%
 # Load the network snapshot and get the car graph.
-network = project.network.build()
+network = project.network
 graph = network.build_graph(mode="c", cost="distance")
 
 # %%

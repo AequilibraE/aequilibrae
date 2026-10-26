@@ -140,17 +140,17 @@ The U-turn setting is managed through the project's ``about`` table:
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
     # Rebuild graphs to apply the change
-    >>> network = project.network.build()
+    >>> network = project.network
 
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you call ``build()``, turn restrictions are automatically loaded
-from the database and applied to all generated graphs:
+``build_graph()`` loads turn restrictions from the database and applies them to the returned graph.
+Traffic assignment loads these restrictions when execution starts.
 
 .. code-block:: python
 
-    >>> network = project.network.build()
+    >>> network = project.network
 
     # Check if a graph has turn restrictions
     >>> graph = network.build_graph(mode='c', cost="distance")
@@ -192,7 +192,7 @@ time costs during the equilibration process.
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> network = project.network.build()
+    >>> network = project.network
     >>> graph = network.build_graph(mode='c', cost="distance")
     >>> graph.set_graph('free_flow_time')
 

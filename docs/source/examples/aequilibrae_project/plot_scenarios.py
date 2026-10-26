@@ -88,7 +88,7 @@ with project.db_connection as conn:
 # Let's perform a traffic assignment in this scenario with lowered capacity
 
 # Load the network snapshot
-network = project.network.build(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
+network = project.network
 
 # Get the demand matrix
 mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])

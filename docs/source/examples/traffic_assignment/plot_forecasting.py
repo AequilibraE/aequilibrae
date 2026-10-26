@@ -60,7 +60,7 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # %%
 
-network = project.network.build()
+network = project.network
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
@@ -348,7 +348,7 @@ assig = TrafficAssignment(
     capacity_field="capacity",
     algorithm="bfw",
 )
-assig.execute(max_iterations=500, rgap=1e-05)
+assig.execute(max_iterations=500, rgap=0.00001)
 
 # %%
 # To save our select link results, all we need to do is provide it with a name.

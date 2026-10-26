@@ -72,7 +72,6 @@ graph = data.create_graph(
 # %%
 # Connector project matching
 # --------------------------
-network = project.network.build()
 graph.create_line_geometry(method="connector project match", graph="c")
 data.save_graphs()
 data.load()

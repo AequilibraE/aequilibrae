@@ -4,7 +4,7 @@ from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def assignment_setup(sioux_falls_example):
     classes = []
     for name, mode, core, pce in (
@@ -25,7 +25,7 @@ def assignment_setup(sioux_falls_example):
             )
         )
     yield TrafficAssignment(
-        network=sioux_falls_example.network.build(),
+        network=sioux_falls_example.network,
         classes=classes,
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -42,7 +42,9 @@ def test_execute_and_save_results(assignment_setup):
     assert set(assignment.class_results) == {"car", "truck", "motorcycle"}
     assignment.save_results("save_to_database")
     assignment.save_skims(matrix_name="my_skims", which_ones="all")
+
     with pytest.raises(ValueError):
         assignment.save_results("save_to_database")
+
     with pytest.raises(FileExistsError):
         assignment.save_skims(matrix_name="my_skims", which_ones="all")

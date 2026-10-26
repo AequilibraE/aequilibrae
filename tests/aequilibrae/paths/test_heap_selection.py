@@ -16,7 +16,7 @@ from .routing_helpers import make_context
 
 
 def build_graph(project):
-    graph = project.network.build().build_graph(mode="c", cost="distance")
+    graph = project.network.build_graph(mode="c", cost="distance")
     graph.set_blocked_centroid_flows(False)
     graph.set_graph(cost_field="distance")
     graph.set_skimming("distance")

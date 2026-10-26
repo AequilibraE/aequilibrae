@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, NetworkData, Graph, Project, AequilibraeMatrix
+from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
 from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
@@ -13,10 +13,12 @@ def transit(coquimbo_example: Project):
 
 @pytest.fixture(scope="function")
 def graph(coquimbo_example: Project):
-    network = coquimbo_example.network.build(fields=["distance"], modes=["c"])
-    network.links["capacity"] = 500.0
-    network.links["travel_time"] = network.links.distance / 50
-    g = network.build_graph(mode="c", cost="travel_time", skimming=["travel_time"], block_centroid_flows=False)
+    g = coquimbo_example.network.build_graph("c", "distance", fields=["distance"], block_centroid_flows=False)
+    g.network["capacity"] = 500.0
+    g.network["travel_time"] = g.network.distance / 50
+    g.prepare_graph(g.centroids)
+    g.set_graph("travel_time")
+    g.set_skimming(["travel_time"])
     return g
 
 
@@ -31,7 +33,7 @@ def demand(graph):
 
 def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None) -> TrafficAssignment:
     links = graph.network.assign(capacity=500.0, travel_time=graph.network.distance / 50)
-    network = NetworkData(links, centroids=graph.centroids, modes=["c"])
+    network = Graph(network=links, centroids=graph.centroids)
     traffic = TrafficClass(
         name="car", mode="c", cost="travel_time", demand=demand, skimming=["travel_time"], block_centroid_flows=False
     )

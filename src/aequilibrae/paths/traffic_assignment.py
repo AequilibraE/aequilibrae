@@ -3,7 +3,6 @@ import logging
 import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
-from functools import cache
 from os import path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
@@ -15,9 +14,10 @@ from numpy import nan_to_num
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.assignment_context import PreparedTrafficClass, validate_assignment_demand
+from aequilibrae.paths.assignment_context import PreparedTrafficClass, _AssignmentNetwork, validate_assignment_demand
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.network_data import NetworkData
+from aequilibrae.paths.graph import Graph
+from aequilibrae.project.network.network import Network
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF
@@ -125,8 +125,9 @@ class AssignmentBase(ABC):
 class TrafficAssignment(AssignmentBase):
     """Traffic assignment class.
 
-    The constructor validates the network fields, modes, demand, and VDF parameters.
-    ``execute()`` prepares compact routing contexts and returns link results.
+    The constructor checks configuration without reading the network.
+    ``execute()`` loads and validates network values, prepares compact routing
+    contexts, and returns link results.
     Classes with matching routing policies share graph and reporting mappings.
     Each class owns its costs, demand, skims, and output buffers.
 
@@ -135,7 +136,7 @@ class TrafficAssignment(AssignmentBase):
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
         >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
-        >>> network = project.network.build(modes=["c"])
+        >>> network = project.network
         >>> demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
         >>> cars = TrafficClass(
         ...     mode="c", cost="free_flow_time", demand=demand,
@@ -159,7 +160,7 @@ class TrafficAssignment(AssignmentBase):
     def __init__(
         self,
         *,
-        network: NetworkData,
+        network: Network | Graph,
         classes: list[TrafficClass],
         time_field: str,
         capacity_field: str,
@@ -169,15 +170,17 @@ class TrafficAssignment(AssignmentBase):
         preload=None,
         project=None,
     ) -> None:
-        """Validate a complete assignment configuration without preparing graphs.
+        """Check assignment configuration without reading or preparing the network.
 
         ``name_mapping`` maps VDF parameter names to network fields or constants.
         Without a mapping, VDF defaults supply values.
         Preload arrays use directed links in ascending link-ID and direction order.
         """
+        if not isinstance(network, (Network, Graph)):
+            raise TypeError("network must be a project Network or an in-memory Graph")
+        if project is None and isinstance(network, Network):
+            project = network.project
         super().__init__(project=project)
-        if not isinstance(network, NetworkData):
-            raise TypeError("network must be a NetworkData")
         classes = tuple(classes)
         if not classes or any(not isinstance(cls, TrafficClass) for cls in classes):
             raise TypeError("classes must contain at least one TrafficClass")
@@ -185,6 +188,9 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Traffic class names must be unique")
         if not isinstance(vdf, VDF):
             raise TypeError("vdf must be a VDF")
+        for label, field in (("time_field", time_field), ("capacity_field", capacity_field)):
+            if not isinstance(field, str) or not field:
+                raise ValueError(f"{label} must be a nonempty string")
         if not isinstance(algorithm, str) or algorithm.lower() not in self.all_algorithms:
             raise ValueError(f"Assignment algorithm must be one of {self.all_algorithms}")
         self.network = network
@@ -213,7 +219,6 @@ class TrafficAssignment(AssignmentBase):
         self.rgap_target = defaults["rgap"]
         self.bfw_conjugacy = "approximate"
         self.steps_below_needed_to_terminate = 1
-        self._validate_network_configuration()
         self._config = {
             "Algorithm": self.algorithm,
             "Time field": time_field,
@@ -232,13 +237,8 @@ class TrafficAssignment(AssignmentBase):
     def get_skim_results(self):
         return {name: results.skims for name, results in self.class_results.items()}
 
-    def _validate_network_configuration(self, prepared=None):
-        network = self.network if prepared is None else prepared.data
-        if prepared is None:
-            rows, directions = network._directed_indices()
-            field_values = cache(lambda field: network._field_values(field, rows, directions))
-        else:
-            field_values = prepared.field_values
+    def _validate_network_configuration(self, network):
+        field_values = network.field_values
         for field in (self.time_field, self.capacity_field):
             values = field_values(field)
             if not np.isfinite(values).all() or np.any(values <= 0):
@@ -310,7 +310,8 @@ class TrafficAssignment(AssignmentBase):
     ) -> pd.DataFrame:
         """Prepare graphs, run assignment, and return link results.
 
-        Execution options apply to this run. Each run owns fresh graphs and outputs.
+        Execution options apply to this run. Project inputs are read when the
+        run starts. Each run owns fresh routing contexts and outputs.
         """
         defaults = self.parameters["assignment"]["equilibrium"]
         max_iterations = defaults["maximum_iterations"] if max_iterations is None else max_iterations
@@ -319,7 +320,7 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("max_iterations must be a positive integer")
         if isinstance(rgap, bool) or not isinstance(rgap, (int, float)) or not np.isfinite(rgap) or rgap < 0:
             raise ValueError("rgap must be nonnegative and finite")
-        if bfw_conjugacy not in self.all_bfw_conjugacies:
+        if not isinstance(bfw_conjugacy, str) or bfw_conjugacy.lower() not in self.all_bfw_conjugacies:
             raise ValueError(f"bfw_conjugacy must be one of {self.all_bfw_conjugacies}")
         if (
             isinstance(steps_below_needed_to_terminate, bool)
@@ -329,11 +330,11 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("steps_below_needed_to_terminate must be a positive integer")
         if isinstance(cores, bool):
             raise ValueError("cores must be an integer")
-        network = self.network._prepare()
+        network = self._load_network()
         self._validate_network_configuration(network)
         self.max_iter = max_iterations
         self.rgap_target = float(rgap)
-        self.bfw_conjugacy = bfw_conjugacy
+        self.bfw_conjugacy = bfw_conjugacy.lower()
         self.steps_below_needed_to_terminate = steps_below_needed_to_terminate
         self.cores = resolve_cores(self.parameters["system"]) if cores is None else clamp_cores(cores)
         self._prepared_network = network
@@ -368,6 +369,25 @@ class TrafficAssignment(AssignmentBase):
         self.total_flow = self.assignment.total_flow.copy()
         return self.results()
 
+    def _load_network(self):
+        if isinstance(self.network, Network):
+            # Retain numeric attributes for additional skims after execution.
+            fields = [self.time_field, self.capacity_field, *self.network.skimmable_fields()]
+            for cls in self.classes:
+                fields.extend([cls.cost, *cls.skimming])
+                if cls.fixed_cost_field:
+                    fields.append(cls.fixed_cost_field)
+            fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
+            links, _, restrictions, allow_uturns = self.network._load_graph_data(list(dict.fromkeys(fields)))
+            modes = self.network.list_modes()
+        else:
+            links = self.network.network.copy(deep=True)
+            restrictions = self.network._turn_restrictions
+            restrictions = None if restrictions is None else restrictions.copy(deep=True)
+            allow_uturns = self.network.allow_path_uturns
+            modes = None if "modes" in links else {cls.mode for cls in self.classes}
+        return _AssignmentNetwork(links, modes=modes, turn_restrictions=restrictions, allow_uturns=allow_uturns)
+
     def _network_field(self, field):
         # VDF callables receive writable memoryviews. Keep their buffers separate
         # from the immutable attributes shared by class routing inputs.
@@ -389,6 +409,7 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"At least one {parameter_name} is not finite")
             if "bounds" not in parameter_data:
                 continue
+
             minimum, maximum = parameter_data["bounds"]
 
             if parameter_data.get("inclusive_lower", True):

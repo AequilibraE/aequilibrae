@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae import Graph, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 
@@ -10,7 +10,7 @@ def configuration(sioux_falls_example):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return {
-        "network": project.network.build(modes=["c"]),
+        "network": project.network,
         "classes": [
             TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand, block_centroid_flows=False)
         ],
@@ -30,8 +30,8 @@ def configuration(sioux_falls_example):
         ({"classes": []}, TypeError),
         ({"classes": [1, 2]}, TypeError),
         ({"algorithm": "invalid"}, ValueError),
-        ({"time_field": "missing"}, ValueError),
-        ({"capacity_field": "missing"}, ValueError),
+        ({"time_field": ""}, ValueError),
+        ({"capacity_field": None}, ValueError),
         ({"name_mapping": {"b": "alpha"}}, ValueError),
     ],
 )
@@ -92,9 +92,7 @@ def test_frank_wolfe_alias(configuration, algorithm):
 
 
 def test_vdf_defaults_do_not_depend_on_matching_network_fields(configuration):
-    network = configuration["network"]
-    network.links["alpha"] = 0.8
-    network.links["beta"] = 2.0
+    configuration["network"] = Graph(network=configuration["network"].links.data.assign(alpha=0.8, beta=2.0))
     assignment = TrafficAssignment(**(configuration | {"name_mapping": None}))
     assignment.execute(max_iterations=1, cores=1)
     np.testing.assert_array_equal(assignment.vdf_parameters["alpha"], 0.15)

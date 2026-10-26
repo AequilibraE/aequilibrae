@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Project, TrafficAssignment, TrafficClass
+from aequilibrae import Graph, Project, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -22,9 +22,9 @@ def aequilibrae_init(proj_path: str, cost: str):
     Prepare the graph for skimming the network for `cost`
     """
     proj = Project.from_path(proj_path)
-    network = proj.network.build(fields=[cost, "capacity"], modes=["c"])
-    matrix = proj.matrices.get_matrix("demand_omx")
-    matrix.computational_view()
+    network = proj.network
+    with proj.matrices.get_matrix("demand_omx") as store:
+        matrix = store.subset(list(store))
     car = TrafficClass(name="car", mode="c", cost=cost, demand=matrix, block_centroid_flows=False)
     configuration = {
         "network": network,
@@ -48,12 +48,7 @@ def arkansas(path: str):
 
     proj = Project.from_path(path)
     net = proj.network
-    nodes = net.nodes
-    for node in [4701, 4702, 4703]:
-        nodes.update(node, is_centroid=0)
-    network = net.build(modes=["c"])
-    for node in [4701, 4702, 4703]:
-        nodes.update(node, is_centroid=1)
+    network = Graph(network=net.links.data, turn_restrictions=net.turn_restrictions.data)
     with proj.db_connection as conn:
         excluded = {
             row[0]
@@ -61,7 +56,7 @@ def arkansas(path: str):
                 "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
             ).fetchall()
         }
-    links = network.links
+    links = network.network
     unavailable = (links.builtyear > 2010) | (links.removedyear < 2010) | ~links.mode_code.between(10, 11)
     links.loc[unavailable | links.link_id.isin(excluded), "modes"] = ""
     defaults = {
@@ -78,8 +73,8 @@ def arkansas(path: str):
             if column in links:
                 links[column] = links[column].fillna(default)
     logger.info("Assigning AM")
-    demand = proj.matrices.get_matrix("AM_omx")
-    demand.computational_view()
+    with proj.matrices.get_matrix("AM_omx") as store:
+        demand = store.subset(list(store))
     car = TrafficClass(name="car", mode="c", cost="tt_am_10", demand=demand, vot=0.2, fixed_cost_field="hov1tollcost")
     configuration = {
         "network": network,

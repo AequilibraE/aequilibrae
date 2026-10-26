@@ -63,7 +63,7 @@ beta = 1.1  # PSL parameter
 
 # %%
 # Let's build all graphs
-network = project.network.build()
+network = project.network
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
@@ -73,7 +73,7 @@ graph = network.build_graph(mode="c", cost="distance")
 
 # %%
 # We also see what graphs are available
-network.modes
+network.list_modes()
 # %%
 # Let's say that utility is just a function of distance.
 # So we build our *utility* field as the :math:`distance * theta`.
@@ -253,7 +253,7 @@ f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 
 # %%
 # Let's prepare our graph once again
-network = project.network.build()
+network = project.network
 graph = network.build_graph(mode="c", cost="distance")
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
 graph.prepare_graph(graph.centroids)

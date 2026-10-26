@@ -10,7 +10,7 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Graph, NetworkData, TrafficAssignment
+from aequilibrae.paths import Graph, TrafficAssignment
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import bpr
@@ -307,8 +307,8 @@ def run_validation(
             fixed_cost_field="toll" if "toll" in graph.network else None,
             block_centroid_flows=False,
         )
-        network = NetworkData(
-            graph.network.assign(modes="c"), centroids=graph.centroids, turn_restrictions=graph._turn_restrictions
+        network = Graph(
+            network=graph.network.assign(modes="c"), centroids=graph.centroids, turn_restrictions=graph._turn_restrictions
         )
         return TrafficAssignment(
             network=network,
