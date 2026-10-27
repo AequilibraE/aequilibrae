@@ -13,7 +13,7 @@ We use the Coquimbo example and compare paths before and after prohibiting one s
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph.Graph.set_turn_restrictions`
+#     * :func:`aequilibrae.paths.network.Network.build_graph`
 #     * :func:`aequilibrae.paths.graph.Graph.compute_path`
 
 # %%
@@ -34,14 +34,9 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# We build all graphs and get the car graph.
-project.network.build_graphs()
-graph = project.network.graphs["c"]
-
-# %%
-# We set the cost field and disable centroid-flow blocking for this demonstration.
-graph.set_graph("distance")
-graph.set_blocked_centroid_flows(False)
+# Load the network snapshot and get the car graph.
+network = project.network.build()
+graph = network.build_graph(mode="c", cost="distance", block_centroid_flows=False)
 
 # %%
 # We choose origin/destination.
@@ -68,7 +63,10 @@ turn_restrictions = pd.DataFrame(
 # %%
 # Apply turn restrictions in memory, with node-based U-turns globally prohibited
 # (i.e. transitions that return to the previous node).
-graph.set_turn_restrictions(turn_restrictions, allow_path_uturns=False)
+graph = network.build_graph(
+    mode="c", cost="distance", turn_restrictions=turn_restrictions,
+    allow_uturns=False, block_centroid_flows=False,
+)
 
 # %%
 # Path with the custom turn prohibition.

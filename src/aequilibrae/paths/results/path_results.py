@@ -4,13 +4,12 @@ import pandas as pd
 from aequilibrae.paths.cython.a_star import a_star as run_a_star
 from aequilibrae.paths.cython.a_star import validate_scale
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.skimming import skimming
 from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace, SkimmingWorkspace
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
@@ -22,10 +21,9 @@ class PathResults:
 
         >>> from aequilibrae.paths.results import PathResults
         >>> project = create_example(project_path)
-        >>> project.network.build_graphs()
-        >>> graph = project.network.graphs['c']
-        >>> graph.set_graph('distance')
-        >>> graph.set_skimming(['distance', 'free_flow_time'])
+        >>> graph = project.network.build_graph(
+        ...     'c', 'distance', skimming=['distance', 'free_flow_time']
+        ... )
         >>> res = PathResults(graph, 1, 17)
         >>> res.update_trace(9)
         >>> project.close()
@@ -33,7 +31,7 @@ class PathResults:
 
     def __init__(
         self,
-        graph: Graph,
+        graph: GraphBase | PreparedGraph,
         origin: int,
         destination: int,
         early_exit: bool = False,
@@ -104,7 +102,7 @@ class PathResults:
         if heap is not None and heap not in available_heaps():
             raise ValueError(f"heap must be one of {available_heaps()}")
 
-    def set_graph_data(self, graph: Graph, *, coordinates: pd.DataFrame | None = None) -> None:
+    def set_graph_data(self, graph: GraphBase | PreparedGraph, *, coordinates: pd.DataFrame | None = None) -> None:
         """
         Prepare graph data for path and skim computation.
 
@@ -122,23 +120,19 @@ class PathResults:
             **ValueError**: If the graph does not have context-compatible IDs or a required node/link mapping is
                 invalid.
         """
+        if isinstance(graph, GraphBase):
+            graph = freeze_graph(graph, compact=False)
         context = make_routing_context(graph)
-        mapping = GraphMapping(context, graph.all_nodes, graph.graph.link_id, graph.graph.direction)
+        self._expansion = None
+        mapping = GraphMapping(context, graph.all_nodes, graph.graph_mapping.link_ids, graph.graph_mapping.directions)
+        skim_context = graph.skimming
+        if graph.compact:
+            self._expansion = (
+                graph.expansion_indices, graph.expansion_links, graph.full_link_ids, graph.full_directions,
+                graph.full_node_ids, graph.full_heads, graph.full_costs.copy(),
+            )
         coordinates = coordinates.copy() if coordinates is not None else None
         lonlat = graph.lonlat_index.copy()
-
-        fields = {}
-        for name in graph.skim_fields:
-            if name != graph.cost_field:
-                values = np.array(graph.graph[name], dtype=np.float64, order="C", copy=True)
-                values.flags.writeable = False
-                fields[name] = values
-
-        skim_context = SkimmingContext(
-            context.link_count,
-            link_fields=fields,
-            cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
-        )
 
         self.context = context
         self._mapping = mapping
@@ -301,11 +295,27 @@ class PathResults:
 
         links = results.connectors[states[1:]]
 
-        self.path = self._mapping.link_ids[links]
-        self.path_link_directions = self._mapping.directions[links]
-        self.path_nodes = self._mapping.path_nodes(results.origin, links)
-        # Stored labels preserve the cost of each actual arrival, including turns.
-        self.milepost = results.distances[states]
+        if self._expansion is not None:
+            offsets, expansion, link_ids, directions, nodes, heads, costs = self._expansion
+            expanded = []
+            mileposts = [0.0]
+            labels = results.distances[states]
+            for index, link in enumerate(links):
+                chain = expansion[offsets[link]:offsets[link + 1]]
+                expanded.extend(chain)
+                turn_cost = labels[index + 1] - labels[index] - costs[chain].sum()
+                mileposts.extend(mileposts[-1] + turn_cost + np.cumsum(costs[chain]))
+            expanded = np.asarray(expanded, dtype=np.int64)
+            self.path = link_ids[expanded]
+            self.path_link_directions = directions[expanded]
+            self.path_nodes = np.concatenate(([self._mapping.node_ids[results.origin]], nodes[heads[expanded]]))
+            self.milepost = np.asarray(mileposts)
+        else:
+            self.path = self._mapping.link_ids[links]
+            self.path_link_directions = self._mapping.directions[links]
+            self.path_nodes = self._mapping.path_nodes(results.origin, links)
+            # Stored labels preserve the cost of each actual arrival, including turns.
+            self.milepost = results.distances[states]
 
     def _clear_path(self) -> None:
         self.path = None

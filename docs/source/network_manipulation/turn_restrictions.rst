@@ -196,16 +196,25 @@ time costs during the equilibration process.
     >>> graph = project.network.graphs['c']
     >>> graph.set_graph('free_flow_time')
 
-    # Turn restrictions are automatically included
+    # Turn restrictions are automatically included during assignment
     >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-    >>> traffic_class = TrafficClass('car', graph, demand_matrix)
+    >>> traffic_class = TrafficClass(
+    ...     mode='c',
+    ...     cost='free_flow_time',
+    ...     demand=demand_matrix,
+    ...     name='car',
+    ...     skimming=('free_flow_time',),
+    ... )
 
-    >>> assignment = TrafficAssignment()
-    >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
-    >>> assignment.set_capacity_field('capacity')
-    >>> assignment.set_time_field('free_flow_time')
-    >>> assignment.set_algorithm('bfw')
+    >>> assignment = TrafficAssignment(
+    ...     network=project.network,
+    ...     classes=[traffic_class],
+    ...     time_field='free_flow_time',
+    ...     capacity_field='capacity',
+    ...     vdf=bpr,
+    ...     algorithm='bfw',
+    ...     name_mapping={'alpha': 0.15, 'beta': 4.0},
+    ... )
     >>> assignment.execute()
 
 Route Choice with Turn Restrictions

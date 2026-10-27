@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import numpy as np
 
-from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
+from aequilibrae.paths.graph import GraphBase, freeze_graph
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -24,11 +24,7 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
         >>> project = create_example(project_path)
-        >>> project.network.build_graphs(modes=["c"])
-
-        >>> graph = project.network.graphs['c']
-        >>> graph.set_graph("distance")
-        >>> graph.set_skimming("distance")
+        >>> graph = project.network.build_graph('c', 'distance', skimming=['distance'], compact=True)
 
         >>> skm = NetworkSkimming(graph)
         >>> skm.execute()
@@ -80,20 +76,13 @@ class NetworkSkimming(WorkerThread):
             self.signal.emit(["finished"])
             return
 
-        graph = self.graph
-        routing = make_routing_context(graph, compact=True)
+        graph = freeze_graph(self.graph, compact=True) if isinstance(self.graph, GraphBase) else self.graph
+        routing = make_routing_context(graph)
 
         # The routing objective includes turn penalties. Other fields are plain
         # compact link sums, as in PathResults.
-        fields = {}
-        for i, name in enumerate(graph.skim_fields):
-            if name != graph.cost_field:
-                fields[name] = np.ascontiguousarray(graph.compact_skims[: routing.link_count, i])
-        inputs = SkimmingContext(
-            routing.link_count,
-            link_fields=fields,
-            cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
-        )
+        inputs = graph.skimming
+        nodes_to_indices = graph.nodes_to_indices
         output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
         # Keep the requested field order and centroid index while sharing the
         # origin-major output buffer with the public AequilibraeMatrix.
@@ -101,14 +90,14 @@ class NetworkSkimming(WorkerThread):
 
         origins = []
         for row, orig in enumerate(graph.centroids):
-            if orig >= len(graph.compact_nodes_to_indices):
+            if orig >= len(nodes_to_indices):
                 self.report.append(f"Centroid {orig} is outside the compact graph")
                 continue
 
-            node = int(graph.compact_nodes_to_indices[orig])
+            node = int(nodes_to_indices[orig])
             if node < 0 or node >= routing.node_count:
                 self.report.append(f"Centroid {orig} is outside the compact graph")
-            elif graph.compact_fs[node] == graph.compact_fs[node + 1]:
+            elif routing.fs[node] == routing.fs[node + 1]:
                 self.report.append(f"Centroid {orig} has no outgoing edges")
             else:
                 origins.append((row, node))

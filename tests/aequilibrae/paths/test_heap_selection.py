@@ -16,12 +16,9 @@ from .routing_helpers import make_context
 
 
 def build_graph(project):
-    project.network.build_graphs()
-    graph = project.network.graphs["c"]
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph(cost_field="distance")
-    graph.set_skimming("distance")
-    return graph
+    return project.network.build_graph(
+        mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False
+    )
 
 
 @pytest.mark.parametrize("heap", available_heaps())

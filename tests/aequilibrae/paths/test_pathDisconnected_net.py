@@ -1,6 +1,7 @@
 from itertools import product
 
 import geopandas as gpd
+import numpy as np
 
 from aequilibrae.paths.results import PathResults
 
@@ -9,10 +10,7 @@ def test_path_disconnected_delete_link(sioux_falls_example):
     with sioux_falls_example.db_connection as conn:
         conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
 
-    sioux_falls_example.network.build_graphs()
-    graph = sioux_falls_example.network.graphs["c"]
-    graph.set_graph("free_flow_time")
-    graph.set_blocked_centroid_flows(False)
+    graph = sioux_falls_example.network.build_graph(mode="c", cost="free_flow_time", block_centroid_flows=False)
 
     lonlat = graph.lonlat_index
     points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
@@ -38,11 +36,11 @@ def test_path_disconnected_delete_link(sioux_falls_example):
 def test_path_disconnected_penalize_link_in_memory(sioux_falls_example):
     links = [2, 4, 5, 14]
 
-    sioux_falls_example.network.build_graphs()
-    graph = sioux_falls_example.network.graphs["c"]
-    graph.exclude_links(links)
-    graph.set_graph("free_flow_time")
-    graph.set_blocked_centroid_flows(False)
+    network = sioux_falls_example.network.build()
+    graph = network.build_graph(mode="c", cost="free_flow_time", block_centroid_flows=False)
+    costs = network.field_values("free_flow_time").copy()
+    costs[np.isin(network.link_ids, links)] = np.inf
+    graph.set_costs(costs)
 
     lonlat = graph.lonlat_index
     points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)

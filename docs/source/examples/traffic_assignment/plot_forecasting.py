@@ -55,27 +55,12 @@ basic_config()
 # In this step, we'll set the skims for the variable ``free_flow_time``, and execute the
 # traffic assignment for the base-year.
 
+from dataclasses import replace
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # %%
 
-# We build all graphs
-project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs. 
-# This is true, but we won't use those fields.
-
-# We grab the graph for cars
-graph = project.network.graphs["c"]
-
-# Let's say we want to minimize the free_flow_time
-graph.set_graph("free_flow_time")
-
-# And will skim time and distance while we are at it
-graph.set_skimming(["free_flow_time", "distance"])
-
-# And we will allow paths to be computed going through other centroids/centroid connectors
-# required for the Sioux Falls network, as all nodes are centroids
-graph.set_blocked_centroid_flows(False)
+network = project.network
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
@@ -90,32 +75,27 @@ demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 # Let's perform the traffic assignment
 
 # Create the assignment class
-assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
+assigclass = TrafficClass(
+    name="car",
+    mode="c",
+    cost="free_flow_time",
+    demand=demand,
+    skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
+    block_centroid_flows=False,
+)
 
-assig = TrafficAssignment()
-
-# We start by adding the list of traffic classes to be assigned
-assig.add_class(assigclass)
-
-# Then we set these parameters, which an only be configured after adding one class to the assignment
-# Setting the volume delay function and its parameters
-
-assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-assig.set_capacity_field("capacity")
-
-
-# The free flow travel times as they exist in the graph
-assig.set_time_field("free_flow_time")
-
-# And the algorithm we want to use to assign
-assig.set_algorithm("bfw")
-
-# Since we haven't checked the parameters file, let's make sure convergence criteria is good
-assig.max_iter = 1000
-assig.rgap_target = 0.001
-
-# we then execute the assignment
-assig.execute()
+# Configure the VDF, network fields, and assignment algorithm.
+assig = TrafficAssignment(
+    network=network,
+    classes=[assigclass],
+    vdf=bpr,
+    name_mapping={"alpha": "b", "beta": "power"},
+    capacity_field="capacity",
+    time_field="free_flow_time",
+    algorithm="bfw",
+)
+assig.execute(max_iterations=1000, rgap=0.001)
 
 # %%
 # After finishing the assignment, we can easily see the convergence report.
@@ -322,26 +302,15 @@ list(demand)
 # The future year assignment is quite similar to the one we did for the base-year.
 
 # So, let's create the assignment class
-assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
-
-assig = TrafficAssignment()
-
-# Add at a list of traffic classes to be assigned
-assig.add_class(assigclass)
-
-# Set the volume delay function and its parameters
-assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-
-# Set the capacity and free flow travel times as they exist in the graph
-assig.set_time_field("free_flow_time")
-assig.set_capacity_field("capacity")
-
-# And the algorithm we want to use to assign
-assig.set_algorithm("bfw")
-
-# Once again we haven't checked the parameters file, so let's make sure convergence criteria is good
-assig.max_iter = 500
-assig.rgap_target = 0.00001
+assigclass = TrafficClass(
+    name="car",
+    mode="c",
+    cost="free_flow_time",
+    demand=demand,
+    skimming=["free_flow_time", "distance"],
+    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
+    block_centroid_flows=False,
+)
 
 # %%
 # Now we select two sets of links to execute select link analysis.
@@ -367,10 +336,19 @@ select_links = {
 # %%
 
 # We call this command on the class we are analyzing with our dictionary of values
-assigclass.set_select_links(select_links)
+assigclass = replace(assigclass, select_link_sets=select_links)
 
-# we then execute the assignment
-assig.execute()
+# Configure the VDF, network fields, and assignment algorithm.
+assig = TrafficAssignment(
+    network=network,
+    classes=[assigclass],
+    vdf=bpr,
+    name_mapping={"alpha": "b", "beta": "power"},
+    time_field="free_flow_time",
+    capacity_field="capacity",
+    algorithm="bfw",
+)
+assig.execute(max_iterations=500, rgap=0.00001)
 
 # %%
 # To save our select link results, all we need to do is provide it with a name.

@@ -1,13 +1,16 @@
+import numpy as np
+
+
 def test_connectivity_analysis(sioux_falls_example):
     network = sioux_falls_example.network
-    network.build_graphs()
-    graph = network.graphs["c"]
-
-    graph.block_centroid_flows = False
+    graph = network.build_graph(mode="c", cost="distance", block_centroid_flows=False)
 
     disconnected = graph.disconnected_nodes()
     assert disconnected.shape[0] == 0
 
-    graph.exclude_links([5, 12, 19])  # Disconnect nodes 1, 2, and 6 from the reset of the graph
+    source = network.build()
+    costs = source.field_values("distance").copy()
+    costs[np.isin(source.link_ids, [5, 12, 19])] = np.inf  # Disconnect nodes 1, 2, and 6 from the rest of the graph
+    graph.set_costs(costs)
     disconnected = graph.disconnected_nodes()
     assert disconnected.shape[0] == 3

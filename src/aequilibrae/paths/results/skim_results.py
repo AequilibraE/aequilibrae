@@ -2,7 +2,7 @@ from typing import List
 
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.dijkstra import HEAP_MAP
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import GraphBase, PreparedGraph
 from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
@@ -15,16 +15,13 @@ class SkimResults:
           >>> from aequilibrae.paths.results import SkimResults
 
           >>> project = create_example(project_path)
-          >>> project.network.build_graphs()
 
           # Mode c is car in this project
-          >>> car_graph = project.network.graphs['c']
-
           # minimize travel time
-          >>> car_graph.set_graph('free_flow_time')
-
           # Skims travel time and distance
-          >>> car_graph.set_skimming(['free_flow_time', 'distance'])
+          >>> car_graph = project.network.build_graph(
+          ...     'c', 'free_flow_time', skimming=['free_flow_time', 'distance'], compact=True
+          ... )
 
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
@@ -40,7 +37,7 @@ class SkimResults:
 
         self._heap = "4ary"
 
-    def prepare(self, graph: Graph, output: SkimmingOutputs | None = None):
+    def prepare(self, graph: GraphBase | PreparedGraph, output: SkimmingOutputs | None = None):
         """
         Prepares the object with dimensions corresponding to the graph objects
 
@@ -51,7 +48,7 @@ class SkimResults:
         """
 
         if not graph.cost_field:
-            raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
+            raise ValueError("Build the graph with a cost field before skimming")
 
         if output is None:
             output = SkimmingOutputs(graph.num_zones, graph.num_zones, graph.skim_fields)

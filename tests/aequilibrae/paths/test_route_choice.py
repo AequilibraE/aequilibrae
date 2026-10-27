@@ -14,10 +14,10 @@ from aequilibrae.paths.route_choice import RouteChoice
 
 @pytest.fixture(scope="function")
 def route_choice_setup(sioux_falls_single_class):
-    sioux_falls_single_class.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
-    graph = sioux_falls_single_class.network.graphs["c"]
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    graph = sioux_falls_single_class.network.build_graph(
+        mode="c", cost="distance", fields=["distance", "free_flow_time"],
+        block_centroid_flows=False, compact=True,
+    )
 
     mat = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
 
@@ -139,7 +139,7 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
     rc.save_path_files(tmp_path)
 
     if change_cost:
-        graph.set_graph("free_flow_time")
+        graph.set_costs(project.network.build(fields=["free_flow_time"]).field_values("free_flow_time"))
 
     rc2 = RouteChoice(graph)
     rc2.add_demand(mat)
@@ -336,7 +336,7 @@ def test_assign_from_df(route_choice_setup):
                 "origin id": [graph.centroids[0]],
                 "destination id": [graph.centroids[1]],
                 "probability": [1.0],
-                "route set": [[-graph.graph.iloc[0].link_id]],
+                "route set": [[-graph.full_link_ids[0]]],
             }
         )
         rc.assign_from_df(df=df, **args)
@@ -354,8 +354,9 @@ def test_assign_from_df(route_choice_setup):
         rc.assign_from_df(df=df, **args)
 
     # Tests that should not raise errors
-    link_ids = graph.network.sample(10).link_id.to_numpy()
-    links = graph.network[graph.network.link_id.isin(link_ids)]
+    source_links = route_choice_setup["project"].network.links.data
+    link_ids = source_links.sample(10).link_id.to_numpy()
+    links = source_links[source_links.link_id.isin(link_ids)]
     links = links.loc[links.link_id.replace({x: i for i, x in enumerate(link_ids)}).sort_values().index]
 
     values = np.random.random(len(links))
@@ -419,9 +420,8 @@ def test_assign_from_df(route_choice_setup):
 @pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
 def test_known_results(route_choice_setup, cost):
     graph = route_choice_setup["graph"]
+    graph.set_costs(route_choice_setup["project"].network.build().field_values(cost))
     rc = RouteChoiceSet(graph)
-
-    graph.set_graph(cost)
 
     np.random.seed(0)
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
@@ -453,9 +453,10 @@ def test_known_results(route_choice_setup, cost):
 
     # Test single one matrix
     u = link_loads["single one"]
-    link = graph.graph[(graph.graph.a_node == nodes[0][0] - 1) & (graph.graph.b_node == nodes[0][1] - 1)]
-
-    lid = link.link_id.values[0]
+    mask = (graph.full_node_ids[graph.full_tails] == nodes[0][0]) & (
+        graph.full_node_ids[graph.full_heads] == nodes[0][1]
+    )
+    lid = graph.full_link_ids[mask][0]
     t = table[table["route set"].apply(lambda x, lid=lid: lid in set(x))]
     v = t.probability.sum()
 
@@ -465,9 +466,8 @@ def test_known_results(route_choice_setup, cost):
 @pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
 def test_select_link(route_choice_setup, cost):
     graph = route_choice_setup["graph"]
+    graph.set_costs(route_choice_setup["project"].network.build().field_values(cost))
     rc = RouteChoiceSet(graph)
-
-    graph.set_graph(cost)
 
     np.random.seed(0)
     nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
@@ -482,10 +482,8 @@ def test_select_link(route_choice_setup, cost):
         rc.batched(
             demand,
             {
-                "sl1": frozenset(
-                    frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__
-                ),
-                "sl2": frozenset(frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[11]].__compressed_id__),
+                "sl1": frozenset(frozenset((x,)) for link in (23, 26) for x in rc.compact_links(link, 0)),
+                "sl2": frozenset(frozenset((x,)) for x in rc.compact_links(11, 0)),
             },
             max_routes=20,
             max_depth=10,

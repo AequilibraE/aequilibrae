@@ -9,6 +9,19 @@ from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace
 
 
+def build_graph_tables(project, mode="c", cost="distance"):
+    """Prepare temporary tables for tests of the low-level graph builder."""
+    from aequilibrae.paths.graph import GraphBase, _prepare_network_graph
+
+    links, centroids, turns, allow_uturns = project.network._load_graph_data()
+    graph = GraphBase()
+    graph.network = links
+    _prepare_network_graph(graph, mode, centroids, turns, True, allow_uturns)
+    graph.lonlat_index = project.network.nodes.lonlat.set_index("node_id").loc[graph.all_nodes]
+    graph.set_graph(cost)
+    return graph
+
+
 def make_context(fs, heads, costs, turns=None, *, turn=False, **options):
     costs = np.asarray(costs, dtype=np.float64)
     if not turn and turns is None:
