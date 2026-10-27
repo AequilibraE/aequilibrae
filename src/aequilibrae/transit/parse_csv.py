@@ -20,11 +20,9 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
             continue
         broken: list[str] = [x.strip() for x in row]
 
-        if not numcols:
-            numcols = len(broken)
-        else:
-            if numcols < len(broken):
-                broken.extend([""] * (numcols - len(broken)))
+        numcols = numcols or len(broken)
+        # Rows may leave out their trailing empty fields
+        broken = broken[:numcols] + [""] * (numcols - len(broken))
 
         tot.append(broken)
     titles: list[str] = tot.pop(0)
@@ -37,7 +35,7 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
 
     missing_cols_names = [x for x in column_order.keys() if x not in data.dtype.names]
     for col in missing_cols_names:
-        data = append_fields(data, col, np.array([""] * len(tot)))
+        data = append_fields(data, col, np.array([""] * len(tot)), usemask=False)
 
     if column_order:
         col_names = [x for x in column_order.keys() if x in data.dtype.names]

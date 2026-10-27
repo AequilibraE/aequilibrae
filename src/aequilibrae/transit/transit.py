@@ -89,7 +89,8 @@ class Transit(WorkerThread):
             **agency_timezone** (:obj:`str`): Time zone of the agencies (e.g. 'America/Santiago'), not kept on import
 
             **prefix_ids** (:obj:`bool`, *Optional*): Prefixes GTFS IDs with the agency, e.g. 'Metro:1', so agencies
-            sharing IDs can be exported together. Defaults to ``False``
+            sharing IDs can be exported together. Agencies imported for several dates also get the date, e.g.
+            'Metro_20260105:1'. Defaults to ``False``
         """
         with self.project.transit_connection as conn:
             export_gtfs(conn, file_path, agency_url, agency_timezone, prefix_ids)

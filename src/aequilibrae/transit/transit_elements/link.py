@@ -46,17 +46,28 @@ class Link:
         if self.geo is not None:
             self.__dict__["length"] = self.geo.length * math.pi * 6371000 / 180
 
-    def build_geo(self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point):
-        """Builds link geometry."""
+    def build_geo(
+        self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point, start: float = 0
+    ) -> float:
+        """Builds link geometry along the shape, from ``start`` along it, and returns where the link ends on the shape.
+
+        Stops found before ``start``, or before the start of the link, are visited again on loops, so they are searched
+        on the rest of the shape."""
         geo = LineString([from_point, to_point])
         if gtfs_shape is not None:
             fpos = gtfs_shape.project(from_point)
+            if fpos < start < gtfs_shape.length:
+                fpos = start + substring(gtfs_shape, start, gtfs_shape.length).project(from_point)
             tpos = gtfs_shape.project(to_point)
+            if tpos <= fpos < gtfs_shape.length:
+                tpos = fpos + substring(gtfs_shape, fpos, gtfs_shape.length).project(to_point)
             if fpos < tpos:
                 geo2 = substring(gtfs_shape, fpos, tpos)
-                geo = geo if geo2.length / geo.length > 2 else geo2
+                if geo2.length / geo.length <= 2:
+                    geo, start = geo2, tpos
 
         self.geo = geo if geo.touches(previous_end) else LineString([previous_end] + list(geo.coords))
+        return start
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit link to the database"""

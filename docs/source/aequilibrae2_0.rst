@@ -69,7 +69,7 @@ Changes in behaviour and corrections include:
 - **Scheduled dwell** is kept: ``trips_schedule`` stores each stop's arrival and departure as published, rather than
   the later of the two for both, which added the dwell at each stop to the run time towards it.
 - **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
-  run times are repaired the same way.
+  run times are repaired the same way. The number of times repaired is logged.
 - **Trips crossing midnight** in clock time (``23:58:00``, then ``00:02:00``) continue past ``24:00:00`` (``24:02:00``),
   rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as published.
 
@@ -77,9 +77,11 @@ Changes in behaviour and corrections include:
   were. Distances are in metres and speeds in metres per second.
 
 - **frequencies.txt** trips are imported, one trip per departure from ``start_time`` up to but excluding ``end_time``,
-  in every window of the trip. Every trip defined by frequencies was skipped before.
+  in every window of the trip. Every trip defined by frequencies was skipped before. Their trip IDs, such as
+  ``F-25200`` for trip ``F`` leaving at 07:00, never replace a trip of the feed.
 
-- **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``.
+- **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``, and
+  the links to a stop visited a second time follow the shape rather than a straight line.
 
 - **Patterns** are told apart by delimited stop IDs, so stop sequences such as ``1, 23`` and ``12, 3`` on one route are
   no longer the same pattern. Pattern IDs of routes with several patterns may differ from those of earlier imports.
@@ -97,8 +99,17 @@ Changes in behaviour and corrections include:
   ``Peñuelas`` was imported as ``Peuelas``, in names, IDs and fare zones alike. Feeds must be encoded in UTF-8, as
   GTFS requires.
 
-- **Fare rules** for a route or fare absent from the feed are skipped with a warning. A rule for an unknown route
-  applied to every route, and one for an unknown fare stopped the import.
+- **Fare rules** for a route or fare absent from the feed are skipped with a warning, and those for routes without
+  service on the date imported are not saved. A rule for an unknown route applied to every route, and one for an
+  unknown fare stopped the import. ``fare_zones`` lists the zones of every rule and stop, and stops without a zone
+  have a NULL ``transit_fare_zone``.
+
+- **Stations** that stops have as their ``parent_station`` are saved with the stops, so ``parent_station`` no longer
+  refers to a missing stop.
+
+- **Malformed files** no longer stop the import: rows that leave out their trailing empty fields, and files with a
+  single row that lack optional columns, are read. Stop times for stops absent from ``stops.txt`` are dropped, and
+  trips without times at their first or last stop are skipped, both with a warning.
 
 The GTFS export code was also overhauled.
 
@@ -106,7 +117,9 @@ The GTFS export code was also overhauled.
 GTFS requires the URL and time zone of the agencies, which import does not keep, so they are arguments. Each agency
 gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
 ``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can only be exported together
-with ``prefix_ids=True``, which prefixes each ID with its agency (e.g. ``Metro:1``).
+with ``prefix_ids=True``, which prefixes each ID with its agency (e.g. ``Metro:1``), and also with the service date
+for an agency imported for several dates (e.g. ``Metro_20260105:1``). Stops keep their ``parent_station``, and
+stations are written with ``location_type`` 1.
 
 .. code-block:: python
 

@@ -116,7 +116,7 @@ class GTFSReader(WorkerThread):
         logger.info("Starting deconflict_stop_times")
 
         msg = "De-conflicting stop times (Step: 6/12)"
-        total_fast = 0
+        repairs = np.zeros(3, dtype=np.int64)
         for route in simple_progress(self.trips, self.signal, msg):
             max_speeds = lookup_by_route_type(self.__max_speeds__, self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
@@ -126,12 +126,16 @@ class GTFSReader(WorkerThread):
                     if stop_times.shape[0] != len(trip.stops):
                         logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
 
-                    total_fast += self.__deconflict_trip(trip, stop_times, max_speeds)
-        if total_fast:
-            logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
+                    repairs += self.__deconflict_trip(trip, stop_times, max_speeds)
+        repaired = ["departures before their arrival", "run times of zero or less", "runs above the maximum speed"]
+        for count, problem in zip(repairs, repaired, strict=True):
+            if count:
+                logger.warning(f"{count} {problem} were repaired")
 
-    def __deconflict_trip(self, trip: Trip, stop_times: pd.DataFrame, max_speeds: pd.DataFrame) -> int:
-        """Makes run times between stops positive and no faster than the maximum speeds, keeping scheduled dwell"""
+    def __deconflict_trip(self, trip: Trip, stop_times: pd.DataFrame, max_speeds: pd.DataFrame) -> np.ndarray:
+        """Makes dwell non-negative and run times positive and no faster than the maximum speeds.
+
+        Returns the number of negative dwells, non-positive run times and runs too fast that were repaired."""
         arrivals = stop_times.arrival_time.to_numpy(dtype=np.int64)
         departures = stop_times.departure_time.to_numpy(dtype=np.int64)
         source_time = np.zeros(arrivals.shape[0], dtype=np.int64)
@@ -141,9 +145,11 @@ class GTFSReader(WorkerThread):
         events[1:] += SERVICE_DAY * np.cumsum(np.diff(events) < -SERVICE_DAY / 2)
         arrivals, departures = events[0::2], events[1::2]
 
+        negative_dwell = departures < arrivals
         dwell = np.maximum(departures - arrivals, 0)
         run = arrivals[1:] - (arrivals[:-1] + dwell[:-1])
-        source_time[1:][run <= 0] = 1
+        tied = run <= 0
+        source_time[1:][tied] = 1
         run = np.maximum(run, 1)
 
         fast = np.zeros_like(run, dtype=bool)
@@ -163,7 +169,7 @@ class GTFSReader(WorkerThread):
         stop_times["arrival_time"] = trip.arrivals = arrivals
         stop_times["departure_time"] = trip.departures = arrivals + dwell
         stop_times["source_time"] = trip.source_time = source_time
-        return int(fast.sum())
+        return np.array([negative_dwell.sum(), tied.sum(), fast.sum()])
 
     def __load_fare_data(self):
         logger.debug("Starting __load_fare_data")
@@ -326,6 +332,8 @@ class GTFSReader(WorkerThread):
                 for departure in range(int(to_seconds(start_time)), int(to_seconds(end_time)), headway):
                     shift = departure - template.departure_time.values[0]
                     new_trip_str = f"{trip}-{departure}"
+                    while new_trip_str in self.stop_times or new_trip_str in templates:
+                        new_trip_str += "-copy"
                     self.stop_times[new_trip_str] = template.assign(
                         arrival_time=template.arrival_time + shift, departure_time=template.departure_time + shift
                     )
@@ -359,6 +367,9 @@ class GTFSReader(WorkerThread):
         stops = [s.stop for s in self.stops.values()]
         stop_ids = [s.stop_id for s in self.stops.values()]
         stop_list = pd.DataFrame({"stop": stops, "stop_id": stop_ids})
+        unknown = df.stop[~df.stop.isin(stop_list.stop)].unique()
+        if unknown.shape[0]:
+            logger.warning(f"Stop times for stops absent from stops.txt were dropped: {', '.join(map(str, unknown))}")
         df = df.merge(stop_list, on="stop")
         df = df.sort_values(["trip_id", "stop_sequence"]).reset_index(drop=True)
 
@@ -366,7 +377,13 @@ class GTFSReader(WorkerThread):
         new_stop = (df.stop != df.stop.shift()) | (df.trip_id != df.trip_id.shift())
         df = df.groupby(new_stop.cumsum()).agg(dict.fromkeys(df.columns, "first") | {"departure_time": "last"})
 
-        # Stops that are not timepoints take the departure from the previous stop
+        # GTFS requires times at the first and last stops of a trip, and the stops in between take the previous time
+        ends = (df.trip_id != df.trip_id.shift()) | (df.trip_id != df.trip_id.shift(-1))
+        untimed = df.trip_id[ends & df.departure_time.isna()].unique()
+        if untimed.shape[0]:
+            trips = ", ".join(map(str, untimed))
+            logger.warning(f"Trips without times at their first or last stop were skipped: {trips}")
+            df = df[~df.trip_id.isin(untimed)]
         times = df.departure_time.groupby(df.trip_id).ffill()
         df = df.fillna({"arrival_time": times, "departure_time": times})
         df = df.astype({"arrival_time": np.int64, "departure_time": np.int64}).assign(source_time=0)

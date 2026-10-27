@@ -1,4 +1,4 @@
-from .synthetic_gtfs import add_stop, add_trips, base_tables, import_feed
+from .synthetic_gtfs import add_stop, add_trip, add_trips, base_tables, import_feed
 
 FARE = ["fare_id", "price", "currency_type", "payment_method", "transfers", "transfer_duration"]
 RULE = ["fare_id", "route_id", "origin_id", "destination_id", "contains_id"]
@@ -48,7 +48,7 @@ def test_fare_zones_are_stored_as_text(empty_project, tmp_path):
         ("two", 0, None, None, "07"),
         ("unlimited", 0, "Z1", "07", "CENTRO"),
     ]
-    assert fetch(empty_project, "SELECT transit_fare_zone FROM fare_zones") == [("07",), ("Z1",)]
+    assert fetch(empty_project, "SELECT transit_fare_zone FROM fare_zones") == [("07",), ("CENTRO",), ("Z1",)]
 
 
 def test_fare_rules_for_unknown_routes_or_fares_are_skipped(empty_project, tmp_path):
@@ -59,3 +59,16 @@ def test_fare_rules_for_unknown_routes_or_fares_are_skipped(empty_project, tmp_p
     import_feed(empty_project, tables, tmp_path / "feed.zip")
     sql = "SELECT a.fare, r.route_id IS NOT NULL FROM fare_rules r JOIN fare_attributes a USING (fare_id)"
     assert fetch(empty_project, sql) == [("free", 1), ("two", 0), ("unlimited", 0)]
+
+
+def test_fare_rules_for_routes_without_service_are_not_saved(empty_project, tmp_path):
+    """Test that a fare rule for a route without service on the date imported is not saved with a missing route."""
+    tables = fare_feed()
+    add_trip(tables, "SUN", "sunday", [("A", 25200, 25200), ("C", 25500, 25500)])
+    days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    tables["calendar.txt"].append(tables["calendar.txt"][0] | {"service_id": "sun"} | dict.fromkeys(days, 0))
+    tables["trips.txt"][-1]["service_id"] = "sun"
+    tables["fare_rules.txt"].append(dict(zip(RULE, ["two", "SUN", "", "", ""], strict=True)))
+    import_feed(empty_project, tables, tmp_path / "feed.zip")
+    sql = "SELECT COUNT(*), COUNT(route_id), SUM(route_id NOT IN (SELECT route_id FROM routes)) FROM fare_rules"
+    assert fetch(empty_project, sql) == [(3, 1, 0)]

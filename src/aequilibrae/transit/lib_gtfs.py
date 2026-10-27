@@ -258,11 +258,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
 
-            zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
-            zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
-            zone_ids = sorted((set(zone_ids1) | set(zone_ids2)) - {None})
+            # Rules for routes without service on this day would refer to routes that are not saved
+            rules = [r for r in self.gtfs_data.fare_rules if r.route is None or r.route in self.select_routes]
+            zone_ids = {zone for rule in rules for zone in [rule.origin, rule.destination, rule.contains]}
+            zone_ids |= {stop.zone for stop in self.select_stops.values()}
 
-            zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
+            zones = [[x, self.gtfs_data.agency.agency_id] for x in sorted(zone_ids - {None})]
             if zones:
                 sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
@@ -270,7 +271,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for fare in self.gtfs_data.fare_attributes.values():
                 fare.save_to_database(conn)
 
-            for fare_rule in self.gtfs_data.fare_rules:
+            for fare_rule in rules:
                 fare_rule.save_to_database(conn)
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
@@ -318,6 +319,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
             route.shape = self.__build_route_shape(patterns)
             route.pattern_id = trip.pattern_id
 
+        # The stations of the stops served, which their parent_station refers to
+        stops = {stop.stop: stop for stop in self.gtfs_data.stops.values()}
+        for stop in list(self.select_stops.values()):
+            station = stops.get(stop.parent_station)
+            if station is not None:
+                station.route_type = -1 if station.route_type is None else station.route_type
+                self.select_stops.setdefault(station.stop_id, station)
+
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
         p = Pattern(route.route_id, self)
@@ -347,6 +356,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.links.clear()
         prev_end = self.gtfs_data.stops[trip.stops[0]].geo
         pgeo = p.best_shape()
+        shape_position = 0
         for i in range(1, len(trip.stops)):
             link = Link(self.srid)
             link.pattern_id = trip.pattern_id
@@ -356,7 +366,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             tstop = trip.stops[i]
             link.from_stop = fstop
             link.to_stop = tstop
-            link.build_geo(self.gtfs_data.stops[fstop].geo, self.gtfs_data.stops[tstop].geo, pgeo, prev_end)
+            fgeo, tgeo = self.gtfs_data.stops[fstop].geo, self.gtfs_data.stops[tstop].geo
+            shape_position = link.build_geo(fgeo, tgeo, pgeo, prev_end, shape_position)
             prev_end = Point(list(link.geo.coords)[-1])
             link.type = int(route.route_type)
             p.links.append(link.transit_link)

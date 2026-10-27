@@ -48,6 +48,7 @@ class Stop(BasicPTElement):
             key = key if key != "zone_id" else "zone"
             self.__dict__[key] = value
 
+        self.zone = self.zone or None
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
 
