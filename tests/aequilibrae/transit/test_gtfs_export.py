@@ -33,14 +33,20 @@ def fetch(project, sql: str) -> list[tuple]:
         return sorted(conn.execute(sql).fetchall(), key=str)
 
 
+def export_and_import(project, tmp_path) -> Project:
+    """Export the transit services of the project and return a new project with the export imported."""
+    project.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE)
+    copy = Project()
+    copy.new(tmp_path / "copy")
+    import_zip(copy, tmp_path / "export.zip")
+    return copy
+
+
 @pytest.fixture
 def round_trip(empty_project, tmp_path):
     """The project with feed() imported, its export, and a new project with the export imported."""
     import_feed(empty_project, feed(), tmp_path / "feed.zip")
-    empty_project.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE)
-    copy = Project()
-    copy.new(tmp_path / "copy")
-    import_zip(copy, tmp_path / "export.zip")
+    copy = export_and_import(empty_project, tmp_path)
     yield empty_project, read_feed(tmp_path / "export.zip"), copy
     copy.close()
 
@@ -80,6 +86,23 @@ def test_fares_round_trip(round_trip):
     assert fetch(copy, rules) == fetch(original, rules)
 
 
+def test_accented_names_round_trip(empty_project, tmp_path):
+    """Test that IDs, names and fare zones with accents and other non-ASCII characters survive import and export."""
+    tables = base_tables()
+    names = {"Ñ1": "Peñuelas", "Ç2": "Estación São João — 1"}
+    for i, (stop, name) in enumerate(names.items()):
+        add_stop(tables, stop, -29.95, -71.33 + i * 0.004, stop_name=name, zone_id="Zona Ñ")
+    add_trips(tables, "Línea 1", list(names), [3], [7 * 3600])
+    tables["routes.txt"][0]["route_long_name"] = "Coquimbo – La Serena"
+    import_feed(empty_project, tables, tmp_path / "feed.zip")
+    copy = export_and_import(empty_project, tmp_path)
+    for project in [empty_project, copy]:
+        stops = fetch(project, "SELECT stop, name, transit_fare_zone FROM stops")
+        assert stops == [("Ç2", "Estación São João — 1", "Zona Ñ"), ("Ñ1", "Peñuelas", "Zona Ñ")]
+        assert fetch(project, "SELECT DISTINCT route, longname FROM routes") == [("Línea 1", "Coquimbo – La Serena")]
+    copy.close()
+
+
 def test_export_has_agency_service_and_times_past_midnight(round_trip):
     """Test that the export has the agency URL and time zone given, its service date and times past 24:00:00."""
     _, exported, _ = round_trip
@@ -101,3 +124,23 @@ def test_coquimbo_exports_and_imports_again(coquimbo_example, tmp_path):
     import_zip(copy, tmp_path / "export.zip", service_date=service_date)
     assert (fetch(copy, counts), schedules(copy)) == before
     copy.close()
+
+
+def test_agencies_sharing_ids_are_exported_with_prefixes(empty_project, tmp_path):
+    """Test that agencies sharing GTFS IDs are exported together only with IDs prefixed by their agency."""
+    agencies = ["NORTE", "SUR"]
+    for agency in agencies:
+        import_feed(empty_project, feed(), tmp_path / f"{agency}.zip", agency=agency)
+    with pytest.raises(ValueError, match="prefix_ids=True"):
+        empty_project.transit.export_gtfs(tmp_path / "shared.zip", URL, TIME_ZONE)
+
+    empty_project.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE, prefix_ids=True)
+    exported = read_feed(tmp_path / "export.zip")
+    assert {row["stop_id"] for row in exported["stops.txt"]} == {f"{a}:{stop}" for a in agencies for stop in STOPS}
+    assert {row["zone_id"] for row in exported["stops.txt"]} == {f"{a}:{z}" for a in agencies for z in ["Z1", "Z2"]}
+    assert {row["route_id"]: row["agency_id"] for row in exported["routes.txt"]}["SUR:N7"] == "SUR"
+    stop_times = exported["stop_times.txt"]
+    assert len(stop_times) == 2 * len(feed()["stop_times.txt"])
+    assert all(row["trip_id"].split(":")[0] == row["stop_id"].split(":")[0] for row in stop_times)
+    rules = {(row["fare_id"], row["route_id"], row["destination_id"]) for row in exported["fare_rules.txt"]}
+    assert {("NORTE:one", "NORTE:R1", ""), ("SUR:pass", "", "SUR:Z2")} <= rules

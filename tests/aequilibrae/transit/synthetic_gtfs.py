@@ -58,12 +58,12 @@ def write_feed(path, tables: dict[str, list[dict]]) -> None:
             feed.writestr(name, buffer.getvalue())
 
 
-def import_zip(project, path, service_date: str = SERVICE_DATE, **builder_calls):
+def import_zip(project, path, service_date: str = SERVICE_DATE, agency: str = "SYN", **builder_calls):
     """Import the service on ``service_date`` of a zipped GTFS feed into the project, and return the builder.
 
-    Each keyword names a ``GTFSRouteSystemBuilder`` method called with its value before loading.
+    Each further keyword names a ``GTFSRouteSystemBuilder`` method called with its value before loading.
     """
-    gtfs = project.scenario.create_transit_database().new_gtfs_builder(agency="SYN", file_path=str(path))
+    gtfs = project.scenario.create_transit_database().new_gtfs_builder(agency=agency, file_path=str(path))
     for method, value in builder_calls.items():
         getattr(gtfs, method)(value)
     gtfs.load_date(service_date)

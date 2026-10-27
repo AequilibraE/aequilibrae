@@ -49,3 +49,13 @@ def test_fare_zones_are_stored_as_text(empty_project, tmp_path):
         ("unlimited", 0, "Z1", "07", "CENTRO"),
     ]
     assert fetch(empty_project, "SELECT transit_fare_zone FROM fare_zones") == [("07",), ("Z1",)]
+
+
+def test_fare_rules_for_unknown_routes_or_fares_are_skipped(empty_project, tmp_path):
+    """Test that fare rules for a route or a fare absent from the feed are skipped, not applied to every route."""
+    tables = fare_feed()
+    unknown = [["free", "R9", "", "", ""], ["gone", "R1", "", "", ""]]
+    tables["fare_rules.txt"] += [dict(zip(RULE, row, strict=True)) for row in unknown]
+    import_feed(empty_project, tables, tmp_path / "feed.zip")
+    sql = "SELECT a.fare, r.route_id IS NOT NULL FROM fare_rules r JOIN fare_attributes a USING (fare_id)"
+    assert fetch(empty_project, sql) == [("free", 1), ("two", 0), ("unlimited", 0)]

@@ -93,12 +93,20 @@ Changes in behaviour and corrections include:
   are text. Transit migration 008 declares ``fare_rules.contains`` as text, though zone IDs that earlier imports
   turned into numbers (such as ``07`` into ``7``) cannot be recovered.
 
+- **Non-ASCII characters** are kept. Every character outside ASCII was removed from the feed before, so
+  ``Peñuelas`` was imported as ``Peuelas``, in names, IDs and fare zones alike. Feeds must be encoded in UTF-8, as
+  GTFS requires.
+
+- **Fare rules** for a route or fare absent from the feed are skipped with a warning. A rule for an unknown route
+  applied to every route, and one for an unknown fare stopped the import.
+
 The GTFS export code was also overhauled.
 
 ``Transit.export_gtfs`` writes the transit database to a zipped GTFS feed, with the GTFS IDs of the imported feeds.
 GTFS requires the URL and time zone of the agencies, which import does not keep, so they are arguments. Each agency
 gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
-``frequencies.txt`` are exported as individual trips.
+``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can only be exported together
+with ``prefix_ids=True``, which prefixes each ID with its agency (e.g. ``Metro:1``).
 
 .. code-block:: python
 

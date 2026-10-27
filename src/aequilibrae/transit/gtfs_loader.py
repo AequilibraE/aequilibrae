@@ -201,8 +201,12 @@ class GTFSReader(WorkerThread):
             data = tuple(farerl[line][list(column_order[farerltxt].keys())])
             fr = FareRule()
             fr.populate(data, ["fare", "route", "origin", "destination", "contains"])
+            # Without its route, the rule would apply to every route
+            if fr.fare not in self.fare_attributes or (fr.route is not None and fr.route not in self.routes):
+                logger.warning(f"Fare rule {data} refers to a fare or route absent from the feed and was skipped")
+                continue
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
-            if fr.route in self.routes:
+            if fr.route is not None:
                 fr.route_id = self.routes[fr.route].route_id
             fr.agency_id = self.agency.agency_id
             self.fare_rules.append(fr)

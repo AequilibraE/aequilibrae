@@ -11,43 +11,66 @@ def _hms(column: str) -> str:
     return f"printf('%02d:%02d:%02d', {column} / 3600, {column} % 3600 / 60, {column} % 60)"
 
 
+def _id(column: str) -> str:
+    # GTFS IDs are prefixed with the label of their agency on request, e.g. 'Metro:1'
+    return f"iif(:prefix, a.agency || ':', '') || {column}"
+
+
 GTFS_SQL = {
     "agency.txt": "SELECT agency agency_id, agency agency_name, :url agency_url, :tz agency_timezone FROM agencies",
-    "stops.txt": """SELECT stop stop_id, name stop_name, description stop_desc, ST_Y(geometry) stop_lat,
-                           ST_X(geometry) stop_lon, transit_fare_zone zone_id FROM stops""",
-    "routes.txt": """SELECT r.route route_id, a.agency agency_id, r.shortname route_short_name,
-                            r.longname route_long_name, r.description route_desc, r.route_type
-                     FROM routes r JOIN agencies a USING (agency_id) GROUP BY r.agency_id, r.route""",
-    "trips.txt": f"""SELECT r.route route_id, {SERVICE_ID} service_id, t.trip trip_id, t.dir direction_id,
-                            t.pattern_id shape_id
+    "stops.txt": f"""SELECT {_id("s.stop")} stop_id, s.name stop_name, s.description stop_desc,
+                            ST_Y(s.geometry) stop_lat, ST_X(s.geometry) stop_lon,
+                            {_id("NULLIF(s.transit_fare_zone, '')")} zone_id
+                     FROM stops s JOIN agencies a USING (agency_id)""",
+    "routes.txt": f"""SELECT {_id("r.route")} route_id, a.agency agency_id, r.shortname route_short_name,
+                             r.longname route_long_name, r.description route_desc, r.route_type
+                      FROM routes r JOIN agencies a USING (agency_id) GROUP BY r.agency_id, r.route""",
+    "trips.txt": f"""SELECT {_id("r.route")} route_id, {SERVICE_ID} service_id, {_id("t.trip")} trip_id,
+                            t.dir direction_id, t.pattern_id shape_id
                      FROM trips t JOIN routes r USING (pattern_id) JOIN agencies a USING (agency_id)""",
     # Stop k of a pattern starts its k-th route link, and the last stop ends its last link
     "stop_times.txt": f"""WITH pattern_stops AS (
                               SELECT pattern_id, seq, from_stop stop_id FROM route_links
                               UNION ALL
                               SELECT pattern_id, MAX(seq) + 1, to_stop FROM route_links GROUP BY pattern_id)
-                          SELECT t.trip trip_id, {_hms("s.arrival")} arrival_time, {_hms("s.departure")} departure_time,
-                                 st.stop stop_id, s.seq + 1 stop_sequence
+                          SELECT {_id("t.trip")} trip_id, {_hms("s.arrival")} arrival_time,
+                                 {_hms("s.departure")} departure_time, {_id("st.stop")} stop_id,
+                                 s.seq + 1 stop_sequence
                           FROM trips_schedule s JOIN trips t USING (trip_id)
+                          JOIN routes r ON r.pattern_id = t.pattern_id JOIN agencies a ON a.agency_id = r.agency_id
                           JOIN pattern_stops p ON p.pattern_id = t.pattern_id AND p.seq = s.seq
                           JOIN stops st ON st.stop_id = CAST(p.stop_id AS TEXT)
                           ORDER BY s.trip_id, s.seq""",
     "calendar_dates.txt": f"""SELECT {SERVICE_ID} service_id, replace(a.service_date, '-', '') date,
                                      1 exception_type FROM agencies a""",
-    "fare_attributes.txt": """SELECT f.fare fare_id, f.price, f.currency currency_type,
-                                     CAST(f.payment_method AS TEXT) payment_method, CAST(f.transfer AS TEXT) transfers,
-                                     a.agency agency_id,
-                                     CAST(CAST(f.transfer_duration AS INTEGER) AS TEXT) transfer_duration
-                              FROM fare_attributes f JOIN agencies a USING (agency_id)""",
-    "fare_rules.txt": """SELECT f.fare fare_id, (SELECT route FROM routes r WHERE r.route_id = fr.route_id) route_id,
-                                fr.origin origin_id, fr.destination destination_id, fr."contains" contains_id
-                         FROM fare_rules fr JOIN fare_attributes f USING (fare_id)""",
+    "fare_attributes.txt": f"""SELECT {_id("f.fare")} fare_id, f.price, f.currency currency_type,
+                                      CAST(f.payment_method AS TEXT) payment_method, CAST(f.transfer AS TEXT) transfers,
+                                      a.agency agency_id,
+                                      CAST(CAST(f.transfer_duration AS INTEGER) AS TEXT) transfer_duration
+                               FROM fare_attributes f JOIN agencies a USING (agency_id)""",
+    "fare_rules.txt": f"""SELECT {_id("f.fare")} fare_id,
+                                 {_id("(SELECT route FROM routes r WHERE r.route_id = fr.route_id)")} route_id,
+                                 {_id("fr.origin")} origin_id, {_id("fr.destination")} destination_id,
+                                 {_id('fr."contains"')} contains_id
+                          FROM fare_rules fr JOIN fare_attributes f USING (fare_id)
+                          JOIN agencies a ON a.agency_id = f.agency_id""",
+}
+
+# GTFS IDs that agencies sharing them would repeat in a feed
+UNIQUE_IDS = {
+    "stops.txt": "stop_id",
+    "routes.txt": "route_id",
+    "trips.txt": "trip_id",
+    "fare_attributes.txt": "fare_id",
 }
 
 
-def export_gtfs(conn: Connection, file_path, agency_url: str, agency_timezone: str) -> None:
-    params = {"url": agency_url, "tz": agency_timezone}
+def export_gtfs(conn: Connection, file_path, agency_url: str, agency_timezone: str, prefix_ids=False) -> None:
+    params = {"url": agency_url, "tz": agency_timezone, "prefix": prefix_ids}
     tables = {name: pd.read_sql_query(sql, conn, params=params) for name, sql in GTFS_SQL.items()}
+    for name, column in UNIQUE_IDS.items():
+        if tables[name][column].duplicated().any():
+            raise ValueError(f"Agencies share IDs in {name}. Export them with prefix_ids=True")
 
     # One shape per pattern, from its geometry
     geo = pd.read_sql_query("SELECT pattern_id, ST_AsBinary(geometry) wkb FROM routes", conn)
