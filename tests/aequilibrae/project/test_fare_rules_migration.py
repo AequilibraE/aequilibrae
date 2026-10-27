@@ -11,7 +11,8 @@ def test_migration_stores_fare_rule_zones_as_text():
     """Test that migration 008 declares fare rule zones as text and keeps existing rules."""
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE fare_rules (fare_id INTEGER, route_id INTEGER, origin, destination, contains INTEGER)")
-    conn.executemany("INSERT INTO fare_rules VALUES (?, ?, ?, ?, ?)", [(1, 10, "A", "B", "Z1"), (2, None, "07", None, 7)])
+    rows = [(1, 10, "A", "B", "Z1"), (2, None, "07", None, 7)]
+    conn.executemany("INSERT INTO fare_rules VALUES (?, ?, ?, ?, ?)", rows)
 
     spec = importlib.util.spec_from_file_location("migration", MIGRATION / "008_fare_rule_zones_as_text.py")
     module = importlib.util.module_from_spec(spec)

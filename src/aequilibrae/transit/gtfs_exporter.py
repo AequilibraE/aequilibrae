@@ -12,7 +12,7 @@ def _hms(column: str) -> str:
 
 
 GTFS_SQL = {
-    "agency.txt": "SELECT agency agency_id, agency agency_name, :url agency_url, :timezone agency_timezone FROM agencies",
+    "agency.txt": "SELECT agency agency_id, agency agency_name, :url agency_url, :tz agency_timezone FROM agencies",
     "stops.txt": """SELECT stop stop_id, name stop_name, description stop_desc, ST_Y(geometry) stop_lat,
                            ST_X(geometry) stop_lon, transit_fare_zone zone_id FROM stops""",
     "routes.txt": """SELECT r.route route_id, a.agency agency_id, r.shortname route_short_name,
@@ -46,7 +46,7 @@ GTFS_SQL = {
 
 
 def export_gtfs(conn: Connection, file_path, agency_url: str, agency_timezone: str) -> None:
-    params = {"url": agency_url, "timezone": agency_timezone}
+    params = {"url": agency_url, "tz": agency_timezone}
     tables = {name: pd.read_sql_query(sql, conn, params=params) for name, sql in GTFS_SQL.items()}
 
     # One shape per pattern, from its geometry
