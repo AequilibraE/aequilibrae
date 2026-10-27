@@ -124,7 +124,7 @@ zones.head()
 # significantly larger, but more flexible matrix.
 from aequilibrae.paths import SubAreaAnalysis
 
-subarea = SubAreaAnalysis(zones, mat, mode="c", cost="utility", project=project, network=network)
+subarea = SubAreaAnalysis(graph, zones, mat)
 subarea.rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False)
 subarea.rc.execute(perform_assignment=True)
 demand = subarea.post_process()
@@ -238,7 +238,9 @@ map
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists
 # our polygon. To do so we perform a select link analysis on all links and pairs of links that cross
 # the boundary. We create them as tuples of tuples to make represent the select link AND sets.
-edge_pairs = {x: (x,) for x in itertools.permutations(g.index, r=2)}
+entering = g.loc[~g.a_node.isin(inside_nodes.index) & g.b_node.isin(inside_nodes.index)].index
+exiting = g.loc[g.a_node.isin(inside_nodes.index) & ~g.b_node.isin(inside_nodes.index)].index
+edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
 single_edges = {x: ((x,),) for x in g.index}
 f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 
@@ -333,6 +335,8 @@ for (l1, l2), v in edge_pair_values.items():
     link2 = g.loc[l2]
 
     for (o, d), load in v.todok().items():
+        o = graph.centroids[o]
+        d = graph.centroids[d]
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
 
@@ -351,11 +355,12 @@ demand = pd.DataFrame(
     ),
     columns=["demand"],
 ).sort_index()
+demand.index = demand.index.set_levels([level.astype(np.int64) for level in demand.index.levels])
 demand.head()
 
 # %%
 # We'll re-prepare our graph but with our new "external" ODs.
-new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
+new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy(dtype=np.int64).reshape(-1))
 graph = network.build_graph(mode="c", cost="utility", centroids=new_centroids, compact=True)
 new_centroids
 

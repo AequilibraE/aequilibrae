@@ -611,11 +611,13 @@ understand, and then we'll perform the assignment.
         return sm
 
 
-    def assign_aeq(network: Network, mat: AequilibraeMatrix, method: str) -> TrafficAssignment:
+    def assign_aeq(
+        network: Network, mat: AequilibraeMatrix, method: str, first_thru_node: int
+    ) -> TrafficAssignment:
         traffic = TrafficClass(
             name="car", mode="c", cost="free_flow_time", demand=mat,
             fixed_cost_field="toll" if "toll" in network.links else None,
-            block_centroid_flows=False,
+            block_centroid_flows=first_thru_node > 1,
         )
         assig = TrafficAssignment(
             network=network, classes=[traffic], time_field="free_flow_time", capacity_field="capacity",
@@ -992,7 +994,7 @@ understand, and then we'll perform the assignment.
                 # --- AequilibraE ---
                 print(f"  Running AequilibraE ({method})...")
                 t0 = perf_counter()
-                assig = assign_aeq(g, mat, method)
+                assig = assign_aeq(g, mat, method, first_thru_node)
                 t_aeq = perf_counter() - t0
                 aeq_report = assig.report()
                 aeq_results = assig.results()  # indexed by link_id; PCE_AB for direction=1

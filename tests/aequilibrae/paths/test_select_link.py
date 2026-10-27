@@ -7,7 +7,7 @@ import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Network, Graph, PathResults
 from aequilibrae.paths.vdf import bpr
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, from_file
 
 
 @pytest.fixture
@@ -262,3 +262,35 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
             link = graph.full_link_ids[mask][0] - 1
             loading[link] += demand[orig, dest]
     return sl_od, loading
+
+
+def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_class):
+    project = sioux_falls_single_class
+    network = Network(pd.DataFrame({
+        "link_id": [11, 12, 13], "a_node": [1, 2, 3], "b_node": [2, 3, 4],
+        "direction": [0, 0, 0], "modes": ["c"] * 3,
+        "time": [1.0] * 3, "capacity": [100.0] * 3,
+    }))
+    classes = []
+    for name, centroids in (("first", [3, 1, 2]), ("second", [4, 2])):
+        demand = AequilibraeMatrix(index=np.array(centroids))
+        demand["flow"] = np.ones((len(centroids), len(centroids)), dtype=np.float64)
+        classes.append(TrafficClass(
+            name=name, mode="c", cost="time", demand=demand, block_centroid_flows=False,
+            select_link_sets={"chosen": [11, 12, 13]},
+        ))
+    assignment = TrafficAssignment(
+        network=network, classes=classes, time_field="time", capacity_field="capacity",
+        vdf=bpr, name_mapping={"alpha": 0.0, "beta": 1.0}, algorithm="msa", project=project,
+    )
+    assignment.execute(max_iterations=1, cores=1)
+    assignment.save_select_link_matrices("different_centroids", project=project)
+    exported = from_file(project.matrices.folder / "different_centroids.omx")
+    np.testing.assert_array_equal(exported.index, [1, 2, 3, 4])
+    for traffic in classes:
+        source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"][:, :, 0]
+        assert source.sum() > 0
+        expected = np.zeros((4, 4))
+        positions = np.searchsorted(exported.index, traffic.demand.index)
+        expected[np.ix_(positions, positions)] = source
+        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"], expected)

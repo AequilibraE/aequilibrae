@@ -206,38 +206,6 @@ class Network(WorkerThread):
             allow_uturns=allow_uturns,
         )
 
-    def compute_path(
-        self, origin, destination, *, mode, cost, skimming=(), centroids=None,
-        block_centroid_flows=True, **options,
-    ):
-        """Find a path directly from the project network."""
-        return self.build_graph(
-            mode, cost, skimming=skimming, centroids=centroids,
-            block_centroid_flows=block_centroid_flows,
-        ).compute_path(origin, destination, **options)
-
-    def compute_skims(self, *, mode, cost, skimming, centroids=None, cores=None, block_centroid_flows=True):
-        """Compute skims directly from the project network."""
-        return self.build_graph(
-            mode, cost, skimming=skimming, centroids=centroids, compact=True,
-            block_centroid_flows=block_centroid_flows,
-        ).compute_skims(cores=cores)
-
-    def estimate_heuristic_scale(self, *, mode, cost, coordinates=None, heuristic="euclidean"):
-        """Find a conservative A* scale for the selected routing cost."""
-        from aequilibrae.paths.path_heuristics import estimate_heuristic_scale
-
-        return estimate_heuristic_scale(self.build_graph(mode, cost), coordinates, heuristic=heuristic)
-
-    def route_choice(self, *, mode, cost, centroids=None, block_centroid_flows=True, coordinates=None):
-        """Prepare route choice directly from the project network."""
-        from aequilibrae.paths.route_choice import RouteChoice
-
-        graph = self.build_graph(
-            mode, cost, centroids=centroids, compact=True, block_centroid_flows=block_centroid_flows,
-        )
-        return RouteChoice(graph, project=self.project, coordinates=coordinates)
-
     def _load_graph_data(self, fields=None, limit_to_area=None):
         """Read source tables once for a graph or an assignment execution."""
         with self.__connections.db_connection as conn:

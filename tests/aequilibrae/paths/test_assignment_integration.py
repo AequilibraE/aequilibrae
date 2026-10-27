@@ -105,6 +105,30 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, name
     return assignment, traffic
 
 
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("tolls", [[np.nan] * 4, [np.nan, 2.0, 0.0, np.nan]])
+def test_nan_fixed_costs_warn_and_assign_as_zero(caplog, turn, tolls):
+    graph = diamond(turn)
+    graph.network["toll"] = tolls
+    options = {"fixed_cost_field": "toll", "fixed_cost_multiplier": 2.0, "vot": 4.0}
+    assignment, traffic = assignment_for(graph, **options)
+    assert "Cost field toll has NaN values. Converted to zero" in caplog.text
+    graph.network["toll"] = graph.network.toll.fillna(0.0)
+    reference, _ = assignment_for(graph, **options)
+    for _ in range(2):
+        assignment.execute(max_iterations=1, cores=1)
+        reference.execute(max_iterations=1, cores=1)
+        np.testing.assert_array_equal(assignment.results(), reference.results())
+        np.testing.assert_array_equal(
+            assignment.class_results[traffic.name].skims.skims,
+            reference.class_results[traffic.name].skims.skims,
+        )
+        np.testing.assert_array_equal(
+            assignment._class_states[0].fixed_cost, np.nan_to_num(assignment.network.field_values("toll")) / 2.0
+        )
+    np.testing.assert_array_equal(assignment.network.links.toll, tolls)
+
+
 @pytest.mark.parametrize("heap", available_heaps())
 @pytest.mark.parametrize("turn", [False, True])
 def test_assignment_uses_selected_heap(heap, turn):

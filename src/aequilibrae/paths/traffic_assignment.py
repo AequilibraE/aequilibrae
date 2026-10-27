@@ -279,8 +279,10 @@ class TrafficAssignment(AssignmentBase):
                     raise ValueError(f"Field {field} must contain nonnegative finite values")
             if cls.fixed_cost_field:
                 values = field_values(cls.fixed_cost_field)
-                if not np.isfinite(values).all() or np.any(values < 0):
-                    raise ValueError("Fixed costs must be nonnegative and finite")
+                if np.isinf(values).any() or np.any(values < 0):
+                    raise ValueError("Fixed costs must be nonnegative and finite where present")
+                if np.isnan(values).any():
+                    logger.warning(f"Cost field {cls.fixed_cost_field} has NaN values. Converted to zero")
             for members in cls.select_link_sets.values():
                 for link, direction in members:
                     rows = network.links.loc[network.mode_mask(cls.mode) & (network.links.link_id == link)]

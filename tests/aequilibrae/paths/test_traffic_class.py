@@ -40,6 +40,21 @@ def test_copies_skims_and_selections(tc):
         configured.select_link_sets["new"] = ()
 
 
+@pytest.mark.parametrize("name", ["screen line", "two  spaces", " leading", "trailing "])
+def test_select_link_names_replace_spaces_and_warn(tc, name):
+    selections = {name: [(1, 0)]}
+    with pytest.warns(UserWarning, match="Input string name has a space in it. Replacing with _"):
+        configured = replace(tc, select_link_sets=selections)
+    assert dict(configured.select_link_sets) == {name.replace(" ", "_"): ((1, 0),)}
+    assert selections == {name: [(1, 0)]}
+
+
+def test_select_link_name_collision_keeps_last_set_like_base(tc):
+    with pytest.warns(UserWarning, match="Replacing with _"):
+        configured = replace(tc, select_link_sets={"screen line": [1], "screen_line": [2]})
+    assert dict(configured.select_link_sets) == {"screen_line": ((2, 0),)}
+
+
 def test_old_class_constructor_is_removed(tc):
     with pytest.raises(TypeError):
         TrafficClass("car", None, tc.demand)

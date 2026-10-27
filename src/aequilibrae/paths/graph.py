@@ -1286,6 +1286,8 @@ class PreparedGraph:
     allow_path_uturns: bool
     _full_costs: np.ndarray
     _lonlat: np.ndarray
+    compact_num_links: int
+    compact_num_nodes: int
 
     @property
     def centroids(self):
@@ -1776,4 +1778,5 @@ def freeze_graph(builder, *, compact, network=None, costs=None, fields=None, cos
     return PreparedGraph(
         routing, mapping, graph_mapping, compact, builder.mode, cost_name, skimming, *arrays,
         builder.block_centroid_flows, builder.allow_path_uturns, np.array(costs[positions], copy=True), coordinates,
+        builder.compact_num_links, builder.compact_num_nodes,
     )

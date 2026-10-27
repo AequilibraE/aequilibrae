@@ -189,39 +189,3 @@ class Network:
                 block_centroid_flows=configuration.block_centroid_flows,
             )
         return self._graphs[key]
-
-    def compute_path(
-        self, origin, destination, *, mode, cost, skimming=(), centroids=None,
-        block_centroid_flows=True, **options,
-    ):
-        """Find a path using a graph prepared from this network."""
-        graph = self.build_graph(
-            mode, cost, skimming=skimming, centroids=centroids,
-            block_centroid_flows=block_centroid_flows,
-        )
-        return graph.compute_path(origin, destination, **options)
-
-    def compute_skims(self, *, mode, cost, skimming, centroids=None, cores=None, block_centroid_flows=True):
-        """Compute network skims without exposing the routing graph."""
-        graph = self.build_graph(
-            mode, cost, skimming=skimming, centroids=centroids, compact=True,
-            block_centroid_flows=block_centroid_flows,
-        )
-        return graph.compute_skims(cores=cores)
-
-    def estimate_heuristic_scale(self, *, mode, cost, coordinates=None, heuristic="euclidean"):
-        """Find a conservative A* scale for the selected routing cost."""
-        from aequilibrae.paths.path_heuristics import estimate_heuristic_scale
-
-        return estimate_heuristic_scale(self.build_graph(mode, cost), coordinates, heuristic=heuristic)
-
-    def route_choice(
-        self, *, mode, cost, centroids=None, block_centroid_flows=True, coordinates=None, project=None,
-    ):
-        """Prepare route choice for a network mode and cost field."""
-        from aequilibrae.paths.route_choice import RouteChoice
-
-        graph = self.build_graph(
-            mode, cost, centroids=centroids, compact=True, block_centroid_flows=block_centroid_flows,
-        )
-        return RouteChoice(graph, project=project, coordinates=coordinates)

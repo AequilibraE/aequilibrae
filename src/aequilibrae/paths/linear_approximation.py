@@ -543,8 +543,9 @@ class LinearApproximation(WorkerThread):
             c.congested_skims = None
             c.fixed_cost[:] = c.network.field_values(c.configuration.cost) - self.free_flow_tt
             if c.configuration.fixed_cost_field:
+                values = c.network.field_values(c.configuration.fixed_cost_field)
                 c.fixed_cost += (
-                    c.network.field_values(c.configuration.fixed_cost_field)
+                    np.where(np.isnan(values), 0.0, values)
                     * c.configuration.fixed_cost_multiplier
                     / c.configuration.vot
                 )

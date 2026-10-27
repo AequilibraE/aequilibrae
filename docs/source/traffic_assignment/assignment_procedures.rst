@@ -229,7 +229,7 @@ see the dedicated :ref:`volume_delay_functions` page, which includes:
 
 * **BPR**: Standard highway assignment (α=0.15, β=4.0)
 * **BPR2**: Enhanced over-capacity penalty (α=0.15, β=4.0)
-* **Conical**: Smooth theoretical function (α=0.15, β=4.0)
+* **Conical**: Smooth theoretical function (α=2.0, β=1.5)
 * **INRETS**: Urban arterials (α=1.0)
 * **Akcelik**: Signalized intersections (α=0.25, τ=0.8)
 

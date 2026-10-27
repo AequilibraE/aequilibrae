@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Network, Project, TrafficAssignment, TrafficClass
+from aequilibrae import Project, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -32,7 +32,7 @@ def aequilibrae_init(proj_path: str, cost: str):
     configuration = {
         "network": network,
         "vdf": bpr,
-        "time_field": cost,
+        "time_field": "distance",
         "capacity_field": "capacity",
         "name_mapping": {"alpha": 0.15, "beta": 4.0},
         "algorithm": "msa",
@@ -52,13 +52,13 @@ def arkansas(path: str):
     proj = Project()
     proj.open(path)
     net = proj.network
-    network = Network(net.links.data, turn_restrictions=net.turn_restrictions.data)
+    network = net.build(modes=["c"])
     with proj.db_connection as conn:
         sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
         exclude_from_passenger = [x[0] for x in conn.execute(sql).fetchall()]
     links = network.links
     set1 = links[(links.builtyear > 2010) | (links.removedyear < 2010)].link_id.to_list()
-    set2 = links[~links.mode_code.between(10, 11)].link_id.to_list()
+    set2 = links[(links.mode_code < 10) | (links.mode_code > 11)].link_id.to_list()
     exclude_from_passenger.extend(set1 + set2)
     links.loc[links.link_id.isin(exclude_from_passenger), "modes"] = ""
     defaults = {
@@ -67,18 +67,23 @@ def arkansas(path: str):
         "hov1tollcost": 0.0,
         "mttollcost": 0.0,
         "httollcost": 0.0,
-        "am_assncap_10": 1.0,
-        "tt_am_10": 0.001,
     }
     for field, default in defaults.items():
         for column in (field, field + "_ab", field + "_ba"):
             if column in links:
                 links[column] = links[column].fillna(default)
+    # The old graph represented excluded links as self-loops and assigned these values to them.
+    self_loops = links.a_node.eq(links.b_node) | links.link_id.isin(exclude_from_passenger)
+    for field, value in {"am_assncap_10": 1.0, "tt_am_10": 0.001}.items():
+        for column in (field, field + "_ab", field + "_ba"):
+            if column in links:
+                links.loc[self_loops, column] = value
     period = "am"
     logger.info(f"\n\n Assigning {period.upper()}")
     proj_matrices = proj.matrices
     with proj_matrices.get_matrix(f"{period.upper()}_omx") as store:
         demand = store.subset(list(store))
+    # Assignment uses the demand index as centroids, excluding 4701-4703 without changing the project.
     car = TrafficClass(name="car", mode="c", cost="tt_am_10", demand=demand, vot=0.2, fixed_cost_field="hov1tollcost")
     configuration = {
         "network": network,
@@ -160,6 +165,7 @@ def main():
                 print("BENCHING links: ", link.keys() if link else link)
                 qries = [] if link is None else list(link.values())
 
+                # Graph preparation now belongs to execute(), so it is included in these timings.
                 t = timeit.Timer(lambda: assignment.execute(max_iterations=1, rgap=1e-5, cores=args["cores"][0]))  # noqa: B023
                 times = t.repeat(repeat=3, number=args["iters"])
                 df = pd.DataFrame(

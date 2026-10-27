@@ -40,8 +40,32 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "nauru")
 
 # %%
+# To simplify the network, we need to create a graph. As Nauru doesn't have any centroid in its network
+# we have to create a centroid from an arbitrary node, otherwise we cannot create a graph.
+
+nodes = project.network.nodes
+centroid_count = nodes.data.query("is_centroid == 1").shape[0]
+
+if centroid_count == 0:
+    arbitrary_node = nodes.data["node_id"][0]
+    nodes.update(arbitrary_node, is_centroid=1)
+
+# %%
+
 # Let's analyze the mode car or 'c' in our model
 mode = "c"
+
+# %%
+
+# Let's set the graph for computation
+network = project.network
+graph = network.build_graph(mode, "distance", skimming=["distance"], compact=True, block_centroid_flows=False)
+
+# %%
+
+# Let's revert to setting up that node as centroid in case we had to do it
+if centroid_count == 0:
+    nodes.update(arbitrary_node, is_centroid=0)
 
 # %%
 # We check the number of links and nodes our project has initially.
@@ -57,9 +81,10 @@ print("This project initially has {} links and {} nodes".format(links_before.sha
 net = NetworkSimplifier(project)
 
 # %%
-# Simplification prepares its routing data from the project network.
+# When we choose to simplify the network, we pass a graph object to the function,
+# and the output of this operation is
 
-net.simplify(mode)
+net.simplify(graph)
 
 # %%
 # Let's plot the previous and actual networks!

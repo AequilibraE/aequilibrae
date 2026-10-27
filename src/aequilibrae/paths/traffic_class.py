@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -139,6 +140,9 @@ class TrafficClass:
         for name, members in self.select_link_sets.items():
             if not isinstance(name, str) or not name:
                 raise ValueError("Select-link set names must be nonempty strings")
+            if " " in name:
+                warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
+                name = "_".join(name.split(" "))
             links = []
             for member in members:
                 link, direction = (member, 0) if isinstance(member, (int, np.integer)) else member

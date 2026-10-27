@@ -305,7 +305,7 @@ def run_validation(
             demand=matrix,
             heap=heap,
             fixed_cost_field="toll" if "toll" in graph.network else None,
-            block_centroid_flows=False,
+            block_centroid_flows=graph.block_centroid_flows,
         )
         network = Network(
             graph.network.assign(modes="c"), centroids=graph.centroids, turn_restrictions=graph._turn_restrictions
