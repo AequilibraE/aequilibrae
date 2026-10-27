@@ -1,12 +1,15 @@
-"""Constructor and fixed-attribute contracts shared by the native sparse owners."""
+"""Constructor and fixed-attribute contracts shared by the native matrix owners."""
 
 import numpy as np
 import pytest
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 from aequilibrae.matrix.cython.sparse_matrix_builder import SparseMatrixBuilder
 
 
-@pytest.fixture(params=[SparseMatrix, SparseMatrixBuilder], ids=["packed_sparse", "builder"])
+@pytest.fixture(
+    params=[DenseMatrix, SparseMatrix, SparseMatrixBuilder], ids=["packed_dense", "packed_sparse", "builder"]
+)
 def owner(request):
     return request.param
 
