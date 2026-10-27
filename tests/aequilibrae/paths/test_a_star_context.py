@@ -316,9 +316,9 @@ def test_coordinate_validation_is_deferred_for_dijkstra(problem):
 def test_missing_coordinates_and_heuristic_selection():
     graph = diamond()
     result = PathResults(graph, 10, 40)
-    with pytest.raises(ValueError, match="coordinate columns"):
+    with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
         result.compute_path(10, 40, a_star=True, heuristic_scale=1)
-    with pytest.raises(ValueError, match="coordinate columns"):
+    with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
         result.compute_path(10, 40, a_star=True, heuristic="haversine", heuristic_scale=1)
     with pytest.raises(ValueError, match="heuristic must be"):
         result.set_heuristic("equirectangular")

@@ -36,17 +36,12 @@ The required information is:
     >>> from aequilibrae.utils.create_example import create_example
 
     >>> project = create_example(project_path)
-    >>> project.network.build_graphs()
 
-    # We get the graphs for cars and trucks
-    >>> graph_car = project.network.graphs['c']
-    >>> graph_truck = project.network.graphs['T']
-
-    # And also get the matrices for cars and trucks
+    # Get the matrices for cars and trucks
     >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
     >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
 
-    # We create the traffic classes
+    # Create the traffic classes
     >>> tc_car = TrafficClass(mode="c", cost="free_flow_time", demand=matrix_car,
     ...                     name="car", skimming=("free_flow_time", "distance"),
     ...                     block_centroid_flows=False)
