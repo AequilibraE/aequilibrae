@@ -79,7 +79,6 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     assig.set_time_field("trav_time")
     assig.set_frequency_field("freq")
     assig.set_algorithm("os")
-    assigclass.set_demand_matrix_core("pt")
 
     assig.execute()
 

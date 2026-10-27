@@ -13,6 +13,7 @@ from libc.stdint cimport int64_t, uint8_t, uint32_t
 from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 
+from aequilibrae.paths.cython.demand cimport DemandMatrix, DemandMatrixView
 from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
 from aequilibrae.utils.cython.bar cimport Bar
 
@@ -177,6 +178,63 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
     return rs_indptr, rs_indices, rs_data
 
 
+@cython.embedsignature(False)
+def compute_SF_in_parallel(
+    uint32_t[::1] indptr_view,  # column csc format
+    uint32_t[::1] edge_idx_view,
+    double[::1] trav_time_view,
+    double[::1] freq_view,
+    uint32_t[::1] tail_view,
+    uint32_t[::1] head_view,
+    DemandMatrix demand,  # packed [destinations, origins, fields]
+    const size_t[::1] destination_zones,
+    const int64_t[::1] o_vert_ids_view,  # origin vertices in zone order
+    const int64_t[::1] d_vert_ids_view,  # destination vertices in zone order
+    double[::1] edge_volume_view,
+    size_t vertex_count,
+    size_t edge_count,
+    int num_threads,
+    double[:, ::1] skim_col_view,
+    double[::1] u_i_vec_view,
+    double[:, :, ::1] skim_matrix,
+    uint32_t[::1] o_indices,
+    int64_t[::1] od_index_to_taz_index,
+    int64_t[::1] nodes_to_indices,
+    bint skimming,
+    bint is_travel_time,
+    size_t n_skim_cols,
+    Bridge bridge,
+):
+    _compute_SF_in_parallel(
+        indptr_view,
+        edge_idx_view,
+        trav_time_view,
+        freq_view,
+        tail_view,
+        head_view,
+        # Cython can't infer that the DenseMatrix type implies DenseMatrixView
+        # type (same with sparse), so we help it.
+        demand.view[double](),
+        destination_zones,
+        o_vert_ids_view,
+        d_vert_ids_view,
+        edge_volume_view,
+        vertex_count,
+        edge_count,
+        num_threads,
+        skim_col_view,
+        u_i_vec_view,
+        skim_matrix,
+        o_indices,
+        od_index_to_taz_index,
+        nodes_to_indices,
+        skimming,
+        is_travel_time,
+        n_skim_cols,
+        bridge
+    )
+
+
 # Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
 # without them the threads appear to enter a deadlock due to the shared edge_volume array. However
 # the indexing on that array and its slices should never collide.
@@ -187,19 +245,17 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void compute_SF_in_parallel(
+cdef void _compute_SF_in_parallel(
     uint32_t[::1] indptr_view,  # column csc format
     uint32_t[::1] edge_idx_view,
     double[::1] trav_time_view,
     double[::1] freq_view,
     uint32_t[::1] tail_view,
     uint32_t[::1] head_view,
-    uint32_t[:] d_vert_ids_view,  # destination vertices
-    uint32_t[:] destination_vertex_indices_view,
-    uint32_t[:] demand_indptr_view,  # start of each destination's slice in the destination-sorted demand arrays
-    uint32_t[:] rest_of_destinations_view,  # Used when skimming to lookup the rest of the destinations to skim from
-    uint32_t[::1] o_vert_ids_view,  # origin vertices
-    double[::1] demand_vls_view,  # volume
+    DemandMatrixView demand,  # packed [destinations, origins, fields]
+    const size_t[::1] destination_zones,
+    const int64_t[::1] o_vert_ids_view,  # origin vertices in zone order
+    const int64_t[::1] d_vert_ids_view,  # destination vertices in zone order
     double[::1] edge_volume_view,
     size_t vertex_count,
     size_t edge_count,
@@ -207,7 +263,6 @@ cdef void compute_SF_in_parallel(
     double[:, ::1] skim_col_view,
     double[::1] u_i_vec_view,
     double[:, :, ::1] skim_matrix,
-    int64_t[::1] origin_ids,
     uint32_t[::1] o_indices,
     int64_t[::1] od_index_to_taz_index,
     int64_t[::1] nodes_to_indices,
@@ -216,6 +271,11 @@ cdef void compute_SF_in_parallel(
     size_t n_skim_cols,
     Bridge bridge,
 ):
+    if destination_zones.shape[0] == 0:
+        return
+
+    num_threads = min(num_threads, destination_zones.shape[0])
+
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
         uint32_t *thread_demand_origins = NULL
@@ -245,19 +305,16 @@ cdef void compute_SF_in_parallel(
             num_threads, sizeof(double) * vertex_count * n_skim_cols)
 
         int i  # openmp on windows requires iterator variable have signed type
-        size_t k, j
-        int64_t destination_vertex
-        int64_t total = (
-            destination_vertex_indices_view.shape[0] + rest_of_destinations_view.shape[0]
-            if skimming else
-            destination_vertex_indices_view.shape[0]
-        )
+        size_t k, j, destination_zone, origin_zone
+        int64_t destination_vertex, origin_vertex
+        double demand_value
+        int64_t total = destination_zones.shape[0]
 
     cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
 
-    with nogil, parallel(num_threads=min(num_threads, o_indices.shape[0] if skimming else d_vert_ids_view.shape[0])):
-        thread_demand_origins = <uint32_t *> malloc(sizeof(uint32_t) * d_vert_ids_view.shape[0])
-        thread_demand_values = <double *> malloc(sizeof(double) * d_vert_ids_view.shape[0])
+    with nogil, parallel(num_threads=num_threads):
+        thread_demand_origins = <uint32_t *> malloc(sizeof(uint32_t) * demand.destination_count)
+        thread_demand_values = <double *> malloc(sizeof(double) * demand.destination_count)
         # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
         # we can safely read and write without collisions.
         thread_edge_volume = &edge_volume[threadid() * edge_count]
@@ -279,39 +336,27 @@ cdef void compute_SF_in_parallel(
             if bridge.should_stop():
                 break
 
-            if i < destination_vertex_indices_view.shape[0]:
-                destination_vertex = destination_vertex_indices_view[i]
-            else:
-                # Setup for when we are skimming, and demand hasn't been provided
-                # We have to go to every origin, and we just say there is 0.0 demand
-                destination_vertex = rest_of_destinations_view[i - destination_vertex_indices_view.shape[0]]
+            destination_zone = destination_zones[i]
+            destination_vertex = d_vert_ids_view[destination_zone]
 
             if nodes_to_indices[destination_vertex] == -1:
                 bar.inc()
                 continue  # Completely disconnected nodes have an index of -1
 
-            if i < destination_vertex_indices_view.shape[0]:
-                demand_size = 0
-                # the demand arrays are sorted by destination, so this destination's
-                # demand is the contiguous slice demand_indptr[i]:demand_indptr[i + 1]
-                for j in range(<size_t>demand_indptr_view[i], <size_t>demand_indptr_view[i + 1]):
-                    if nodes_to_indices[o_vert_ids_view[j]] == -1:
-                        continue
+            demand_size = 0
+            # Each packed row belongs to this destination. Dense rows visit all
+            # origins, sparse rows visit only their stored positions.
+            for j in range(demand.origin(destination_zone).entry_count()):
+                origin_zone = demand.origin(destination_zone).destination(j)
+                demand_value = demand.origin(destination_zone).values(j)[0]
+                origin_vertex = nodes_to_indices[o_vert_ids_view[origin_zone]]
+                if origin_vertex == -1 or demand_value == 0.0:
+                    continue
 
-                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
-                    thread_demand_values[demand_size] = demand_vls_view[j]
-                    # demand_size += 1 is not allowed as cython believes this is a reduction
-                    demand_size = demand_size + 1
-            else:
-                demand_size = 0
-                for j in range(<size_t>o_vert_ids_view.shape[0]):
-                    if nodes_to_indices[o_vert_ids_view[j]] == -1:
-                        continue
-
-                    thread_demand_origins[demand_size] = nodes_to_indices[o_vert_ids_view[j]]
-                    thread_demand_values[demand_size] = 0.0
-                    # demand_size += 1 is not allowed as cython believes this is a reduction
-                    demand_size = demand_size + 1
+                thread_demand_origins[demand_size] = origin_vertex
+                thread_demand_values[demand_size] = demand_value
+                # demand_size += 1 is not allowed as cython believes this is a reduction
+                demand_size = demand_size + 1
 
             # S&F
             compute_SF_in(
@@ -340,7 +385,6 @@ cdef void compute_SF_in_parallel(
                 thread_skim_j_vec,
                 n_skim_cols,
                 skim_matrix,
-                origin_ids,
                 o_indices,
                 od_index_to_taz_index,
                 skimming,
@@ -366,7 +410,7 @@ cdef void compute_SF_in_parallel(
         for j in range(edge_count):
             edge_volume_view[j] += edge_volume[i * edge_count + j]
 
-    if d_vert_ids_view.shape[0] == 1:
+    if total == 1:
         for k in range(vertex_count):
             u_i_vec_view[k] = u_i_vec_out[k]
 
@@ -405,7 +449,6 @@ cdef void compute_SF_in(
     double *skim_j_vec,
     size_t n_skim_cols,
     double[:, :, ::1] skim_matrix,
-    int64_t[::1] origin_ids,
     uint32_t[::1] o_indices,
     int64_t[::1] od_index_to_taz_index,
     bint skimming,

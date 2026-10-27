@@ -11,8 +11,8 @@ from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array
 
 
-def assignment_demand(matrix, centroids):
-    """Copy named matrices into fixed, packed dense or sparse assignment demand."""
+def assignment_demand(matrix, centroids, *, transpose=False):
+    """Copy named matrices into fixed, packed dense or sparse demand, optionally transposed."""
     if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
         raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
     if not np.array_equal(matrix.index, centroids):
@@ -21,9 +21,9 @@ def assignment_demand(matrix, centroids):
         raise ValueError("Demand must have shape (zones, zones, classes)")
 
     if isinstance(matrix, AequilibraeSparseMatrix):
-        packed = SparseMatrix.from_matrix(matrix, dtype=np.float64)
+        packed = SparseMatrix.from_matrix(matrix, dtype=np.float64, transpose=transpose)
     else:
-        packed = DenseMatrix.from_matrix(matrix, dtype=np.float64)
+        packed = DenseMatrix.from_matrix(matrix, dtype=np.float64, transpose=transpose)
     validate_demand(packed, len(centroids))
     return packed
 

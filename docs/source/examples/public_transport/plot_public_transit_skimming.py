@@ -110,7 +110,6 @@ assig.set_time_field("trav_time")
 assig.set_frequency_field("freq")
 assig.set_skimming_fields(["trav_time", "boardings", "freq"])
 assig.set_algorithm("os")
-assigclass.set_demand_matrix_core("pt")
 
 # Perform the assignment for the transit classes added
 assig.execute()

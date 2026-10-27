@@ -276,22 +276,9 @@ class TrafficClass(TransportClassBase):
 
 
 class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
+    _matrix_types = (AequilibraeMatrix, AequilibraeSparseMatrix)
+
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix | AequilibraeSparseMatrix):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
-
-        if len(matrix) == 1:
-            self.matrix_core = next(iter(matrix))
-        else:
-            self.matrix_core = None
-
-    def set_demand_matrix_core(self, core: str):
-        """
-        Set the matrix core to use for demand.
-
-        :Arguments:
-            **core** (:obj:`str`):"""
-        if core not in self.matrix:
-            raise KeyError(f"'{core}' is not present in the matrix")
-        self.matrix_core = core

@@ -186,8 +186,8 @@ cdef class SparseMatrix(_MatrixBase):
             np.copyto(values[:, i], cores[name], casting="same_kind")
 
     @classmethod
-    def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order"""
+    def from_matrix(cls, matrix, dtype=None, *, transpose=False):
+        """Copy all named matrices into one packed buffer, keeping their order, optionally transposed."""
         if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
             raise TypeError("matrix must be an AequilibraeMatrix or AequilibraeSparseMatrix")
 
@@ -204,11 +204,11 @@ cdef class SparseMatrix(_MatrixBase):
                 dtype=np.float64 if dtype is None else dtype,
                 origin_count=matrix.shape[0],
             )
-        return cls.from_dict(sources, dtype=dtype)
+        return cls.from_dict(sources, dtype=dtype, transpose=transpose)
 
     @classmethod
-    def from_dict(cls, matrices, dtype=None):
-        """Pack named dense or sparse matrices using their canonical shared COO positions."""
+    def from_dict(cls, matrices, dtype=None, *, transpose=False):
+        """Pack named dense or sparse matrices using their canonical shared COO positions, optionally transposed."""
         if not isinstance(matrices, Mapping):
             raise TypeError("matrices must be a mapping of names to arrays")
         if not matrices:
@@ -247,10 +247,16 @@ cdef class SparseMatrix(_MatrixBase):
         if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
             raise TypeError("dtype must be float32 or float64")
 
+        if transpose:
+            shape = shape[::-1]
+
         # Canonicalise each field with SciPy before constructing the union of
         # CSR indices.
         coo_matrices = {}
         for name, matrix in inputs.items():
+            if transpose:
+                matrix = matrix.T
+
             if sparse.issparse(matrix):
                 source = matrix.tocoo(copy=False)
                 # Cast values before summing duplicates to avoid source-dtype overflow.
