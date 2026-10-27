@@ -107,8 +107,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         :Arguments:
             **max_speeds** (:obj:`pd.DataFrame`): Requires 4 fields: mode, min_distance, max_distance, speed.
-            Distances are in metres between consecutive stops and speeds in metres per second. Modes are GTFS
-            route types, and extended route types use the speeds of their basic type unless they have their own.
+            Distances are in metres and speeds in metres per second.
             Modes not covered in the data will not be touched and distance brackets not covered will receive
             the maximum speed, with a warning
         """
@@ -139,8 +138,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def map_match(self, route_types=(3,)) -> None:
         """Performs map-matching for all routes of one or more types.
 
-        Defaults to map-matching Bus routes (type 3) only. A basic route type also selects the extended route
-        types that map onto it, so ``3`` also selects extended bus types such as ``700``.
+        Defaults to map-matching Bus routes (type 3) only, including extended bus types such as 700.
 
         For a reference of route types, see the inputs for
         `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
@@ -260,12 +258,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
 
-            # Fare zones are those of the stops saved and those the fare rules refer to, skipping empty ones
-            zone_ids = {stop.zone for stop in self.select_stops.values()}
-            for rule in self.gtfs_data.fare_rules:
-                zone_ids |= {rule.origin, rule.destination, rule.contains}
+            zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
+            zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
+            zone_ids = sorted((set(zone_ids1) | set(zone_ids2)) - {None})
 
-            zones = [[x, self.gtfs_data.agency.agency_id] for x in sorted(zone_ids - {None, ""})]
+            zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
             if zones:
                 sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
@@ -363,7 +360,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             prev_end = Point(list(link.geo.coords)[-1])
             link.type = int(route.route_type)
             p.links.append(link.transit_link)
-            # Loop routes go through the same pair of stops more than once, so links are keyed by their position
             self.select_links[(link.pattern_id, link.seq)] = link
 
         return p

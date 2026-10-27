@@ -1,6 +1,4 @@
 import logging
-import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List
 
 import pandas as pd
@@ -8,7 +6,7 @@ import pandas as pd
 if TYPE_CHECKING:
     from aequilibrae import Project
 
-from aequilibrae.transit.gtfs_exporter import gtfs_tables, write_gtfs
+from aequilibrae.transit.gtfs_exporter import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -80,71 +78,18 @@ class Transit(WorkerThread):
         gtfs.gtfs_data.signal: PythonSignal = self.transit
         return gtfs
 
-    def export_gtfs(
-        self,
-        file_path: os.PathLike | str,
-        *,
-        agency_url: str | Dict[int | str, str],
-        agency_timezone: str,
-        agencies: List[int | str] | None = None,
-        prefix_ids: bool = False,
-    ) -> Path:
-        """Writes the transit services in the transit database to a zipped GTFS feed
-
-        The feed has the agencies, stops, routes, trips and schedules (``agency.txt``, ``stops.txt``,
-        ``routes.txt``, ``trips.txt``, ``stop_times.txt``), the service date imported for each agency
-        (``calendar_dates.txt``), one shape per stop pattern (``shapes.txt``) and the fares, if any
-        (``fare_attributes.txt``, ``fare_rules.txt``).
-
-        Stops, routes, trips, fares and fare zones keep the GTFS IDs they were imported with, and the name given
-        to each agency on import is its ``agency_id`` and ``agency_name``. As each feed is imported for a single
-        day, each agency gets a single service (``<agency>_<YYYYMMDD>``), which runs on its service date only.
-        Shapes are the geometry of each stop pattern (map-matched, as published in GTFS or straight lines between
-        stops, in this order of preference), with the pattern ID as ``shape_id``.
-
-        GTFS requires the URL and time zone of each agency, which are not kept on import, so they must be given.
-        Fields not kept on import (e.g. route colours, headsigns or pickup types) are left out.
+    def export_gtfs(self, file_path: str, agency_url: str, agency_timezone: str) -> None:
+        """Writes the transit services of the transit database to a zipped GTFS feed
 
         :Arguments:
-            **file_path** (:obj:`str` or :obj:`PathLike`): Path of the zip file to write (e.g. 'D:/feeds/feed.zip').
-            An existing file is replaced
+            **file_path** (:obj:`str`): Path of the zip file to write (e.g. 'D:/feeds/feed.zip')
 
-            **agency_url** (:obj:`str` or :obj:`dict`): Agency URL (e.g. 'https://www.agency.com'), or a
-            dictionary with the URL of each agency, keyed by agency name or ``agency_id``
+            **agency_url** (:obj:`str`): URL of the agencies (e.g. 'https://www.agency.com'), not kept on import
 
-            **agency_timezone** (:obj:`str`): Time zone of the agencies, from the tz database
-            (e.g. 'America/Santiago'). GTFS requires all agencies in a feed to share a time zone
-
-            **agencies** (:obj:`list`, *Optional*): Agencies to export, by name (:obj:`str`) or by ``agency_id``
-            (:obj:`int`). Defaults to all agencies in the transit database
-
-            **prefix_ids** (:obj:`bool`, *Optional*): Prefix the IDs of stops, routes, trips, fares and fare zones
-            with the name of their agency and a colon (e.g. 'CTA:1234'). Agencies sharing GTFS IDs can only be
-            exported together with prefixes, as their records would merge otherwise. Defaults to ``False``
-
-        :Returns:
-            **file_path** (:obj:`Path`): Path of the zip file written
-
-        .. code-block:: python
-
-            >>> project = create_example(project_path, "coquimbo")
-
-            >>> transit = Transit(project)
-            >>> feed = transit.export_gtfs(
-            ...     Path(my_folder_path) / "coquimbo_gtfs.zip",
-            ...     agency_url="https://www.example.com",
-            ...     agency_timezone="America/Santiago",
-            ... )
-
-            >>> project.close()
+            **agency_timezone** (:obj:`str`): Time zone of the agencies (e.g. 'America/Santiago'), not kept on import
         """
         with self.project.transit_connection as conn:
-            tables = gtfs_tables(conn, agency_url, agency_timezone, agencies, prefix_ids)
-
-        path = write_gtfs(tables, file_path)
-        counts = ", ".join(f"{table.shape[0]:,} {name[:-4]}" for name, table in tables.items())
-        logger.info(f"Exported GTFS feed to {path} ({counts})")
-        return path
+            export_gtfs(conn, file_path, agency_url, agency_timezone)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

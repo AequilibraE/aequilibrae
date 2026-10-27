@@ -9,11 +9,11 @@ class Fare:
     * fare (:obj:`str`): ID of the fare as in GTFS
     * agency (:obj:`str`): Corresponding agency as inputted during import
     * agency_id (:obj:`int`): ID of the corresponding agency as in the network model
-    * price (:obj:`float`): As in GTFS
+    * price (:obj:`int`): As in GTFS
     * currency (:obj:`str`): As in GTFS
     * payment_method (:obj:`int`): As in GTFS
-    * transfer (:obj:`int`): As in GTFS, with ``None`` for unlimited transfers
-    * transfer_duration (:obj:`float`): As in GTFS, with ``None`` for transfers that do not expire"""
+    * transfer (:obj:`int`): As in GTFS
+    * transfer_duration (:obj:`int`): As in GTFS"""
 
     def __init__(self, agency_id: int):
         self.fare = ""
@@ -31,12 +31,11 @@ class Fare:
         """Adds fare information."""
         for key, value in zip(headers, record, strict=True):
             if key not in self.__dict__.keys():
-                raise KeyError(f"{key} field in fare_attributes.txt is unknown field for that file on GTFS")
+                raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")
 
-            # We convert fare_id into fare, as the GTFS header for it is not maintained in our database
+            # We convert route_id into route, as the the GTFS header for it is not maintained in our database
             key = "fare" if key == "fare_id" else key
             key = "agency" if key == "agency_id" else key
-            # Values are kept as published, as zero (e.g. a free fare) and empty (e.g. unlimited transfers) differ
             self.__dict__[key] = None if value == "" else value
 
     def save_to_database(self, conn: Connection) -> None:

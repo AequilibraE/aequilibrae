@@ -11,12 +11,10 @@ class FareRule:
     * fare (:obj:`str`): Name of the fare rule
     * route (:obj:`str`): Route ID as in GTFS to which this fare rule applies
     * route_id (:obj:`int`): Route ID as in network model to which this fare rule applies
-    * origin (:obj:`str`): Transit fare zone ID for origin
-    * destination (:obj:`str`): Transit fare zone ID for destination
-    * contains (:obj:`str`): Transit fare zone ID the trip passes through
-    * agency_id (:obj:`int`): Agency ID as in the network model
-
-    Fields left empty in GTFS, which do not restrict the rule, are ``None``"""
+    * origin (:obj:`text`): Transit fare zone ID for origin
+    * destination (:obj:`text`): Transit fare zone ID for destination
+    * contains (:obj:`str`): As in GTFS
+    * agency_id (:obj:`int`): Agency ID as in the network model"""
 
     def __init__(self):
         self.fare = ""
@@ -36,7 +34,6 @@ class FareRule:
 
             key = "fare" if key == "fare_id" else key
             key = "route" if key == "route_id" else key
-            # Zone IDs are kept as published, as text
             self.__dict__[key] = None if value == "" else value
 
     def save_to_database(self, conn: Connection) -> None:

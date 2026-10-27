@@ -78,7 +78,7 @@ class Stop(BasicPTElement):
             self.stop_desc,
             self.stop_street,
             self.taz,
-            self.zone or None,  # Fare zone IDs are text, and stops without one get NULL
+            self.zone,
             int(self.route_type),
             self.geo.wkb,
             self.srid,
