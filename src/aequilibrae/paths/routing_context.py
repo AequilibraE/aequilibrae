@@ -83,7 +83,9 @@ class GraphMapping:
         return nodes
 
 
-def make_routing_context(graph: GraphBase | PreparedGraph, costs: np.ndarray | None = None, *, compact: bool = False) -> GraphContext:
+def make_routing_context(
+    graph: GraphBase | PreparedGraph, costs: np.ndarray | None = None, *, compact: bool = False
+) -> GraphContext:
     """Copy topology from Graph into a full or compact routing context.
 
     Without costs, copy the graph's current cost buffer too. Supplied costs are
