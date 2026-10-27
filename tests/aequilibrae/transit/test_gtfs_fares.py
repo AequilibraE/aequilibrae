@@ -65,8 +65,7 @@ def test_fare_rules_for_routes_without_service_are_not_saved(empty_project, tmp_
     """Test that a fare rule for a route without service on the date imported is not saved with a missing route."""
     tables = fare_feed()
     add_trip(tables, "SUN", "sunday", [("A", 25200, 25200), ("C", 25500, 25500)])
-    days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-    tables["calendar.txt"].append(tables["calendar.txt"][0] | {"service_id": "sun"} | dict.fromkeys(days, 0))
+    tables["calendar_dates.txt"] = [{"service_id": "sun", "date": "20260111", "exception_type": 1}]
     tables["trips.txt"][-1]["service_id"] = "sun"
     tables["fare_rules.txt"].append(dict(zip(RULE, ["two", "SUN", "", "", ""], strict=True)))
     import_feed(empty_project, tables, tmp_path / "feed.zip")

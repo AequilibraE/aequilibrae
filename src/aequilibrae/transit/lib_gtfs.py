@@ -320,12 +320,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             route.pattern_id = trip.pattern_id
 
         # The stations of the stops served, which their parent_station refers to
-        stops = {stop.stop: stop for stop in self.gtfs_data.stops.values()}
-        for stop in list(self.select_stops.values()):
-            station = stops.get(stop.parent_station)
-            if station is not None:
-                station.route_type = -1 if station.route_type is None else station.route_type
-                self.select_stops.setdefault(station.stop_id, station)
+        parents = {stop.parent_station for stop in self.select_stops.values()}
+        stations = {stop.stop_id: stop for stop in self.gtfs_data.stops.values() if stop.stop in parents}
+        self.select_stops = stations | self.select_stops
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
@@ -354,7 +351,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_patterns[trip.pattern_id] = p
 
         p.links.clear()
-        prev_end = self.gtfs_data.stops[trip.stops[0]].geo
+        stops = self.gtfs_data.stops
+        prev_end = stops[trip.stops[0]].geo
         pgeo = p.best_shape()
         shape_position = 0
         for i in range(1, len(trip.stops)):
@@ -362,12 +360,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             link.pattern_id = trip.pattern_id
             link.seq = i - 1
             link.get_link_id()
-            fstop = trip.stops[i - 1]
-            tstop = trip.stops[i]
-            link.from_stop = fstop
-            link.to_stop = tstop
-            fgeo, tgeo = self.gtfs_data.stops[fstop].geo, self.gtfs_data.stops[tstop].geo
-            shape_position = link.build_geo(fgeo, tgeo, pgeo, prev_end, shape_position)
+            fstop, tstop = link.from_stop, link.to_stop = trip.stops[i - 1], trip.stops[i]
+            shape_position = link.build_geo(stops[fstop].geo, stops[tstop].geo, pgeo, prev_end, shape_position)
             prev_end = Point(list(link.geo.coords)[-1])
             link.type = int(route.route_type)
             p.links.append(link.transit_link)

@@ -133,9 +133,7 @@ class GTFSReader(WorkerThread):
                 logger.warning(f"{count} {problem} were repaired")
 
     def __deconflict_trip(self, trip: Trip, stop_times: pd.DataFrame, max_speeds: pd.DataFrame) -> np.ndarray:
-        """Makes dwell non-negative and run times positive and no faster than the maximum speeds.
-
-        Returns the number of negative dwells, non-positive run times and runs too fast that were repaired."""
+        """Repairs negative dwell, non-positive run times and runs above the maximum speeds, and returns their counts"""
         arrivals = stop_times.arrival_time.to_numpy(dtype=np.int64)
         departures = stop_times.departure_time.to_numpy(dtype=np.int64)
         source_time = np.zeros(arrivals.shape[0], dtype=np.int64)
@@ -381,8 +379,7 @@ class GTFSReader(WorkerThread):
         ends = (df.trip_id != df.trip_id.shift()) | (df.trip_id != df.trip_id.shift(-1))
         untimed = df.trip_id[ends & df.departure_time.isna()].unique()
         if untimed.shape[0]:
-            trips = ", ".join(map(str, untimed))
-            logger.warning(f"Trips without times at their first or last stop were skipped: {trips}")
+            logger.warning(f"Trips without a first or last stop time were skipped: {', '.join(map(str, untimed))}")
             df = df[~df.trip_id.isin(untimed)]
         times = df.departure_time.groupby(df.trip_id).ffill()
         df = df.fillna({"arrival_time": times, "departure_time": times})

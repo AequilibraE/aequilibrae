@@ -37,7 +37,7 @@ class Stop(BasicPTElement):
         self.dir = None
         self.srid = -1
         self.geo: Optional[Point] = None
-        self.route_type: Optional[int] = None
+        self.route_type = -1
         self.__map_matching_id__: Dict[Any, Any] = {}
         self.__moved_map_matching__ = 0
 

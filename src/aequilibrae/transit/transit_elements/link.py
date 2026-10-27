@@ -49,10 +49,7 @@ class Link:
     def build_geo(
         self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point, start: float = 0
     ) -> float:
-        """Builds link geometry along the shape, from ``start`` along it, and returns where the link ends on the shape.
-
-        Stops found before ``start``, or before the start of the link, are visited again on loops, so they are searched
-        on the rest of the shape."""
+        """Builds link geometry along the shape after ``start``, as loops visit stops again, and returns its end"""
         geo = LineString([from_point, to_point])
         if gtfs_shape is not None:
             fpos = gtfs_shape.project(from_point)

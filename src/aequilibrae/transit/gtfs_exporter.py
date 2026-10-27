@@ -33,7 +33,7 @@ GTFS_SQL = {
     "routes.txt": f"""SELECT {_id("r.route")} route_id, a.agency agency_id, r.shortname route_short_name,
                              r.longname route_long_name, r.description route_desc, r.route_type
                       FROM routes r JOIN agencies a USING (agency_id) GROUP BY r.agency_id, r.route""",
-    "trips.txt": f"""SELECT {_id("r.route")} route_id, {SERVICE_ID} service_id, {_id("t.trip")} trip_id,
+    "trips.txt": f"""SELECT {_id("t.trip")} trip_id, {_id("r.route")} route_id, {SERVICE_ID} service_id,
                             t.dir direction_id, t.pattern_id shape_id
                      FROM trips t JOIN routes r USING (pattern_id) JOIN agencies a USING (agency_id)""",
     # Stop k of a pattern starts its k-th route link, and the last stop ends its last link
@@ -64,22 +64,14 @@ GTFS_SQL = {
                           JOIN agencies a ON a.agency_id = f.agency_id""",
 }
 
-# GTFS IDs that agencies sharing them would repeat in a feed
-UNIQUE_IDS = {
-    "stops.txt": "stop_id",
-    "routes.txt": "route_id",
-    "trips.txt": "trip_id",
-    "fare_attributes.txt": "fare_id",
-}
-
 
 def export_gtfs(conn: Connection, file_path, agency_url: str, agency_timezone: str, prefix_ids=False) -> None:
     params = {"url": agency_url, "tz": agency_timezone, "prefix": prefix_ids}
     tables = {name: pd.read_sql_query(sql, conn, params=params) for name, sql in GTFS_SQL.items()}
-    for name, column in UNIQUE_IDS.items():
-        if tables[name][column].duplicated().any():
-            fix = "Import each agency once per date" if prefix_ids else "Export them with prefix_ids=True"
-            raise ValueError(f"Agencies share IDs in {name}. {fix}")
+    # The first column of these files is their ID
+    for name in ["stops.txt", "routes.txt", "trips.txt", "fare_attributes.txt"]:
+        if tables[name].iloc[:, 0].duplicated().any():
+            raise ValueError(f"Agencies share IDs in {name}. Use prefix_ids=True and import each agency once per date")
 
     # One shape per pattern, from its geometry
     geo = pd.read_sql_query("SELECT pattern_id, ST_AsBinary(geometry) wkb FROM routes", conn)

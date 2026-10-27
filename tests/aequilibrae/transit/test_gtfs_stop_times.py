@@ -92,7 +92,7 @@ def test_untimed_trip_ends_and_unknown_stops_are_dropped(empty_project, tmp_path
     with caplog.at_level(logging.WARNING, logger="aequilibrae"):
         import_feed(empty_project, tables, tmp_path / "feed.zip")
     assert schedules(empty_project) == {"unknown": times(events("A 9:00, C 9:05"))}
-    assert "first or last stop were skipped: first, last" in caplog.text
+    assert "first or last stop time were skipped: first, last" in caplog.text
     assert "absent from stops.txt were dropped: X" in caplog.text
 
 
