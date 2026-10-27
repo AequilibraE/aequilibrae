@@ -69,10 +69,9 @@ Changes in behaviour and corrections include:
 - **Scheduled dwell** is kept: ``trips_schedule`` stores each stop's arrival and departure as published, rather than
   the later of the two for both, which added the dwell at each stop to the run time towards it.
 - **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
-  run times are repaired the same way, with a warning.
+  run times are repaired the same way.
 - **Trips crossing midnight** in clock time (``23:58:00``, then ``00:02:00``) continue past ``24:00:00`` (``24:02:00``),
-  with a warning, rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as
-  published.
+  rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as published.
 
 - **Maximum speeds** set with ``set_maximum_speeds`` are applied. Distances were measured in degrees, so they never
   were. Distances are in metres and speeds in metres per second.
@@ -94,16 +93,12 @@ Changes in behaviour and corrections include:
   are text. Transit migration 008 declares ``fare_rules.contains`` as text, though zone IDs that earlier imports
   turned into numbers (such as ``07`` into ``7``) cannot be recovered.
 
-- **Fare rules** for a route absent from ``routes.txt`` are skipped with a warning, rather than applying to every
-  route.
-
 The GTFS export code was also overhauled.
 
 ``Transit.export_gtfs`` writes the transit database to a zipped GTFS feed, with the GTFS IDs of the imported feeds.
-GTFS requires the URL and time zone of each agency, which import does not keep, so they are arguments. Each agency
+GTFS requires the URL and time zone of the agencies, which import does not keep, so they are arguments. Each agency
 gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
-``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can be exported together with
-``prefix_ids=True``.
+``frequencies.txt`` are exported as individual trips.
 
 .. code-block:: python
 

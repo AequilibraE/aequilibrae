@@ -23,7 +23,6 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
 
-# Seconds in a service day
 SERVICE_DAY = 86400
 
 
