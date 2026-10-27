@@ -18,7 +18,7 @@ def parse_csv(file_name: str, column_order={}):  # noqa B006
     for row in contents:
         if not len("".join(row).strip()):
             continue
-        broken: list[str] = [x.encode("ascii", errors="ignore").decode().strip() for x in row]
+        broken: list[str] = [x.strip() for x in row]
 
         if not numcols:
             numcols = len(broken)

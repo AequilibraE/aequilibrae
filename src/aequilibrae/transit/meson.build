@@ -5,20 +5,18 @@ pyfiles = [
   'column_order.py',
   'constants.py',
   'date_tools.py',
+  'gtfs_exporter.py',
   'gtfs_loader.py',
   'lib_gtfs.py',
   'parse_csv.py',
   'route_map_matcher.py',
-  'route_system.py',
-  'service_periods.py',
+  'route_types.py',
   'transit.py',
   'transit_graph_builder.py',
 ]
 
 pkgs = [
   'functions',
-  'gtfs_writer',
-  'route_system_reader',
   'transit_elements',
 ]
 

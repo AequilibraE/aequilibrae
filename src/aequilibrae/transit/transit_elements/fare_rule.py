@@ -21,8 +21,8 @@ class FareRule:
         self.fare_id = -1
         self.route = None
         self.route_id = None
-        self.origin = -1
-        self.destination = -1
+        self.origin = None
+        self.destination = None
         self.contains = None
         self.agency_id = -1
 
@@ -34,11 +34,10 @@ class FareRule:
 
             key = "fare" if key == "fare_id" else key
             key = "route" if key == "route_id" else key
-            self.__dict__[key] = value
+            self.__dict__[key] = None if value == "" else value
 
     def save_to_database(self, conn: Connection) -> None:
         """Saves Fare rules to the database"""
-        self.contains = None if len(self.contains) == 0 else int(self.contains)
         data = [self.fare_id, self.route_id, self.origin, self.destination, self.contains]
         if not self.__exists():
             logger.warning(f"Transit Fare rule with data {data} was not added")
@@ -49,4 +48,4 @@ class FareRule:
         conn.commit()
 
     def __exists(self):
-        return min(self.fare_id, self.route_id or 0, len(self.origin) or 0, len(self.destination) or 0) >= 0
+        return min(self.fare_id, self.route_id or 0) >= 0

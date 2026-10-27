@@ -11,6 +11,7 @@ from shapely.geometry import LineString
 from shapely.ops import transform
 
 from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.route_types import lookup_by_route_type
 
 from .basic_element import BasicPTElement
 from .link import Link
@@ -146,13 +147,14 @@ class Pattern(BasicPTElement):
 
         if not self.__feed.map_matchers:
             self.__feed.builds_map_matchers()
-        if self.route_type not in mode_corresp or mode_corresp[self.route_type] not in self.__feed.map_matchers:
+        road_mode = lookup_by_route_type(mode_corresp, self.route_type)
+        if road_mode not in self.__feed.map_matchers:
             return
 
         df = pd.DataFrame(
             {"stop_id": [stop.stop_id for stop in self.stops], "geometry": [stop.geo for stop in self.stops]}
         )
-        map_matcher: RouteMapMatcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
+        map_matcher: RouteMapMatcher = self.__feed.map_matchers[road_mode]
 
         stops = gpd.GeoDataFrame(df, geometry="geometry", crs=f"EPSG:{self.__srid}").to_crs(map_matcher.crs)
 

@@ -46,28 +46,6 @@ using 8 threads for the parallelization (this CPU's *performance cores*).
 - The speed-up procedure considers the ratio between the median time for 10 runs.
 
 
-Public transport assignment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The optimal strategies kernel moved to C++. It keeps its scratch space between destinations and assignments,
-takes new costs without rebuilding the graph, and loads each strategy without sorting it. On synthetic grids,
-assignment takes about half the time it did:
-
-+------------------------+--------------+---------+--------+--------+----------+
-| Graph                  | Destinations | Threads | Before | 2.0    | Speed-up |
-+========================+==============+=========+========+========+==========+
-| 179,400 edges          | 1,000        | 1       | 10.6 s | 5.2 s  | 2.1x     |
-+------------------------+--------------+---------+--------+--------+----------+
-| 179,400 edges, 3 skims | 1,000        | 1       | 11.8 s | 5.7 s  | 2.1x     |
-+------------------------+--------------+---------+--------+--------+----------+
-| 179,400 edges          | 20,000       | 24      | 20.8 s | 11.2 s | 1.9x     |
-+------------------------+--------------+---------+--------+--------+----------+
-| 319,200 edges          | 4,000        | 24      | 8.2 s  | 4.1 s  | 2.0x     |
-+------------------------+--------------+---------+--------+--------+----------+
-| 319,200 edges, 3 skims | 4,000        | 24      | 9.1 s  | 4.8 s  | 1.9x     |
-+------------------------+--------------+---------+--------+--------+----------+
-
-
 API Changes
 --------------------
 
@@ -76,63 +54,63 @@ API Changes
 
    table_api_migration
    matrix_api_migration
-   transit_api_migration
 
 Changes in Behaviour
 --------------------
 
-Public transport
-~~~~~~~~~~~~~~~~
-Transit graph building, assignment and skimming were repaired, and these repairs change results for
-existing models. Saved transit graphs are dropped on upgrade and must be rebuilt, and GTFS feeds
-imported before 2.0 keep the defects of the old importer until they are imported again. See
-:doc:`transit_api_migration` for the API changes.
+GTFS import
+~~~~~~~~~~~
+The behaviour of GTFS importer changed in AequilibraE 2.0. Models created with previous versions, particularly those
+that imported GTFS feeds that include ``frequencies.txt``, loop routes, scheduled dwell, consecutive stops with
+equal times, free fares or unlimited transfers would benefit from being imported again.
 
-- **Line frequencies** are each line's distinct departures in the period over the period's length, rather than
-  the inverse of a minimum gap between stop events, which could fall to zero and remove the wait altogether.
-- **Default wait** is half a headway (``TransitCosting.headway_fraction = 0.5``), rather than a full headway.
-- **Waiting time skims** are the expected waits of the strategy, rather than travel time minus in-vehicle, access and
-  egress times, which also swept in alighting penalties, dwell and walking times.
-- **Transfer skims** are expected boardings minus the probability of boarding at all, rather than counts of transfer
-  edges, which were zero with the default settings.
-- **Boardings** count every boarding, now that transfers alight to the stop and board again.
-- **Unreachable pairs** skim as ``inf`` rather than ``0.0``, and their demand is reported as unassigned.
-- **Connectors** are measured geodesically, rather than in Web Mercator, and every zone connects to at least its
-  nearest stop.
-- **Dwell** is the scheduled dwell at each stop, rather than a uniform 30 s added to times that already included it.
-- **Post-midnight trips** belong to the whole-day default period, which now runs to ``48:00:00``.
-- **Trips** belong to a period by a trip-level rule, by default their first departure, so run times and headways
-  come from complete trips.
-- **Zone order** no longer matters: demand and skims follow the graph's centroids whatever the order of the
-  ``zones`` table.
-- **Public transport preloads** use half-open windows, so a trip leaving exactly at the end of a window belongs to the
-  next one.
+Changes in behaviour and corrections include:
 
-On the Coquimbo example, with default settings except ``with_walking_edges=False`` and one trip between every
-pair of zones, results before these repairs and in 2.0 compare as follows. The 07:00-09:00 rows average over the
-380 pairs both versions reach.
+- **Scheduled dwell** is kept: ``trips_schedule`` stores each stop's arrival and departure as published, rather than
+  the later of the two for both, which added the dwell at each stop to the run time towards it.
+- **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
+  run times are repaired the same way.
+- **Trips crossing midnight** in clock time (``23:58:00``, then ``00:02:00``) continue past ``24:00:00`` (``24:02:00``),
+  rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as published.
 
-+-------------+--------------------------------+--------------+---------------------------------+
-| Period      | Result                         | Before       | 2.0                             |
-+=============+================================+==============+=================================+
-| Whole day   | Zones with a connector         | 20 of 133    | 133 of 133                      |
-+-------------+--------------------------------+--------------+---------------------------------+
-| Whole day   | Zone pairs reachable           | 380          | 17,556                          |
-+-------------+--------------------------------+--------------+---------------------------------+
-| Whole day   | Unreachable pairs skimmed as 0 | 17,176       | 0 (they skim as inf)            |
-+-------------+--------------------------------+--------------+---------------------------------+
-| Whole day   | Mean boarding frequency        | 12.0 trips/h | 7.5 trips/h                     |
-+-------------+--------------------------------+--------------+---------------------------------+
-| 07:00-09:00 | Mean in-vehicle time           | 2,477 s      | 2,066 s                         |
-+-------------+--------------------------------+--------------+---------------------------------+
-| 07:00-09:00 | Mean waiting time              | 968 s        | 178 s (357 s at a full headway) |
-+-------------+--------------------------------+--------------+---------------------------------+
-| 07:00-09:00 | Mean expected cost (trav_time) | 4,191 s      | 3,453 s                         |
-+-------------+--------------------------------+--------------+---------------------------------+
-| 07:00-09:00 | Mean transfers                 | 0.00         | 0.19                            |
-+-------------+--------------------------------+--------------+---------------------------------+
-| 07:00-08:00 | Bus preload (PCE x links)      | 12,484       | 12,288                          |
-+-------------+--------------------------------+--------------+---------------------------------+
+- **Maximum speeds** set with ``set_maximum_speeds`` are applied. Distances were measured in degrees, so they never
+  were. Distances are in metres and speeds in metres per second.
+
+- **frequencies.txt** trips are imported, one trip per departure from ``start_time`` up to but excluding ``end_time``,
+  in every window of the trip. Every trip defined by frequencies was skipped before.
+
+- **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``.
+
+- **Patterns** are told apart by delimited stop IDs, so stop sequences such as ``1, 23`` and ``12, 3`` on one route are
+  no longer the same pattern. Pattern IDs of routes with several patterns may differ from those of earlier imports.
+
+- **Extended route types** (``100`` to ``1700``) take the default capacities, PCEs and maximum speeds of their basic
+  type, and map matching a basic type also matches its extended types, so extended bus types such as ``700`` can be
+  map matched.
+
+- **Fares** are stored as published: a free fare keeps its price of zero, empty ``transfers`` (unlimited transfers),
+  ``transfer_duration`` (no time limit) and ``payment_method`` are stored as NULL rather than zero, and fare zone IDs
+  are text. Transit migration 008 declares ``fare_rules.contains`` as text, though zone IDs that earlier imports
+  turned into numbers (such as ``07`` into ``7``) cannot be recovered.
+
+- **Non-ASCII characters** are kept. Every character outside ASCII was removed from the feed before, so
+  ``Peñuelas`` was imported as ``Peuelas``, in names, IDs and fare zones alike. Feeds must be encoded in UTF-8, as
+  GTFS requires.
+
+- **Fare rules** for a route or fare absent from the feed are skipped with a warning. A rule for an unknown route
+  applied to every route, and one for an unknown fare stopped the import.
+
+The GTFS export code was also overhauled.
+
+``Transit.export_gtfs`` writes the transit database to a zipped GTFS feed, with the GTFS IDs of the imported feeds.
+GTFS requires the URL and time zone of the agencies, which import does not keep, so they are arguments. Each agency
+gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
+``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can only be exported together
+with ``prefix_ids=True``, which prefixes each ID with its agency (e.g. ``Metro:1``).
+
+.. code-block:: python
+
+    transit.export_gtfs("feed.zip", agency_url="https://www.agency.com", agency_timezone="America/Santiago")
 
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
@@ -158,9 +136,9 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
 .. doctest::
 
     >>> project = create_example(project_path)
+    >>> project.network.build_graphs()
 
-    # We build the graph for cars
-    >>> graph = project.network.build_graph("c", "free_flow_time")
+    # We get the graphs for cars and trucks
+    >>> graph = project.network.graphs['c']
     >>> graph.disconnected_nodes()
     array([], dtype=int64)
-    >>> project.close()
