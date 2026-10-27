@@ -12,20 +12,28 @@ def _hms(column: str) -> str:
 
 
 def _id(column: str) -> str:
-    # GTFS IDs are prefixed with the label of their agency on request, e.g. 'Metro:1'
-    return f"iif(:prefix, a.agency || ':', '') || {column}"
+    # GTFS IDs are prefixed with the label of their agency on request, e.g. 'Metro:1', and also with the service
+    # date of the import for agencies imported for several dates, e.g. 'Metro_20260105:1'
+    repeated = "(SELECT COUNT(*) FROM agencies x WHERE x.agency = a.agency) > 1"
+    return f"iif(:prefix, iif({repeated}, {SERVICE_ID}, a.agency) || ':', '') || {column}"
 
 
 GTFS_SQL = {
-    "agency.txt": "SELECT agency agency_id, agency agency_name, :url agency_url, :tz agency_timezone FROM agencies",
+    "agency.txt": """SELECT DISTINCT agency agency_id, agency agency_name, :url agency_url, :tz agency_timezone
+                     FROM agencies""",
+    # Stations are the stops that other stops have as their parent_station
     "stops.txt": f"""SELECT {_id("s.stop")} stop_id, s.name stop_name, s.description stop_desc,
                             ST_Y(s.geometry) stop_lat, ST_X(s.geometry) stop_lon,
-                            {_id("NULLIF(s.transit_fare_zone, '')")} zone_id
-                     FROM stops s JOIN agencies a USING (agency_id)""",
+                            {_id("NULLIF(s.transit_fare_zone, '')")} zone_id,
+                            st.station IS NOT NULL location_type, {_id("p.stop")} parent_station
+                     FROM stops s JOIN agencies a USING (agency_id)
+                     LEFT JOIN stops p ON p.agency_id = s.agency_id AND p.stop = s.parent_station
+                     LEFT JOIN (SELECT DISTINCT agency_id, parent_station station FROM stops) st
+                          ON st.agency_id = s.agency_id AND st.station = s.stop""",
     "routes.txt": f"""SELECT {_id("r.route")} route_id, a.agency agency_id, r.shortname route_short_name,
                              r.longname route_long_name, r.description route_desc, r.route_type
                       FROM routes r JOIN agencies a USING (agency_id) GROUP BY r.agency_id, r.route""",
-    "trips.txt": f"""SELECT {_id("r.route")} route_id, {SERVICE_ID} service_id, {_id("t.trip")} trip_id,
+    "trips.txt": f"""SELECT {_id("t.trip")} trip_id, {_id("r.route")} route_id, {SERVICE_ID} service_id,
                             t.dir direction_id, t.pattern_id shape_id
                      FROM trips t JOIN routes r USING (pattern_id) JOIN agencies a USING (agency_id)""",
     # Stop k of a pattern starts its k-th route link, and the last stop ends its last link
@@ -56,21 +64,14 @@ GTFS_SQL = {
                           JOIN agencies a ON a.agency_id = f.agency_id""",
 }
 
-# GTFS IDs that agencies sharing them would repeat in a feed
-UNIQUE_IDS = {
-    "stops.txt": "stop_id",
-    "routes.txt": "route_id",
-    "trips.txt": "trip_id",
-    "fare_attributes.txt": "fare_id",
-}
-
 
 def export_gtfs(conn: Connection, file_path, agency_url: str, agency_timezone: str, prefix_ids=False) -> None:
     params = {"url": agency_url, "tz": agency_timezone, "prefix": prefix_ids}
     tables = {name: pd.read_sql_query(sql, conn, params=params) for name, sql in GTFS_SQL.items()}
-    for name, column in UNIQUE_IDS.items():
-        if tables[name][column].duplicated().any():
-            raise ValueError(f"Agencies share IDs in {name}. Export them with prefix_ids=True")
+    # The first column of these files is their ID
+    for name in ["stops.txt", "routes.txt", "trips.txt", "fare_attributes.txt"]:
+        if tables[name].iloc[:, 0].duplicated().any():
+            raise ValueError(f"Agencies share IDs in {name}. Use prefix_ids=True and import each agency once per date")
 
     # One shape per pattern, from its geometry
     geo = pd.read_sql_query("SELECT pattern_id, ST_AsBinary(geometry) wkb FROM routes", conn)

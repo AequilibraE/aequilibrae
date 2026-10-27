@@ -112,6 +112,34 @@ def test_export_has_agency_service_and_times_past_midnight(round_trip):
     assert night == ["23:50:00", "24:02:00", "24:10:00"]
 
 
+def test_stations_round_trip(empty_project, tmp_path):
+    """Test that the stations of the stops served are saved, and exported and imported again as their parents."""
+    tables = feed()
+    add_stop(tables, "STN", -29.95, -71.33, stop_name="Estación", location_type=1)
+    add_stop(tables, "unused", -29.90, -71.30)
+    for row in tables["stops.txt"][:2]:
+        row["parent_station"] = "STN"
+    import_feed(empty_project, tables, tmp_path / "feed.zip")
+    copy = export_and_import(empty_project, tmp_path)
+    sql = "SELECT stop, parent_station, transit_fare_zone FROM stops WHERE stop IN ('A', 'B', 'C', 'STN', 'unused')"
+    expected = [("A", "STN", "Z1"), ("B", "STN", "Z1"), ("C", "", "Z2"), ("STN", "", None)]
+    assert fetch(empty_project, sql) == fetch(copy, sql) == expected
+    exported = {row["stop_id"]: row["location_type"] for row in read_feed(tmp_path / "export.zip")["stops.txt"]}
+    assert (exported["STN"], exported["A"]) == ("1", "0")
+    copy.close()
+
+
+def test_agency_imported_for_two_dates_is_exported_with_dated_prefixes(empty_project, tmp_path):
+    """Test that an agency imported for two dates gets one agency and IDs prefixed by agency and date."""
+    for date in ["2026-01-05", "2026-01-06"]:
+        import_feed(empty_project, feed(), tmp_path / "feed.zip", service_date=date)
+    empty_project.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE, prefix_ids=True)
+    exported = read_feed(tmp_path / "export.zip")
+    assert [row["agency_id"] for row in exported["agency.txt"]] == ["SYN"]
+    dates = ["SYN_20260105", "SYN_20260106"]
+    assert {row["stop_id"] for row in exported["stops.txt"]} == {f"{d}:{stop}" for d in dates for stop in STOPS}
+
+
 def test_coquimbo_exports_and_imports_again(coquimbo_example, tmp_path):
     """Test that the Coquimbo example imports again from its export with the same routes, trips and schedules."""
     coquimbo_example.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE)
