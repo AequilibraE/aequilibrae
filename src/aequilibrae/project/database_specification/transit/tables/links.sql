@@ -1,24 +1,28 @@
---@ The links table holds all the links available in the aequilibrae network model
---@ regardless of the modes allowed on it.
+--@ The links table holds the edges of the saved Spiess & Florian transit graphs, one graph per
+--@ **period_id**.
 --@
---@ All information on the fields a_node and b_node correspond to a entries in
---@ the node_id field in the nodes table. They are automatically managed with
---@ triggers as the user edits the network, but they are not protected by manual
---@ editing, which would break the network if it were to happen.
+--@ Each edge runs from its tail, **a_node**, to its head, **b_node**, which are entries in
+--@ the node_id field of the nodes table for the same period.
 --@
---@ The **modes** field is a concatenation of all the ids (mode_id) of the models allowed
---@ on each link, and map directly to the mode_id field in the **Modes** table. A mode
---@ can only be added to a link if it exists in the **Modes** table.
+--@ Edges hold physical attributes only. A transit class turns them into the costs and frequencies it
+--@ assigns with:
+--@
+--@ * **run_time** is the mean scheduled run time of on-board edges, in seconds
+--@ * **dwell_time** is the mean scheduled dwell at the stop of dwell, boarding and alighting edges
+--@ * **walk_distance** is the geodesic length of connectors and of walks between stops, in metres, and
+--@   **walk_time** that length over the walking speed
+--@ * **headway** is the scheduled headway between departures of a boarding edge's line, and
+--@   **trip_count** the line's trips in the period
+--@ * **line_freq** is the line's distinct departures over the period length on boarding edges, and
+--@   infinite elsewhere
+--@ * **capacity** is the capacity of all the period's trips on on-board edges
+--@
+--@ **segment_id** names the physical element of an edge: *pattern_id:seq* for line edges, the stop
+--@ for connectors, and *from_stop:to_stop* for walks between stops.
 --@
 --@ The **link_type** corresponds to the *link_type* field from the *link_types* table.
---@ As it is the case for modes, a link_type can only be assigned to a link if it exists
---@ in the **link_types** table.
 --@
---@ The fields **length**, **node_a** and **node_b** are automatically
---@ updated by triggers based in the links' geometries and node positions. Link length
---@ is always measured in **meters**.
---@
---@ The table is indexed on **link_id** (its primary key), **node_a** and **node_b**.
+--@ The table is indexed on **link_id** and **period_id**, **a_node** and **b_node**.
 
 
 CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
@@ -27,17 +31,20 @@ CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                   a_node          INTEGER,
                                   b_node          INTEGER,
                                   direction       INTEGER NOT NULL DEFAULT 0,
-                                  distance        NUMERIC,
                                   modes           TEXT    NOT NULL,
                                   link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
                                   line_id         TEXT,
                                   stop_id         TEXT    REFERENCES stops(stop_id) ON update RESTRICT ON delete RESTRICT,
                                   line_seg_idx    INTEGER,
-                                  trav_time       NUMERIC  NOT NULL,
-                                  freq            NUMERIC  NOT NULL,
-                                  o_line_id       TEXT,
-                                  d_line_id       TEXT,
-                                  transfer_id     TEXT,
+                                  segment_id      TEXT,
+                                  run_time        NUMERIC NOT NULL DEFAULT 0,
+                                  dwell_time      NUMERIC NOT NULL DEFAULT 0,
+                                  walk_distance   NUMERIC NOT NULL DEFAULT 0,
+                                  walk_time       NUMERIC NOT NULL DEFAULT 0,
+                                  headway         NUMERIC NOT NULL DEFAULT 0,
+                                  trip_count      INTEGER NOT NULL DEFAULT 0,
+                                  line_freq       NUMERIC NOT NULL,
+                                  capacity        NUMERIC NOT NULL DEFAULT 0,
                                   CHECK(TYPEOF(link_id) == 'integer')
                                   UNIQUE(link_id, period_id) ON CONFLICT ABORT
                                   CHECK(link_id > 0)
@@ -75,27 +82,19 @@ CREATE INDEX idx_link_link_type ON links (link_type);
 CREATE INDEX idx_links_a_node_b_node ON links (a_node, b_node);
 
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID within the period');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_node', 'origin node for the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_id', 'Period of the graph');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','b_node', 'destination node for the link');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_node', 'tail node of the link');
+--#
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','b_node', 'head node of the link');
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','direction', 'Flow direction allowed on the link');
---#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','distance', 'length of the link');
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
--- --#
---  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
--- --#
---  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
--- --#
---  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
--- --#
---  INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_id', 'ID of the line the link belongs to');
 --#
@@ -103,14 +102,20 @@ INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, descri
 --#
 INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_seg_idx', 'Line segment index');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','trav_time', 'Travel time');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','segment_id', 'Physical segment, stop or stop pair the link belongs to');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','freq', 'Frequency of link traversal');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','run_time', 'Mean scheduled run time (s)');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','*_line_id', 'Origin/Destination line ID for transfer links');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','dwell_time', 'Mean scheduled dwell at the stop (s)');
 --#
-INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','transfer_id', 'Transfer link ID');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','walk_distance', 'Geodesic walking distance (m)');
 --#
--- INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_start', 'Graph start time');
--- --#
--- INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_end', 'Graph end period');
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','walk_time', 'Walking distance over walking speed (s)');
+--#
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','headway', 'Scheduled headway of the line (s)');
+--#
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','trip_count', 'Trips of the line in the period');
+--#
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_freq', 'Distinct departures over the period length (1/s)');
+--#
+INSERT OR REPLACE INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity', 'Capacity of the period trips');

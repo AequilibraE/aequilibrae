@@ -6,11 +6,13 @@ from types import MappingProxyType
 from typing import Mapping
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.graph import GraphBase, TransitGraph
+from aequilibrae.paths.transit_costing import TransitCosting
 from aequilibrae.paths.results import TransitAssignmentResults
 
 
@@ -181,7 +183,42 @@ class TrafficClass:
 
 
 class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
+    """A transit demand class and the costing it is assigned with.
+
+    On a graph from ``TransitGraphBuilder``, the class evaluates ``costing`` into edge costs and frequencies, and
+    writes them to the graph's time and frequency fields (``trav_time`` and ``freq``). Classes sharing a graph each
+    keep their own costing. Other graphs must provide those fields, and wait a full headway unless a costing gives
+    the headway fraction and wait weight.
+
+    .. code-block:: python
+
+        >>> from aequilibrae.paths import TransitClass, TransitCosting
+
+        >>> project = create_example(project_path, "coquimbo")
+        >>> builder = project.scenario.transit.create_graph(with_walking_edges=False)
+        >>> graph = builder.to_transit_graph()
+
+        >>> demand = AequilibraeMatrix(index=graph.centroids)
+        >>> demand["pt"] = np.ones((graph.num_zones, graph.num_zones))
+
+        >>> pt = TransitClass("pt", graph, demand, costing=TransitCosting(wait_weight=2.0))
+
+        >>> project.close()
+
+    :Arguments:
+        **name** (:obj:`str`): Unique class name.
+
+        **graph** (:obj:`TransitGraph`): Graph to assign on.
+
+        **matrix** (:obj:`AequilibraeMatrix`): Demand.
+
+        **costing** (:obj:`TransitCosting`, optional): How the class perceives the graph. Defaults to
+        ``TransitCosting()`` on graphs from ``TransitGraphBuilder``.
+    """
+
+    def __init__(
+        self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix, costing: TransitCosting | None = None
+    ):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
@@ -190,6 +227,8 @@ class TransitClass(TransportClassBase):
             self.matrix_core = next(iter(matrix))
         else:
             self.matrix_core = None
+
+        self.set_costing(costing)
 
     def set_demand_matrix_core(self, core: str):
         """
@@ -200,3 +239,108 @@ class TransitClass(TransportClassBase):
         if core not in self.matrix:
             raise KeyError(f"'{core}' is not present in the matrix")
         self.matrix_core = core
+
+    def set_costing(self, costing: TransitCosting | None = None) -> None:
+        """Set how the class perceives the graph, and write the resulting costs to the graph's fields.
+
+        :Arguments:
+            **costing** (:obj:`TransitCosting`, optional): Costing to use. Defaults to the one set through the
+            graph builder's deprecated cost attributes, or to ``TransitCosting()``.
+        """
+        if costing is None:
+            costing = self.graph.costing
+        if costing is None and TransitCosting.applies_to(self.graph.graph):
+            costing = TransitCosting()
+        if costing is not None and not isinstance(costing, TransitCosting):
+            raise TypeError("costing must be a TransitCosting")
+
+        self.costing = costing
+        if costing is not None and TransitCosting.applies_to(self.graph.graph):
+            cost, freq = costing.edge_costs(self.graph.graph)
+            self.graph.graph[self.graph.time_field] = cost
+            self.graph.graph[self.graph.frequency_field] = freq
+        self._config["Costing"] = None if costing is None else costing.to_dict()
+
+    def edge_costs(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return the cost and frequency of every edge of the graph, as this class assigns them."""
+        edges = self.graph.graph
+        if self.costing is not None and TransitCosting.applies_to(edges):
+            return self.costing.edge_costs(edges)
+        return (
+            edges[self.graph.time_field].to_numpy(dtype=np.float64),
+            edges[self.graph.frequency_field].to_numpy(dtype=np.float64),
+        )
+
+    @property
+    def wait_parameters(self) -> tuple[float, float]:
+        """Headway fraction and wait weight of the class."""
+        if self.costing is None:
+            return 1.0, 1.0
+        return self.costing.headway_fraction, self.costing.wait_weight
+
+    @property
+    def provenance(self) -> dict:
+        """The graph and costing a result of this class comes from."""
+        return {**self.graph.provenance, "costing": self._config["Costing"]}
+
+    def apply_costs(self):
+        """Give the graph's kernel this class's costs and waits, and return the kernel."""
+        cost, freq = self.edge_costs()
+        headway_fraction, wait_weight = self.wait_parameters
+        context = self.graph.context
+        context.update_costs(cost, freq, headway_fraction=headway_fraction, wait_weight=wait_weight)
+        return context
+
+    def strategy(self, origin: int, destination: int) -> pd.DataFrame:
+        """Return the optimal strategy of one trip between two zones.
+
+        Lists every edge the trip may use, with its expected ``volume`` and its ``split``, the share of the flow
+        through the edge's tail that takes it. When the graph's edges have geometry (see
+        ``TransitGraphBuilder.create_line_geometry``), the result is a GeoDataFrame in ``EPSG:4326``.
+
+        .. code-block:: python
+
+            >>> project = create_example(project_path, "coquimbo")
+            >>> builder = project.scenario.transit.create_graph(with_walking_edges=False)
+            >>> builder.create_line_geometry()
+            >>> graph = builder.to_transit_graph()
+
+            >>> demand = AequilibraeMatrix(index=graph.centroids)
+            >>> demand["pt"] = np.ones((graph.num_zones, graph.num_zones))
+
+            >>> strategy = TransitClass("pt", graph, demand).strategy(1, 50)
+
+            >>> project.close()
+
+        :Arguments:
+            **origin** (:obj:`int`): Origin zone.
+
+            **destination** (:obj:`int`): Destination zone.
+
+        :Returns:
+            **strategy** (:obj:`pd.DataFrame`): One row per edge, with its ``link_id``.
+        """
+        mapping = self.graph.od_node_mapping.set_index("taz_id")
+        o_key, d_key = ("node_id", "node_id") if "node_id" in mapping.columns else ("o_node_id", "d_node_id")
+        for zone in (origin, destination):
+            if zone not in mapping.index:
+                raise ValueError(f"zone {zone} is not in the graph")
+
+        context = self.apply_costs()
+        used = context.strategy(int(mapping.at[origin, o_key]), int(mapping.at[destination, d_key]))
+
+        edges = self.graph.graph.iloc[used.index.to_numpy()]
+        columns = [c for c in ("link_id", "link_type", "line_id", "stop_id", "segment_id") if c in edges.columns]
+        frame = edges[columns].reset_index(drop=True)
+        frame["a_node"] = self.graph.all_nodes[used["tail"].to_numpy()]
+        frame["b_node"] = self.graph.all_nodes[used["head"].to_numpy()]
+        frame["volume"] = used["volume"].to_numpy()
+        frame["split"] = used["split"].to_numpy()
+
+        if "geometry" not in edges.columns:
+            return frame
+
+        import geopandas as gpd
+
+        geometry = gpd.GeoSeries.from_wkb(edges.geometry.to_numpy(), crs="EPSG:4326")
+        return gpd.GeoDataFrame(frame, geometry=geometry.values, crs="EPSG:4326")

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, estimate_heuristic_scale
+from aequilibrae.paths import Graph, TransitGraph, estimate_heuristic_scale
 from .routing_helpers import build_graph_tables
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
@@ -615,6 +615,15 @@ def test_transit_graph_config(transit_graph):
 def test_transit_graph_od_node_mapping(transit_graph):
     transit_graph_obj = transit_graph.to_transit_graph()
     pd.testing.assert_frame_equal(transit_graph.od_node_mapping, transit_graph_obj.od_node_mapping)
+
+
+def test_transit_graph_rejects_zone_vertices_out_of_centroid_order(transit_graph):
+    """Test that a transit graph whose zone vertices are not its centroids, in zone order, cannot be created."""
+    mapping = transit_graph.od_node_mapping.copy()
+    mapping["node_id"] = mapping.node_id.to_numpy()[::-1]
+    centroids = transit_graph.od_node_mapping.node_id.to_numpy()
+    with pytest.raises(ValueError, match="centroid"):
+        TransitGraph(network=transit_graph.edges, centroids=centroids, od_node_mapping=mapping)
 
 
 @pytest.fixture(scope="function")

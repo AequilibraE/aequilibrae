@@ -62,10 +62,10 @@ def test_save(sioux_falls_example):
         {
             "period_id": [1, 2, 3, 4, 5],
             "period_start": [0, 2, 3, 4, 5],
-            "period_end": [86400, 2, 3, 4, 5],
+            "period_end": [172800, 2, 3, 4, 5],
         }
     )
     expected["period_description"] = "test"
-    expected.at[0, "period_description"] = "Default time period, whole day"
+    expected.at[0, "period_description"] = "Default time period, whole service day"
 
     pd.testing.assert_frame_equal(periods.data, expected)

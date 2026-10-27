@@ -8,7 +8,6 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import MultiLineString, Point
 
-from aequilibrae.context import get_active_project
 from aequilibrae.transit.constants import PATTERN_ID_MULTIPLIER, Constants
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
@@ -27,7 +26,18 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):
+    def __init__(
+        self,
+        network,
+        agency_identifier,
+        file_path,
+        day="",
+        description="",
+        capacities=None,
+        pces=None,
+        *,
+        scenario,
+    ):
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -44,11 +54,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             **description** (:obj:`str`, *Optional*): Description for this feed
                 (e.g. 'CTA19 fixed by John after coffee')
+
+            **scenario** (:obj:`Scenario`): Scenario whose transit database receives the feed
         """
         WorkerThread.__init__(self, None)
 
         self.__network = network
-        self.project = get_active_project(False)
+        # The scenario this feed imports into, whichever scenario is active later
+        self.project = scenario
         self.archive_dir = None  # type: str
         self.day = day
         with self.project.transit_connection as conn:

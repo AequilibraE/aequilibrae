@@ -12,12 +12,12 @@ pyfiles = [
     'network_skimming.py',
     'optimal_strategies.py',
     'path_heuristics.py',
-    'public_transport.py',
     'route_choice.py',
     'routing_context.py',
     'sub_area.py',
     'traffic_assignment.py',
     'traffic_class.py',
+    'transit_costing.py',
     'vdf.py',
 ]
 

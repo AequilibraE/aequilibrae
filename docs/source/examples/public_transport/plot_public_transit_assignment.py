@@ -21,6 +21,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 #     * :func:`aequilibrae.transit.transit`
 #     * :func:`aequilibrae.transit.transit_graph_builder`
 #     * :func:`aequilibrae.paths.traffic_class.TransitClass`
+#     * :func:`aequilibrae.paths.transit_costing.TransitCosting`
 #     * :func:`aequilibrae.paths.traffic_assignment.TransitAssignment`
 #     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
@@ -62,12 +63,17 @@ graph = data.create_graph(with_outer_stop_transfers=False, with_walking_edges=Fa
 graph.vertices.drop(columns="geometry")
 
 # %%
+# Every edge runs from its tail, ``a_node``, to its head, ``b_node``. The graph holds physical attributes only:
+# scheduled run and dwell times, walking distances and times, and each line's headway, trip count and frequency
+# over the period. The assignment class turns them into costs.
 graph.edges
 
 # %%
 # The graphs also also stored in the ``Transit.graphs`` dictionary. They are keyed by the 'period_id' they 
 # were created for. A graph for a different 'period_id' can be created by providing ``period_id=`` in the 
 # ``Transit.create_graph`` call. You can view previously created periods with the ``Periods`` object.
+# Times count seconds from the start of the service day, so the default period runs from 00:00:00 to 48:00:00 and
+# keeps the trips that run past midnight. A trip belongs to a period by its first departure.
 periods = project.network.periods
 periods.data
 
@@ -139,12 +145,15 @@ mat["pt"] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 # %%
 # Hyperpath generation/assignment
 # -------------------------------
-# We'll create a ``TransitAssignment`` object as well as a ``TransitClass``
-from aequilibrae.paths import TransitAssignment, TransitClass
+# We'll create a ``TransitAssignment`` object as well as a ``TransitClass``. The class's ``TransitCosting`` says
+# how it perceives the graph: here, waits of half a headway, perceived as one and a half times as long as time in
+# vehicle, and a 5-minute penalty on every alighting.
+from aequilibrae.paths import TransitAssignment, TransitClass, TransitCosting
 
 # %%
 # Create the assignment class
-assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
+costing = TransitCosting(headway_fraction=0.5, wait_weight=1.5, alighting_penalty=300)
+assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat, costing=costing)
 
 assig = TransitAssignment()
 
@@ -169,6 +178,22 @@ assig.execute()
 # %%
 # View the results
 assig.results()
+
+# %%
+# Demand between zones that no strategy connects is not loaded, and is reported instead.
+assigclass.results.unassigned_demand
+
+# %%
+# Strategy of a single trip
+# -------------------------
+# To see why a trip rides the lines it does, we can extract its strategy: every edge it may use, with its expected
+# volume and its split, the share of the flow through its tail that takes it. Since the graph has line geometry,
+# the strategy is a GeoDataFrame we can map.
+strategy = assigclass.strategy(origin=1, destination=16)
+strategy[["link_id", "link_type", "line_id", "volume", "split"]]
+
+# %%
+strategy.explore(color="#146DB3", style_kwds={"weight": 4})
 
 # %%
 # Saving results

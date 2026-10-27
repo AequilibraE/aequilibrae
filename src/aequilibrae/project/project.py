@@ -254,14 +254,29 @@ class Project:
         if any((ignore_project, ignore_transit, ignore_results)):
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
-        project_path = self._project_database_path if not ignore_project else None
-        transit_path = (
-            self._transit_database_path if self._transit_database_path.exists() and not ignore_transit else None
-        )
-        results_path = (
-            self._results_database_path if self._results_database_path.exists() and not ignore_results else None
-        )
-        _upgrade(project_path=project_path, results_path=results_path, transit_path=transit_path)
+        # Every scenario has its own databases, and the root database lists the others once it is upgraded
+        root = self.root_scenario.base_path
+        scenario_paths = [root]
+        for base_path in scenario_paths:
+            project_path = base_path / "project_database.sqlite"
+            transit_path = base_path / "public_transport.sqlite"
+            results_path = base_path / "results_database.sqlite"
+            _upgrade(
+                project_path=project_path if not ignore_project else None,
+                results_path=results_path if results_path.exists() and not ignore_results else None,
+                transit_path=transit_path if transit_path.exists() and not ignore_transit else None,
+            )
+            if base_path == root:
+                scenario_paths.extend(self.__scenario_paths(root))
+
+    @staticmethod
+    def __scenario_paths(root: Path) -> list[Path]:
+        with commit_and_close(root / "project_database.sqlite", spatial=False) as conn:
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='scenarios'").fetchone() is None:
+                return []
+            names = [row[0] for row in conn.execute("SELECT scenario_name FROM scenarios").fetchall()]
+        paths = [root / "scenarios" / name for name in names if name != "root"]
+        return [path for path in paths if (path / "project_database.sqlite").is_file()]
 
     @functools.cached_property
     def project_parameters(self) -> Parameters:

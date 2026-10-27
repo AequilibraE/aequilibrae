@@ -25,23 +25,23 @@ extended to other contexts such as risk-averse vehicle navigation [2]_.
 Bell's network
 --------------
 
-We start by defining the directed graph :math:`\mathcal{G} = \left( V, E \right)`, where :math:`V` 
-and :math:`E` are the graph vertices and edges. The hyperpath generating algorithm requires 2 
-attributes for each edge :math:`a \in V`: 
+We start by defining the directed graph :math:`\mathcal{G} = \left( V, E \right)`, where :math:`V`
+and :math:`E` are the graph vertices and edges. The hyperpath generating algorithm requires 2
+attributes for each edge :math:`a \in E`:
 
-- edge travel time: :math:`u_a \geq 0` 
+- edge travel time: :math:`c_a \geq 0`
 
 - edge frequency: :math:`f_a \geq 0`
 
-The edge frequency is inversely related to the exposure to delay. For example, in a transit network, 
-a boarding edge has a frequency that is the inverse of the headway (or half the headway, depending 
-on the model assumptions). A walking edge has no exposure to delay, so its frequency is assumed to 
-be infinite.
+The edge frequency is inversely related to the exposure to delay. For example, in a transit network,
+a boarding edge has the frequency of its line, the inverse of the line's headway, and the expected
+wait is a fraction of that headway (half of it for regular services). A walking edge has no exposure
+to delay, so its frequency is infinite.
 
 Bell's network is a synthetic network: it is a :math:`n`-by-:math:`n` grid bi-directional network 
 [2]_ [3]_. The edge travel time is taken as random number following a uniform distribution:
 
-.. math:: u_a \sim \mathbf{U}[0,1)
+.. math:: c_a \sim \mathbf{U}[0,1)
 
 To demonstrate how the hyperpath depends on the exposure to delay, we will use a positive constant 
 (:math:`\alpha`) and a base delay (:math:`d_a`) for each edge that follows a uniform distribution:
@@ -170,9 +170,10 @@ The code below allows you to reproduce the same experiment that resulted in the 
         else:
             edges["freq"] = edges.freq_base / alpha
 
-        # Spiess & Florian
+        # Spiess & Florian. Vertex IDs are already the indices 0 to n * n - 1.
         sf = HyperpathGenerating(
-            edges, tail="tail", head="head", trav_time="trav_time", freq="freq"
+            edges, tail="tail", head="head", trav_time="trav_time", freq="freq",
+            nodes_to_indices=np.arange(n * n),
         )
         sf.run(origin=0, destination=n * n - 1, volume=1.0)
 
@@ -232,6 +233,55 @@ The code below allows you to reproduce the same experiment that resulted in the 
     plot_shortest_hyperpath(n=10, alpha=1.0, title="Shortest hyperpath - Bell's Network $\\alpha$=1.0")
     plot_shortest_hyperpath(n=10, alpha=100.0, title="Shortest hyperpath - Bell's Network $\\alpha$=100.0")
 
+
+How the strategy is computed
+----------------------------
+
+AequilibraE's ``HyperpathGenerating`` computes the strategy towards one destination at a time, in
+C++, in parallel over destinations. For each destination it sets a label :math:`u_i` on every vertex,
+the expected cost from :math:`i` to the destination, scanning edges in increasing order of
+:math:`u_j + c_a`, where :math:`j` is the head of edge :math:`a` and :math:`c_a` its cost. An edge
+joins the attractive set :math:`A_i` of its tail only if it strictly lowers the tail's label,
+:math:`u_j + c_a < u_i`, and then
+
+.. math::
+
+   u_i = \frac{\kappa_i + \sum_{a \in A_i} f_a \left( u_j + c_a \right)}{\sum_{a \in A_i} f_a}
+
+where :math:`f_a` is the edge frequency and :math:`\kappa_i` the vertex's wait constant. In transit
+assignment :math:`\kappa_i` is the class's headway fraction times its wait weight
+(``TransitCosting.headway_fraction`` and ``wait_weight``): with a headway fraction of ``0.5``, a stop
+served by lines of combined frequency :math:`F_i` waits half their combined headway,
+:math:`0.5 / F_i`, on average. The reported waiting time uses the headway fraction alone, so the wait
+weight changes the strategy's perceived cost but not its waits.
+
+A few rules keep the computation exact:
+
+- an edge with infinite frequency has no wait. Once one is attractive, it takes all the flow through
+  its tail, and finite-frequency edges of that vertex get exactly zero share;
+- an edge with zero frequency is never used;
+- edge costs must be nonnegative, and every cost is raised to at least ``1e-9`` s, so labels strictly
+  increase along attractive edges.
+
+The demand is then loaded by walking the attractive edges in the reverse of the order in which they
+were scanned, which meets each vertex with all of its inflow, splitting the flow of vertex :math:`i`
+in proportion to :math:`f_a` over its attractive edges. Destinations are split into one block per
+thread, and each block loads into its own buffer, so repeating an assignment with the same number of
+threads gives bitwise-identical results.
+
+Costs and wait parameters can be replaced without rebuilding the graph, which is what a transit
+class does before each assignment, and the strategy of a single trip can be inspected:
+
+.. code-block:: python
+
+    # New costs and frequencies for every edge, and waits of half a headway
+    sf.update_costs(edges.trav_time.to_numpy() * 1.1, edges.freq.to_numpy(), headway_fraction=0.5)
+
+    # Edges one trip from vertex 0 to the last vertex may use, with expected volumes and splits
+    strategy = sf.strategy(0, n * n - 1)
+
+On a transit graph, ``TransitClass.strategy(origin, destination)`` does the same between two zones,
+with each edge's ``link_id``, and returns a GeoDataFrame when the edges have geometry.
 
 References
 ----------

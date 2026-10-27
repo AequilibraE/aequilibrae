@@ -1387,18 +1387,6 @@ class PreparedGraph:
         return disconnected_analysis(self)
 
 
-class TransitGraph(GraphBase):
-    def __init__(self, config: Optional[dict] = None, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._config = config
-        self.od_node_mapping = od_node_mapping
-        self.mode = "t"
-
-    @property
-    def config(self):
-        return self._config
-
-
 def sanitise_centroids(centroids: np.ndarray) -> np.ndarray:
     if len(centroids.shape) != 1:
         raise ValueError(f"centroids must be 1D, got: {centroids.shape}")
@@ -1561,47 +1549,73 @@ def _build_directed_graph(
     return all_nodes, nodes_to_indices, fs, graph
 
 
-class NewTransitGraph:
+class TransitGraph:
+    """Graph for the Spiess & Florian transit assignment.
+
+    Its edges run from ``a_node`` (tail) to ``b_node`` (head). Graphs from ``TransitGraphBuilder`` hold physical
+    attributes only, and each ``TransitClass`` costs them. Other graphs must provide the time and frequency fields.
+
+    :Arguments:
+        **network** (:obj:`pd.DataFrame`): Edges, with ``link_id``, ``direction``, tail and head node fields.
+
+        **centroids** (:obj:`np.ndarray`): Node IDs of the zones' origin vertices, which are also their zone IDs.
+
+        **time_field** (:obj:`str`): Edge cost field of graphs that no class costs. Defaults to ``trav_time``.
+
+        **frequency_field** (:obj:`str`): Edge frequency field of graphs that no class costs. Defaults to ``freq``.
+
+        **od_node_mapping** (:obj:`pd.DataFrame`): Zone vertices, with ``taz_id`` and either ``node_id`` or
+        ``o_node_id`` and ``d_node_id``.
+
+        **a_node_field** (:obj:`str`): Tail node field. Defaults to ``a_node``.
+
+        **b_node_field** (:obj:`str`): Head node field. Defaults to ``b_node``.
+
+        **skimming_fields** (:obj:`list[str]`, optional): Fields or predefined skims to compute.
+
+        **config** (:obj:`dict`, optional): Settings the graph was built with.
+    """
+
     def __init__(
         self,
         network: pd.DataFrame,
-        centroids: np.ndarray,  # FIXME: Centroids used to be optional?
-        time_field: str,
-        frequency_field: str,
-        od_node_mapping: pd.DataFrame,
+        centroids: np.ndarray,
+        time_field: str = "trav_time",
+        frequency_field: str = "freq",
+        od_node_mapping: pd.DataFrame | None = None,
         a_node_field: str = "a_node",
         b_node_field: str = "b_node",
         skimming_fields: list[str] | None = None,
         config: dict | None = None,
+        *,
+        provenance: dict | None = None,
+        costing=None,
     ):
+        if od_node_mapping is None:
+            raise ValueError("a transit graph needs the mapping between zones and their vertices")
+
         self.network = sanitise_network(network)
         self.centroids = sanitise_centroids(centroids)
-        # FIXME: Old graphs make a distinction between free_flow_time and cost? Not sure why
 
         self.skimming_fields = skimming_fields if skimming_fields is not None else []
         self.time_field = time_field
         self.frequency_field = frequency_field
         self.a_node_field = a_node_field
         self.b_node_field = b_node_field
+        # Costing that classes default to, set through TransitGraphBuilder's deprecated cost attributes
+        self.costing = costing
+        self.provenance = dict(provenance or {})
 
-        self.od_node_mapping = od_node_mapping.copy()
-        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+        # Skims and demand use centroid order, so the zone vertices must follow it
+        self.od_node_mapping = od_node_mapping.sort_values("taz_id").reset_index(drop=True)
+        o_key = "node_id" if "node_id" in self.od_node_mapping.columns else "o_node_id"
+        if not np.array_equal(self.od_node_mapping[o_key].to_numpy(), self.centroids):
+            raise ValueError("the origin vertices of od_node_mapping must be the graph's centroids, in zone order")
 
         self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
             self.network, self.centroids, build_fs=False
         )
-
-        self.context = HyperpathGenerating(
-            self.graph,
-            head=self.a_node_field,
-            tail=self.b_node_field,
-            trav_time=self.time_field,
-            freq=self.frequency_field,
-            skim_cols=self.skimming_fields,
-            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),  # taz_id
-            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
-            nodes_to_indices=self.nodes_to_indices,
-        )
+        self.context = self._make_context()
 
         self._config = {
             "time_field": time_field,
@@ -1616,24 +1630,35 @@ class NewTransitGraph:
         if config is not None:
             self._config.update(config)
 
-    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
-        """Set the fields to skim and rebuild the hyperpath context."""
-        self.skimming_fields = list(skimming_fields or [])
-        self.context = HyperpathGenerating(
-            self.graph,
-            head=self.a_node_field,
-            tail=self.b_node_field,
+    def _make_context(self) -> HyperpathGenerating:
+        """Build the kernel's view of the graph. Classes replace its costs before every assignment."""
+        edges = self.graph
+        placeholders = {}
+        if self.time_field not in edges.columns:
+            placeholders[self.time_field] = np.zeros(len(edges))
+        if self.frequency_field not in edges.columns:
+            placeholders[self.frequency_field] = np.full(len(edges), np.inf)
+        if placeholders:
+            edges = edges.assign(**placeholders)
+
+        mapping = self.od_node_mapping
+        o_key, d_key = ("node_id", "node_id") if "node_id" in mapping.columns else ("o_node_id", "d_node_id")
+        return HyperpathGenerating(
+            edges,
+            tail=self.a_node_field,
+            head=self.b_node_field,
             trav_time=self.time_field,
             freq=self.frequency_field,
             skim_cols=self.skimming_fields,
-            o_vert_ids=self.od_node_mapping[
-                "node_id" if len(self.od_node_mapping.columns) == 2 else "o_node_id"
-            ].to_numpy(),
-            d_vert_ids=self.od_node_mapping[
-                "node_id" if len(self.od_node_mapping.columns) == 2 else "d_node_id"
-            ].to_numpy(),
+            o_vert_ids=mapping[o_key].to_numpy(),  # taz_id
+            d_vert_ids=mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
             nodes_to_indices=self.nodes_to_indices,
         )
+
+    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
+        """Set the fields to skim and rebuild the hyperpath context."""
+        self.skimming_fields = list(skimming_fields or [])
+        self.context = self._make_context()
         self._config["skimming_fields"] = self.skimming_fields
 
     @property
@@ -1655,6 +1680,18 @@ class NewTransitGraph:
     @property
     def block_centroid_flows(self) -> bool:
         return False
+
+
+class NewTransitGraph(TransitGraph):
+    """Deprecated name of ``TransitGraph``, removed in 2.1."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "NewTransitGraph is deprecated and will be removed in 2.1, use TransitGraph instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 class AssignmentMapping:
