@@ -11,6 +11,7 @@ pyfiles = [
   'parse_csv.py',
   'route_map_matcher.py',
   'route_types.py',
+  'service_periods.py',
   'transit.py',
   'transit_graph_builder.py',
 ]

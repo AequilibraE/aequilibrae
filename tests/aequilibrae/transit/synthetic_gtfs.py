@@ -5,6 +5,8 @@ import io
 import zipfile
 from itertools import accumulate
 
+from shapely.geometry import MultiPolygon, box
+
 SERVICE_DATE = "2026-01-05"
 
 
@@ -13,10 +15,11 @@ def hms(seconds: int) -> str:
     return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
 
 
-def base_tables() -> dict[str, list[dict]]:
+def base_tables(agency_id: str = "SYN") -> dict[str, list[dict]]:
     """Return one agency, a calendar running every day of 2026 and empty service tables."""
     days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-    agency = {"agency_id": "SYN", "agency_name": "SYN", "agency_url": "https://example.com", "agency_timezone": "UTC"}
+    agency = {"agency_id": agency_id, "agency_name": agency_id, "agency_url": "https://example.com"}
+    agency["agency_timezone"] = "UTC"
     calendar = {"service_id": "all", **dict.fromkeys(days, 1), "start_date": "20260101", "end_date": "20261231"}
     return {"agency.txt": [agency], "calendar.txt": [calendar]} | {
         name: [] for name in ["stops.txt", "routes.txt", "trips.txt", "stop_times.txt"]
@@ -47,7 +50,22 @@ def add_trips(tables: dict, route_id: str, stops: list[str], run_minutes: list[f
         add_trip(tables, route_id, f"{route_id}_{k}", [(s, t, t) for s, t in zip(stops, times, strict=True)], **kw)
 
 
-def write_feed(path, tables: dict[str, list[dict]]) -> None:
+def add_timetable(
+    tables: dict,
+    route_id: str,
+    stops: list[str],
+    run_minutes: list[float],
+    headway_minutes: float,
+    first: int,
+    last: int,
+    route_type: int = 3,
+) -> None:
+    """Add a route with one trip every headway, departing from ``first`` up to but excluding ``last``, without dwell."""
+    departures = list(range(first, last, round(headway_minutes * 60)))
+    add_trips(tables, route_id, stops, run_minutes, departures, route_type=route_type)
+
+
+def write_feed(path, tables: dict[str, list[dict]]):
     """Write each table to a zipped GTFS feed, with the union of its rows' columns."""
     with zipfile.ZipFile(path, "w") as feed:
         for name, rows in tables.items():
@@ -56,6 +74,20 @@ def write_feed(path, tables: dict[str, list[dict]]) -> None:
             writer.writeheader()
             writer.writerows(rows)
             feed.writestr(name, buffer.getvalue())
+    return path
+
+
+def add_zone(project, zone_id: int, lat: float, lon: float, half_width: float = 0.002) -> None:
+    """Add a small square zone centred on a point."""
+    geometry = MultiPolygon([box(lon - half_width, lat - half_width, lon + half_width, lat + half_width)])
+    project.network.zones.insert(zone_id=zone_id, geometry=geometry)
+
+
+def add_period(project, period_id: int, start: int, end: int) -> None:
+    """Add a period, in seconds from the start of the service day."""
+    sql = "INSERT INTO periods (period_id, period_start, period_end, period_description) VALUES (?, ?, ?, ?)"
+    with project.db_connection as conn:
+        conn.execute(sql, [period_id, start, end, f"period {period_id}"])
 
 
 def import_zip(project, path, service_date: str = SERVICE_DATE, agency: str = "SYN", **builder_calls):

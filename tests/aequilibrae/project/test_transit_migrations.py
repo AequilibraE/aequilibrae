@@ -30,8 +30,8 @@ def columns(conn, table: str) -> list[str]:
     return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
-def forget_migration(conn, migration_id: int):
-    conn.execute("DELETE FROM migrations WHERE id = ?", [migration_id])
+def forget_migration(conn, *migration_ids: int):
+    conn.executemany("DELETE FROM migrations WHERE id = ?", [[migration_id] for migration_id in migration_ids])
 
 
 def status(path: Path, migration_id: int) -> str:
@@ -56,7 +56,7 @@ def add_pre_phase1_graph(transit_path: Path, project_path: Path):
             "VALUES (?, 1, ?, ?, GeomFromText('POINT(0 0)', 4326))",
             [(1, "od", 1), (2, "stop", -1), (3, "boarding", -1)],
         )
-        forget_migration(conn, 7)
+        forget_migration(conn, 7, 8)
 
     with commit_and_close(project_path, spatial=True) as conn:
         conn.execute("INSERT INTO transit_graph_configs (period_id, config) VALUES (1, ?)", [json.dumps(OLD_CONFIG)])
@@ -120,7 +120,7 @@ def test_upgrade_without_saved_graphs_leaves_supply_alone(coquimbo_example):
     tables = ["routes", "stops", "trips", "trips_schedule", "route_links", "pattern_mapping"]
     with coquimbo_example.transit_connection as conn:
         before = {table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
-        forget_migration(conn, 7)
+        forget_migration(conn, 7, 8)
 
     coquimbo_example.upgrade()
 
@@ -210,12 +210,13 @@ def test_frozen_schemas_match_the_schema_before_phase_1():
 
 
 def test_new_migrations_are_registered():
-    """Test that transit migration 007 and network migration 010 are part of their migration series."""
+    """Test that transit migrations 007 and 008 and network migration 010 are part of their migration series."""
     transit = MigrationManager(MigrationManager.transit_migration_file).migrations
     network = MigrationManager(MigrationManager.network_migration_file).migrations
     assert transit[7].name == "physical_transit_graphs"
     assert network[10].name == "default_period_whole_service_day"
-    assert max(transit) == 7
+    assert transit[8].name == "fare_rule_zones_as_text"
+    assert max(transit) == 8
     assert max(network) == 10
     assert (NETWORK_MIGRATIONS / "010_default_period_whole_service_day.py").exists()
 

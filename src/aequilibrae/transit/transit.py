@@ -95,7 +95,7 @@ class Transit(WorkerThread):
             **prefix_ids** (:obj:`bool`, *Optional*): Prefixes GTFS IDs with the agency, e.g. 'Metro:1', so agencies
             sharing IDs can be exported together. Defaults to ``False``
         """
-        with self.project.transit_connection as conn:
+        with self.scenario.transit_connection as conn:
             export_gtfs(conn, file_path, agency_url, agency_timezone, prefix_ids)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
