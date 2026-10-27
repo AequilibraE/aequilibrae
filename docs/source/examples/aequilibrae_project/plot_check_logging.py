@@ -71,9 +71,23 @@ with open(join(fldr, "aequilibrae.log")) as file:
         print(idx + 1, "-", line)
 
 # %%
-# The log records each traffic class configuration and its demand totals.
-# It then records the assignment configuration, including the VDF, algorithm,
-# iteration limit, relative gap target, and thread count.
+# The log records the Traffic Class specifications, including the network mode,
+# cost field, PCE, value of time, and matrix totals.
+#
+# The log then shows the Traffic Assignment specifications.
+# We can see that the VDF parameters, VDF function, capacity and time fields, algorithm,
+# maximum number of iterations, and target gap are just like the ones we set previously.
+# The only information that might be new to you is the number of cores used for computation.
+# If you haven't set any, AequilibraE is going to use the largest number of CPU threads
+# available.
+#
 # Each iteration records its relative gap and step size. ``assig.report()``
 # returns the same convergence data as a DataFrame.
-# A new run records its configuration before the iteration messages.
+#
+# In case you execute a new traffic assignment using different classes or changing the
+# parameters values, these new specification values would be stored in the log file as well
+# so you can always keep a record of what you have been doing. One last reminder is that
+# if we had created our project from OSM, the lines on top of the log would have been
+# different to display information on the queries done to the server to obtain the data.
+#
+# Log image by `OSRS Wiki <https://oldschool.runescape.wiki/index.php?curid=66905#>`_

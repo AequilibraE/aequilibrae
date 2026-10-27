@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths.graph import GraphBase as Graph
+from aequilibrae import Graph
 from aequilibrae.matrix import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.route_choice import RouteChoice

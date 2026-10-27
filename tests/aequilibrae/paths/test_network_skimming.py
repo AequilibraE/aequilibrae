@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 
-from aequilibrae.paths.graph import GraphBase as Graph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import PathResults, SkimResults
 

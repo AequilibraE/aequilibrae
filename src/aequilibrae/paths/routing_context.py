@@ -10,7 +10,7 @@ import numpy as np
 from aequilibrae.paths.cython.context import GraphContext, NodeBasedContext, TurnBasedContext
 
 if TYPE_CHECKING:
-    from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.graph import GraphBase, PreparedGraph
 
 
 def _copy_ids(values: np.ndarray, count: int, name: str) -> np.ndarray:
@@ -83,16 +83,16 @@ class GraphMapping:
         return nodes
 
 
-def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compact: bool = False) -> GraphContext:
+def make_routing_context(graph: GraphBase | PreparedGraph, costs: np.ndarray | None = None, *, compact: bool = False) -> GraphContext:
     """Copy topology from Graph into a full or compact routing context.
 
     Without costs, copy the graph's current cost buffer too. Supplied costs are
     borrowed so assignment can update its own buffer between searches. No Graph
     arrays are changed or retained by the context when costs are omitted.
     """
-    from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.graph import PreparedGraph
 
-    if isinstance(graph, Graph):
+    if isinstance(graph, PreparedGraph):
         if costs is None:
             costs = np.array(graph.routing.costs, copy=True)
             costs.flags.writeable = False

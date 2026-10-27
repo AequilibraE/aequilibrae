@@ -63,9 +63,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "sioux_falls")
 
 # %%
-# Build graphs and load demand matrix.
-network = project.network
-
+# Load the network and demand matrix.
+network = project.network.build()
 
 matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
@@ -86,14 +85,12 @@ turn_restrictions = pd.DataFrame(
         "penalty": [5.0, np.nan],  # 5.0 minutes penalty, and one prohibited turn
     }
 )
-graph = network.build_graph(
-    "c", "free_flow_time", block_centroid_flows=False,
-    turn_restrictions=turn_restrictions, allow_uturns=True,
-)
+network.turn_restrictions = turn_restrictions
+network.allow_uturns = True
 
 # %%
 # Assignment with custom turn controls.
-restricted_flows = run_assignment(graph, matrix)
+restricted_flows = run_assignment(network, matrix)
 
 # %%
 # Plot flows for both cases and the difference.

@@ -130,25 +130,47 @@ class TrafficAssignment(AssignmentBase):
     Classes with matching routing policies share graph and reporting mappings.
     Each class owns its costs, demand, skims, and output buffers.
 
+    For a comprehensive example on use, see the Use examples page.
+
     .. code-block:: python
 
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
         >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
         >>> network = project.network
-        >>> demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-        >>> cars = TrafficClass(
-        ...     mode="c", cost="free_flow_time", demand=demand,
-        ...     skimming=["free_flow_time", "distance"],
-        ...     block_centroid_flows=False,
+        >>> proj_matrices = project.matrices
+
+        # We will only assign one user class stored as 'matrix' inside the OMX file
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+
+        # Creates the assignment class
+        >>> assigclass = TrafficClass(
+        ...     name="car", mode="c", cost="free_flow_time", demand=demand,
+        ...     skimming=['free_flow_time', 'distance'], block_centroid_flows=False,
         ... )
-        >>> assignment = TrafficAssignment(
-        ...     network=network, classes=[cars], time_field="free_flow_time",
-        ...     capacity_field="capacity", vdf=bpr,
-        ...     name_mapping={"alpha": "b", "beta": "power"}, algorithm="bfw",
+        >>> assig = TrafficAssignment(
+        ...     network=network, classes=[assigclass], time_field='free_flow_time',
+        ...     capacity_field='capacity', vdf=bpr,
+        ...     name_mapping={"alpha": "b", "beta": "power"}, algorithm='bfw',
         ... )
-        >>> results = assignment.execute(max_iterations=10, rgap=1e-5, cores=1)
-        >>> report = assignment.report()
+        >>> results_df = assig.execute(max_iterations=10, rgap=0.00001)
+
+        # If you want, it is possible to access the convergence report
+        >>> convergence_report = pd.DataFrame(assig.assignment.convergence_report)
+
+        # Assignment results can be viewed as a Pandas DataFrame
+        >>> results_df = assig.results()
+
+        # Information on the assignment setup can be recovered with
+        >>> info = assig.info()
+
+        # Or save it directly to the results database
+        >>> results = assig.save_results(table_name='base_year_assignment')
+
+        # skims are here
+        >>> avg_skims = assig.class_results['car'].skims # blended ones
+        >>> last_skims = assig._class_states[0]._aon_results.skims # those for the last iteration
+
         >>> project.close()
 
     """
@@ -312,6 +334,35 @@ class TrafficAssignment(AssignmentBase):
 
         Execution options apply to this run. Source data comes from the
         constructor's snapshot. Each run owns fresh routing contexts and outputs.
+
+        ``bfw_conjugacy`` chooses how BFW solves for its direction coefficients. Ignored by every other algorithm.
+
+        * ``"approximate"`` (default) - appendix A of Mitradjieva & Lindberg, which assumes the two previous
+          directions are already conjugate with respect to the *current* Hessian. They were made conjugate with
+          respect to the previous one, so the assumption holds only in the limit; the paper notes BFW is
+          therefore "correct only in the limit".
+
+        * ``"exact"`` - solve both conjugacy conditions jointly as a 2x2 system, keeping the cross term the
+          appendix drops. Costs two extra Hessian contractions per iteration, which is negligible next to the
+          shortest-path build. The system is singular when the two previous directions are H-parallel, in which
+          case the iteration restarts from Frank-Wolfe.
+
+        Either way, negative coefficients are clamped to zero to keep the weights on the simplex, and that
+        clamping breaks strict biconjugacy whenever it triggers.
+
+        When the algorithm is BFW the convergence report gains ``conjugacy_prev``, ``conjugacy_prev2`` and
+        ``hessian_drift`` columns to compare the two variants; see ``LinearApproximation``.
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of CPU cores to use
+
+            **threading_threshold** (:obj:`int`, `Optional`): Minimum number of array elements for elementwise
+            operations to be threaded. Negative values disable threading for those operations.
+
+            **elementwise_cores** (:obj:`int`, `Optional`): Number of CPU cores for elementwise
+            (``parallel_numpy``/VDF) operations. When not provided, it is resolved from the
+            ``AEQ_ELEMENTWISE_CPUS`` environment variable or ``parameters.yml``, defaulting to at most
+            8 threads
         """
         defaults = self.parameters["assignment"]["equilibrium"]
         max_iterations = defaults["maximum_iterations"] if max_iterations is None else max_iterations
@@ -589,7 +640,17 @@ class TrafficAssignment(AssignmentBase):
         return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
-        """Return the assignment configuration and execution limits."""
+        """Returns information for the traffic assignment procedure
+
+        Dictionary contains keys  'Algorithm', 'Classes', 'Computer name', 'Procedure ID',
+        'Maximum iterations' and 'Target RGap'.
+
+        The classes key is also a dictionary with all the user classes per traffic class and their respective
+        matrix totals
+
+        :Returns:
+            **info** (:obj:`dict`): Dictionary with summary information
+        """
         return {
             "Algorithm": self.algorithm,
             "Classes": {cls.name: cls.info for cls in self.classes},

@@ -42,6 +42,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
         project=scenario_example,
     )
     assignment.execute(max_iterations=5, cores=1)
+    assert assignment.class_results["car"].total_link_loads is not None
     assert len(assignment.class_results["car"].total_link_loads) > 0
 
 

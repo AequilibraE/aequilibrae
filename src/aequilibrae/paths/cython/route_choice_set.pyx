@@ -50,7 +50,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace, CppAStarWorkspace
-from aequilibrae.paths.graph import Graph, GraphBase, freeze_graph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.cython.route_choice_set_results cimport (
@@ -81,7 +81,7 @@ cdef class RouteChoiceSet:
     See the module documentation for the algorithms and reference.
     """
 
-    def __init__(self, graph: Graph, *, coordinates: pd.DataFrame | None = None):
+    def __init__(self, graph: PreparedGraph, *, coordinates: pd.DataFrame | None = None):
         if isinstance(graph, GraphBase):
             graph = freeze_graph(graph, compact=True)
         self.graph = graph

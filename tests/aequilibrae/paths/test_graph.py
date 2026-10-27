@@ -5,8 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import estimate_heuristic_scale
-from aequilibrae.paths.graph import GraphBase as Graph
+from aequilibrae.paths import Graph, estimate_heuristic_scale
 from .routing_helpers import build_graph_tables
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit

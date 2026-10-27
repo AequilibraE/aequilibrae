@@ -74,6 +74,29 @@ def test_skim_after(configuration):
     assert skims["car"].field_names == ("__congested_time__", "__assignment_cost__")
 
 
+def test_matrix_with_wrong_type(configuration):
+    matrix = configuration["classes"][0].demand
+    core = next(iter(matrix))
+    matrix[core] = np.array(matrix[core], np.int32)
+    with pytest.raises(TypeError):
+        TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix)
+
+
+def test_algorithms_available(configuration):
+    assignment = TrafficAssignment(**configuration)
+    algs = assignment.algorithms_available()
+    real = ["all-or-nothing", "msa", "frank-wolfe", "bfw", "cfw", "fw"]
+    diff = [x for x in real if x not in algs]
+    diff2 = [x for x in algs if x not in real]
+    assert len(diff) + len(diff2) <= 0, "list of algorithms raised is wrong"
+
+
+def test_steps_below_needed_to_terminate_reaches_algorithm(configuration):
+    assignment = TrafficAssignment(**(configuration | {"algorithm": "bfw"}))
+    assignment.execute(max_iterations=1, cores=1, steps_below_needed_to_terminate=3)
+    assert assignment.assignment.steps_below_needed_to_terminate == 3
+
+
 def test_info_and_execution_options(configuration):
     assignment = TrafficAssignment(**configuration)
     assert assignment.info()["Classes"]["car"]["network mode"] == "c"
@@ -81,7 +104,6 @@ def test_info_and_execution_options(configuration):
     assert assignment.info()["Maximum iterations"] == 3
     assert assignment.info()["Target RGap"] == 1e-3
     assert assignment.cores == 1
-    assert set(assignment.algorithms_available()) == {"all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"}
 
 
 @pytest.mark.parametrize("algorithm", ["fw", "FW", "frank-wolfe"])

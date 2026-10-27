@@ -1,5 +1,6 @@
 import logging
 from dataclasses import replace
+from os.path import isfile
 from pathlib import Path
 
 import numpy as np
@@ -117,11 +118,31 @@ def test_execute_and_save_results(configuration, file_logging):
     with pytest.raises(ValueError):
         assignment.save_results("save_to_database")
 
-    log = (Path(project.path_to_file).parent / "aequilibrae.log").read_text()
-    assert log.count("Traffic Class specification") > 1
+    num_cores = assignment.cores
+    log_ = Path(project.path_to_file).parent / "aequilibrae.log"
+    assert isfile(log_)
+
+    with open(log_, "r", encoding="utf-8") as file:
+        file_text = file.read()
+
+    tc_spec = "INFO ; Traffic Class specification"
+    assert file_text.count(tc_spec) > 1
+
+    tc_matrix = "'matrix_totals': {'matrix': 360600.0}"
+    assert file_text.count(tc_matrix) > 1
+
     for algorithm in ("msa", "frank-wolfe", "cfw", "bfw"):
-        assert f"'Algorithm': '{algorithm}'" in log
-    assert "'matrix_totals': {'matrix': 360600.0}" in log
+        assert f"'Algorithm': '{algorithm}'" in file_text
+    assert "'VDF parameters': {'alpha': 'b', 'beta': 'power'}" in file_text
+    assert "'VDF function': 'bpr'" in file_text
+    assert f"'Number of cores': {num_cores}" in file_text
+    assert "'Capacity field': 'capacity'" in file_text
+    assert "'Time field': 'free_flow_time'" in file_text
+    assert "'Maximum iterations': 10" in file_text
+    assert "'Maximum iterations': 500" in file_text
+    assert "'Target RGAP': 0.0001" in file_text
+    assert "'Target RGAP': 0.001" in file_text
+    assert "'BFW conjugacy': 'approximate'" in file_text
 
 
 def test_execute_no_project(configuration):
@@ -133,7 +154,8 @@ def test_execute_no_project(configuration):
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))
     assignment.execute(max_iterations=10, cores=1)
     assert assignment.project is None
-    assert np.corrcoef(assignment.class_results["car"].total_link_loads, reference)[0, 1] > 0.8
+    correl = np.corrcoef(assignment.class_results["car"].total_link_loads, reference)[0, 1]
+    assert 0.8 < correl
     with pytest.raises(FileNotFoundError):
         assignment.save_results("anything")
 
@@ -174,6 +196,7 @@ def test_bfw_reports_conjugacy_diagnostics(configuration, conjugacy):
     assignment = TrafficAssignment(**configuration)
     assignment.execute(max_iterations=25, rgap=1e-8, cores=1, bfw_conjugacy=conjugacy)
     assert assignment.assignment.bfw_conjugacy == conjugacy.lower()
+    assert assignment._config["BFW conjugacy"] == conjugacy.lower()
     report = assignment.assignment.convergence_report
     columns = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
     assert all(column in report for column in columns)

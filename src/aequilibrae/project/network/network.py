@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 if TYPE_CHECKING:
-    from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.graph import PreparedGraph
     from aequilibrae.project import Project
 
 logger = logging.getLogger(__name__)
@@ -140,8 +140,33 @@ class Network(WorkerThread):
 
         logger.info("Network exported successfully")
 
-    def build(self, fields=None, modes=None, limit_to_area=None):
-        """Copy project tables into an independent routing Network."""
+    def build(
+        self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None
+    ):
+        """Copy project tables into an independent routing Network.
+
+        :Arguments:
+            **fields** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
+            database, it may be useful to specify which fields to use
+
+            **modes** (:obj:`list`, *Optional*): Network modes to include in the source data
+
+            **limit_to_area** (:obj:`Polygon`, *Optional*): When working with a very large model area, you may want to
+            filter your database to a small area for your computation, which you can do by providing a polygon.
+            The search is limited to a spatial index search, so it is very fast but NOT PRECISE.
+
+        To use the 'fields' parameter, a minimalistic option is the following
+
+        .. code-block:: python
+
+            >>> project = create_example(project_path)
+
+            >>> fields = ['distance']
+            >>> network = project.network.build(fields, modes = ['c', 'w'])
+
+            >>> project.close()
+
+        """
         from aequilibrae.paths.network import Network
 
         if isinstance(modes, str):
@@ -169,7 +194,7 @@ class Network(WorkerThread):
         compact=False,
         turn_restrictions=None,
         allow_uturns=None,
-    ) -> "Graph":
+    ) -> "PreparedGraph":
         """Build a standalone graph without retaining project connections."""
         if isinstance(skimming, str):
             skimming = [skimming]
@@ -180,6 +205,38 @@ class Network(WorkerThread):
             block_centroid_flows=block_centroid_flows, turn_restrictions=turn_restrictions,
             allow_uturns=allow_uturns,
         )
+
+    def compute_path(
+        self, origin, destination, *, mode, cost, skimming=(), centroids=None,
+        block_centroid_flows=True, **options,
+    ):
+        """Find a path directly from the project network."""
+        return self.build_graph(
+            mode, cost, skimming=skimming, centroids=centroids,
+            block_centroid_flows=block_centroid_flows,
+        ).compute_path(origin, destination, **options)
+
+    def compute_skims(self, *, mode, cost, skimming, centroids=None, cores=None, block_centroid_flows=True):
+        """Compute skims directly from the project network."""
+        return self.build_graph(
+            mode, cost, skimming=skimming, centroids=centroids, compact=True,
+            block_centroid_flows=block_centroid_flows,
+        ).compute_skims(cores=cores)
+
+    def estimate_heuristic_scale(self, *, mode, cost, coordinates=None, heuristic="euclidean"):
+        """Find a conservative A* scale for the selected routing cost."""
+        from aequilibrae.paths.path_heuristics import estimate_heuristic_scale
+
+        return estimate_heuristic_scale(self.build_graph(mode, cost), coordinates, heuristic=heuristic)
+
+    def route_choice(self, *, mode, cost, centroids=None, block_centroid_flows=True, coordinates=None):
+        """Prepare route choice directly from the project network."""
+        from aequilibrae.paths.route_choice import RouteChoice
+
+        graph = self.build_graph(
+            mode, cost, centroids=centroids, compact=True, block_centroid_flows=block_centroid_flows,
+        )
+        return RouteChoice(graph, project=self.project, coordinates=coordinates)
 
     def _load_graph_data(self, fields=None, limit_to_area=None):
         """Read source tables once for a graph or an assignment execution."""

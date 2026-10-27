@@ -12,7 +12,7 @@ from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
-from aequilibrae.paths.graph import AssignmentMapping, Graph
+from aequilibrae.paths.graph import AssignmentMapping, PreparedGraph
 
 if TYPE_CHECKING:
     from aequilibrae.paths.cython.outputs import AoNOutputs
@@ -108,7 +108,7 @@ class AssignmentInputs:
 
     def __init__(
         self,
-        graph: Graph,
+        graph: PreparedGraph,
         matrix: AequilibraeMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
@@ -116,8 +116,8 @@ class AssignmentInputs:
         *,
         field_values,
         skim_fields=(),
-        cost_name=None,
-        heap="4ary",
+        cost_name: str | None = None,
+        heap: str = "4ary",
         select_link_od=True,
     ):
         self.mapping = graph.mapping
@@ -171,7 +171,8 @@ class AssignmentInputs:
         if self.time_skim is not None:
             self.mapping.aggregate_costs(congested_time, self.time_skim)
 
-    def report_skims(self, output):
+    def report_skims(self, output: SkimmingOutputs) -> SkimmingOutputs:
+        """Add turn delay to a separate travel-time skim, without changing raw outputs."""
         return self.skim_layout.report(output)
 
     def make_state(self, cores: int, threading_threshold: int) -> AssignmentState:
@@ -205,7 +206,15 @@ class PreparedTrafficClass:
         return self.configuration.pce
 
     def skim_congested(self, skim_fields=None):
-        """Compute additional skims without rebuilding routing graph."""
+        """
+        Skims the congested network using the final assignment costs.
+
+        Congested time includes link travel time and turn delay. Assignment cost
+        also includes fixed costs, such as tolls converted to time units.
+
+        :Arguments:
+            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
+        """
         if self.congested_time.size == 0:
             raise RuntimeError("Run the assignment before skimming congested costs")
         fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
@@ -221,6 +230,7 @@ class PreparedTrafficClass:
             heap=self.configuration.heap,
         )
         inputs.update_costs(self.congested_time, self.fixed_cost)
+        # FIXME: Use a separate skim-only driver when one is available.
         output = inputs.driver.run(inputs.driver.make_outputs()).skimming
         self.congested_skims = inputs.report_skims(output)
         return self.congested_skims

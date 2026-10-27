@@ -13,7 +13,6 @@ from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -33,16 +32,22 @@ class NetworkSimplifier(WorkerThread):
 
         logger.warning("This will alter your database in place. Make sure you have a backup.")
 
-    def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
+    def simplify(self, mode: str = "c", max_speed_ratio: float = 1.1):
         """
         Simplifies the network by merging links that are shorter than a given threshold
 
         :Arguments:
-            **graph** (:obj:`Graph`): AequilibraE graph
+            **mode** (:obj:`str`): Network mode to simplify
 
             **max_speed_ratio** (:obj:`float`, *Optional*): Maximum ratio between the fastest
             and slowest speed for a link to be considered for simplification.
         """
+        centroids = None
+        if self.network.count_centroids() == 0:
+            centroids = np.array([int(self.link_layer.a_node.iloc[0])])
+        graph = self.network.build_graph(
+            mode, "distance", centroids=centroids, compact=True, block_centroid_flows=False
+        )
         self.graph = graph
 
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation

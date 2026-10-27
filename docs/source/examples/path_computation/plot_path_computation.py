@@ -49,16 +49,12 @@ network = project.network
 # This is true, but we won't use those fields.
 
 # %%
-# Build the car graph with distance as the cost field.
+# We grab the graph for cars, minimize distance, and skim time and distance.
 graph = network.build_graph(mode="c", cost="distance", skimming=["travel_time", "distance"])
 
 # %%
-# we'll also see what graphs are available.
+# we'll also see what modes are available.
 network.list_modes()
-
-# %%
-# and will skim time and distance while we are at it.
-graph.skim_fields
 
 # %%
 # Let's create a path results object from the graph and compute a path from

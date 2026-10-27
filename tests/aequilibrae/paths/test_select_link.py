@@ -125,21 +125,36 @@ def test_single_demand(select_link_setup):
         np.testing.assert_allclose(assignment.class_results["car"].select_link_loading[key], link_loading)
 
 
-def test_select_link_analysis_does_not_change_loading(select_link_setup):
-    plain = select_link_setup["make"]()
-    plain.execute(max_iterations=1, cores=1)
-    selected = select_link_setup["make"]({"selected": [(39, 1), (66, 1), (73, 1)]})
-    selected.execute(max_iterations=1, cores=1)
-    np.testing.assert_allclose(plain.class_results["car"].link_loads, selected.class_results["car"].link_loads)
+def test_select_link_network_loading(select_link_setup):
+    """
+    Test to ensure the SL_network_loading method correctly does the network loading
+    """
+    # First run without select links
+    assignment = select_link_setup["make"]()
+    assignment.execute(max_iterations=1, cores=1)
+    non_sl_loads = assignment.class_results["car"].get_load_results()
+
+    # Create new setup for select links
+    new_assignment = select_link_setup["make"]({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
+    new_assignment.execute(max_iterations=1, cores=1)
+    sl_loads = new_assignment.class_results["car"].get_load_results()
+
+    np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
 
 
-def test_duplicate_selected_links_are_removed(select_link_setup):
+def test_duplicate_links(select_link_setup):
+    """
+    Tests to make sure the user api correctly filters out duplicate links in the compressed graph
+    """
     assignment = select_link_setup["make"]({"test": [(1, 1), (1, 1)]})
     assignment.execute(max_iterations=1, cores=1)
-    assert len(assignment._class_states[0]._selected_links["test"]) == 1
+    assert len(assignment._class_states[0]._selected_links["test"]) == 1, "Did not correctly remove duplicate link"
 
 
-def test_invalid_selected_link_fails_at_execution(select_link_setup):
+def test_link_out_of_bounds(select_link_setup):
+    """
+    Test to confirm the user api correctly identifies when an input node is invalid for the current graph
+    """
     with pytest.raises(ValueError, match="Selected link"):
         select_link_setup["make"]({"test": [(78, 1), (1, 1)]}).execute(cores=1)
 
@@ -188,19 +203,26 @@ def test_kaitang(test_data_path, tmp_path):
     )
 
 
-@pytest.mark.parametrize("algorithm", ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"])
+@pytest.mark.parametrize("algorithm", ["all-or-nothing", "msa", "fw", "cfw", "bfw"])
 def test_multi_iteration(select_link_setup, algorithm):
     assignment = select_link_setup["make"]({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]}, algorithm)
     assignment.execute(max_iterations=10, cores=1)
     results = assignment.class_results["car"]
-    loads, selected = results.get_load_results(), results.get_sl_results()
-    for link in (1, 5):
-        assert abs(loads["matrix_ab"].loc[link] - selected[f"sl_{link}_1_matrix_ab"].loc[link]) < 1e-6
+    assignment_results = results.get_load_results()
+    sl_results = results.get_sl_results()
+
+    assert abs(assignment_results["matrix_ab"].loc[1] - sl_results["sl_1_1_matrix_ab"].loc[1]) < 1e-6, (
+        f"Select link results differ to that of the assignment ({algorithm})"
+    )
+
+    assert abs(assignment_results["matrix_ab"].loc[5] - sl_results["sl_5_1_matrix_ab"].loc[5]) < 1e-6, (
+        f"Select link results differ to that of the assignment ({algorithm})"
+    )
 
 
 def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     demand = np.stack([demand[name] for name in demand], axis=2)
-    # This uses the full graph so paths can end at any node.
+    # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
 
     def g(o, d):
         res = PathResults(graph, o, d)

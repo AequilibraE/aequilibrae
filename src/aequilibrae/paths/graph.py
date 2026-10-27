@@ -1250,8 +1250,13 @@ class GraphBase(ABC):  # noqa: B024
         super().__setattr__(key, value)
 
 
+class Graph(GraphBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 @dataclasses.dataclass(frozen=True, eq=False)
-class Graph:
+class PreparedGraph:
     """One routing context with fixed topology and mappings to source links.
 
     Network tables and the temporary graph builder are not retained. Full-link
@@ -1768,7 +1773,7 @@ def freeze_graph(builder, *, compact, network=None, costs=None, fields=None, cos
         np.empty((0, 2)) if lonlat is None or lonlat.empty else lonlat.loc[nodes, ["lon", "lat"]].to_numpy(copy=True)
     )
     coordinates.flags.writeable = False
-    return Graph(
+    return PreparedGraph(
         routing, mapping, graph_mapping, compact, builder.mode, cost_name, skimming, *arrays,
         builder.block_centroid_flows, builder.allow_path_uturns, np.array(costs[positions], copy=True), coordinates,
     )

@@ -4,9 +4,8 @@ from uuid import uuid4
 
 import numpy as np
 
-from aequilibrae.paths.cython.context import SkimmingContext
 from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import GraphBase, freeze_graph
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -25,9 +24,7 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
         >>> project = create_example(project_path)
-        >>> network = project.network
-
-        >>> graph = network.build_graph(mode='c', cost="distance", skimming=["distance"])
+        >>> graph = project.network.build_graph('c', 'distance', skimming=['distance'], compact=True)
 
         >>> skm = NetworkSkimming(graph)
         >>> skm.execute()
@@ -79,23 +76,13 @@ class NetworkSkimming(WorkerThread):
             self.signal.emit(["finished"])
             return
 
-        graph = self.graph
-        routing = make_routing_context(graph, compact=True)
+        graph = freeze_graph(self.graph, compact=True) if isinstance(self.graph, GraphBase) else self.graph
+        routing = make_routing_context(graph)
 
-        if isinstance(graph, Graph):
-            inputs = graph.skimming
-            nodes_to_indices = graph.nodes_to_indices
-        else:
-            fields = {}
-            for i, name in enumerate(graph.skim_fields):
-                if name != graph.cost_field:
-                    fields[name] = np.ascontiguousarray(graph.compact_skims[: routing.link_count, i])
-            inputs = SkimmingContext(
-                routing.link_count,
-                link_fields=fields,
-                cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
-            )
-            nodes_to_indices = graph.compact_nodes_to_indices
+        # The routing objective includes turn penalties. Other fields are plain
+        # compact link sums, as in PathResults.
+        inputs = graph.skimming
+        nodes_to_indices = graph.nodes_to_indices
         output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
         # Keep the requested field order and centroid index while sharing the
         # origin-major output buffer with the public AequilibraeMatrix.

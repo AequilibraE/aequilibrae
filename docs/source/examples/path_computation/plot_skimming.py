@@ -68,22 +68,17 @@ network = project.network
 # This is true, but we won't use those fields.
 
 # %%
-# Build the car graph with distance as the cost field.
-graph = network.build_graph(
-    mode="c", cost="distance", skimming=["distance"], compact=True,
-    centroids=np.array(list(range(28, 41)) + list(range(49, 91))),
-)
-
-# Available network modes:
+# we also see what modes are available
 network.list_modes()
 
+# let's say we want to minimize the distance
 # And will skim distance while we are at it, other fields like ``free_flow_time`` or ``travel_time`` 
 # can be added here as well
-graph.skim_fields
 
 # But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), 
 # these happen to be a selection of western centroids.
-graph.centroids
+centroids = np.array(list(range(28, 41)) + list(range(49, 91)))
+graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], centroids=centroids, compact=True)
 
 # %%
 # And run the skimming

@@ -10,8 +10,7 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Network, TrafficAssignment
-from aequilibrae.paths.graph import GraphBase as Graph
+from aequilibrae.paths import Graph, Network, TrafficAssignment
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import bpr

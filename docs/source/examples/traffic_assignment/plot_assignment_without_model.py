@@ -96,6 +96,7 @@ geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set
 
 # %%
 # Create the network snapshot from the link table.
+# See :ref:`aequilibrae-graphs` for more information about graphs.
 
 # %%
 network = Network(network.assign(modes="c"), centroids=index, lonlat=geom)

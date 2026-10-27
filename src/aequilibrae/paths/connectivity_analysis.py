@@ -57,9 +57,9 @@ def blocking_through_centroids(graph) -> np.ndarray:
 def disconnected_analysis(graph) -> np.ndarray:
     from types import SimpleNamespace
 
-    from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.graph import PreparedGraph
 
-    if isinstance(graph, Graph):
+    if isinstance(graph, PreparedGraph):
         import pandas as pd
 
         active = np.isfinite(graph.cost)

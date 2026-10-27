@@ -8,7 +8,6 @@ import pandas as pd
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import RouteChoice
-from aequilibrae.paths.graph import Graph
 
 logger = logging.getLogger(__name__)
 
@@ -16,24 +15,25 @@ logger = logging.getLogger(__name__)
 class SubAreaAnalysis:
     def __init__(
         self,
-        graph: Graph,
         subarea: gpd.GeoDataFrame,
         demand: Union[pd.DataFrame, AequilibraeMatrix],
+        *,
+        mode: str,
+        cost: str,
         project=None,
+        network=None,
     ):
         """
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
 
         This class aims to provide a semi-automated method for constructing the sub-area matrix.
-        The user should provide the Graph object, demand matrix, and a GeoDataFrame whose geometry
+        The user should provide a mode, cost field, demand matrix, and a GeoDataFrame whose geometry
         union represents the desired sub-area. Perform a route choice assignment, then call the
         ``post_process`` method to obtain a sub-area matrix.
 
         Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
 
         :Arguments:
-            **graph** (:obj:`Graph`): AequilibraE graph object to use
-
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
 
@@ -41,6 +41,9 @@ class SubAreaAnalysis:
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
+        network = project.network if network is None else network
+        centroids = demand.index if isinstance(demand, AequilibraeMatrix) else None
+        graph = network.build_graph(mode, cost, centroids=centroids, compact=True)
         self.graph = graph
         self.sub_area_demand = None
 

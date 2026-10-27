@@ -4,7 +4,7 @@ from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
 
 @pytest.fixture(scope="function")
-def project_with_graph(nauru_example):
+def project_for_simplification(nauru_example):
     remaining_links = [899, 900, 901, 902, 903, 1042, 1043, 1159, 1160]
     remaining_links += list(range(171, 222))
 
@@ -18,27 +18,22 @@ def project_with_graph(nauru_example):
         nodes = nauru_example.network.nodes
         nodes.update(arbitrary_node, is_centroid=1)
 
-    mode = "c"
-
-    network = nauru_example.network
-    graph = network.build_graph(mode=mode, cost="distance", compact=True, block_centroid_flows=False)
-
-    yield graph
+    yield nauru_example
 
 
-def test_simplify(project_with_graph):
+def test_simplify(project_for_simplification):
     net = NetworkSimplifier()
 
     links_before = net.link_layer.shape[0]
     nodes_before = net.network.nodes.data.shape[0]
 
-    net.simplify(project_with_graph)
+    net.simplify("c")
 
     assert links_before > net.network.links.data.shape[0]
     assert nodes_before > net.network.nodes.data.shape[0]
 
 
-def test_collapse_links_into_nodes(project_with_graph):
+def test_collapse_links_into_nodes(project_for_simplification):
     net = NetworkSimplifier()
 
     links_before = net.link_layer.shape[0]

@@ -71,6 +71,22 @@ class TrafficClass:
 
     Demand matrices must contain float64 values. ``name`` defaults to the
     mode. Classes with the same mode need distinct names.
+
+    .. code-block:: python
+
+        >>> from aequilibrae.paths import TrafficClass
+
+        >>> project = create_example(project_path)
+        >>> proj_matrices = project.matrices
+
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+
+        >>> tc = TrafficClass(
+        ...     name="car", mode="c", cost='free_flow_time', demand=demand, pce=1.3,
+        ...     skimming=['free_flow_time', 'distance'], block_centroid_flows=False,
+        ... )
+
+        >>> project.close()
     """
 
     mode: str

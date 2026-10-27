@@ -21,10 +21,13 @@ def aequilibrae_init(proj_path: str, cost: str):
     """
     Prepare the graph for skimming the network for `cost`
     """
-    proj = Project.from_path(proj_path)
+    proj = Project()
+    proj.open(proj_path)
     network = proj.network
     with proj.matrices.get_matrix("demand_omx") as store:
         matrix = store.subset(list(store))
+    # Keep centroid connector turns allowed for Sioux Falls, since all nodes are centroids
+    # BE CAREFUL WITH THIS SETTING
     car = TrafficClass(name="car", mode="c", cost=cost, demand=matrix, block_centroid_flows=False)
     configuration = {
         "network": network,
@@ -46,19 +49,18 @@ def arkansas(path: str):
 
     logger = logging.getLogger("aequilibrae")
 
-    proj = Project.from_path(path)
+    proj = Project()
+    proj.open(path)
     net = proj.network
     network = Network(net.links.data, turn_restrictions=net.turn_restrictions.data)
     with proj.db_connection as conn:
-        excluded = {
-            row[0]
-            for row in conn.execute(
-                "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
-            ).fetchall()
-        }
+        sql = "select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')"
+        exclude_from_passenger = [x[0] for x in conn.execute(sql).fetchall()]
     links = network.links
-    unavailable = (links.builtyear > 2010) | (links.removedyear < 2010) | ~links.mode_code.between(10, 11)
-    links.loc[unavailable | links.link_id.isin(excluded), "modes"] = ""
+    set1 = links[(links.builtyear > 2010) | (links.removedyear < 2010)].link_id.to_list()
+    set2 = links[~links.mode_code.between(10, 11)].link_id.to_list()
+    exclude_from_passenger.extend(set1 + set2)
+    links.loc[links.link_id.isin(exclude_from_passenger), "modes"] = ""
     defaults = {
         "alpha": 0.15,
         "beta": 4.0,
@@ -72,8 +74,10 @@ def arkansas(path: str):
         for column in (field, field + "_ab", field + "_ba"):
             if column in links:
                 links[column] = links[column].fillna(default)
-    logger.info("Assigning AM")
-    with proj.matrices.get_matrix("AM_omx") as store:
+    period = "am"
+    logger.info(f"\n\n Assigning {period.upper()}")
+    proj_matrices = proj.matrices
+    with proj_matrices.get_matrix(f"{period.upper()}_omx") as store:
         demand = store.subset(list(store))
     car = TrafficClass(name="car", mode="c", cost="tt_am_10", demand=demand, vot=0.2, fixed_cost_field="hov1tollcost")
     configuration = {
