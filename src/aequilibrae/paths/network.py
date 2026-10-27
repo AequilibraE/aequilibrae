@@ -7,11 +7,7 @@ import pandas as pd
 
 
 class Network:
-    """Hold link attributes, modes, centroids and turn restrictions.
-
-    Source tables are copied on construction. Graphs contain routing arrays,
-    not these tables. Without a modes column, every mode can use every link.
-    """
+    """Store link attributes, modes, centroids and turn restrictions."""
 
     def __init__(self, links, *, modes=None, centroids=None, turn_restrictions=None, allow_uturns=False, lonlat=None):
         links = links.copy(deep=True)
@@ -38,8 +34,8 @@ class Network:
         self.centroids = None if centroids is None else np.array(centroids, copy=True)
         self.turn_restrictions = None if turn_restrictions is None else turn_restrictions.copy(deep=True)
         if modes is not None and self.turn_restrictions is not None and "modes" in self.turn_restrictions:
-            selected = self.turn_restrictions.modes.fillna("").astype(str).map(
-                lambda value: any(m in value for m in modes)
+            selected = (
+                self.turn_restrictions.modes.fillna("").astype(str).map(lambda value: any(m in value for m in modes))
             )
             self.turn_restrictions = self.turn_restrictions.loc[selected].copy()
         self.allow_uturns = allow_uturns
@@ -49,8 +45,12 @@ class Network:
     def copy(self):
         """Copy source data without retaining prepared graphs."""
         network = Network(
-            self.links, modes=self.modes, centroids=self.centroids,
-            turn_restrictions=self.turn_restrictions, allow_uturns=self.allow_uturns, lonlat=self.lonlat,
+            self.links,
+            modes=self.modes,
+            centroids=self.centroids,
+            turn_restrictions=self.turn_restrictions,
+            allow_uturns=self.allow_uturns,
+            lonlat=self.lonlat,
         )
         network._node_ids = np.union1d(self._node_ids, network._node_ids)
         return network
@@ -144,8 +144,16 @@ class Network:
                 raise ValueError(f"Turn restrictions have missing directed legs {first} -> {second} for mode '{mode}'")
 
     def build_graph(
-        self, mode, cost=None, *, centroids=None, skimming=(), compact=False,
-        block_centroid_flows=True, turn_restrictions=None, allow_uturns=None,
+        self,
+        mode,
+        cost=None,
+        *,
+        centroids=None,
+        skimming=(),
+        compact=False,
+        block_centroid_flows=True,
+        turn_restrictions=None,
+        allow_uturns=None,
     ):
         """Prepare one full or compact graph from the current source tables.
 
@@ -174,9 +182,12 @@ class Network:
         if builder.network.empty:
             raise ValueError(f"No links are available for mode '{mode}'")
         _prepare_network_graph(
-            builder, mode, centroids,
+            builder,
+            mode,
+            centroids,
             self.turn_restrictions if turn_restrictions is None else turn_restrictions,
-            block_centroid_flows, self.allow_uturns if allow_uturns is None else allow_uturns,
+            block_centroid_flows,
+            self.allow_uturns if allow_uturns is None else allow_uturns,
         )
         return freeze_graph(builder, compact=compact, network=self, costs=costs, fields=fields, cost_name=cost)
 
@@ -185,7 +196,9 @@ class Network:
         key = (configuration.mode, tuple(configuration.demand.index), configuration.block_centroid_flows)
         if key not in self._graphs:
             self._graphs[key] = self.build_graph(
-                configuration.mode, centroids=configuration.demand.index, compact=True,
+                configuration.mode,
+                centroids=configuration.demand.index,
+                compact=True,
                 block_centroid_flows=configuration.block_centroid_flows,
             )
         return self._graphs[key]

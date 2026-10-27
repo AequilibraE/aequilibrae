@@ -139,22 +139,23 @@ The U-turn setting is managed through the project's ``about`` table:
 
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
-    # Rebuild graphs to apply the change
-    >>> project.network.build_graphs()
+    # Rebuild network and build graphs to apply the change
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you call ``build_graphs()``, turn restrictions are automatically loaded
-from the database and applied to all generated graphs:
+When you build a graph, turn restrictions are automatically loaded from the
+database and applied:
 
 .. code-block:: python
 
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
     # Check if a graph has turn restrictions
-    >>> graph = project.network.graphs['c']
-    >>> print(graph.has_turn_restrictions)
+    >>> print(graph._has_turn_restrictions)
     True
 
 Manual Turn Restriction Setup
@@ -192,24 +193,20 @@ time costs during the equilibration process.
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> project.network.build_graphs()
-    >>> graph = project.network.graphs['c']
-    >>> graph.set_graph('free_flow_time')
-
-    # Turn restrictions are automatically included during assignment
+    >>> network = project.network.build()
     >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     >>> traffic_class = TrafficClass(
     ...     mode='c',
-    ...     cost='free_flow_time',
+    ...     cost='distance',
     ...     demand=demand_matrix,
     ...     name='car',
-    ...     skimming=('free_flow_time',),
+    ...     skimming=('distance',),
     ... )
 
     >>> assignment = TrafficAssignment(
-    ...     network=project.network,
+    ...     network=network,
     ...     classes=[traffic_class],
-    ...     time_field='free_flow_time',
+    ...     time_field='distance',
     ...     capacity_field='capacity',
     ...     vdf=bpr,
     ...     algorithm='bfw',
