@@ -15,8 +15,10 @@ from aequilibrae.transit.column_order import column_order
 from aequilibrae.transit.date_tools import create_days_between, format_date, to_seconds
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
+from aequilibrae.transit.route_types import lookup_by_route_type
 from aequilibrae.transit.transit_elements import Agency, Fare, FareRule, Route, Service, Stop, Trip
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
+from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
@@ -112,9 +114,9 @@ class GTFSReader(WorkerThread):
         logger.info("Starting deconflict_stop_times")
 
         msg = "De-conflicting stop times (Step: 6/12)"
-        total_fast = 0
+        total_ties, total_fast = 0, 0
         for route in simple_progress(self.trips, self.signal, msg):
-            max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
+            max_speeds = lookup_by_route_type(self.__max_speeds__, self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
                     logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
@@ -122,74 +124,75 @@ class GTFSReader(WorkerThread):
                     if stop_times.shape[0] != len(trip.stops):
                         logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
 
-                    if not stop_times.arrival_time.is_monotonic_increasing:
-                        stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
-                        stop_times["arrival_time"] = stop_times.arrival_time.ffill()
-                    diffs = np.diff(stop_times.arrival_time.values)
-
-                    stop_geos = [self.stops[x].geo for x in trip.stops]
-                    distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:], strict=True)])
-
-                    times = np.copy(stop_times.arrival_time.values)
-                    source_time = np.zeros_like(stop_times.arrival_time.values)
-
-                    if times[-1] == times[-2]:
-                        logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                        logger.info("    Had conflicting stop times in its end")
-                        times[-1] += 1
-                        source_time[-1] = 1
-                        diffs = np.diff(times)
-
-                    to_override = np.argwhere(diffs == 0)[:, 0] + 1
-                    if to_override.shape[0] > 0:
-                        logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                        logger.info("     Had consecutive stops with the same timestamp")
-                        for i in to_override:
-                            source_time[i] = 1
-                            times[i:] += 1
-                        diffs = np.diff(times)
-
-                    if max_speeds.shape[0] > 0:
-                        speeds = distances / diffs
-                        df = pd.DataFrame(
-                            {
-                                "speed": speeds,
-                                "max_speed": max_speeds.speed.max(),
-                                "dist": distances,
-                                "elapsed_time": diffs,
-                                "add_time": np.zeros(diffs.shape[0], dtype=int),
-                                "source_time": source_time[1:],
-                            }
-                        )
-
-                        for _, r in max_speeds.iterrows():
-                            df.loc[(df.dist >= r.min_distance) & (df.dist < r.max_distance), "max_speed"] = r.speed
-
-                        to_fix = df[df.max_speed < df.speed].index.values
-                        if to_fix.shape[0] > 0:
-                            logger.debug(f"     Trip {trip.trip} had {to_fix.shape[0]} segments too fast")
-                            total_fast += to_fix.shape[0]
-                            df.loc[to_fix[0] :, "source_time"] = 2
-                            for i in to_fix:
-                                df.loc[i:, "add_time"] += (
-                                    df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
-                                ).astype(int)
-
-                            source_time[1:] = df.source_time[:]
-                            times[1:] += df.add_time[:].astype(int)
-
-                    times = pd.to_numeric(times, errors="coerce")
-                    source_time = pd.to_numeric(source_time, errors="coerce")
-
-                    cleaned_times = stop_times["arrival_time"].ffill().astype(int)
-                    assert cleaned_times.diff().min(skipna=True) > 0
-                    stop_times["arrival_time"] = cleaned_times
-                    stop_times["departure_time"] = cleaned_times
-                    stop_times["source_time"] = np.nan_to_num(source_time, nan=0).astype(int)
-                    trip.arrivals = stop_times.arrival_time.to_numpy(copy=True)
-                    trip.departures = stop_times.departure_time.to_numpy(copy=True)
+                    ties, fast = self.__deconflict_trip(trip, stop_times, max_speeds)
+                    total_ties += ties
+                    total_fast += fast
+        if total_ties:
+            logger.info(f"There were a total of {total_ties} segments with no (or negative) run time, now 1 s each")
         if total_fast:
             logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
+
+    def __deconflict_trip(self, trip: Trip, stop_times: pd.DataFrame, max_speeds: pd.DataFrame) -> tuple:
+        """Repairs the run times between stops of a trip, keeping the scheduled dwell at each stop.
+
+        A run time is from the departure from a stop to the arrival at the next one. Run times of zero (common in
+        timetables to the minute) become one second, negative ones are repaired the same way with a warning, and
+        those faster than the maximum speed for their distance are slowed down to it. Every change shifts the rest
+        of the trip. ``source_time`` is 0 for stops with times as in GTFS, 1 for stops whose times were changed by
+        de-conflicting and 2 for those changed by the maximum speeds.
+
+        Returns the number of run times de-conflicted and slowed down.
+        """
+        arrivals = stop_times.arrival_time.to_numpy(dtype=np.int64)
+        departures = stop_times.departure_time.to_numpy(dtype=np.int64)
+        source_time = np.zeros(arrivals.shape[0], dtype=np.int64)
+
+        dwell = departures - arrivals
+        if (dwell < 0).any():
+            logger.warning(f"Trip {trip.trip} departs before arriving at {(dwell < 0).sum()} stops. Dwell set to zero")
+            source_time[dwell < 0] = 1
+            dwell = np.maximum(dwell, 0)
+
+        run = arrivals[1:] - (arrivals[:-1] + dwell[:-1])
+        if (run < 0).any():
+            logger.warning(
+                f"Trip {trip.trip} arrives at {(run < 0).sum()} stops before leaving the previous one. "
+                "Their arrivals were shifted forward, with the rest of the trip"
+            )
+        ties = run <= 0
+        source_time[1:][ties] = 1
+        run = np.maximum(run, 1)
+
+        fast = np.zeros_like(ties)
+        if max_speeds.shape[0] > 0:
+            lons, lats = np.array([[self.stops[x].geo.x, self.stops[x].geo.y] for x in trip.stops]).T
+            distances = haversine(lons[:-1], lats[:-1], lons[1:], lats[1:])
+            max_speed = np.full(distances.shape[0], max_speeds.speed.max(), dtype=float)
+            for r in max_speeds.itertuples():
+                max_speed[(distances >= r.min_distance) & (distances < r.max_distance)] = r.speed
+
+            min_run = np.ceil(distances / max_speed).astype(np.int64)
+            fast = run < min_run
+            if fast.any():
+                logger.debug(f"     Trip {trip.trip} had {fast.sum()} segments too fast")
+                source_time[1:][fast] = 2
+                run = np.maximum(run, min_run)
+
+        new_arrivals = arrivals.copy()
+        new_arrivals[1:] = arrivals[0] + np.cumsum(dwell[:-1] + run)
+        new_departures = new_arrivals + dwell
+
+        # Changes carry over to the rest of the trip, which keeps the most significant reason it was shifted for
+        changed = (new_arrivals != arrivals) | (new_departures != departures)
+        source_time = np.where(changed, np.maximum.accumulate(source_time), 0)
+
+        stop_times["arrival_time"] = new_arrivals
+        stop_times["departure_time"] = new_departures
+        stop_times["source_time"] = source_time
+        trip.arrivals = new_arrivals
+        trip.departures = new_departures
+        trip.source_time = source_time
+        return int(ties.sum()), int(fast.sum())
 
     def __load_fare_data(self):
         logger.debug("Starting __load_fare_data")
@@ -228,7 +231,11 @@ class GTFSReader(WorkerThread):
             fr = FareRule()
             fr.populate(data, ["fare", "route", "origin", "destination", "contains"])
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
-            if fr.route in self.routes:
+            if fr.route is not None:
+                # Without its route, the rule would apply to every route
+                if fr.route not in self.routes:
+                    logger.warning(f"Fare rule for fare {fr.fare} refers to route {fr.route}, absent from routes.txt")
+                    continue
                 fr.route_id = self.routes[fr.route].route_id
             fr.agency_id = self.agency.agency_id
             self.fare_rules.append(fr)
@@ -293,8 +300,12 @@ class GTFSReader(WorkerThread):
             trip.route_id = self.routes[trip.route].route_id
             trip.shape = self.shapes.get(trip.shape_id, trip.shape)
             all_trips = [trip]
-            if trip.trip_id in trip_replacements:
-                all_trips = [deepcopy(trip) for _ in range(len(trip_replacements[trip.trip_id]))]
+            if trip.trip in trip_replacements:
+                # A trip in frequencies.txt is a template, replaced by one trip per departure in its windows
+                all_trips = []
+                for new_trip_str in trip_replacements[trip.trip]:
+                    all_trips.append(deepcopy(trip))
+                    all_trips[-1].trip = new_trip_str
 
             for trip in all_trips:
                 stop_times = self.stop_times.get(trip.trip, [])
@@ -302,18 +313,10 @@ class GTFSReader(WorkerThread):
                     logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
                     continue
 
-                cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1) + "#####" + stop_times.stop)
-                cleaner.drop_duplicates(["seqkey"], inplace=True, keep="first")
-                stop_times = cleaner.drop(columns=["seqkey"])
-                stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
-                stop_times["departure_time"] = stop_times.departure_time.astype(int)
-                self.stop_times[trip.trip] = stop_times
                 trip.stops = list(stop_times.stop_id.values)
-                m = hashlib.md5()
-                m.update(trip.route.encode())
-                m.update("".join(stop_times.stop.values).encode())
-
-                trip.pattern_hash = m.hexdigest()
+                # Delimited, so that stops such as "1", "23" and "12", "3" do not make up the same pattern
+                pattern_key = "\x1f".join([trip.route, *stop_times.stop.values])
+                trip.pattern_hash = hashlib.md5(pattern_key.encode()).hexdigest()
                 trip.arrivals = list(stop_times.arrival_time.values)
                 trip.departures = list(stop_times.departure_time.values)
                 trip.source_time = list(stop_times.source_time.values)
@@ -338,30 +341,40 @@ class GTFSReader(WorkerThread):
             with self.zip_archive.open(freqtxt, "r") as file:
                 freqs = parse_csv(file, column_order[freqtxt])
             self.data_arrays[freqtxt] = freqs
+            windows = {}
             for line in range(freqs.shape[0]):
                 trip, start_time, end_time, headway = list(freqs[line][list(column_order[freqtxt].keys())])
                 if trip not in self.stop_times:
                     self.__fail(f"trip id {trip} in frequency table has no corresponding entry in trips")
 
-                headway = int(headway)
+                headway = int(float(headway))
                 if headway <= 0:
                     self.__fail(f"Trip {trip} has non-positive headway on table frequencies.txt")
 
-                start_seconds = to_seconds(start_time)
-                end_seconds = to_seconds(end_time)
+                windows.setdefault(trip, []).append((int(to_seconds(start_time)), int(to_seconds(end_time)), headway))
 
+            # The template trip departs its first stop every headway from the start of each window, up to (but not
+            # at) its end. Every window is taken as having exact times
+            for trip, trip_windows in windows.items():
                 template = self.stop_times.pop(trip)
-
                 trip_replacements[trip] = []
-                steps = int(((end_seconds - start_seconds) / headway) + 1)
-                for step in range(steps):
-                    shift = step * headway
-                    new_trip = template.copy()
-                    new_trip_str = f"{trip}-{new_trip.arrival_time.values[0]}".replace(":", "")
-                    new_trip["arrival_time"] += shift
-                    new_trip["departure_time"] += shift
-                    self.stop_times[new_trip_str] = new_trip
-                    trip_replacements[trip].append(new_trip_str)
+                for start_seconds, end_seconds, headway in sorted(trip_windows):
+                    for departure in range(start_seconds, end_seconds, headway):
+                        hhmmss = f"{departure // 3600:02d}{departure % 3600 // 60:02d}{departure % 60:02d}"
+                        new_trip_str = f"{trip}-{hhmmss}"
+                        if new_trip_str in self.stop_times:
+                            logger.warning(f"Trip {new_trip_str}, from the frequencies of trip {trip}, is repeated")
+                            continue
+                        shift = departure - template.departure_time.values[0]
+                        new_trip = template.assign(
+                            trip_id=new_trip_str,
+                            arrival_time=template.arrival_time + shift,
+                            departure_time=template.departure_time + shift,
+                        )
+                        self.stop_times[new_trip_str] = new_trip
+                        trip_replacements[trip].append(new_trip_str)
+                if not trip_replacements[trip]:
+                    logger.warning(f"Trip {trip} has no departures within its windows on frequencies.txt")
         return trip_replacements
 
     def __load_stop_times(self):
@@ -374,17 +387,6 @@ class GTFSReader(WorkerThread):
             stoptimes = parse_csv(file, column_order[stoptimestxt])
         self.data_arrays[stoptimestxt] = stoptimes
 
-        df = pd.DataFrame(stoptimes)
-        for col in ["arrival_time", "departure_time"]:
-            df2 = df[col].str.split(":", expand=True)
-            df2 = df2.fillna("0")
-            df2.columns = ["h", "m", "s"]
-            df2.loc[df2.h.str.len() < 1, "h"] = "0"
-            df2.loc[df2.m.str.len() < 1, "m"] = "0"
-            df2.loc[df2.s.str.len() < 1, "s"] = "0"
-            df2["sec"] = df2.h.astype(int) * 3600 + df2.m.astype(int) * 60 + df2.s.astype(int)
-            stoptimes[col] = df2.sec.values
-
         trips = stoptimes["trip_id"].astype(str)
         sequences = stoptimes["stop_sequence"].astype(str)
         key = np.char.add(np.char.add(trips, "##"), sequences)
@@ -392,28 +394,45 @@ class GTFSReader(WorkerThread):
             self.__fail("There are repeated stop_sequences for a single trip_id on stop_times.txt")
 
         df = pd.DataFrame(stoptimes)
+        df["arrival_time"] = _gtfs_seconds(df.arrival_time)
+        df["departure_time"] = _gtfs_seconds(df.departure_time)
 
-        df["arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
-        df["departure_time"] = df["arrival_time"]
-
-        counter = df.shape[0]
-        df = df.assign(other_stop=df.stop_id.shift(-1), other_trip=df.trip_id.shift(-1))
-        df = df.loc[~((df.other_stop == df.stop_id) & (df.trip_id == df.other_trip)), :]
-        counter -= df.shape[0]
-        df.drop(columns=["other_stop", "other_trip"], inplace=True)
+        # GTFS allows either time to be empty, and both of them at stops that are not timepoints
+        df["arrival_time"] = df.arrival_time.fillna(df.departure_time)
+        df["departure_time"] = df.departure_time.fillna(df.arrival_time)
         df.columns = ["stop" if x == "stop_id" else x for x in df.columns]
 
         stops = [s.stop for s in self.stops.values()]
         stop_ids = [s.stop_id for s in self.stops.values()]
         stop_list = pd.DataFrame({"stop": stops, "stop_id": stop_ids})
         df = df.merge(stop_list, on="stop")
-        df.sort_values(["trip_id", "stop_sequence"], inplace=True)
-        df = df.assign(source_time=0)
+        df = df.sort_values(["trip_id", "stop_sequence"]).reset_index(drop=True)
+
+        # Consecutive events at the same stop are a single stop, with a dwell from the first arrival to the last
+        # departure. "first" and "last" skip missing times
+        new_stop = (df.stop != df.stop.shift()) | (df.trip_id != df.trip_id.shift())
+        if not new_stop.all():
+            logger.info(f"    Merged {(~new_stop).sum()} stop_times records at the same stop as the previous one")
+            aggregation = dict.fromkeys(df.columns, "first") | {"departure_time": "last"}
+            df = df.groupby(new_stop.cumsum()).agg(aggregation).reset_index(drop=True)
+
+        # Stops without any time take the departure from the previous stop, which de-conflicting spreads out later
+        no_time = df.arrival_time.isna()
+        if no_time.any():
+            times = df.departure_time.groupby(df.trip_id).ffill()
+            times = times.fillna(df.arrival_time.groupby(df.trip_id).bfill())
+            df.loc[no_time, "arrival_time"] = times[no_time]
+            df.loc[no_time, "departure_time"] = times[no_time]
+            if df.arrival_time.isna().any():
+                no_times = df.loc[df.arrival_time.isna(), "trip_id"].unique().tolist()
+                logger.error(f"Trips without any arrival or departure time on stop_times.txt are skipped: {no_times}")
+                df = df.loc[df.arrival_time.notna(), :]
+
+        df = df.astype({"arrival_time": np.int64, "departure_time": np.int64}).assign(source_time=0)
 
         msg = "Loading stop times (Step: 3/12)"
         for trip_id, data in simple_progress(df.groupby(df["trip_id"]), self.signal, msg):
-            data["stop_sequence"] = np.arange(data.shape[0])
-            self.stop_times[trip_id] = data
+            self.stop_times[trip_id] = data.assign(stop_sequence=np.arange(data.shape[0]))
 
     def __load_stops_table(self):
         logger.debug("Starting __load_stops_table")
@@ -451,16 +470,17 @@ class GTFSReader(WorkerThread):
         if np.unique(routes["route_id"]).shape[0] < routes.shape[0]:
             self.__fail("There are repeated route IDs in routes.txt")
 
-        seated_cap, total_cap = self.__capacities__.get("other", [None, None])
+        # Extended route types take the defaults of their basic type unless they have their own
         routes = pd.DataFrame(routes)
-        routes = routes.assign(seated_capacity=seated_cap, total_capacity=total_cap, srid=self.srid)
-        for route_type, cap in self.__capacities__.items():
-            routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
-
+        default_cap = self.__capacities__.get("other", [None, None])
+        caps = [lookup_by_route_type(self.__capacities__, rt, default_cap) for rt in routes.route_type]
         default_pce = self.__pces__.get("other", 2.0)
-        routes = routes.assign(pce=default_pce)
-        for route_type, pce in self.__pces__.items():
-            routes.loc[routes.route_type == route_type, ["pce"]] = pce
+        routes = routes.assign(
+            seated_capacity=[cap[0] for cap in caps],
+            total_capacity=[cap[1] for cap in caps],
+            srid=self.srid,
+            pce=[lookup_by_route_type(self.__pces__, rt, default_pce) for rt in routes.route_type],
+        )
 
         for _i, line in simple_progress(routes.iterrows(), self.signal, "Loading routes (Step: 1/12)"):
             r = Route(self.agency.agency_id)
@@ -564,3 +584,9 @@ class GTFSReader(WorkerThread):
     def __fail(self, msg: str) -> None:
         logger.error(msg)
         raise Exception(msg)
+
+
+def _gtfs_seconds(times: pd.Series) -> pd.Series:
+    """Converts GTFS times (H:MM:SS, with hours past 24 after midnight) to seconds, with NaN for empty times"""
+    parts = times.astype(str).str.extract(r"^\s*(\d+):(\d+)(?::(\d+))?\s*$").astype(float)
+    return parts[0] * 3600 + parts[1] * 60 + parts[2].fillna(0)

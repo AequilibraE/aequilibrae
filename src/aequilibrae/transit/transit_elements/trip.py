@@ -28,6 +28,8 @@ class Trip(BasicPTElement):
     * pattern_hash (:obj:`str`): Pattern ID derived from stops for this route/stop-pattern
     * arrivals (:obj:`List[int]`): Sequence of arrival at stops for this trip
     * departures (:obj:`List[int]`): Sequence of departures from stops for this trip
+    * source_time (:obj:`List[int]`): Source of the times at each stop: 0 as in GTFS, 1 changed when de-conflicting
+      stop times and 2 changed to respect maximum speeds. Not saved to the database
     * stops (:obj:`List[Stop]`): Sequence of stops for this trip
     * shape (:obj:`LineString`): Shape for this trip. Directly from shapes.txt or rebuilt from sequence of stops
     """

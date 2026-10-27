@@ -1,5 +1,16 @@
 from collections import OrderedDict
 
+
+class Nullable:
+    """Numeric column whose empty fields are read as ``None`` (stored as NULL) instead of zero.
+
+    For columns where GTFS gives an empty field a meaning of its own, such as unlimited transfers
+    """
+
+    def __init__(self, dtype: type):
+        self.dtype = dtype
+
+
 column_order = {
     "agency.txt": OrderedDict(
         [
@@ -72,12 +83,12 @@ column_order = {
     "fare_attributes.txt": OrderedDict(
         [
             ("fare_id", str),
-            ("price", float),
+            ("price", Nullable(float)),
             ("currency_type", str),
-            ("payment_method", int),
-            ("transfers", int),
+            ("payment_method", Nullable(int)),
+            ("transfers", Nullable(int)),
             # ("agency_id", str),
-            ("transfer_duration", float),
+            ("transfer_duration", Nullable(float)),
         ]
     ),
     "fare_rules.txt": OrderedDict(

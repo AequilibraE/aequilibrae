@@ -12,6 +12,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.transit.constants import PATTERN_ID_MULTIPLIER, Constants
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
+from aequilibrae.transit.route_types import base_route_type, lookup_by_route_type
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_corresp
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
@@ -106,6 +107,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         :Arguments:
             **max_speeds** (:obj:`pd.DataFrame`): Requires 4 fields: mode, min_distance, max_distance, speed.
+            Distances are in metres between consecutive stops and speeds in metres per second. Modes are GTFS
+            route types, and extended route types use the speeds of their basic type unless they have their own.
             Modes not covered in the data will not be touched and distance brackets not covered will receive
             the maximum speed, with a warning
         """
@@ -136,7 +139,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def map_match(self, route_types=(3,)) -> None:
         """Performs map-matching for all routes of one or more types.
 
-        Defaults to map-matching Bus routes (type 3) only.
+        Defaults to map-matching Bus routes (type 3) only. A basic route type also selects the extended route
+        types that map onto it, so ``3`` also selects extended bus types such as ``700``.
 
         For a reference of route types, see the inputs for
         `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
@@ -150,19 +154,19 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        if any(e not in mode_corresp for e in route_types):
-            missing_route_types = [e for e in route_types if e not in mode_corresp]
+        if any(lookup_by_route_type(mode_corresp, e) is None for e in route_types):
+            missing_route_types = [e for e in route_types if lookup_by_route_type(mode_corresp, e) is None]
             logger.warning(
                 f"Skipping the following route_types as they have no corresponding road mode: {missing_route_types}"
             )
-            route_types = [e for e in route_types if e in mode_corresp]
+            route_types = [e for e in route_types if lookup_by_route_type(mode_corresp, e) is not None]
 
             if not route_types:
                 logger.warning("No valid route_types remain after filtering")
                 return
 
         for pat in simple_progress(self.select_patterns.values(), self.signal, "Map-matching patterns"):  # type:Pattern
-            if pat.route_type in route_types:
+            if pat.route_type in route_types or base_route_type(pat.route_type) in route_types:
                 pat.map_match()
 
     def set_agency_identifier(self, agency_id: str) -> None:
@@ -256,11 +260,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for link in simple_progress(self.select_links.values(), self.signal, "Saving links (Step: 11/12)"):
                 link.save_to_database(conn, commit=False)
 
-            zone_ids1 = [x.origin for x in self.gtfs_data.fare_rules]
-            zone_ids2 = [x.destination for x in self.gtfs_data.fare_rules]
-            zone_ids = sorted(set(zone_ids1) | set(zone_ids2))
+            # Fare zones are those of the stops saved and those the fare rules refer to, skipping empty ones
+            zone_ids = {stop.zone for stop in self.select_stops.values()}
+            for rule in self.gtfs_data.fare_rules:
+                zone_ids |= {rule.origin, rule.destination, rule.contains}
 
-            zones = [[x, self.gtfs_data.agency.agency_id] for x in zone_ids]
+            zones = [[x, self.gtfs_data.agency.agency_id] for x in sorted(zone_ids - {None, ""})]
             if zones:
                 sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
@@ -283,6 +288,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_stops.clear()
         self.select_links.clear()
         self.select_patterns.clear()
+        self.select_trips.clear()
 
         if self.__do_execute_map_matching:
             self.builds_map_matchers()
@@ -357,7 +363,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             prev_end = Point(list(link.geo.coords)[-1])
             link.type = int(route.route_type)
             p.links.append(link.transit_link)
-            self.select_links[link.key] = link
+            # Loop routes go through the same pair of stops more than once, so links are keyed by their position
+            self.select_links[(link.pattern_id, link.seq)] = link
 
         return p
 
@@ -438,9 +445,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         stop_data = []
         for stop in self.select_stops.values():
-            if stop.route_type not in mode_corresp:
+            road_mode = lookup_by_route_type(mode_corresp, stop.route_type)
+            if road_mode is None:
                 continue
-            stop_data.append([stop.stop_id, mode_corresp[stop.route_type], stop.geo])
+            stop_data.append([stop.stop_id, road_mode, stop.geo])
         df = pd.DataFrame(stop_data, columns=["stop_id", "mode_type", "geometry"])
         all_stops_gdf = gpd.GeoDataFrame(df[["stop_id", "mode_type"]], geometry=df.geometry).set_crs(self.srid)
 

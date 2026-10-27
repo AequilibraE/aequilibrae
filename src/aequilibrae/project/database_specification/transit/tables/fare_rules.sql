@@ -18,6 +18,6 @@ create TABLE IF NOT EXISTS fare_rules (
 	route_id    INTEGER,
 	origin      TEXT,
 	destination TEXT,
-	contains    INTEGER,
+	contains    TEXT,
 	FOREIGN KEY(fare_id) REFERENCES fare_attributes(fare_id) deferrable initially deferred
 );

@@ -58,6 +58,46 @@ API Changes
 Changes in Behaviour
 --------------------
 
+GTFS import
+~~~~~~~~~~~
+The behaviour of GTFS importer changed in AequilibraE 2.0. Models created with previous versions, particularly those
+that imported GTFS feeds that include ``frequencies.txt``, loop routes, scheduled dwell, consecutive stops with
+equal times, free fares or unlimited transfers would benefit from being imported again.
+
+Changes in behaviour and corrections include:
+
+- **Scheduled dwell** is kept: ``trips_schedule`` stores each stop's arrival and departure as published, rather than
+  the later of the two for both, which added the dwell at each stop to the run time towards it.
+- **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
+  run times are repaired the same way, with a warning.
+
+- **Maximum speeds** set with ``set_maximum_speeds`` are applied. Distances were measured in degrees, so they never
+  were. Distances are in metres and speeds in metres per second.
+
+- **frequencies.txt** trips are imported, one trip per departure from ``start_time`` up to but excluding ``end_time``,
+  in every window of the trip. Every trip defined by frequencies was skipped before.
+
+- **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``.
+
+- **Patterns** are told apart by delimited stop IDs, so stop sequences such as ``1, 23`` and ``12, 3`` on one route are
+  no longer the same pattern. Pattern IDs of routes with several patterns may differ from those of earlier imports.
+
+- **Extended route types** (``100`` to ``1700``) take the default capacities, PCEs and maximum speeds of their basic
+  type, and map matching a basic type also matches its extended types, so extended bus types such as ``700`` can be
+  map matched.
+
+- **Fares** are stored as published: a free fare keeps its price of zero, empty ``transfers`` (unlimited transfers),
+  ``transfer_duration`` (no time limit) and ``payment_method`` are stored as NULL rather than zero, and fare zone IDs
+  are text. Transit migration 008 declares ``fare_rules.contains`` as text, though zone IDs that earlier imports
+  turned into numbers (such as ``07`` into ``7``) cannot be recovered.
+
+- **Fare rules** for a route absent from ``routes.txt`` are skipped with a warning, rather than applying to every
+  route.
+
+The GTFS export code was also overhauled.
+
+.. GTFS_EXPORT_API
+
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
 The Connectivity Analysis procedure no longer returns a list of disconnected OD pairs, but rather a Numpy array
