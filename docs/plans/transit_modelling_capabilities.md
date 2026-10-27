@@ -512,8 +512,13 @@ open-source packages offer the capability: **Standard** (essentially all), **Com
     applied directly at zone origins after the backward pass (origins are never interior nodes when
     `blocking_centroid_flows=True`), with the origin label replaced by the logit expected cost; it is
     `S` and ships with `A2` in Phase 3. Destination-side logit is logit at interior `alighting` and
-    stop vertices: it needs an efficient-edge rule (only edges with $u_j < u_i$) to keep strategies
-    acyclic and the label order valid, and stays in `B4` (`M`).
+    stop vertices. Its efficient-edge rule cannot use the logsum labels themselves: with
+    $u_i = -\tfrac{1}{\theta} \ln \sum_a e^{-\theta (u_j + c_a)}$ a valid edge gives $u_i < u_j$
+    whenever $c_a < \tfrac{1}{\theta} \ln |E_i^+|$ (a 60 s station walk at $\theta = 0.01$
+    s$^{-1}$ with two options), so "$u_j < u_i$" is circular and breaks the heap's extraction order.
+    Define efficient edges on a monotone reference potential $\pi$ (the deterministic SF labels, as
+    in Dial's STOCH) and evaluate the logit splits in topological order of $\pi$. It stays in `B4`
+    (`M`).
   - **Stop split & headways**: scaling `freq` by `1 / wait_time_factor` (e.g. `0.5` for clockface
     service) gets single-line wait right but overstates common-line wait savings and still splits
     riders purely by $f_a$ regardless of in-vehicle time differences. Adding RTPI / countdown
@@ -521,24 +526,28 @@ open-source packages offer the capability: **Standard** (essentially all), **Com
     app-informed riders and express-vs-stopper corridors properly.
 - **B5/B6** cannot simply reuse road `LinearApproximation` (FW/CFW/BFW):
   - Even for separable fixed-frequency crowding (`B5`), Spiess & Florian's (1989, §5) convex
-    objective is $\sum_a \int_0^{v_a} c_a(x)\,dx + \sum_d \sum_i w_i^d$, with waits kept per
-    destination ($v_a^d \le f_a w_i^d$), so any exact line search and gap must include each strategy
-    direction's total waiting time $W = \sum_d \sum_i w_i^d$. $W$ is linear in the step, so it only
-    adds the constant $W_y - W_x$ to the line-search derivative, the hook road
-    `LinearApproximation` already uses for fixed and turn costs; what cannot be reused is its road
-    subproblem and per-class result handling.
+    objective is $\sum_a \int_0^{v_a} c_a(x)\,dx + \sum_d \sum_i \kappa_i\, w_i^d$, with waits kept
+    per destination ($v_a^d \le f_a w_i^d$) and weighted by the kernel's $\kappa_{i,m}$ (§5.3; with
+    $\kappa = 1$ it is the textbook form), so any exact line search and gap must include each
+    strategy direction's weighted total waiting time $W_m = \sum_d \sum_i \kappa_{i,m}\, w_i^{m,d}$,
+    summed over classes in `B11`. $W$ is linear in the step, so it only adds the constant
+    $W_y - W_x$ to the line-search derivative, the hook road `LinearApproximation` already uses for
+    fixed and turn costs; what cannot be reused is its road subproblem and per-class result handling.
   - Once **seated-vs-standing priority** (continuing `dwell` riders keep seats before `boarding`
     riders; Schmöcker et al. 2011), **boarding-dependent dwell times (`A5`)**, or **effective
     frequencies (`B6`, Cepeda–Cominetti–Florian 2006)** are active, the Jacobian is **asymmetric**
     and no convex Beckmann objective exists — invalidating exact line search and CFW/BFW Hessian
     conjugacy. Plan on **MSA, MSWA or self-regulated averaging** and the **Marcotte–Nguyen / CCF
-    variational-inequality gap**:
-    $$\text{Gap}(v) = \frac{\sum_a c_a(v)\,v_a + \sum_d \sum_i w_i^d(v) - \sum_{od} d_{od}\,u_{od}(v)}{\sum_a c_a(v)\,v_a + \sum_d \sum_i w_i^d(v)}, \qquad w_i^d(v) = \max_{a \in A_i^+} \frac{v_a^d}{f_a(v)},$$
-    which is non-negative and zero only at equilibrium (Marcotte & Nguyen 1998; CCF 2006). The
-    maximum is per destination, so averaged flows on finite-frequency edges must be kept per
-    destination across iterations (about 10 GB dense at 4,000 zones × 300,000 boarding edges);
-    aggregate $v_a$ is not enough. With `B4` logit active the VI gap stays positive, so also report
-    the fixed-point gap $\lVert y - v \rVert / \lVert v \rVert$.
+    variational-inequality gap**, written for one class (sum over classes in `B11`):
+    $$\text{Gap}(v) = \frac{\sum_a c_a(v)\,v_a + \sum_d \sum_i \kappa_i\, w_i^d(v) - \sum_{od} d_{od}\,u_{od}(v)}{\sum_a c_a(v)\,v_a + \sum_d \sum_i \kappa_i\, w_i^d(v)}, \qquad w_i^d(v) = \max_{a \in A_i^+} \frac{v_a^d}{f_a(v)},$$
+    which is non-negative and zero only at equilibrium (Marcotte & Nguyen 1998; CCF 2006). Leaving
+    the waits unweighted while the labels carry $\kappa_i$ makes the gap negative wherever
+    $\kappa_i > 1$ and keeps it from reaching zero otherwise. The maximum is per destination, so for
+    `B6` the averaged flows on finite-frequency edges must be kept per destination and per class
+    across iterations: about 10 GB dense per class at 4,000 zones × 300,000 boarding edges, so four
+    to six classes breach the 64 GB of §5.8 unless the store is sparse, which the sparsity of
+    $v_a^d > 0$ allows. Fixed-frequency `B5` needs only the scalar $W_m$. With `B4` logit active the
+    VI gap stays positive, so also report the fixed-point gap $\lVert y - v \rVert / \lVert v \rVert$.
   - **On-board priority in B6**: residual capacity available to `boarding` passengers on segment $k$
     is $C_k - v_{\text{prio},k}$ (using period trip count $N_{\text{trips}} \times
     \text{total\_capacity}$, in the period units of the demand), never $C_k -
@@ -584,7 +593,11 @@ open-source packages offer the capability: **Standard** (essentially all), **Com
     prices for lot capacity, and split PnR demand into auto leg matrix $D_{ok}^{\text{auto}}$ (loaded
     in `TrafficAssignment`) and PT leg matrix $D_{kd}^{\text{PT}}$ (loaded in `TransitAssignment`).
     Lots enter both graphs as pseudo-zones (road destinations, transit origins with walk
-    connectors), so both matrix indices grow to zones plus lots.
+    connectors), so both matrix indices grow to zones plus lots. Each lot needs its own virtual
+    centroid node joined to the road network by synthetic access links, never an existing
+    intersection node: `prepare_graph` treats every link at a centroid node as a connector, and
+    `block_centroid_flows` would then block through traffic at the station's intersection and stop
+    graph compression there.
   - Unlike a monolithic car+transit SF graph (`B10b`), this needs **no `B3` dependency**, keeps car
     use at the home end, and loads PnR cars onto congested station access roads. Using the same lot
     for the PM return as for the AM outbound trip still needs tour- or PA-based demand, or deriving
@@ -713,7 +726,9 @@ iteratively from road congestion. Three options:
      Importing a further service date of a feed (`A6`), for late-night periods that span two
      service days, merges into that feed's stops and patterns, offsets its trips by
      `86400 × day_index` and records `service_date` on each trip, so GTFS trip IDs stay unique per
-     (`feed_id`, `service_date`) and export can write each trip's date.
+     (`feed_id`, `service_date`) and export can write each trip's date. Graph builds and
+     `build_pt_preload` take the service days to include (default: day 0 only), so a whole-day
+     period never counts two days of trips against one day's $T_{\text{period}}$.
    - `TransitGraphBuilder` and `build_pt_preload` today read `trips_schedule` only; both must read
      `pattern_headways` and the segment profiles as well, or headway-specified and edited patterns
      reach neither SF graphs nor road preloads.
@@ -737,22 +752,31 @@ route-choice code, rather than forcing one paradigm to do both.
   `reset_heap`), and the per-destination `qsort` can go: attractive edges leave the heap in
   nondecreasing $u_j + c_a$, so loading can walk the recorded extraction order backwards. Fix the
   kernel API in the port so later items do not reopen it:
-  - a per-node wait constant $\kappa_i = \alpha_i \omega_i$ (headway fraction × class wait weight)
-    in place of the hard-coded `beta = 1.0`, with a per-skim-column version so reported waits use
-    $\alpha_i$ alone;
+  - a per-node, per-class wait constant $\kappa_{i,m} = \alpha_{i,m}\, \omega_{i,m}$ (headway
+    fraction × class wait weight) in place of the hard-coded `beta = 1.0`, with a per-skim-column
+    version so reported waits use $\alpha_{i,m}$ alone; every objective, gap and invariant below
+    then weights waits by $\kappa_{i,m}$;
   - skim operators beyond addition: "any" (for $P_{\text{PT}}$ and select-link probabilities) and
     "reset at boarding" (for first wait);
   - a sparse per-destination cost overlay (`B3` zonal pricing);
-  - outputs: unassigned demand per OD, total waiting time $W$ per class (`B5`/`B6` line search and
-    gap), an optional per-destination store of flows on finite-frequency edges (CCF gap), and the
-    attractive set and splits for `C8`;
+  - outputs: unassigned demand per OD, the $\kappa$-weighted total waiting time $W_m$ per class
+    (`B5`/`B6` line search and gap), accumulated as a scalar in the loading pass, which is all
+    fixed-frequency `B5` needs; an optional sparse per-destination, per-class store of flows on
+    finite-frequency edges (`B6` CCF gap); and the attractive set and splits for `C8`;
   - per-destination hooks: a per-stop line-to-line accumulator (`C1` transfer matrices) and forward
     marked-flow propagation (`C2`) in the loading pass, and a node split rule (frequency share, or
-    logit at origin connectors and interior nodes for `B4`);
+    logit at origin connectors and interior nodes for `B4`, evaluated in topological order of a
+    monotone reference potential rather than of the logsum labels);
   - exact infinite frequency (a flag, not `1e20`), so a node with an attractive walk or dwell edge
     gives finite-frequency edges exactly zero share;
-  - a check that costed $c_a > 0$, since negative mode bonuses break label setting and strategy
-    acyclicity;
+  - a check that costed $c_a \ge 0$, with a positive $\varepsilon$ floor on zero-time structural
+    edges (scheduled dwell where `departure = arrival`, `in_seat_transfers`, alighting edges once
+    transfer penalties move to level-1 boardings), replacing the masking that `uniform_dwell_time`
+    and `a_tiny_time_duration` provide today: negative mode bonuses break label setting and
+    strategy acyclicity, and the floor keeps extraction order strict, which is what makes the
+    recorded order a valid loading order. Today's `u_i >= u_j_c_a` test admits ties into the
+    attractive set without lowering $u_i$; the port uses a strict test and reads skims at
+    extraction;
   - bitwise-identical results for a fixed thread count, whatever the scheduling (static destination
     blocks, fixed-order reduction).
 - **Schedule engine (`B7`/`B8`)**: implement **rRAPTOR / McRAPTOR** in `paths/cpp/raptor.hpp`,
@@ -806,7 +830,11 @@ Do **not** bake perception weights, boarding/alighting penalties or fares into p
   `foreign_keys = ON`, which cannot be switched off inside it; `stops.agency_id` is an immediate
   foreign key and `links.stop_id` and `links.link_type` are `RESTRICT`, so a migration cannot drop
   and recreate `agencies`, `stops` or `link_types` while child rows exist. Prefer new tables and
-  `ADD COLUMN`, and rebuild children before parents.
+  `ADD COLUMN`, and rebuild children before parents. Migrations 002 and 005 read the live
+  `tables/links.sql`, `nodes.sql`, `fare_rules.sql`, `pattern_mapping.sql` and
+  `transit_triggers.sql` when they run, and 005 landed after v1.7.2, so every 1.7.2 upgrade runs it
+  before any Phase 1 migration. Both must inline the historical SQL they need before those files
+  change, or an upgrade rebuilds `links` from the new definition and re-inserts the old columns.
 - **Documentation is a deliverable per phase**: `transit_graph.rst`, `transit_skimming.rst`,
   `hyperpath_routing.rst` and the three gallery examples describe today's `a_node`/`b_node` order and
   costed `trav_time`, and become wrong after Phase 1. Data-model pages are generated by
@@ -834,8 +862,9 @@ fixtures land before the repairs, not after:
 - **Invariants checked on every assignment**: loaded demand equals the matrix total minus reported
   unreachable demand; flow is conserved at every non-zone vertex (so `on-board` volume on segment
   $k$ equals `dwell` plus `boarding` inflow, and per-line boardings equal alightings); at fixed costs
-  $\sum_a c_a v_a + W = \sum_{od} d_{od} u_{od}$, which ties skims to loads; skims are `inf`, never
-  `0`, where no strategy exists.
+  $\sum_a c_a v_a + \sum_d \sum_i \kappa_i w_i^d = \sum_{od} d_{od} u_{od}$ per class, with the same
+  $\kappa_i$ the labels used (it fails under Phase 1's $\alpha = 0.5$ if the waits are left
+  unweighted), which ties skims to loads; skims are `inf`, never `0`, where no strategy exists.
 - **GTFS fixture library**: small synthetic feeds, each with an expected `public_transport.sqlite`
   content check, landing with the phase that can store them. Phase 1: loop/lasso routes,
   `frequencies.txt` (single and multiple windows), post-midnight trips, consecutive stops with
@@ -929,7 +958,8 @@ Each item has a recommended answer; confirm or change it before the phase in bra
 - **Q8 Default headway fraction [Phase 1]**: $\alpha = 0.5$ (regular service) replaces today's
   full-headway default as a `TransitClass` setting; per-stop values arrive with `B4`'s
   regular-headway wait models. The class wait weight $\omega$ is a separate parameter and never
-  enters reported waits.
+  enters reported waits; the kernel sees only the product $\kappa_{i,m}$ (§5.3), and every
+  objective, gap and invariant weights waits by it.
 - **Q9 Multi-feed IDs [Phase 2]**: database-allocated surrogate keys, with GTFS IDs unique per
   `feed_id` (trips per `feed_id` and `service_date`, §5.1), as `A4` and the 2b editing API assume;
   retire the multiplier-encoded IDs of `constants.py` and the process-global `Constants` caches.
@@ -953,9 +983,11 @@ Each item has a recommended answer; confirm or change it before the phase in bra
 - **Q17 Two-level stop layer [Phase 3]**: ships with `B1` (rest) in Phase 3; pull it into Phase 1b
   only if the port's "any" and "reset" skim operators prove insufficient for first wait and
   $P_{\text{PT}}$.
-- **Q18 Default period [Phase 1]**: the network migration sets it to `[0, 172800]` (service-day
-  times up to `48:00:00`), and its period rate uses $T_{\text{period}} = 86400$ s, so whole-day
-  frequencies stay daily averages.
+- **Q18 Default period [Phase 1]**: the network migration drops and recreates
+  `aequilibrae_default_period_update` around the change, sets the default period to `[0, 172800]`
+  (service-day times up to `48:00:00`) over service day 0 only, and its period rate uses
+  $T_{\text{period}} = 86400$ s, so whole-day frequencies stay daily averages. A further imported
+  service date (§5.1) is seen only by periods that ask for it.
 
 ---
 
@@ -967,8 +999,9 @@ A phase or sub-phase is done when:
 
 - every schema change has a `tables/*.sql` definition with `--@` docstrings and a `table_list.txt`
   entry, a numbered migration, an upgrade test from projects of the previous release (one with
-  saved transit graphs, one with a scenario) and `attributes_documentation` rows, and the example
-  zips are rebuilt or migrated on load (§5.5);
+  saved transit graphs, one with a scenario, and for Phase 1 a v1.7.2 project, which still runs
+  migrations 005 and 006) and `attributes_documentation` rows, and the example zips are rebuilt or
+  migrated on load (§5.5);
 - its §5.6 fixtures, invariants and analytic cases pass in CI, and each result change has its
   before/after row and release-note entry;
 - its §5.8 target is met on both benchmark models and recorded;
@@ -1026,9 +1059,10 @@ transfers, the `C8` GeoDataFrame, legacy removal, and compatibility and document
     centroid) and measure every reported distance geodesically, so connectors agree with the
     haversine walking edges (§5.10, Q5). Record the CRS actually used in `transit_graph_configs`.
   - Adopt the service-day convention (§5.1): periods may exceed `86400`, a network migration
-    redefines the trigger-protected default period as the whole service day (§5.10, Q18), and the
-    builder and `build_pt_preload` filter trips on that axis so post-midnight services are no longer
-    dropped.
+    redefines the trigger-protected default period as the whole service day (dropping and
+    recreating `aequilibrae_default_period_update` around the update; §5.10, Q18), and the builder
+    and `build_pt_preload` filter trips on that axis and on service day, so post-midnight services
+    are no longer dropped.
   - Replace `_add_mean_headway_to_segments` rather than patch it (its intended "smallest gap per
     trip, then mean" is biased low): per pattern, store the scheduled headway
     $(t_{\text{last}} - t_{\text{first}}) / (N_{\text{trips}} - 1)$ at the first stop and the period
@@ -1057,7 +1091,7 @@ transfers, the `C8` GeoDataFrame, legacy removal, and compatibility and document
     fails loudly instead of silently using uncosted times. Add a physical `segment_id` to every edge
     and persist all topological builder attributes in `transit_graph_configs`. This (and flipping
     `a_node`/`b_node`) changes persisted `links`, so transit migration 007 drops saved graphs
-    (§5.9).
+    (§5.9), and migrations 002 and 005 are frozen onto inlined SQL first (§5.5).
   - **Default costing on `TransitClass` (`B1` part 1, `Effort: S–M`)**: `alighting_penalty`, the
     dwell halves on boarding and alighting edges, `wait_time_factor` and the access/egress/walk
     perception factors move from builder attributes to a `TransitClass` costing specification whose
@@ -1151,7 +1185,8 @@ to keep them consistent under the 2b triggers.
 - **Supply schema migrations (first)**:
   - Normalise `route_links.from_stop`/`to_stop` to `TEXT` (`stops.stop_id` and `links.stop_id`
     already are), and add the missing foreign-key comma in `route_links.sql`, so key matching no
-    longer relies on SQLite affinity rules.
+    longer relies on SQLite affinity rules. Migration 005's use of `fare_rules.sql` and
+    `pattern_mapping.sql` is frozen onto inlined SQL before either file changes (§5.5).
   - §5.1: `pattern_headways` and `pattern_segment_profiles`, keyed on service windows.
   - `A1`: `transfers` (stop-, route- and trip-level rules), `pathways` and `stop_footpaths`
     (`from_stop_id`, `to_stop_id`, `distance`, physical `trav_time`, source) tables, and
@@ -1364,8 +1399,8 @@ routing algorithms roll out in four complexity tiers:
 
 | Sub-phase | Complexity | Items | Summary & key dependencies |
 |---|---|---|---|
-| **4.1** | **Moderate** (Effort M to M–L each; single-pass SF extensions & matrix coupling) | `C2`, `B4`, `B10a` | **`C2`** select-link/line/stop & stop-to-stop traversal matrices in `hyperpath.hpp` (backward "any" labels plus forward marked flows, `C2` note); **`B4`** destination-side and interior-node logit (origin-connector logit ships with `A2` in Phase 3), RTPI / frequency-and-time stop splits & regular-headway waits, reporting a fixed-point gap next to the VI gap once logit is active; **`B10a`** matrix-coupled PnR/KnR/feeder station choice (with its `pnr_lots` table and lots as pseudo-zones in both graphs) coupling `TrafficAssignment` auto skims with `TransitAssignment` PT skims over the §5.7 period mapping, and Sinkhorn/dual lot-capacity shadow prices |
-| **4.2** | **Medium–High** (Effort M–L each; iterative equilibrium, road → PT hand-off & inverse problems) | `B5`, `B6`, `A5`, `C6` | **`B5`** congested SF with WebTAG/ATAP seated-vs-standing (`dwell`-priority) crowding curves and station/walkway VDFs (walkway capacities added here); **`B6`** strict-capacity SF ($C_k - v_{\text{prio},k}$, with an uncapacitated fallback or reported denied demand) via CCF effective frequencies / fail-to-board, solved by MSA/MSWA against the CCF VI gap with per-destination waits $\max_a v_a^d / f_a(v)$; **`A5`** (after `B5`, reusing its outer loop for the dwell feedback) TTF definitions and bus run times from congested road speeds + boarding-driven dwell times, as a road → transit hand-off plus a transit-internal dwell loop (no road↔transit fixed point while bus stops do not reduce road capacity; map-matched modes only, rail, tram and ferry keep schedule run times); **`C6`** transit ODME against boarding, line and screenline counts by the gradient method (one residual skim and one extra loading per iteration; no `C2` dependency) |
+| **4.1** | **Moderate** (Effort M to M–L each; single-pass SF extensions & matrix coupling) | `C2`, `B4`, `B10a` | **`C2`** select-link/line/stop & stop-to-stop traversal matrices in `hyperpath.hpp` (backward "any" labels plus forward marked flows, `C2` note); **`B4`** destination-side and interior-node logit (origin-connector logit ships with `A2` in Phase 3), RTPI / frequency-and-time stop splits & regular-headway waits, reporting a fixed-point gap next to the VI gap once logit is active; **`B10a`** matrix-coupled PnR/KnR/feeder station choice (with its `pnr_lots` table and lots as virtual centroids with synthetic access links in both graphs) coupling `TrafficAssignment` auto skims with `TransitAssignment` PT skims over the §5.7 period mapping, and Sinkhorn/dual lot-capacity shadow prices |
+| **4.2** | **Medium–High** (Effort M–L each; iterative equilibrium, road → PT hand-off & inverse problems) | `B5`, `B6`, `A5`, `C6` | **`B5`** congested SF with WebTAG/ATAP seated-vs-standing (`dwell`-priority) crowding curves and station/walkway VDFs (walkway capacities added here); **`B6`** strict-capacity SF ($C_k - v_{\text{prio},k}$, with an uncapacitated fallback or reported denied demand) via CCF effective frequencies / fail-to-board, solved by MSA/MSWA against the CCF VI gap with $\kappa_{i,m}$-weighted per-destination waits $\max_a v_a^d / f_a(v)$; **`A5`** (after `B5`, reusing its outer loop for the dwell feedback) TTF definitions and bus run times from congested road speeds + boarding-driven dwell times, as a road → transit hand-off plus a transit-internal dwell loop (no road↔transit fixed point while bus stops do not reduce road capacity; map-matched modes only, rail, tram and ferry keep schedule run times); **`C6`** transit ODME against boarding, line and screenline counts by the gradient method (one residual skim and one extra loading per iteration; no `C2` dependency) |
 | **4.3** | **High** (Effort L to L–XL each; state expansion & path enumeration) | `B3` (+ `B10b`), `B9` | **`B3`** journey-level state-augmented SF and intra-line pattern chords, compiled from the Phase 3 fare rules and checked against the fare calculator (3–6 levels for transfer rules and mode sequences, copying the in-vehicle network per level beyond two, summing physical segment loads across levels/chords, plus zero-replication destination-thread OD zonal pricing through the §5.3 cost overlay and optional **`B10b`** graph-coupled PnR); **`B9`** path-based PT route choice (route/mode-breaker with group bans + PSL/nested logit over line-bundle legs, giving exact per-journey **fare caps**, and **time-window transfers** on timetable paths, on the C++ port of the `B12` fare calculator) |
 | **4.4** | **Very High** (Effort L–XL, `C4` S; new C++ schedule engine & dynamic demand/supply dimensions) | `B7`, `C4`, `B8` | **`B7`** C++ `rRAPTOR`/`McRAPTOR` router in `paths/cpp/raptor.hpp` with Pareto connection search over transitively closed footpaths and in-kernel period-summary / sliced skims; **`C4`** timetable accessibility & isochrones (`S` once `B7` lands); **`B8`** full schedule-based assignment with connection + departure/adaptation-time choice over a desired-departure profile per period, relaxed-dominance choice sets and iterative trip-level capacity restraint (`XL`, structural) |
 
