@@ -51,7 +51,7 @@ The required information is:
 
 It is also possible to set the common assignment parameters during class definition:
 
-* **pce**: passenger-car equivalent for multi-class assignment; default is ``1.0``.
+* **pce**: passenger-car equivalent for multi-class assignment (see [3]_); default is ``1.0``.
 * **vot**: value of time used to convert fixed costs to time units; default is ``1.0``.
 * **fixed_cost_field**: link field providing a time-equivalent fixed cost, if needed.
 * **fixed_cost_multiplier**: scale applied to the fixed cost field.
@@ -85,7 +85,7 @@ current class configuration, then prepares the required routing contexts during 
 
 * **network**: the source network object or project network containing the links and modes
 * **classes**: one or more fully-specified ``TrafficClass`` objects
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``,
+* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2`` [1]_, ``CONICAL`` [2]_,
   ``INRETS``, or ``AKCELIK``
 * **name_mapping**: parameter names for the VDF, either as network fields or numeric constants
 * **time_field**: link field representing free-flow travel time
@@ -114,15 +114,15 @@ This is the case because, strictly speaking, the equilibrium travel time is the 
 at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
 are those resulting from the blended skim of all iterations.
 
-The user can select the fields they want to skim, as well save the skims to disk (and the project)
+The user can select the fields they want to skim with the ``skimming`` argument of each ``TrafficClass``, as well as
+save the skims to disk (and the project)
 at the end of the assignment procedure, where skims are tagged with suffixes *"_final"* and *"_blended"*
 for easy identification.
 
 ::
 
-  >>> assig.set_skimming_fields(["distance"]) # doctest: +SKIP
-  >>> assig.execute() # doctest: +SKIP
-  >>> assig.save_skims("one_matrix_name") # doctest: +SKIP
+  >>> results = assignment.execute() # doctest: +SKIP
+  >>> assignment.save_skims("one_matrix_name") # doctest: +SKIP
 
 Unassigned demand
 ~~~~~~~~~~~~~~~~~
@@ -151,9 +151,9 @@ of zones and over 100 iterations of assignment.
 
 ::
 
-  >>> assig.execute()
-  >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
+  >>> results = assignment.execute()
+  >>> skims = assignment.skim_congested(skim_fields=["distance"], return_matrices=True)
+  >>> assignment.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
   [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
@@ -207,7 +207,7 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
     >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)
 
     # Add the preload to the assignment
-    >>> assig.add_preload(preload, 'PT_vehicles') # doctest: +SKIP
+    >>> assignment = TrafficAssignment(..., preload=preload) # doctest: +SKIP
 
 
 Executing an Assignment
@@ -217,7 +217,7 @@ Finally, run traffic assignment!
 
 .. doctest::
 
-  >>> assig.execute()
+  >>> results = assignment.execute()
 
   >>> project.close()
 
