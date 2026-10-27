@@ -37,6 +37,8 @@ def run_example(from_model, zones):
             connector_method="overlapping_regions",
         )
 
+        project.network.build_graphs()
+
         # c for All motorized vehicles
         graph.create_line_geometry(method="direct", graph="c")
 

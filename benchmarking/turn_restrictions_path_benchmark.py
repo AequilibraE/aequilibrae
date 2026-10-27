@@ -41,23 +41,23 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
 
 def _prepare_graph(model_path: Path, mode: str):
     project = Project.from_path(model_path)
-    network = project.network
-    graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
+    project.network.build_graphs(modes=[mode])
+    graph = project.network.graphs[mode]
 
     centroids = np.asarray(graph.centroids, dtype=np.int64)
     if centroids.size == 0:
         raise ValueError("Model has no centroids in this graph")
 
+    graph.set_graph("distance")
+    graph.set_blocked_centroid_flows(False)
+    graph.set_skimming(["distance"])
     return project, graph, centroids, "distance"
 
 
 def _build_arc_index(graph):
-    graph_df = pd.DataFrame({
-        "id": np.arange(len(graph.full_link_ids)),
-        "a_node": graph.full_node_ids[graph.full_tails],
-        "b_node": graph.full_node_ids[graph.full_heads],
-        "link_id": graph.full_link_ids, "direction": graph.full_directions, "distance": graph.full_costs,
-    })
+    graph_df = graph.graph[["id", "a_node", "b_node", "link_id", "direction", "distance"]].copy()
+    graph_df["a_node"] = graph.all_nodes[graph_df["a_node"].to_numpy(dtype=np.int64)]
+    graph_df["b_node"] = graph.all_nodes[graph_df["b_node"].to_numpy(dtype=np.int64)]
 
     arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]] = {}
     arc_meta: ArcMeta = {}
@@ -272,10 +272,7 @@ def run_benchmark(
         print(f"Paths eligible for turn-ban selection: {ban_candidates}")
         print(f"Prohibited turns inserted: {len(turn_bans_df)}")
 
-        graph = project.network.build_graph(
-            mode=mode, cost=chosen_cost, skimming=[chosen_cost], block_centroid_flows=False,
-            turn_restrictions=turn_bans_df, allow_uturns=allow_uturns,
-        )
+        graph.set_turn_restrictions(turn_bans_df, allow_path_uturns=allow_uturns)
 
         networkx_equivalent = _build_networkx_equivalent_digraph(graph_df)
         print(
