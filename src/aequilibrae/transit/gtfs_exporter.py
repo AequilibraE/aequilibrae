@@ -112,8 +112,8 @@ def gtfs_tables(
     )
 
     stop_times, trips = _stop_times(conn, ids, trips, stops.stop_id)
-    stop_ids = pd.Series((stops.agency_id.map(prefix) + stops.stop).to_numpy(), index=stops.stop_id.to_numpy())
-    trip_ids = pd.Series((trips.agency_id.map(prefix) + trips.trip).to_numpy(), index=trips.trip_id.to_numpy())
+    stop_ids = pd.Series(_prefixed(prefix, stops, "stop").to_numpy(), index=stops.stop_id.to_numpy())
+    trip_ids = pd.Series(_prefixed(prefix, trips, "trip").to_numpy(), index=trips.trip_id.to_numpy())
 
     agency_txt = pd.DataFrame(
         {
@@ -141,7 +141,7 @@ def gtfs_tables(
             }
         ),
         "calendar_dates.txt": pd.DataFrame(
-            {"service_id": services.service_id, "date": services.date, "exception_type": 1}
+            {"service_id": services.service_id, "date": services["date"], "exception_type": 1}
         ).reset_index(drop=True),
     }
     if shapes.shape[0]:
@@ -284,7 +284,11 @@ def _check_ids(ids: dict[str, tuple[pd.DataFrame, bool]], prefix_ids: bool) -> N
 
 def _stop_times(conn: Connection, ids: list, trips: pd.DataFrame, stop_ids: pd.Series) -> tuple:
     """Stop events of the trips whose schedule has one event per stop of their pattern, and those trips"""
-    sequences = _stop_sequences(_read(conn, LINKS_SQL, ids), stop_ids)
+    links = _read(conn, LINKS_SQL, ids)
+    unlinked = np.setdiff1d(trips.pattern_id.unique(), links.pattern_id.unique())
+    if unlinked.size:
+        logger.warning(f"Patterns {_examples(unlinked)} have no route links, so their trips are not exported")
+    sequences = _stop_sequences(links, stop_ids)
     schedule = _read(conn, SCHEDULE_SQL, ids).merge(trips[["trip_id", "pattern_id"]], on="trip_id")
 
     if (schedule[["arrival", "departure"]] < 0).any(axis=None):
@@ -354,14 +358,12 @@ def _services(agency: pd.DataFrame, active_agencies) -> pd.DataFrame:
                 f"Agency {row.agency!r} has no valid service date stored ({row.service_date!r}), "
                 "so the day its trips run on is unknown"
             ) from e
-    services = services.assign(date=pd.Series(dates, dtype=object))
-    return services.assign(service_id=services.agency + "_" + services["date"])
+    services = services.assign(date=pd.Series(dates, dtype=str))
+    return services.assign(service_id=services.agency.astype(str) + "_" + services["date"])
 
 
 def _stops_txt(stops: pd.DataFrame, prefix: pd.Series, served: set) -> pd.DataFrame:
     """stops.txt, with the parent stations that are exported and can be stations"""
-    stop_prefix = stops.agency_id.map(prefix)
-
     # A parent station is a stop of the same agency, which is a station (location_type 1) only if no trip stops
     # there and it has no parent itself
     parents = stops[["agency_id", "stop", "stop_id", "parent_station"]].set_axis(
@@ -380,14 +382,14 @@ def _stops_txt(stops: pd.DataFrame, prefix: pd.Series, served: set) -> pd.DataFr
 
     txt = pd.DataFrame(
         {
-            "stop_id": stop_prefix + stops.stop,
+            "stop_id": _prefixed(prefix, stops, "stop"),
             "stop_name": stops.name,
             "stop_desc": stops.description,
             "stop_lat": stops.lat,
             "stop_lon": stops.lon,
-            "zone_id": np.where(stops.zone != "", stop_prefix + stops.zone, ""),
+            "zone_id": np.where(stops.zone != "", _prefixed(prefix, stops, "zone"), ""),
             "location_type": stations.astype(int),
-            "parent_station": np.where(keep, stop_prefix + stops.parent_station, ""),
+            "parent_station": np.where(keep, _prefixed(prefix, stops, "parent_station"), ""),
         }
     )
     if (txt.stop_name == "").any():
@@ -412,7 +414,7 @@ def _routes_txt(patterns: pd.DataFrame, prefix: pd.Series, names: pd.Series, mul
         logger.warning(f"Routes {_examples(routes.route[unnamed].unique())} have no name, which GTFS requires")
     txt = pd.DataFrame(
         {
-            "route_id": routes.agency_id.map(prefix) + routes.route,
+            "route_id": _prefixed(prefix, routes, "route"),
             "agency_id": routes.agency_id.map(names),
             "route_short_name": routes.shortname,
             "route_long_name": routes.longname,
@@ -429,9 +431,9 @@ def _trips_txt(trips: pd.DataFrame, prefix: pd.Series, services: pd.DataFrame, s
     shape_id = trips.pattern_id.astype(str)
     txt = pd.DataFrame(
         {
-            "route_id": trips.agency_id.map(prefix) + trips.route,
+            "route_id": _prefixed(prefix, trips, "route"),
             "service_id": trips.agency_id.map(services.service_id),
-            "trip_id": trips.agency_id.map(prefix) + trips.trip,
+            "trip_id": _prefixed(prefix, trips, "trip"),
             "direction_id": trips.dir,
             "shape_id": shape_id.where(shape_id.isin(shape_ids), ""),
         }
@@ -479,10 +481,10 @@ def _points(geometries: pd.DataFrame, patterns: np.ndarray) -> pd.DataFrame:
 
 def _fares(fares, rules, patterns, stops, prefix: pd.Series, names: pd.Series, multiple: bool) -> tuple:
     """fare_attributes.txt and fare_rules.txt, leaving out rules that refer to routes or stop zones not exported"""
-    fare_prefix = fares.agency_id.map(prefix)
+    fare_ids = pd.Series(_prefixed(prefix, fares, "fare").to_numpy(), index=fares.fare_id.to_numpy())
     attributes = pd.DataFrame(
         {
-            "fare_id": fare_prefix + fares.fare,
+            "fare_id": fare_ids.to_numpy(),
             "price": fares.price.map(_text),
             "currency_type": fares.currency.map(_text),
             "payment_method": fares.payment_method.map(_text),
@@ -495,8 +497,8 @@ def _fares(fares, rules, patterns, stops, prefix: pd.Series, names: pd.Series, m
         attributes = attributes.drop(columns=["agency_id"])
 
     # A rule for a route or zone not exported never applies, and without its route it would apply to every route
-    routes = patterns.drop_duplicates("route_id").set_index("route_id")
-    route = rules.route_id.map(routes.agency_id.map(prefix) + routes.route)
+    routes = patterns.drop_duplicates("route_id")
+    route = rules.route_id.map(pd.Series(_prefixed(prefix, routes, "route").to_numpy(), index=routes.route_id))
     zone_ids = set(zip(stops.agency_id, stops.zone, strict=True))
     unknown = rules.route_id.notna() & route.isna()
     for column in ["origin", "destination", "contains"]:
@@ -506,9 +508,7 @@ def _fares(fares, rules, patterns, stops, prefix: pd.Series, names: pd.Series, m
         logger.warning(f"{unknown.sum()} fare rules refer to routes or fare zones not exported, so they are left out")
 
     rules = rules[~unknown]
-    rule_prefix = rules.agency_id.map(prefix)
-    fare_ids = pd.Series((fare_prefix + fares.fare).to_numpy(), index=fares.fare_id.to_numpy())
-    zone = {c: np.where(rules[c] != "", rule_prefix + rules[c], "") for c in ["origin", "destination", "contains"]}
+    zone = {c: np.where(rules[c] != "", _prefixed(prefix, rules, c), "") for c in ["origin", "destination", "contains"]}
     rules_txt = pd.DataFrame(
         {
             "fare_id": rules.fare_id.map(fare_ids),
@@ -519,6 +519,11 @@ def _fares(fares, rules, patterns, stops, prefix: pd.Series, names: pd.Series, m
         }
     )
     return attributes.reset_index(drop=True), rules_txt.reset_index(drop=True)
+
+
+def _prefixed(prefix: pd.Series, records: pd.DataFrame, column: str) -> pd.Series:
+    """IDs in *column* of *records* as text, each with the prefix of its agency (empty unless IDs are prefixed)"""
+    return records.agency_id.map(prefix).astype(str) + records[column].astype(str)
 
 
 def _gtfs_times(seconds: pd.Series) -> np.ndarray:

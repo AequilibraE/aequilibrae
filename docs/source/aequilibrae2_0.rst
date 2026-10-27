@@ -70,6 +70,9 @@ Changes in behaviour and corrections include:
   the later of the two for both, which added the dwell at each stop to the run time towards it.
 - **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
   run times are repaired the same way, with a warning.
+- **Trips crossing midnight** in clock time (``23:58:00``, then ``00:02:00``) continue past ``24:00:00`` (``24:02:00``),
+  with a warning, rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as
+  published.
 
 - **Maximum speeds** set with ``set_maximum_speeds`` are applied. Distances were measured in degrees, so they never
   were. Distances are in metres and speeds in metres per second.
@@ -96,7 +99,15 @@ Changes in behaviour and corrections include:
 
 The GTFS export code was also overhauled.
 
-.. GTFS_EXPORT_API
+``Transit.export_gtfs`` writes the transit database to a zipped GTFS feed, with the GTFS IDs of the imported feeds.
+GTFS requires the URL and time zone of each agency, which import does not keep, so they are arguments. Each agency
+gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
+``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can be exported together with
+``prefix_ids=True``.
+
+.. code-block:: python
+
+    transit.export_gtfs("feed.zip", agency_url="https://www.agency.com", agency_timezone="America/Santiago")
 
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~

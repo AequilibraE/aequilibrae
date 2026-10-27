@@ -23,6 +23,9 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
 
+# Seconds in a service day
+SERVICE_DAY = 86400
+
 
 class GTFSReader(WorkerThread):
     signal = SIGNAL(object)
@@ -135,17 +138,30 @@ class GTFSReader(WorkerThread):
     def __deconflict_trip(self, trip: Trip, stop_times: pd.DataFrame, max_speeds: pd.DataFrame) -> tuple:
         """Repairs the run times between stops of a trip, keeping the scheduled dwell at each stop.
 
-        A run time is from the departure from a stop to the arrival at the next one. Run times of zero (common in
-        timetables to the minute) become one second, negative ones are repaired the same way with a warning, and
-        those faster than the maximum speed for their distance are slowed down to it. Every change shifts the rest
-        of the trip. ``source_time`` is 0 for stops with times as in GTFS, 1 for stops whose times were changed by
-        de-conflicting and 2 for those changed by the maximum speeds.
+        A run time is from the departure from a stop to the arrival at the next one. Times that go back by more than
+        half a day cross midnight (23:58, then 00:02), so they and every later time move on by a day (00:02 is read
+        as 24:02). Run times of zero (common in timetables to the minute) become one second, other negative ones are
+        repaired the same way with a warning, and those faster than the maximum speed for their distance are slowed
+        down to it. Every change shifts the rest of the trip. ``source_time`` is 0 for stops with times as in GTFS,
+        1 for stops whose times were changed by de-conflicting or crossing midnight and 2 for those changed by the
+        maximum speeds.
 
         Returns the number of run times de-conflicted and slowed down.
         """
-        arrivals = stop_times.arrival_time.to_numpy(dtype=np.int64)
-        departures = stop_times.departure_time.to_numpy(dtype=np.int64)
+        gtfs_arrivals = stop_times.arrival_time.to_numpy(dtype=np.int64)
+        gtfs_departures = stop_times.departure_time.to_numpy(dtype=np.int64)
+        arrivals, departures = gtfs_arrivals.copy(), gtfs_departures.copy()
         source_time = np.zeros(arrivals.shape[0], dtype=np.int64)
+
+        # Timetables written in clock time go back by most of a day when they cross midnight (23:58, then 00:02).
+        # Those times are on the same service day, as GTFS times past 24:00:00 would be
+        events = np.column_stack([arrivals, departures]).ravel()
+        wraps = np.diff(events) < -SERVICE_DAY / 2
+        if wraps.any():
+            logger.warning(f"Trip {trip.trip} crosses midnight with times before 24:00:00, read as past 24:00:00")
+            events[1:] += SERVICE_DAY * np.cumsum(wraps)
+            arrivals, departures = events[0::2].copy(), events[1::2].copy()
+            source_time[(np.flatnonzero(wraps) + 1) // 2] = 1
 
         dwell = departures - arrivals
         if (dwell < 0).any():
@@ -183,7 +199,7 @@ class GTFSReader(WorkerThread):
         new_departures = new_arrivals + dwell
 
         # Changes carry over to the rest of the trip, which keeps the most significant reason it was shifted for
-        changed = (new_arrivals != arrivals) | (new_departures != departures)
+        changed = (new_arrivals != gtfs_arrivals) | (new_departures != gtfs_departures)
         source_time = np.where(changed, np.maximum.accumulate(source_time), 0)
 
         stop_times["arrival_time"] = new_arrivals

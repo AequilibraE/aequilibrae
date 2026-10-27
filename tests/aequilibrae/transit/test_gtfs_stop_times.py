@@ -224,6 +224,27 @@ def test_trip_after_midnight_is_stored_unchanged(empty_project, tmp_path):
     assert source_times(gtfs) == {"late": [0, 0, 0]}
 
 
+@pytest.mark.parametrize(
+    "gtfs_b, stored_b, sources",
+    [
+        (("23:58", "23:59:30"), ("23:58", "23:59:30"), [0, 0, 1, 1]),
+        (("23:59:30", "0:00:30"), ("23:59:30", "24:00:30"), [0, 1, 1, 1]),
+    ],
+)
+def test_clock_times_crossing_midnight_continue_past_24(empty_project, tmp_path, caplog, gtfs_b, stored_b, sources):
+    """Test that times going back to 00:xx after 23:xx are read as past 24:00:00, with a warning."""
+    tables = line_feed()
+    add_trip(tables, "R", "night", events(("A", "23:50"), ("B", *gtfs_b), ("C", "0:02"), ("D", "0:10")))
+    with caplog.at_level(logging.WARNING, logger="aequilibrae.transit.gtfs_loader"):
+        gtfs = import_feed(empty_project, tables, tmp_path / "feed.zip")
+
+    expected = events(("A", "23:50"), ("B", *stored_b), ("C", "24:02"), ("D", "24:10"))
+    assert schedules(empty_project) == {"night": times(expected)}
+    assert source_times(gtfs) == {"night": sources}
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "night" in r.getMessage()]
+    assert len(warnings) == 1
+
+
 def test_graph_run_times_exclude_scheduled_dwell(empty_project, tmp_path):
     """Test that transit graph segment times run from leaving a stop to reaching the next, without its dwell."""
     tables = line_feed()
