@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
+from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext, TurnBasedContext
+from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
 from aequilibrae.paths.graph import AssignmentMapping, PreparedGraph
@@ -34,32 +35,24 @@ class SkimLayout:
         return SkimmingOutputs.from_matrices(matrices)
 
 
-def validate_assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> None:
+def validate_assignment_demand(matrix: AequilibraeMatrix | AequilibraeSparseMatrix, centroids: np.ndarray) -> None:
     """Validate named demand matrices without allocating an assignment copy."""
-    if not isinstance(matrix, AequilibraeMatrix):
-        raise TypeError("Demand must be an AequilibraeMatrix")
+    if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+        raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
     if not np.array_equal(matrix.index, centroids):
         raise ValueError("Matrix and graph must have the same centroid order")
     zones = len(centroids)
     if not zones or not len(matrix):
         raise ValueError("Demand must have shape (zones, zones, classes)")
+    sparse = isinstance(matrix, AequilibraeSparseMatrix)
     for values in matrix.values():
         if values.shape != (zones, zones):
             raise ValueError("Demand must have shape (zones, zones, classes)")
         if not np.issubdtype(values.dtype, np.number) or np.iscomplexobj(values):
             raise TypeError("Demand must contain real numbers")
-        if not np.all(np.isfinite(values)) or np.any(values < 0):
+        stored = values.tocoo(copy=False).data if sparse else values
+        if not np.all(np.isfinite(stored)) or np.any(stored < 0):
             raise ValueError("Demand must be finite and nonnegative")
-
-
-def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
-    """Copy validated named matrices into packed, read-only assignment storage."""
-    validate_assignment_demand(matrix, centroids)
-    demand = np.stack(list(matrix.values()), axis=2, dtype=np.float64)
-    if not np.all(np.isfinite(demand)):
-        raise ValueError("Demand must be finite when stored as float64")
-    demand.flags.writeable = False
-    return demand
 
 
 class AssignmentState:
@@ -109,7 +102,7 @@ class AssignmentInputs:
     def __init__(
         self,
         graph: PreparedGraph,
-        matrix: AequilibraeMatrix,
+        matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
         cores: int,

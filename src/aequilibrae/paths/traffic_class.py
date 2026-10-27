@@ -7,7 +7,7 @@ from typing import Mapping
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.graph import GraphBase, TransitGraph
@@ -15,7 +15,9 @@ from aequilibrae.paths.results import TransitAssignmentResults
 
 
 class TransportClassBase(ABC):  # noqa: B024
-    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
+    _matrix_types = (AequilibraeMatrix,)
+
+    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
         """
         Instantiates the class
 
@@ -24,10 +26,12 @@ class TransportClassBase(ABC):  # noqa: B024
 
             **graph** (:obj:`Graph`): Class/mode-specific graph
 
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Class/mode-specific matrix.
+            Supports multiple user classes
         """
-        if not isinstance(matrix, AequilibraeMatrix):
-            raise TypeError("Matrix must be an AequilibraeMatrix")
+        if not isinstance(matrix, self._matrix_types):
+            names = " or ".join(matrix_type.__name__ for matrix_type in self._matrix_types)
+            raise TypeError(f"Matrix must be an {names}")
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
         if any(values.dtype != np.float64 for values in matrix.values()):
@@ -52,8 +56,8 @@ class TransportClassBase(ABC):  # noqa: B024
             "Number of centroids": len(matrix.index),
             "Matrix cores": matrix_names,
         }
-        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        mat_config["Matrix totals"] = {name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names}
+
+        mat_config["Matrix totals"] = matrix.totals()
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -70,8 +74,8 @@ class TrafficClass:
     the change in travel time. Fixed costs are multiplied by
     ``fixed_cost_multiplier`` and divided by ``vot``.
 
-    Demand matrices must contain float64 values. ``name`` defaults to the
-    mode. Classes with the same mode need distinct names.
+    Demand is a dense or sparse matrix of float64 values. ``name`` defaults to
+    the mode. Classes with the same mode need distinct names.
 
     .. code-block:: python
 
@@ -92,7 +96,7 @@ class TrafficClass:
 
     mode: str
     cost: str
-    demand: AequilibraeMatrix
+    demand: AequilibraeMatrix | AequilibraeSparseMatrix
     name: str | None = None
     pce: float = 1.0
     vot: float = 1.0
@@ -157,8 +161,8 @@ class TrafficClass:
                 links.append((int(link), direction))
             selections[name] = tuple(links)
         object.__setattr__(self, "select_link_sets", MappingProxyType(selections))
-        if not isinstance(self.demand, AequilibraeMatrix):
-            raise TypeError("Demand must be an AequilibraeMatrix")
+        if not isinstance(self.demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
         if any(values.dtype != np.float64 for values in self.demand.values()):
             raise TypeError("Demand matrices require float64 values")
         validate_assignment_demand(self.demand, self.demand.index)
@@ -172,7 +176,7 @@ class TrafficClass:
             "Value-of-time": self.vot,
             "Fixed cost field": self.fixed_cost_field,
             "Fixed cost multiplier": self.fixed_cost_multiplier,
-            "matrix_totals": {name: float(values.sum()) for name, values in self.demand.items()},
+            "matrix_totals": self.demand.totals(),
         }
 
 

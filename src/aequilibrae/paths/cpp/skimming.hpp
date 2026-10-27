@@ -49,7 +49,7 @@ void sum_skim_fields(const SearchResults &results,
 template <typename T>
 void skim_fields(const SearchResults &results,
                  const SkimmingWorkspace<T> &workspace,
-                 const SkimmingOriginView<T> &output) noexcept {
+                 const DenseMatrixOriginView<T> &output) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
 
   for (std::size_t node = 0; node < output.destination_count; ++node) {
@@ -72,7 +72,7 @@ void skim_fields(const SearchResults &results,
 // and preserves the search's exact double values, including its turn costs.
 template <typename T>
 void project_skim_labels(const SearchResults &results, const double *labels,
-                         const SkimmingOriginView<T> &output,
+                         const DenseMatrixOriginView<T> &output,
                          std::size_t field) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
 
@@ -91,14 +91,14 @@ void project_skim_labels(const SearchResults &results, const double *labels,
 
 template <typename T>
 void skim_costs(const SearchResults &results,
-                const SkimmingOriginView<T> &output,
+                const DenseMatrixOriginView<T> &output,
                 std::size_t field) noexcept {
   project_skim_labels(results, results.distances, output, field);
 }
 
 template <typename T>
 void skim_turn_costs(const SearchResults &results,
-                     const SkimmingOriginView<T> &output,
+                     const DenseMatrixOriginView<T> &output,
                      std::size_t field) noexcept {
   project_skim_labels(results, results.turn_costs, output, field);
 }
@@ -107,7 +107,7 @@ void skim_turn_costs(const SearchResults &results,
 template <typename T>
 void skimming(const SearchResults &results, const SkimmingContext<T> &context,
               const SkimmingWorkspace<T> &workspace,
-              const SkimmingOriginView<T> &output) noexcept {
+              const DenseMatrixOriginView<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);
 
   if (context.needs_state_sums()) {

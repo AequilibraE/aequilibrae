@@ -1,5 +1,8 @@
 from libc.stddef cimport size_t
 from libcpp cimport bool as cpp_bool
+from libcpp.vector cimport vector
+from aequilibrae.paths.cython.outputs cimport CppSelectLinkODOutputsView
+from aequilibrae.matrix.cython.sparse_matrix_builder cimport CppSparseMatrixBuilderView
 
 
 cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
@@ -44,6 +47,7 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
         CppLoadingWorkspace[T] loading
         CppSkimmingWorkspace[T] skimming
         CppSelectLinkWorkspace select_link
+        CppSelectLinkODOutputsView[T] selected_od
 
 
 cdef class SearchWorkspace:
@@ -76,10 +80,17 @@ cdef class SelectLinkWorkspace:
     cdef CppSelectLinkWorkspace view(self) noexcept nogil
 
 
+cdef class SelectLinkODWorkspace:
+    cdef readonly tuple builders
+    cdef vector[CppSparseMatrixBuilderView[double]] builder_views
+    cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil
+
+
 cdef class AoNWorkspace:
     cdef readonly size_t node_count, state_count
     cdef readonly SearchWorkspace search
     cdef readonly LoadingWorkspace loading
     cdef readonly SkimmingWorkspace skimming
     cdef readonly SelectLinkWorkspace select_link
+    cdef readonly SelectLinkODWorkspace selected_od
     cdef CppAoNWorkspace[double] view(self) noexcept nogil

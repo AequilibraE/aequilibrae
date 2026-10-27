@@ -1,8 +1,7 @@
-"""Independent, fixed-size operation scratch, with an optional AoN grouping."""
-
 import operator
 import numpy as np
 cimport cython
+from aequilibrae.matrix.cython.sparse_matrix_builder cimport SparseMatrixBuilder
 
 from aequilibrae.utils.cython.array_allocations cimport array, array_pointer
 from aequilibrae.utils.cython.array_allocations import readonly_view
@@ -150,10 +149,34 @@ cdef class SelectLinkWorkspace:
         return readonly_view(self.selected_paths_buffer)
 
 
+cdef class SelectLinkODWorkspace:
+    """COO builder per set for a single worker."""
+
+    def __init__(self, origin_count, destination_count, field_names, set_names):
+        if self.builders is not None:
+            raise RuntimeError("SelectLinkODWorkspace cannot be reinitialised")
+
+        self.builders = tuple(
+            SparseMatrixBuilder(destination_count, field_names, origin_count=origin_count)
+            for _ in set_names
+        )
+
+        cdef SparseMatrixBuilder builder
+        for builder in self.builders:
+            self.builder_views.push_back(builder.view[double]())
+
+    cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil:
+        cdef CppSelectLinkODOutputsView[double] result
+        result.set_count = self.builder_views.size()
+        result.builders = self.builder_views.data()
+        return result
+
+
 cdef class AoNWorkspace:
     """All scratch buffers required by an assignment worker."""
 
-    def __init__(self, node_count, state_count, *, heap="4ary", class_count=None, field_count=None, select_links=False):
+    def __init__(self, node_count, state_count, *, heap="4ary", class_count=None, field_count=None, select_links=False,
+                 od_zone_count=None, demand_names=(), set_names=()):
         if self.state_count:
             raise RuntimeError("AoNWorkspace cannot be reinitialised")
 
@@ -170,6 +193,8 @@ cdef class AoNWorkspace:
             self.skimming = SkimmingWorkspace(state_count, field_count)
         if select_links:
             self.select_link = SelectLinkWorkspace(state_count)
+        if od_zone_count is not None:
+            self.selected_od = SelectLinkODWorkspace(od_zone_count, od_zone_count, demand_names, set_names)
 
     cdef CppAoNWorkspace[double] view(self) noexcept nogil:
         cdef CppAoNWorkspace[double] workspace
@@ -181,5 +206,7 @@ cdef class AoNWorkspace:
             workspace.skimming = self.skimming.view()
         if self.select_link is not None:
             workspace.select_link = self.select_link.view()
+        if self.selected_od is not None:
+            workspace.selected_od = self.selected_od.view()
 
         return workspace

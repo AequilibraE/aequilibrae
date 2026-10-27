@@ -4,6 +4,7 @@
 #include <utility>
 #include <variant>
 
+#include "outputs.hpp"
 #include "pq_4ary_heap.hpp"
 #include "pq_pairing_heap.hpp"
 #include "pq_std_priority_queue_adapter.hpp"
@@ -80,6 +81,7 @@ template <typename T> struct AoNWorkspace {
   LoadingWorkspace<T> loading;
   SkimmingWorkspace<T> skimming;
   SelectLinkWorkspace select_link;
+  SelectLinkODOutputsView<T> selected_od;
 };
 
 } // namespace aequilibrae::paths::cpp::routing

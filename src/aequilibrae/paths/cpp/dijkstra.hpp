@@ -6,7 +6,7 @@
 
 #include "context.hpp"
 #include "pq_heap_base.hpp"
-#include "queries.hpp"
+#include "search_query.hpp"
 #include "search_results.hpp"
 #include "workspaces.hpp"
 

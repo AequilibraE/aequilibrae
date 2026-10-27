@@ -83,6 +83,33 @@ def test_from_matrix_copies_values_and_names(dtype):
         assert not np.shares_memory(source[name], result[name])
 
 
+def test_from_dict_copies_named_arrays(dtype):
+    data = {
+        "time": np.arange(4, dtype=dtype).reshape(2, 2),
+        "distance": np.full((2, 2), 5, dtype=dtype),
+    }
+    dense = DenseMatrix.from_dict(data)
+    result = dense.to_matrix([1, 2])
+    assert dense.dtype == np.dtype(dtype)
+    assert dense.field_names == tuple(data)
+    for name, values in data.items():
+        np.testing.assert_array_equal(result[name], values)
+        assert not np.shares_memory(values, result[name])
+
+
+def test_from_dict_checks_inputs():
+    with pytest.raises(TypeError, match="mapping"):
+        DenseMatrix.from_dict([[1]])
+    with pytest.raises(ValueError, match="at least one"):
+        DenseMatrix.from_dict({})
+    with pytest.raises(ValueError, match="same shape"):
+        DenseMatrix.from_dict({"time": np.ones((2, 2)), "distance": np.ones((3, 3))})
+    with pytest.raises(ValueError, match="two-dimensional"):
+        DenseMatrix.from_dict({"time": np.ones(2)})
+    with pytest.raises(TypeError, match="mixed dtypes"):
+        DenseMatrix.from_dict({"time": np.ones((2, 2), np.float32), "distance": np.ones((2, 2))})
+
+
 def test_from_export_always_copies(dtype):
     dense = DenseMatrix(2, ["time", "distance"], dtype=dtype, fill_value=3)
     source = dense.to_matrix([1, 2])

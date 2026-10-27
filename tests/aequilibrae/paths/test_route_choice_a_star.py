@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from aequilibrae.matrix import from_df
 from aequilibrae.paths import Graph, RouteChoice, estimate_heuristic_scale
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
@@ -53,12 +54,18 @@ def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, c
             heuristic=heuristic,
             heuristic_scale=scale,
         )
-        choice.add_demand(
-            pd.DataFrame(
-                {"flow": [2.0, 3.0, 4.0, 5.0]},
-                index=pd.MultiIndex.from_tuples(
-                    [(10, 40), (20, 40), (40, 10), (10, 10)], names=choice.demand_index_names
+        choice.set_demand(
+            from_df(
+                pd.DataFrame(
+                    {
+                        "origin": [10, 20, 40, 10],
+                        "destination": [40, 40, 10, 10],
+                        "flow": [2.0, 3.0, 4.0, 5.0],
+                    }
                 ),
+                "origin",
+                "destination",
+                sparse=True,
             )
         )
         choice.set_select_links({"selected": [(14, 1)]})
@@ -160,7 +167,7 @@ def test_invalid_penalty_rejected_at_both_entry_points(a_star, penalty):
     with pytest.raises(ValueError, match="penalty.*finite and >= 1"):
         RouteChoice(graph).set_choice_set_generation("bfsle", **options)
     with Bridge() as bridge, pytest.raises(ValueError, match="penalty.*finite and >= 1"):
-        RouteChoiceSet(graph).run(10, 40, (4, 4), bridge=bridge, **options)
+        RouteChoiceSet(graph).run(10, 40, bridge=bridge, **options)
 
 
 @pytest.mark.parametrize(
@@ -179,7 +186,7 @@ def test_invalid_search_options_rejected_at_both_entry_points(options, match):
     with pytest.raises(ValueError, match=match):
         RouteChoice(graph).set_choice_set_generation("bfsle", max_routes=1, **options)
     with Bridge() as bridge, pytest.raises(ValueError, match=match):
-        RouteChoiceSet(graph).run(10, 40, (4, 4), max_routes=1, bridge=bridge, **options)
+        RouteChoiceSet(graph).run(10, 40, max_routes=1, bridge=bridge, **options)
 
 
 @pytest.mark.parametrize(

@@ -83,12 +83,13 @@ tests = [
   "seaborn",
   "coveralls",
   "ruff==0.16.1",
-  "cython-lint==0.21.0",
+  "cython-lint==0.22.0",
   "wheel",
 ]
 
 dev = [
-  "aequilibrae[tests, docs, create]"
+  "aequilibrae[tests, docs, create]",
+  "scipy-stubs",
 ]
 
 [tool.uv.extra-build-dependencies]
