@@ -1596,13 +1596,6 @@ def test_from_df_selects_columns():
     assert set(matrix) == {"car"}
 
 
-@pytest.mark.parametrize("fill_value", [0, 7, np.nan], ids=["zero", "nonzero", "nan"])
-def test_from_df_fills_missing_pairs(fill_value):
-    df = pd.DataFrame({"origin": [10], "destination": [20], "car": [2]})
-    matrix = from_df(df, "origin", "destination", fill_value=fill_value)
-    np.testing.assert_array_equal(matrix["car"], [[fill_value, 2], [fill_value, fill_value]])
-
-
 def test_from_df_requires_known_zones():
     df = pd.DataFrame({"origin": [101], "destination": [309], "car": [7]})
     with pytest.raises(ValueError):

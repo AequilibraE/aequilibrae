@@ -241,6 +241,9 @@ cdef class SparseMatrix(_MatrixBase):
             ):
                 raise TypeError("Matrix values must be real numbers")
 
+            if sparse.issparse(matrix) and hasattr(matrix, "check_format"):
+                matrix.check_format(full_check=True)
+
             inputs[name] = matrix
 
         dtype = np.dtype(source_dtype if dtype is None else dtype)

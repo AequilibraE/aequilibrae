@@ -220,9 +220,6 @@ class RouteChoice:
         if not isinstance(demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
             raise TypeError("demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
 
-        if self._nodes is not None and demand is not None:
-            raise ValueError("provide either a `demand` matrix or `nodes`, not both")
-
         self.demand = demand
         self._nodes = None
         self.__rc.clear_results()
