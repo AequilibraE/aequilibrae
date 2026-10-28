@@ -29,9 +29,6 @@ SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY', 1);
 SELECT CreateSpatialIndex( 'nodes' , 'geometry' );
 
 --#
-CREATE INDEX idx_node ON nodes (node_id);
-
---#
 CREATE INDEX idx_node_is_centroid ON nodes (is_centroid);
 
 --#

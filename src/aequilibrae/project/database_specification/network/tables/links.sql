@@ -3,8 +3,9 @@
 --@
 --@ All information on the fields a_node and b_node correspond to a entries in
 --@ the node_id field in the nodes table. They are automatically managed with
---@ triggers as the user edits the network. Updates that would make either field
---@ inconsistent with the corresponding geometry endpoint are rejected.
+--@ triggers as the user edits the network, so they can be left empty when adding
+--@ a link. Updates that would make either field inconsistent with the corresponding
+--@ geometry endpoint are rejected.
 --@
 --@ The **modes** field is a concatenation of all the ids (mode_id) of the models allowed
 --@ on each link, and map directly to the mode_id field in the **Modes** table. A mode
@@ -41,17 +42,14 @@ CREATE TABLE  if not exists links (ogc_fid           INTEGER PRIMARY KEY,
                                    other_attributes  TEXT
                                    CHECK(TYPEOF(link_id) == 'integer')
                                    CHECK(link_id > 0)
-                                   CHECK(TYPEOF(a_node) == 'integer')
-                                   CHECK(TYPEOF(b_node) == 'integer')
+                                   CHECK(TYPEOF(a_node) IN ('integer', 'null'))
+                                   CHECK(TYPEOF(b_node) IN ('integer', 'null'))
                                    CHECK(TYPEOF(direction) == 'integer')
                                    CHECK(LENGTH(modes)>0)
                                    CHECK(direction IN (-1, 0, 1)));
 
 --#
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
-
---#
-CREATE UNIQUE INDEX idx_link ON links (link_id);
 
 --#
 SELECT CreateSpatialIndex( 'links' , 'geometry' );

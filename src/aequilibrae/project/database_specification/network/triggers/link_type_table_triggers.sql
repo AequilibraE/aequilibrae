@@ -2,7 +2,7 @@
 
 CREATE TRIGGER aequilibrae_link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "link_types"
 WHEN
-    (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
+    EXISTS (SELECT 1 FROM links WHERE old.link_type = link_type)
 BEGIN
     SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
@@ -11,7 +11,7 @@ END;
 -- Prevents a link_type record to be removed when it is in use for any link
 CREATE TRIGGER aequilibrae_link_type_keep_if_in_use_deleting BEFORE DELETE ON "link_types"
 WHEN
-    (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
+    EXISTS (SELECT 1 FROM links WHERE old.link_type = link_type)
 BEGIN
     SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
@@ -20,7 +20,7 @@ END;
 -- Ensures an ALTERED link does not reference a non existing link_type
 CREATE TRIGGER aequilibrae_link_type_on_links_update BEFORE UPDATE OF 'link_type' ON links
 WHEN
-    (SELECT count(*) FROM link_types WHERE new.link_type = link_type)<1
+    NOT EXISTS (SELECT 1 FROM link_types WHERE new.link_type = link_type)
 BEGIN
     SELECT RAISE(ABORT, 'Link_type need to exist in the link_types table in order to be used');
 END;
@@ -29,7 +29,7 @@ END;
 -- Ensures an added link does not reference a non existing mode
 CREATE TRIGGER aequilibrae_link_type_on_links_insert BEFORE INSERT ON links
 WHEN
-    (SELECT count(*) FROM link_types WHERE new.link_type = link_type)<1
+    NOT EXISTS (SELECT 1 FROM link_types WHERE new.link_type = link_type)
 BEGIN
     SELECT RAISE(ABORT, 'Link_type need to exist in the link_types table in order to be used');
 END;
@@ -123,7 +123,7 @@ BEGIN
                                        INNER JOIN link_types ON links.link_type=link_types.link_type
                                        WHERE (links.a_node = old.a_node) OR (links.b_node = old.a_node)
                                        ), link_type_id) > 0)
-        WHERE nodes.node_id=old.a_node;
+        WHERE nodes.node_id=old.a_node AND old.a_node IS NOT new.a_node;
 END;
 
 --#
@@ -147,5 +147,5 @@ UPDATE nodes
                                                    INNER JOIN link_types ON links.link_type=link_types.link_type
                                                    WHERE (links.a_node = old.b_node) OR (links.b_node = old.b_node)
                                                    ), link_type_id) > 0)
-    WHERE nodes.node_id=old.b_node;
+    WHERE nodes.node_id=old.b_node AND old.b_node IS NOT new.b_node;
 END;
