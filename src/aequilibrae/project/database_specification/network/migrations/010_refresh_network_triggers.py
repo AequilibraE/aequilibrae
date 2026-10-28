@@ -128,7 +128,8 @@ def _allow_empty_link_endpoints(conn: sqlite3.Connection):
         return
 
     # SQLite cannot alter a CHECK constraint in place, but loosening one leaves the stored rows valid, so the
-    # writable_schema procedure documented at https://www.sqlite.org/lang_altertable.html#otheralter applies
+    # writable_schema procedure documented at https://www.sqlite.org/lang_altertable.html#otheralter applies.
+    # RESET (rather than OFF) also reloads this connection's schema, without which its next statement can fail
     version = conn.execute("PRAGMA schema_version").fetchone()[0]
     conn.execute("PRAGMA writable_schema = ON")
     try:
@@ -138,4 +139,4 @@ def _allow_empty_link_endpoints(conn: sqlite3.Connection):
         # SQLite builds running in defensive mode refuse schema edits. Inserts then keep needing a placeholder
         logger.warning("Could not allow empty a_node/b_node on links: %s", e)
     finally:
-        conn.execute("PRAGMA writable_schema = OFF")
+        conn.execute("PRAGMA writable_schema = RESET")

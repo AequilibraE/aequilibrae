@@ -451,7 +451,10 @@ def test_link_insert_without_endpoint_nodes(empty_project):
     with empty_project.db_connection as conn:
         a_node, b_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
         conn.execute(
-            "INSERT INTO links (link_id, modes, link_type, geometry) VALUES (1002, 'c', 'default', GeomFromWKB(?, 4326))",
+            """
+            INSERT INTO links (link_id, modes, link_type, geometry)
+            VALUES (1002, 'c', 'default', GeomFromWKB(?, 4326))
+            """,
             (LineString([(1, 0), (2, 0)]).wkb,),
         )
         new_a_node, new_b_node = conn.execute("SELECT a_node, b_node FROM links WHERE link_id = 1002").fetchone()
@@ -487,7 +490,10 @@ def test_link_reshape_keeps_centroid_it_leaves(empty_project):
             (LineString([(0, 1), (1, 0)]).wkb,),
         )
 
-        assert conn.execute("SELECT is_centroid, modes FROM nodes WHERE node_id = ?", (centroid,)).fetchone() == (1, None)
+        assert conn.execute("SELECT is_centroid, modes FROM nodes WHERE node_id = ?", (centroid,)).fetchone() == (
+            1,
+            None,
+        )
         assert conn.execute("SELECT a_node FROM links WHERE link_id = 1001").fetchone()[0] != centroid
         _assert_network_consistent(conn)
 

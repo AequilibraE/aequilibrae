@@ -58,7 +58,7 @@ def _restore_strict_endpoint_checks(conn):
     conn.execute("PRAGMA writable_schema = ON")
     conn.execute("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'links'", (sql,))
     conn.execute(f"PRAGMA schema_version = {version + 1}")
-    conn.execute("PRAGMA writable_schema = OFF")
+    conn.execute("PRAGMA writable_schema = RESET")
 
 
 def test_migration_replaces_outdated_triggers(empty_project, migrate):
@@ -66,7 +66,9 @@ def test_migration_replaces_outdated_triggers(empty_project, migrate):
     with empty_project.db_connection as conn:
         expected = _schema(conn)
         conn.execute("DROP TRIGGER aequilibrae_updated_link_geometry")
-        conn.execute("CREATE TRIGGER aequilibrae_updated_link_geometry AFTER UPDATE OF geometry ON links BEGIN SELECT 1; END")
+        conn.execute(
+            "CREATE TRIGGER aequilibrae_updated_link_geometry AFTER UPDATE OF geometry ON links BEGIN SELECT 1; END"
+        )
         conn.execute("DROP TRIGGER aequilibrae_turn_restrictions_keep_referenced_node")
 
         migrate(project_conn=conn)
@@ -135,12 +137,28 @@ def test_migration_allows_links_without_endpoint_nodes(empty_project, migrate):
         assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
 
 
+def test_upgrade_allows_links_without_endpoint_nodes(empty_project):
+    """Test that upgrading a project with the strict a_node/b_node checks lets links be added without them."""
+    with empty_project.db_connection as conn:
+        _restore_strict_endpoint_checks(conn)
+        conn.execute("UPDATE migrations SET status = 'MISSING' WHERE id = 10")
+
+    empty_project.upgrade()
+
+    with empty_project.db_connection as conn:
+        _insert_link_without_nodes(conn, 1001, [(0, 0), (1, 0)])
+        assert conn.execute("SELECT status FROM migrations WHERE id = 10").fetchone()[0] == "APPLIED"
+        assert conn.execute("SELECT count(*) FROM links WHERE a_node IS NULL OR b_node IS NULL").fetchone()[0] == 0
+
+
 def test_upgraded_example_matches_new_project_triggers(sioux_falls_example, empty_project):
     """Test that an upgraded example project ends up with the same AequilibraE triggers as a new project."""
 
     def triggers(project):
         with project.db_connection as conn:
-            sql = "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'aequilibrae%' ORDER BY name"
+            sql = (
+                "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'aequilibrae%' ORDER BY name"
+            )
             return conn.execute(sql).fetchall()
 
     assert triggers(sioux_falls_example) == triggers(empty_project)
