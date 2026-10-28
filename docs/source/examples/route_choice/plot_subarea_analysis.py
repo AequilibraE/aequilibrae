@@ -286,6 +286,8 @@ ods_pairs_of_interest = [
     (39, 34),
 ]
 ods_pairs_of_interest = ods_pairs_of_interest + [(x[1], x[0]) for x in ods_pairs_of_interest]
+
+# Construct a sparse Aeq matrix for our sub-selection
 demand = pd.DataFrame(
     {name: [mat.mat[name, o, d] for o, d in ods_pairs_of_interest] for name in mat},
     index=pd.MultiIndex.from_tuples(ods_pairs_of_interest, names=["origin id", "destination id"]),
