@@ -88,3 +88,10 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
     >>> graph = project.network.graphs['c']
     >>> graph.disconnected_nodes()
     array([], dtype=int64)
+
+Akcelik derivative
+~~~~~~~~~~~~~~~~~~
+The derivative of the Akcelik volume-delay function now includes the link length, as the function itself does.
+In 1.X it was computed as if every link had unit length, and it returned the free-flow time on links without flow.
+Both errors distorted the search directions of the conjugate and biconjugate Frank-Wolfe algorithms, so
+assignments that use the Akcelik function with these algorithms converge differently than they did in 1.X.
