@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae.paths.graph import GraphBase
+from aequilibrae.paths.graph import GraphBase, freeze_graph
 from aequilibrae.paths.routing_context import make_routing_context
 
 from .routing_helpers import search
@@ -30,31 +30,34 @@ def shared_junction_graph():
 
 
 def test_centroid_blocking_without_turn_penalties_uses_node_search():
-    graph = shared_junction_graph()
-    graph.set_blocked_centroid_flows(True)
+    graph_base = shared_junction_graph()
+    graph_base.set_blocked_centroid_flows(True)
 
-    assert isinstance(make_routing_context(graph), NodeBasedContext)
+    assert isinstance(make_routing_context(graph_base), NodeBasedContext)
+    graph = freeze_graph(graph_base, compact=False)
     assert list(graph.compute_path(1, 2).path_nodes) == [1, 3, 2]
     assert list(graph.compute_path(3, 4).path_nodes) == [3, 6, 4]
 
 
 def test_centroid_blocking_with_turn_penalty_only_bans_centroid_traversal():
-    graph = shared_junction_graph()
-    graph.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [4], "to_node": [3], "penalty": [0.5]}))
-    graph.set_blocked_centroid_flows(False)
+    graph_base = shared_junction_graph()
+    graph_base.set_turn_restrictions(pd.DataFrame({"from_node": [1], "via_node": [4], "to_node": [3], "penalty": [0.5]}))
+    graph_base.set_blocked_centroid_flows(False)
+    graph = freeze_graph(graph_base, compact=False)
     assert list(graph.compute_path(3, 4).path_nodes) == [3, 5, 4]
 
-    graph.set_blocked_centroid_flows(True)
-    assert isinstance(make_routing_context(graph), TurnBasedContext)
+    graph_base.set_blocked_centroid_flows(True)
+    graph = freeze_graph(graph_base, compact=False)
+    assert isinstance(make_routing_context(graph_base), TurnBasedContext)
     assert list(graph.compute_path(1, 2).path_nodes) == [1, 3, 2]
     assert list(graph.compute_path(3, 4).path_nodes) == [3, 6, 4]
 
-    compact = make_routing_context(graph, compact=True)
+    compact = make_routing_context(graph_base, compact=True)
     assert isinstance(compact, TurnBasedContext)
-    from_1 = graph.compact_nodes_to_indices[1]
-    from_3 = graph.compact_nodes_to_indices[3]
-    to_2 = graph.compact_nodes_to_indices[2]
-    to_4 = graph.compact_nodes_to_indices[4]
+    from_1 = graph_base.compact_nodes_to_indices[1]
+    from_3 = graph_base.compact_nodes_to_indices[3]
+    to_2 = graph_base.compact_nodes_to_indices[2]
+    to_4 = graph_base.compact_nodes_to_indices[4]
     assert search(compact, from_1).path_cost_to(to_2) == 2.0
     assert search(compact, from_3).path_cost_to(to_4) == 4.0
 
@@ -95,4 +98,4 @@ def test_single_bidirectional_connector_only_needs_ban_when_uturns_allowed(allow
         else:
             assert out_of_centroid not in bans
 
-    assert list(graph.compute_path(1, 4).path_nodes) == [1, 3, 4]
+    assert list(freeze_graph(graph, compact=False).compute_path(1, 4).path_nodes) == [1, 3, 4]

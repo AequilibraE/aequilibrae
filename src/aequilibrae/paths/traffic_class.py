@@ -1,6 +1,4 @@
 import warnings
-from abc import ABC
-from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping
@@ -10,56 +8,7 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.paths.results import TransitAssignmentResults
-
-
-class TransportClassBase(ABC):  # noqa: B024
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
-        """
-        Instantiates the class
-
-        :Arguments:
-            **name** (:obj:`str`): UNIQUE class name.
-
-            **graph** (:obj:`Graph`): Class/mode-specific graph
-
-            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
-        """
-        if not isinstance(matrix, AequilibraeMatrix):
-            raise TypeError("Matrix must be an AequilibraeMatrix")
-        if not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-        if any(values.dtype != np.float64 for values in matrix.values()):
-            raise TypeError("Matrix values need to be of type np.float64")
-        self._config = {}
-        self.graph = graph
-        self.matrix = matrix
-        self._id = name
-
-        graph_config = {
-            "Mode": graph.mode,
-            "Block through centroids": graph.block_centroid_flows,
-            "Number of centroids": graph.num_zones,
-            "Links": graph.num_links,
-            "Nodes": graph.num_nodes,
-        }
-        self._config["Graph"] = str(graph_config)
-
-        matrix_names = tuple(matrix)
-        mat_config = {
-            "Source": matrix.metadata.get("source", ""),
-            "Number of centroids": len(matrix.index),
-            "Matrix cores": matrix_names,
-        }
-        # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        mat_config["Matrix totals"] = {name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names}
-        self._config["Matrix"] = str(mat_config)
-
-    @property
-    def info(self) -> dict:
-        config = deepcopy(self._config)
-        return {self._id: config}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -178,23 +127,38 @@ class TrafficClass:
         }
 
 
-class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
-        super().__init__(name, graph, matrix)
-        self._config["Graph"] = str(graph._config)
-        self.results = TransitAssignmentResults()
+@dataclass(frozen=True, kw_only=True)
+class TransitClass:
+    """Transit demand and its legacy transit-graph binding.
 
-        if len(matrix) == 1:
-            self.matrix_core = next(iter(matrix))
-        else:
-            self.matrix_core = None
+    Transit hyperpath assignment has not yet adopted the independent network
+    workflow used by road TrafficClass.
+    """
 
-    def set_demand_matrix_core(self, core: str):
-        """
-        Set the matrix core to use for demand.
+    name: str
+    matrix: AequilibraeMatrix
+    graph: object = field(default=None, repr=False, compare=False)
+    matrix_core: str | None = None
+    results: TransitAssignmentResults = field(default_factory=TransitAssignmentResults, repr=False, compare=False)
 
-        :Arguments:
-            **core** (:obj:`str`):"""
-        if core not in self.matrix:
-            raise KeyError(f"'{core}' is not present in the matrix")
-        self.matrix_core = core
+    def __post_init__(self):
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("name must be a nonempty string")
+        if not isinstance(self.matrix, AequilibraeMatrix):
+            raise TypeError("Matrix must be an AequilibraeMatrix")
+        if any(values.dtype != np.float64 for values in self.matrix.values()):
+            raise TypeError("Matrix values need to be of type np.float64")
+
+    @property
+    def _id(self):
+        return self.name
+
+    def set_demand_matrix_core(self, core):
+        object.__setattr__(self, "matrix_core", core)
+
+    @property
+    def info(self):
+        return {
+            "name": self.name,
+            "matrix_totals": {name: float(values.sum()) for name, values in self.matrix.items()},
+        }

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae.paths.graph import GraphBase
+from aequilibrae.paths.graph import GraphBase, freeze_graph
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 from .routing_helpers import make_context, search
@@ -68,33 +68,38 @@ def compressed_uturn_graph(with_return_chain=True):
 
 
 def test_compact_dijkstra_allows_return_through_another_chain():
-    graph = compressed_uturn_graph()
-    assert 4 not in graph.compact_all_nodes
-    assert 5 not in graph.compact_all_nodes
+    graph_base = compressed_uturn_graph()
+    assert 4 not in graph_base.compact_all_nodes
+    assert 5 not in graph_base.compact_all_nodes
+    
+    # Build a Graph for path computation
+    graph = freeze_graph(graph_base, compact=False)
     np.testing.assert_array_equal(graph.compute_path(1, 6).path_nodes, [1, 2, 4, 3, 5, 2, 6])
 
-    context = make_routing_context(graph, compact=True)
-    origin = graph.compact_nodes_to_indices[1]
-    destination = graph.compact_nodes_to_indices[6]
+    # Test compact routing context (internal infrastructure test)
+    context = make_routing_context(graph_base, compact=True)
+    origin = graph_base.compact_nodes_to_indices[1]
+    destination = graph_base.compact_nodes_to_indices[6]
     results = search(context, origin, destination)
 
     # Links 2/3 form the outward chain and links 4/5 are the return via 5.
-    forward = graph.graph.loc[graph.graph.direction == 1].set_index("link_id")
+    forward = graph_base.graph.loc[graph_base.graph.direction == 1].set_index("link_id")
     expected_links = forward.loc[[1, 2, 4, 6], "__compressed_id__"].to_numpy()
     np.testing.assert_array_equal(results.path_links_to(destination), expected_links)
     assert results.path_cost_to(destination) == 6.0
 
 
 def test_compact_dijkstra_bans_reversal_through_same_chain():
-    graph = compressed_uturn_graph(with_return_chain=False)
+    graph_base = compressed_uturn_graph(with_return_chain=False)
 
     # Without 3 -> 5 -> 2, the only return is 3 -> 4 -> 3, so 6 is unreachable.
+    graph = freeze_graph(graph_base, compact=False)
     assert graph.compute_path(1, 6).path is None
 
     # Check compact as well
-    context = make_routing_context(graph, compact=True)
-    origin = graph.compact_nodes_to_indices[1]
-    destination = graph.compact_nodes_to_indices[6]
+    context = make_routing_context(graph_base, compact=True)
+    origin = graph_base.compact_nodes_to_indices[1]
+    destination = graph_base.compact_nodes_to_indices[6]
     results = search(context, origin, destination)
     assert not results.reachable_to(destination)
 

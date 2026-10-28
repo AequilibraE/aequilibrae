@@ -48,21 +48,17 @@ class NetworkSimplifier(WorkerThread):
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation
         if not isinstance(graph, Graph):
             raise TypeError("graph must be a Graph built by Network.build_graph()")
-            if not graph.compact:
-                raise ValueError("Network simplification requires a compact graph")
-            compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
-            correspondence = pd.DataFrame({
-                "link_id": graph.full_link_ids,
-                "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
-            })
-            link_set_df = self.link_layer.merge(correspondence, on="link_id")
-            graph_link_ids = graph.full_link_ids
-            centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]
-        else:
-            compressed_idx, compressed_link_data, _ = self.graph.create_compressed_link_network_mapping()
-            link_set_df = self.graph.network.merge(self.graph.graph[["link_id", "__compressed_id__"]], on="link_id")
-            graph_link_ids = self.graph.graph.link_id.to_numpy()
-            centroid_connectors = self.graph.network.query("link_id not in @self.link_layer.link_id").link_id.to_numpy()
+        
+        if not graph.compact:
+            raise ValueError("Network simplification requires a compact graph")
+        compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
+        correspondence = pd.DataFrame({
+            "link_id": graph.full_link_ids,
+            "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
+        })
+        link_set_df = self.link_layer.merge(correspondence, on="link_id")
+        graph_link_ids = graph.full_link_ids
+        centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]
 
         # compressed_ids that appear for more than one link
         relevant_compressed_ids = pd.DataFrame(link_set_df.value_counts("__compressed_id__")).query("count>1").index

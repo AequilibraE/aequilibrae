@@ -19,7 +19,7 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.network import Network
 from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
-from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
+from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores
 
@@ -729,7 +729,7 @@ class TrafficAssignment(AssignmentBase):
                 output_matrices.update({f"{core}_final": values for core, values in last_skims.items()})
             if which_ones in ["blended", "all"]:
                 output_matrices.update({f"{core}_blended": values for core, values in avg_skims.items()})
-            out_skims = AequilibraeMatrix(index=cls.graph.mapping.centroids)
+            out_skims = AequilibraeMatrix(index=cls.configuration.demand.index)
             out_skims.update(output_matrices)
             description = f"Skimming for assignment procedure. Class {cls.configuration.name}"
             out_skims.metadata["description"] = description
@@ -820,10 +820,10 @@ class TrafficAssignment(AssignmentBase):
         selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
         if not selected_classes:
             return
-        centroids = np.unique(np.concatenate([cls.graph.mapping.centroids for cls in selected_classes]))
+        centroids = np.unique(np.concatenate([cls.configuration.demand.index for cls in selected_classes]))
         matrices = {}
         for cls in selected_classes:
-            source_centroids = cls.graph.mapping.centroids
+            source_centroids = cls.configuration.demand.index
             positions = np.searchsorted(centroids, source_centroids)
             for name, values in cls.results.select_link_od.matrices.items():
                 for column, class_name in enumerate(cls.results.classes["names"]):
@@ -862,28 +862,25 @@ class TransitAssignment(AssignmentBase):
 
         self._config["Skimming Fields"] = None
 
-    def set_classes(self, classes: List[TransportClassBase]) -> None:
+    def set_classes(self, classes: List[TransitClass]) -> None:
         """
-        Sets Transport classes to be assigned
+        Sets Transit classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TransportClassBase]`): List of TransportClass's for assignment
+            **classes** (:obj:`List[TransitClass]`): List of TransitClass's for assignment
         """
 
         ids = {x._id for x in classes}
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
-        self.classes = classes  # type: List[TransportClassBase]
-        if "Skimming Fields" in self._config:
-            for transport_class in self.classes:
-                transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
+        self.classes = classes  # type: List[TransitClass]
 
-    def add_class(self, transport_class: TransportClassBase) -> None:
+    def add_class(self, transport_class: TransitClass) -> None:
         """
-        Adds a Transport class to the assignment
+        Adds a Transit class to the assignment
 
         :Arguments:
-            **transport_class** (:obj:`TransportClassBase`): Transport class
+            **transport_class** (:obj:`TransitClass`): Transit class
         """
 
         ids = [x._id for x in self.classes if x._id == transport_class._id]
@@ -891,29 +888,14 @@ class TransitAssignment(AssignmentBase):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
-        if "Skimming Fields" in self._config:
-            transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
         if not self.classes:
-            raise ValueError("You need add at least one transport class first")
+            raise ValueError("You need add at least one transit class first")
 
-        for c in self.classes:
-            if field not in c.graph.graph.columns:
-                raise ValueError(f"'{field}' not in graph for '{c._id}'")
-
-            try:
-                c.graph.graph[field] = pd.to_numeric(c.graph.graph[field], errors="raise").astype(np.float64)
-                values = c.graph.graph[field].to_numpy(dtype=np.float64)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"Field {field} must contain numeric values for '{c._id}'") from exc
-
-            if np.any(pd.isna(values)):
-                raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
-
-            if values.min() <= 0 and not allow_zeros:
-                raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
+        # Validation is performed when preparing classes in execute()
+        # as graphs are built at that time
 
     def set_algorithm(self, algorithm: str):
         """
@@ -979,7 +961,7 @@ class TransitAssignment(AssignmentBase):
             uclass = {}
 
             uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
-            uclass["network mode"] = cls.graph.mode
+            uclass["network mode"] = getattr(cls.matrix.index, "name", None) or f"transit_{cls._id}"
 
             classes[cls._id] = uclass
 
@@ -1051,11 +1033,8 @@ class TransitAssignment(AssignmentBase):
         :Arguments:
             **time_field** (:obj:`str`): Field name
         """
-        self._check_field(time_field)
-        c = self.classes[0]
-        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], "float64")
-        self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
-        self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
+        if not isinstance(time_field, str) or not time_field:
+            raise ValueError("time_field must be a nonempty string")
         self.time_field = time_field
         self._config["Time field"] = time_field
 
@@ -1093,5 +1072,3 @@ class TransitAssignment(AssignmentBase):
 
         fields = list(skimming_fields or [])
         self._config["Skimming Fields"] = fields
-        for transport_class in self.classes:
-            transport_class.graph.set_skimming_fields(fields)

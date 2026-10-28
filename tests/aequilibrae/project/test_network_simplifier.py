@@ -1,6 +1,5 @@
 import pytest
 
-from aequilibrae.paths.graph import GraphBase, _prepare_network_graph
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
 
@@ -21,22 +20,15 @@ def project_with_graph(nauru_example):
 
     mode = "c"
 
-    network = nauru_example.network
+    network = nauru_example.network.build()
     graph = network.build_graph(mode, "distance", skimming=["distance"], compact=True, block_centroid_flows=False)
 
     yield graph
 
 
-@pytest.mark.parametrize("legacy", [False, True])
-def test_simplify(project_with_graph, monkeypatch, legacy):
+def test_simplify(project_with_graph, monkeypatch):
     net = NetworkSimplifier()
     graph = project_with_graph
-    if legacy:
-        links, centroids, turns, allow_uturns = net.network._load_graph_data()
-        graph = GraphBase()
-        graph.network = links
-        _prepare_network_graph(graph, "c", centroids, turns, False, allow_uturns)
-        graph.set_graph("distance")
 
     links_before = net.link_layer.shape[0]
     nodes_before = net.network.nodes.data.shape[0]
@@ -54,7 +46,7 @@ def test_simplify(project_with_graph, monkeypatch, legacy):
 
 def test_simplify_rejects_full_prepared_graph(project_with_graph):
     net = NetworkSimplifier()
-    graph = net.network.build_graph("c", "distance", compact=False)
+    graph = net.network.build().build_graph("c", "distance", compact=False)
     links_before = net.link_layer.shape[0]
 
     with pytest.raises(ValueError, match="requires a compact graph"):

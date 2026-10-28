@@ -19,6 +19,7 @@ from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.context import GraphContext, SkimmingContext
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads
+from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 if TYPE_CHECKING:
@@ -1395,11 +1396,85 @@ class Graph:
 
 
 class TransitGraph(GraphBase):
-    def __init__(self, config: Optional[dict] = None, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._config = config
-        self.od_node_mapping = od_node_mapping
+    def __init__(
+        self,
+        network: pd.DataFrame,
+        centroids: np.ndarray,
+        time_field: str,
+        frequency_field: str,
+        od_node_mapping: pd.DataFrame,
+        a_node_field: str = "a_node",
+        b_node_field: str = "b_node",
+        skimming_fields: list[str] | None = None,
+        config: dict | None = None,
+    ):
+        super().__init__()
+        self.network = sanitise_network(network)
+        self.centroids = sanitise_centroids(centroids)
+        self.skimming_fields = skimming_fields if skimming_fields is not None else []
+        self.time_field = time_field
+        self.frequency_field = frequency_field
+        self.a_node_field = a_node_field
+        self.b_node_field = b_node_field
+        self.od_node_mapping = od_node_mapping.copy() if od_node_mapping is not None else None
+        
+        # Build graph structure
+        self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
+            self.network, self.centroids, build_fs=False
+        )
+        self.num_nodes = len(self.all_nodes)
+        self.num_links = len(self.graph)
+        self.num_zones = len(self.centroids)
+        
+        # Create hyperpath context for transit assignment
+        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),
+            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
+        
+        # Setup config
+        self._config = {
+            "time_field": time_field,
+            "frequency_field": frequency_field,
+            "a_node_field": self.a_node_field,
+            "b_node_field": self.b_node_field,
+            "num_links": self.num_links,
+            "num_nodes": self.num_nodes,
+            "num_zones": self.num_zones,
+            "skimming_fields": self.skimming_fields,
+        }
+        if config is not None:
+            self._config.update(config)
+        
         self.mode = "t"
+
+    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
+        """Set the fields to skim and rebuild the hyperpath context if needed."""
+        self.skimming_fields = list(skimming_fields or [])
+        if self._config:
+            self._config["skimming_fields"] = self.skimming_fields
+        
+        # Rebuild context
+        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),
+            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
 
     @property
     def config(self):
