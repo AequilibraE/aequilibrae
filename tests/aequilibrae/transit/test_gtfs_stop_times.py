@@ -81,6 +81,24 @@ def test_missing_times_are_filled(empty_project, tmp_path):
     assert schedules(empty_project) == {"T": times(expected)}
 
 
+@pytest.mark.parametrize(
+    "gtfs, untimed, stored",
+    [
+        ("A 7:00, B 7:03 7:04, B 0:00, C 7:09", 2, "A 7:00, B 7:03 7:04, C 7:09"),
+        ("A 7:00, B 7:03 7:04, B 0:00", 2, "A 7:00, B 7:03 7:04"),
+        ("A 0:00, A 7:01, B 7:05", 0, "A 7:01, B 7:05"),
+    ],
+)
+def test_repeated_stop_keeps_the_times_of_its_timed_row(empty_project, tmp_path, gtfs, untimed, stored):
+    """Test that a stop repeated without times keeps the times of its timed row, also at the ends of a trip."""
+    tables = line_feed()
+    add_trip(tables, "R", "T", events(gtfs))
+    row = tables["stop_times.txt"][untimed]
+    row["arrival_time"] = row["departure_time"] = ""
+    import_feed(empty_project, tables, tmp_path / "feed.zip")
+    assert schedules(empty_project) == {"T": times(events(stored))}
+
+
 def test_untimed_trip_ends_and_unknown_stops_are_dropped(empty_project, tmp_path, caplog):
     """Test that trips without a time at an end are skipped and stop times at unknown stops dropped, with warnings."""
     tables = line_feed()
