@@ -312,8 +312,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  const RunResult adapter_result =
-      run_queue<StdPriorityQueueAdapter<double>>(initial_keys, updates, order, keys);
+  const RunResult adapter_result = run_queue<StdPriorityQueueAdapter<double>>(
+      initial_keys, updates, order, keys);
   if (!adapter_result.ok) {
     std::cerr << "StdPriorityQueueAdapter failed: " << adapter_result.message
               << '\n';

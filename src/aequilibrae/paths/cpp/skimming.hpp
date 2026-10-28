@@ -106,7 +106,8 @@ void skim_turn_costs(const SearchResults<Cost> &results,
 
 // Overwrite one output row using finalised paths.
 template <typename T, typename Cost>
-void skimming(const SearchResults<Cost> &results, const SkimmingContext<T> &context,
+void skimming(const SearchResults<Cost> &results,
+              const SkimmingContext<T> &context,
               const SkimmingWorkspace<T> &workspace,
               const DenseMatrixOriginView<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);

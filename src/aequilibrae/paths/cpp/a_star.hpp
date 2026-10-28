@@ -31,9 +31,11 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
                        std::size_t destination,
                        const HeuristicContext &heuristic,
                        const MutableSearchResults<T> &results,
-                       const AStarWorkspace<T> &workspace, Queue &queue) noexcept {
+                       const AStarWorkspace<T> &workspace,
+                       Queue &queue) noexcept {
   static_assert(std::is_base_of_v<PriorityQueueBase<Queue, T>, Queue>);
-  constexpr bool turn_based = std::is_same_v<RoutingContext, TurnBasedContext<T>>;
+  constexpr bool turn_based =
+      std::is_same_v<RoutingContext, TurnBasedContext<T>>;
   const auto &graph = a_star_graph(context);
   const auto root = turn_based ? graph.link_count : query.origin;
   const auto infinity = std::numeric_limits<T>::infinity();

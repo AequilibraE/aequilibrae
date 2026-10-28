@@ -35,7 +35,8 @@ inline bool selected_terminal(const SearchResults<Cost> &results,
 }
 
 template <typename T, typename DemandRow, typename Cost>
-void write_selected_od(const SearchResults<Cost> &results, const DemandRow &query,
+void write_selected_od(const SearchResults<Cost> &results,
+                       const DemandRow &query,
                        const SelectLinkWorkspace &selection,
                        const SelectLinkODOriginView<T> &od,
                        std::size_t set) noexcept {
@@ -58,7 +59,8 @@ void write_selected_od(const SearchResults<Cost> &results, const DemandRow &quer
 // Seed each matched OD once, even if its path crosses several set members.
 // The cascade loading then loads the whole path.
 template <typename T, typename DemandRow, typename Cost>
-void load_selected_paths(const SearchResults<Cost> &results, const DemandRow &query,
+void load_selected_paths(const SearchResults<Cost> &results,
+                         const DemandRow &query,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,
                          const LoadingOutputs<T> &output) noexcept {
@@ -86,7 +88,8 @@ void load_selected_paths(const SearchResults<Cost> &results, const DemandRow &qu
 }
 
 template <typename T, typename DemandRow, typename Cost>
-void select_link_loading(const SearchResults<Cost> &results, const DemandRow &query,
+void select_link_loading(const SearchResults<Cost> &results,
+                         const DemandRow &query,
                          const SelectLinkContext &context,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,

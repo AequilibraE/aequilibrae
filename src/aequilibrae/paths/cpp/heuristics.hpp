@@ -37,9 +37,8 @@ template <typename T> struct HaversineContext {
     constexpr T earth_radius_metres = T{6371000};
     const T sin_lat = std::sin((latitudes[to] - latitudes[from]) / T{2});
     const T sin_lon = std::sin((longitudes[to] - longitudes[from]) / T{2});
-    const T a = sin_lat * sin_lat + cos_latitudes[from] *
-                                             cos_latitudes[to] * sin_lon *
-                                             sin_lon;
+    const T a = sin_lat * sin_lat +
+                cos_latitudes[from] * cos_latitudes[to] * sin_lon * sin_lon;
 
     // Round-off near antipodal points must not put asin outside its domain.
     return T{2} * earth_radius_metres *

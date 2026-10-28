@@ -104,8 +104,7 @@ private:
     return states_[element_idx];
   }
 
-  [[nodiscard]] T
-  element_key_impl(std::size_t element_idx) const noexcept {
+  [[nodiscard]] T element_key_impl(std::size_t element_idx) const noexcept {
     if (states_[element_idx] == ElementState::SCANNED) {
       return extracted_keys_[element_idx];
     }

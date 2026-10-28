@@ -171,8 +171,7 @@ private:
     elements_[element_i].node_idx = node_j;
   }
 
-  void decrease_key_from_node_index(std::size_t node_idx,
-                                    T key_new) noexcept {
+  void decrease_key_from_node_index(std::size_t node_idx, T key_new) noexcept {
     assert(node_idx < size_);
 
     std::size_t current = node_idx;

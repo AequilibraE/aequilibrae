@@ -36,7 +36,8 @@ public:
 
 private:
   std::variant<cpp::FourAryHeap<T>, cpp::PairingHeap<T>,
-               cpp::StdPriorityQueueAdapter<T>> heap;
+               cpp::StdPriorityQueueAdapter<T>>
+      heap;
 };
 
 // Scratch heap for Dijkstra.
