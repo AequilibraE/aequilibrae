@@ -13,15 +13,14 @@ run the assignment.
 ``TrafficClass``
 ----------------
 
-The ``TrafficClass`` object holds all the information pertaining to a specific traffic class to be 
-assigned. There are three pieces of information that are required in the instantiation of this class:
+The ``TrafficClass`` object defines a single user class independently of the network. It holds the
+mode, cost field, demand matrix, optional skimming fields, and any fixed-cost or select-link configuration.
+The required information is:
 
-* **name**: name of the class. It has to be unique among all classes used in a multi-class traffic assignment
-
-* **graph**: it is the ``Graph`` object corresponding to that particular traffic class/mode
-
-* **matrix**: it is the AequilibraE matrix with the demand for that traffic class, which can have
-  an arbitrary number of user-classes setup as different layers (cores) of the matrix object.
+* **mode**: the network mode identifier (for example ``"c"`` for cars)
+* **cost**: the free-flow generalized cost field used for route choice
+* **demand**: the ``AequilibraeMatrix`` containing OD demand for that class
+* **name**: an optional class label; when omitted, it defaults to the mode
 
 .. testsetup::
 
@@ -37,46 +36,31 @@ assigned. There are three pieces of information that are required in the instant
     >>> from aequilibrae.utils.create_example import create_example
 
     >>> project = create_example(project_path)
-    >>> project.network.build_graphs()
 
-    # We get the graphs for cars and trucks
-    >>> graph_car = project.network.graphs['c']
-    >>> graph_truck = project.network.graphs['T']
-
-    # And also get the matrices for cars and trucks
+    # Get the matrices for cars and trucks
     >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
-
     >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
 
-    # We create the Traffic Classes
-    >>> tc_car = TrafficClass("car", graph_car, matrix_car)
-    >>> tc_truck = TrafficClass("truck", graph_truck, matrix_truck)
+    # Create the traffic classes
+    >>> tc_car = TrafficClass(mode="c", cost="free_flow_time", demand=matrix_car,
+    ...                     name="car", skimming=("free_flow_time", "distance"),
+    ...                     block_centroid_flows=False)
+    >>> tc_truck = TrafficClass(mode="T", cost="free_flow_time", demand=matrix_truck,
+    ...                      name="truck", skimming=("free_flow_time", "distance"),
+    ...                      block_centroid_flows=False)
 
-It is also possible to modify the default values for the following parameters of a traffic class by using a
-method call:
+It is also possible to set the common assignment parameters during class definition:
 
-* **Passenger-car equivalent** (PCE) is the standard way of modeling multi-class traffic assignment 
-  equilibrium in a consistent manner (see [3]_ for the technical detail), and its value is set to 1.0 
-  by default.
-
-.. doctest::
-
-    >>> tc_truck.set_pce(2.5)
-
-* **Fixed costs**: in case there are fixed costs associated with the traversal of links in the network, the user 
-  can provide the name of the field in the graph that contains that network.
+* **pce**: passenger-car equivalent for multi-class assignment; default is ``1.0``.
+* **vot**: value of time used to convert fixed costs to time units; default is ``1.0``.
+* **fixed_cost_field**: link field providing a time-equivalent fixed cost, if needed.
+* **fixed_cost_multiplier**: scale applied to the fixed cost field.
 
 .. doctest::
 
-    >>> tc_truck.set_fixed_cost("distance")
-
-* **Value-of-Time** (VoT) is the mechanism to bring time and monetary costs into a consistent basis 
-  within a generalized cost function. In the event that fixed cost is measured in the same unit as free-flow travel
-  time, then *vot* must be set to 1.0.
-
-.. doctest::
-
-    >>> tc_truck.set_vot(0.35)
+    >>> tc_truck = TrafficClass(mode="T", cost="free_flow_time", demand=matrix_truck,
+    ...                      name="truck", pce=2.5, vot=0.35,
+    ...                      fixed_cost_field="distance", fixed_cost_multiplier=1.0)
 
 ``TrafficAssignment``
 ---------------------
@@ -86,64 +70,39 @@ method call:
     >>> from aequilibrae.paths import TrafficAssignment
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> assig = TrafficAssignment()
+    >>> assignment = TrafficAssignment(
+    ...     network=project.network,
+    ...     classes=[tc_car, tc_truck],
+    ...     time_field="free_flow_time",
+    ...     capacity_field="capacity",
+    ...     vdf=bpr,
+    ...     algorithm="bfw",
+    ...     name_mapping={"alpha": "b", "beta": "power"},
+    ... )
 
-AequilibraE's traffic assignment is organized within an object with the same name which contains a series of
-member variables that should be populated by the user, providing thus a complete specification of the assignment
-procedure.
+AequilibraE's traffic assignment is organized around a single constructor that snapshots the network and
+current class configuration, then prepares the required routing contexts during execution.
 
-* **classes**: list of completely specified traffic classes
-
-.. doctest::
-
-    # You can add one or more traffic classes to the assignment instance
-    >>> assig.add_class(tc_truck) # doctest: +SKIP
-
-    >>> assig.set_classes([tc_car, tc_truck])
-
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, ``INRETS``, or ``AKCELIK``
-
-.. doctest::
-
-
-
-* **name_mapping**: the parameters to be used in the volume-delay function, other than volume, and 
-  free-flow time. VDF parameters must be consistent across all graphs.
-
-  Because AequilibraE supports different parameters for each link, its implementation is the most general possible 
-  while still preserving the desired properties for multi-class assignment, but the user needs to provide individual
-  values for each link *OR* a single value for the entire network.
+* **network**: the source network object or project network containing the links and modes
+* **classes**: one or more fully-specified ``TrafficClass`` objects
+* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``,
+  ``INRETS``, or ``AKCELIK``
+* **name_mapping**: parameter names for the VDF, either as network fields or numeric constants
+* **time_field**: link field representing free-flow travel time
+* **capacity_field**: link field representing capacity
+* **algorithm**: assignment algorithm, such as ``"bfw"``, ``"fw"``, ``"msa"``, or ``"all-or-nothing"``
 
 .. doctest::
 
-    # The VDF parameters can be either an existing field in the graph, passed as a parameter:
-    >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"}) # doctest: +SKIP
-
-    # Or as a global value:
-    >>> assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-
-* **time_field**: the field of the graph that corresponds to free-flow travel time. The procedure will 
-  collect this information from the graph associated with the first traffic class provided, but will check 
-  if all graphs have the same information on free-flow travel time
-  
-.. doctest::
-
-    >>> assig.set_time_field("free_flow_time")
-
-* **capacity_field**: the field of the graph that corresponds to capacity of links. The procedure will 
-  collect this information from the graph associated with the first traffic class provided, but will check 
-  if all graphs have the same information on capacity
-
-.. doctest::
-
-    >>> assig.set_capacity_field("capacity")
-
-* **algorithm**: the assignment algorithm to be used, being one of ``all-or-nothing``, ``bfw``, ``cfw``, ``fw``,  
-  ``franke-wolfe``, or ``msa``.
-
-.. doctest::
-
-    >>> assig.set_algorithm("bfw")
+    >>> assignment = TrafficAssignment(
+    ...     network=project.network,
+    ...     classes=[tc_car, tc_truck],
+    ...     time_field="free_flow_time",
+    ...     capacity_field="capacity",
+    ...     vdf=bpr,
+    ...     algorithm="bfw",
+    ...     name_mapping={"alpha": 0.15, "beta": 4.0},
+    ... )
 
 Skimming while assigning
 ~~~~~~~~~~~~~~~~~~~~~~~~

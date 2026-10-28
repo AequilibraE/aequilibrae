@@ -21,11 +21,7 @@ logger = logging.getLogger(__name__)
 def test_traffic_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    # Build graphs for the scenario
-    scenario_example.network.build_graphs(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
-    graph = scenario_example.network.graphs["c"]
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    network = scenario_example.network
 
     try:
         mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
@@ -34,19 +30,20 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
         assert scenario != "root"
         return
 
-    assigclass = TrafficClass("car", graph, mat)
-    assignment = TrafficAssignment(scenario_example)
-    assignment.add_class(assigclass)
-    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-    assignment.set_time_field("distance")
-    assignment.set_capacity_field("capacity")
-    assignment.max_iter = 5
-    assignment.set_algorithm("msa")
-
-    assignment.execute()
-
-    assert assigclass.results.total_link_loads is not None
-    assert len(assigclass.results.total_link_loads) > 0
+    traffic = TrafficClass(name="car", mode="c", cost="distance", demand=mat, block_centroid_flows=False)
+    assignment = TrafficAssignment(
+        network=network,
+        classes=[traffic],
+        vdf=bpr,
+        algorithm="msa",
+        time_field="distance",
+        capacity_field="capacity",
+        name_mapping={"alpha": 0.15, "beta": 4.0},
+        project=scenario_example,
+    )
+    assignment.execute(max_iterations=5, cores=1)
+    assert assignment.class_results["car"].total_link_loads is not None
+    assert len(assignment.class_results["car"].total_link_loads) > 0
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -66,7 +63,6 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
         assert scenario != "coquimbo"
         return
 
-    scenario_example.network.build_graphs(modes=["c"])
     graph.create_line_geometry(method="connector project match", graph="c")
     transit_graph = graph.to_transit_graph()
     zones_in_the_model = len(transit_graph.centroids)
@@ -114,10 +110,9 @@ def test_matrices_scenarios(scenario_example, scenario):
 def test_route_choice_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    scenario_example.network.build_graphs(fields=["distance"], modes=["c"])
-    graph = scenario_example.network.graphs["c"]
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    graph = scenario_example.network.build_graph(
+        mode="c", cost="distance", fields=["distance"], block_centroid_flows=False
+    )
 
     if len(graph.centroids) >= 2:
         rc = RouteChoiceSet(graph)
@@ -182,8 +177,7 @@ def test_network_scenarios(scenario_example, scenario):
     links1 = network.links.data
     nodes1 = network.nodes.data
 
-    network.build_graphs(fields=["distance"], modes=["c"])
-    graph1 = network.graphs["c"]
+    graph1 = network.build_graph(mode="c", cost="distance", fields=["distance"])
 
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
@@ -194,8 +188,7 @@ def test_network_scenarios(scenario_example, scenario):
         links2 = network.links.data
         nodes2 = network.nodes.data
 
-        network.build_graphs(fields=["distance"], modes=["c"])
-        graph2 = network.graphs["c"]
+        graph2 = network.build_graph(mode="c", cost="distance", fields=["distance"])
 
         # Pandas doesn't have a good way to assert frames not equal
         try:

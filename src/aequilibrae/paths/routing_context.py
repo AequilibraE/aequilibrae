@@ -1,8 +1,3 @@
-"""Internal helpers for preparing routing inputs and mapping local IDs."""
-
-from __future__ import annotations
-
-import operator
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -13,10 +8,11 @@ if TYPE_CHECKING:
     from aequilibrae.paths.graph import Graph
 
 
-def _copy_ids(values: np.ndarray, count: int, name: str) -> np.ndarray:
+def _copy_ids(values: np.ndarray, count: int | None, name: str) -> np.ndarray:
+    """Copy node IDs to a C-contiguous, read-only array."""
     values = np.asarray(values)
 
-    if values.shape != (count,):
+    if count is not None and values.shape != (count,):
         raise ValueError(f"{name} must have {count} entries")
 
     if values.dtype.kind not in "iu":
@@ -29,19 +25,14 @@ def _copy_ids(values: np.ndarray, count: int, name: str) -> np.ndarray:
 
 
 class GraphMapping:
-    """Map a routing context's local indices to copied external IDs.
+    """
+    Map a routing context's local indices to copied external IDs.
 
     Node IDs follow context node order. Link IDs and directions follow context
     link order. This object does not read Graph or expand compressed links.
     """
 
-    def __init__(
-        self,
-        context: GraphContext,
-        node_ids: np.ndarray,
-        link_ids: np.ndarray,
-        directions: np.ndarray,
-    ):
+    def __init__(self, context: GraphContext, node_ids: np.ndarray, link_ids: np.ndarray, directions: np.ndarray):
         if not isinstance(context, GraphContext):
             raise TypeError("context must be a routing context")
 
@@ -60,6 +51,7 @@ class GraphMapping:
 
     def node_index(self, node_id: int) -> int:
         """Find the local index of an external node ID."""
+        import operator
         if isinstance(node_id, (bool, np.bool_)):
             raise TypeError("node_id must be an integer, not a boolean")
 
@@ -83,68 +75,86 @@ class GraphMapping:
         return nodes
 
 
-def make_routing_context(graph: Graph, costs: np.ndarray | None = None, *, compact: bool = False) -> GraphContext:
+def make_routing_context(
+    graph: "Graph", costs: np.ndarray | None = None, *, compact: bool = False
+) -> GraphContext:
     """Copy topology from Graph into a full or compact routing context.
 
     Without costs, copy the graph's current cost buffer too. Supplied costs are
     borrowed so assignment can update its own buffer between searches. No Graph
     arrays are changed or retained by the context when costs are omitted.
+    
+    Note: This function also handles internal GraphBase objects for freeze_graph().
+    Users should only pass Graph objects.
     """
-    if compact:
-        links = graph.compact_graph
-        offsets = graph.compact_fs
-        turn_offsets = graph.compact_turn_fs
-        turn_links = graph.compact_turn_to_arcs
-        turn_penalties = graph.compact_turn_penalties
-    else:
-        links = graph.graph
-        offsets = graph.fs
-        turn_offsets = graph.turn_fs
-        turn_links = graph.turn_to_arcs
-        turn_penalties = graph.turn_penalties
-
-    link_count = len(links)
-
-    if costs is None:
-        if not graph.cost_field:
-            raise ValueError("Set the graph cost field before preparing routing")
-
-        source = graph.compact_cost if compact else graph.cost
-        costs = np.array(source[:link_count], dtype=np.float64, order="C", copy=True)
-        costs.flags.writeable = False
-
-    topology = (offsets, links.b_node.to_numpy(), costs)
-
-    if graph.has_turn_restrictions:
-        first = last = None
+    from aequilibrae.paths.graph import Graph, GraphBase
+    
+    # Handle Graph objects (public API)
+    if isinstance(graph, Graph):
+        if costs is None:
+            costs = np.array(graph.routing.costs, copy=True)
+            costs.flags.writeable = False
+        return graph.routing.with_costs(costs)
+    
+    # Handle GraphBase objects (internal use by freeze_graph)
+    if isinstance(graph, GraphBase):
         if compact:
-            # Find each compact link's physical neighbours in full-node indices.
-            compressed = graph.graph["__compressed_id__"].to_numpy()
-            retained = compressed < link_count
-            compressed = compressed[retained]
-            tails = graph.graph.a_node.to_numpy()[retained]
-            heads = graph.graph.b_node.to_numpy()[retained]
-            compact_to_full = graph.nodes_to_indices[graph.compact_all_nodes]
-            starts = tails == compact_to_full[links.a_node.to_numpy()[compressed]]
-            ends = heads == compact_to_full[links.b_node.to_numpy()[compressed]]
-            first = np.empty(link_count, dtype=np.uintp)
-            last = np.empty(link_count, dtype=np.uintp)
-            first[compressed[starts]] = heads[starts]
-            last[compressed[ends]] = tails[ends]
-        # Keep Graph's connector bans rather than also blocking centroid nodes.
-        # Compact routing uses Graph's turn tables without rebuilding them.
-        return TurnBasedContext(
-            *topology,
-            turn_fs=turn_offsets,
-            turn_to_links=turn_links,
-            turn_penalties=turn_penalties,
-            allow_uturns=graph.allow_path_uturns,
-            blocked_centroid_count=0,
-            first_nodes=first,
-            last_nodes=last,
-        )
+            links = graph.compact_graph
+            offsets = graph.compact_fs
+            turn_offsets = graph.compact_turn_fs
+            turn_links = graph.compact_turn_to_arcs
+            turn_penalties = graph.compact_turn_penalties
+        else:
+            links = graph.graph
+            offsets = graph.fs
+            turn_offsets = graph.turn_fs
+            turn_links = graph.turn_to_arcs
+            turn_penalties = graph.turn_penalties
 
-    return NodeBasedContext(
-        *topology,
-        blocked_centroid_count=graph.num_zones if graph.block_centroid_flows else 0,
-    )
+        link_count = len(links)
+
+        if costs is None:
+            if not graph.cost_field:
+                raise ValueError("Set the graph cost field before preparing routing")
+
+            source = graph.compact_cost if compact else graph.cost
+            costs = np.array(source[:link_count], dtype=np.float64, order="C", copy=True)
+            costs.flags.writeable = False
+
+        topology = (offsets, links.b_node.to_numpy(), costs)
+
+        if graph.has_turn_restrictions:
+            first = last = None
+            if compact:
+                # Find each compact link's physical neighbours in full-node indices.
+                compressed = graph.graph["__compressed_id__"].to_numpy()
+                retained = compressed < link_count
+                compressed = compressed[retained]
+                tails = graph.graph.a_node.to_numpy()[retained]
+                heads = graph.graph.b_node.to_numpy()[retained]
+                compact_to_full = graph.nodes_to_indices[graph.compact_all_nodes]
+                starts = tails == compact_to_full[links.a_node.to_numpy()[compressed]]
+                ends = heads == compact_to_full[links.b_node.to_numpy()[compressed]]
+                first = np.empty(link_count, dtype=np.uintp)
+                last = np.empty(link_count, dtype=np.uintp)
+                first[compressed[starts]] = heads[starts]
+                last[compressed[ends]] = tails[ends]
+            # Keep Graph's connector bans rather than also blocking centroid nodes.
+            # Compact routing uses Graph's turn tables without rebuilding them.
+            return TurnBasedContext(
+                *topology,
+                turn_fs=turn_offsets,
+                turn_to_links=turn_links,
+                turn_penalties=turn_penalties,
+                allow_uturns=graph.allow_path_uturns,
+                blocked_centroid_count=0,
+                first_nodes=first,
+                last_nodes=last,
+            )
+
+        return NodeBasedContext(
+            *topology,
+            blocked_centroid_count=graph.num_zones if graph.block_centroid_flows else 0,
+        )
+    
+    raise TypeError(f"graph must be a Graph object, got {type(graph).__name__}")

@@ -1,103 +1,65 @@
-"""Translate the current Graph and matrix APIs for assignment.
-
-This boundary can be removed when Graph uses routing contexts directly. It does
-not rebuild topology or repair compression and turn tables.
-"""
+"""Assignment-owned cost, skim, demand and output buffers for prepared graph."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.cython.aon_context import PreparedAoN
-from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
+from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
-from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads, sum_axis1
-from aequilibrae.paths.routing_context import make_routing_context
+from aequilibrae.paths.cython.parallel_numpy import sum_axis1
+from aequilibrae.paths.graph import AssignmentMapping, Graph
 
 if TYPE_CHECKING:
-    from aequilibrae.matrix import AequilibraeMatrix
     from aequilibrae.paths.cython.outputs import AoNOutputs
-    from aequilibrae.paths.graph import Graph
 
 
-def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
-    """Copy named matrices into fixed, packed assignment demand."""
+@dataclass(frozen=True)
+class SkimLayout:
+    """Public skim names and the internal turn-delay reporting adjustment."""
+
+    time_field: str
+    turn_cost_name: str | None = None
+
+    def report(self, output):
+        if output is None or self.turn_cost_name is None:
+            return output
+        matrices = output.matrices
+        turn_costs = matrices.pop(self.turn_cost_name)
+        matrices[self.time_field] = matrices[self.time_field] + turn_costs
+        return SkimmingOutputs.from_matrices(matrices)
+
+
+def validate_assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> None:
+    """Validate named demand matrices without allocating an assignment copy."""
     if not isinstance(matrix, AequilibraeMatrix):
         raise TypeError("Demand must be an AequilibraeMatrix")
     if not np.array_equal(matrix.index, centroids):
         raise ValueError("Matrix and graph must have the same centroid order")
-
-    names = tuple(matrix)
-    demand = np.stack([matrix[name] for name in names], axis=2) if names else np.empty((0, 0, 0))
     zones = len(centroids)
-    classes = len(names)
-    if demand.shape != (zones, zones, classes) or not zones or not classes:
+    if not zones or not len(matrix):
         raise ValueError("Demand must have shape (zones, zones, classes)")
-    if not np.issubdtype(demand.dtype, np.number) or np.iscomplexobj(demand):
-        raise TypeError("Demand must contain real numbers")
-    if not np.all(np.isfinite(demand)) or np.any(demand < 0):
-        raise ValueError("Demand must be finite and nonnegative")
+    for values in matrix.values():
+        if values.shape != (zones, zones):
+            raise ValueError("Demand must have shape (zones, zones, classes)")
+        if not np.issubdtype(values.dtype, np.number) or np.iscomplexobj(values):
+            raise TypeError("Demand must contain real numbers")
+        if not np.all(np.isfinite(values)) or np.any(values < 0):
+            raise ValueError("Demand must be finite and nonnegative")
 
-    demand = np.array(demand, dtype=np.float64, order="C", copy=True)
+
+def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
+    """Copy validated named matrices into packed, read-only assignment storage."""
+    validate_assignment_demand(matrix, centroids)
+    demand = np.stack(list(matrix.values()), axis=2, dtype=np.float64)
     if not np.all(np.isfinite(demand)):
         raise ValueError("Demand must be finite when stored as float64")
     demand.flags.writeable = False
     return demand
-
-
-class AssignmentMapping:
-    """Map compact assignment loads to full-network reporting order.
-
-    This is separate from GraphMapping, whose IDs describe only context links.
-    """
-
-    def __init__(self, graph: Graph):
-        self.link_count = graph.num_links
-        self.compact_link_count = graph.compact_num_links
-        self.centroids = np.array(graph.centroids, copy=True)
-        self.link_ids = graph.graph.link_id.to_numpy(copy=True)
-        self.directions = graph.graph.direction.to_numpy(copy=True)
-        self.graph_ids = graph.graph.__supernet_id__.to_numpy(dtype=np.int64, copy=True)
-        compact_ids = graph.graph.__compressed_id__.to_numpy(dtype=np.int64, copy=True)
-
-        self.crosswalk = np.empty(self.link_count, dtype=np.int64)
-        self.crosswalk[self.graph_ids] = compact_ids
-        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > self.compact_link_count):
-            raise ValueError("Invalid compact link mapping")
-
-        # Graph uses compact_link_count for links removed during compression.
-        # These links contribute no routing cost and receive zero assigned flow.
-        for values in (self.centroids, self.link_ids, self.directions, self.graph_ids, self.crosswalk):
-            values.flags.writeable = False
-
-    def aggregate_costs(self, full_costs: np.ndarray, compact_costs: np.ndarray) -> None:
-        aggregate_link_costs(full_costs, compact_costs, self.crosswalk)
-
-    def project_loads(
-        self, compact: np.ndarray, output: np.ndarray, cores: int = 1, threading_threshold: int = 10000
-    ) -> None:
-        if cores < 1:
-            raise ValueError("cores must be positive")
-        if output.ndim != 2 or compact.ndim != 2:
-            raise ValueError("compact and output must be two-dimensional")
-        if output.shape[0] != self.link_count or compact.shape[0] != self.compact_link_count:
-            raise ValueError("projection link counts must match the assignment context")
-        if output.shape[1] != compact.shape[1]:
-            raise ValueError("projection class counts must match")
-        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact.shape[0]):
-            raise ValueError("crosswalk contains an invalid compact link")
-
-        project_link_loads(output, compact, self.crosswalk, cores, threading_threshold)
-
-    def full_loads(self, compact: np.ndarray) -> np.ndarray:
-        """Make a reporting snapshot in supernetwork order."""
-        output = np.empty((self.link_count, compact.shape[1]), dtype=np.float64)
-        self.project_loads(compact, output)
-        output.flags.writeable = False
-        return output
 
 
 class AssignmentState:
@@ -107,7 +69,11 @@ class AssignmentState:
     Refresh totals after writing or blending the output group.
     """
 
-    def __init__(self, output: AoNOutputs, mapping: AssignmentMapping, cores: int, threading_threshold: int):
+    def __init__(
+        self, output: AoNOutputs, mapping: AssignmentMapping, cores: int, threading_threshold: int, skim_layout=None
+    ):
+        self.skim_layout = skim_layout
+        self._skim_cache = None
         self.output = output
         self.mapping = mapping
         self.cores = cores
@@ -116,14 +82,29 @@ class AssignmentState:
         self.total_link_loads = np.zeros(mapping.link_count, dtype=np.float64)
 
     def update_totals(self) -> None:
+        self._skim_cache = None
         sum_axis1(self.compact_totals, self.output.loading.link_loads, self.cores, self.threading_threshold)
         self.mapping.project_loads(
             self.compact_totals[:, None], self.total_link_loads[:, None], self.cores, self.threading_threshold
         )
 
+    @property
+    def skims(self):
+        if self.skim_layout is None:
+            return self.output.skimming
+        if self._skim_cache is None:
+            self._skim_cache = self.skim_layout.report(self.output.skimming)
+        return self._skim_cache
+
+    def reset(self):
+        if self._skim_cache is not None and self._skim_cache is not self.output.skimming:
+            self._skim_cache.reset()
+        self.output.reset()
+        self.update_totals()
+
 
 class AssignmentInputs:
-    """Own one class's prepared routing inputs and reusable workers."""
+    """Own one class's costs and workers while sharing immutable graph arrays."""
 
     def __init__(
         self,
@@ -133,52 +114,40 @@ class AssignmentInputs:
         selected_links: dict[str, np.ndarray],
         cores: int,
         *,
-        skim_fields: list[str] | None = None,
+        field_values,
+        skim_fields=(),
         cost_name: str | None = None,
         heap: str = "4ary",
+        select_link_od=True,
     ):
-        self.mapping = AssignmentMapping(graph)
+        self.mapping = graph.mapping
         self.demand = assignment_demand(matrix, self.mapping.centroids)
         self.class_names = tuple(matrix)
         links = self.mapping.compact_link_count
         self.costs = np.zeros(links, dtype=np.float64)
         self.full_costs = np.zeros(self.mapping.link_count, dtype=np.float64)
-
-        self.routing = make_routing_context(graph, self.costs, compact=True)
-
-        skim_names = graph.skim_fields if skim_fields is None else skim_fields
-        separate_time = cost_name is not None and cost_name != time_field
-        if cost_name is None and time_field in skim_names:
-            cost_name = time_field
-
+        self.routing = graph.routing.with_costs(self.costs)
         fields = {}
-        self.time_field = time_field
         self.time_skim = None
-        self.turn_cost_name = None
-
-        for name in skim_names:
-            if name == time_field and not separate_time:
-                # The routing distance already includes the turn costs.
+        # Travel time has one meaning, independent of which cost skims are requested.
+        cost_label = cost_name if cost_name in skim_fields and cost_name != time_field else None
+        for name in skim_fields:
+            if name == cost_label:
                 continue
 
             values = np.zeros(links, dtype=np.float64)
             if name == time_field:
                 self.time_skim = values
             else:
-                full = np.empty(self.mapping.link_count, dtype=np.float64)
-                full[self.mapping.graph_ids] = graph.graph[name].to_numpy()
-                self.mapping.aggregate_costs(full, values)
-
+                self.mapping.aggregate_costs(field_values(name), values)
             fields[name] = values
-
-        if self.time_skim is not None and graph.has_turn_restrictions:
-            self.turn_cost_name = "__turn_cost__"
-            while self.turn_cost_name in fields or self.turn_cost_name == cost_name:
-                self.turn_cost_name = "_" + self.turn_cost_name
-
-        self.skimming = SkimmingContext(
-            links, link_fields=fields, cost_name=cost_name, turn_cost_name=self.turn_cost_name
-        )
+        turn_cost_name = None
+        if self.time_skim is not None and isinstance(self.routing, TurnBasedContext):
+            turn_cost_name = "__turn_cost__"
+            while turn_cost_name in fields or turn_cost_name == cost_label:
+                turn_cost_name = "_" + turn_cost_name
+        self.skim_layout = SkimLayout(time_field, turn_cost_name)
+        self.skimming = SkimmingContext(links, link_fields=fields, cost_name=cost_label, turn_cost_name=turn_cost_name)
         # A selected link removed by compression can never be used by a path.
         selections = {}
         for name, indices in selected_links.items():
@@ -186,7 +155,13 @@ class AssignmentInputs:
             selections[name] = indices[indices != links]
         self.selection = SelectLinkContext(links, selections)
         self.driver = PreparedAoN(
-            self.routing, self.demand, cores=cores, skimming=self.skimming, selected_links=self.selection, heap=heap
+            self.routing,
+            self.demand,
+            cores=cores,
+            skimming=self.skimming,
+            selected_links=self.selection,
+            heap=heap,
+            select_link_od=select_link_od,
         )
 
     def update_costs(self, congested_time: np.ndarray, fixed_cost: np.ndarray) -> None:
@@ -198,14 +173,65 @@ class AssignmentInputs:
 
     def report_skims(self, output: SkimmingOutputs) -> SkimmingOutputs:
         """Add turn delay to a separate travel-time skim, without changing raw outputs."""
-        if self.turn_cost_name is None:
-            return output
-
-        matrices = output.matrices
-        turn_costs = matrices.pop(self.turn_cost_name)
-        matrices[self.time_field] = matrices[self.time_field] + turn_costs
-
-        return SkimmingOutputs.from_matrices(matrices)
+        return self.skim_layout.report(output)
 
     def make_state(self, cores: int, threading_threshold: int) -> AssignmentState:
-        return AssignmentState(self.driver.make_outputs(), self.mapping, cores, threading_threshold)
+        return AssignmentState(self.driver.make_outputs(), self.mapping, cores, threading_threshold, self.skim_layout)
+
+
+class PreparedTrafficClass:
+    """Per-class state over an execution's shared network and compact graph."""
+
+    def __init__(self, configuration, network, fields):
+        from aequilibrae.paths.results import AssignmentResults
+
+        self.configuration = configuration
+        self.network = network
+        self.fields = fields
+        self.graph = network._assignment_graph(configuration)
+        self.results = AssignmentResults()
+        self._aon_results = AssignmentResults()
+        self.results.set_heap(configuration.heap)
+        self._aon_results.set_heap(configuration.heap)
+        self.fixed_cost = np.zeros(self.graph.mapping.link_count, dtype=np.float64)
+        self.congested_time = np.array([])
+        self.congested_skims = None
+        self._selected_links = self.graph.selected_links(configuration.select_link_sets)
+
+    @property
+    def _id(self):
+        return self.configuration.name
+
+    @property
+    def pce(self):
+        return self.configuration.pce
+
+    def skim_congested(self, skim_fields=None):
+        """
+        Skims the congested network using the final assignment costs.
+
+        Congested time includes link travel time and turn delay. Assignment cost
+        also includes fixed costs, such as tolls converted to time units.
+
+        :Arguments:
+            **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
+        """
+        if self.congested_time.size == 0:
+            raise RuntimeError("Run the assignment before skimming congested costs")
+        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
+        inputs = AssignmentInputs(
+            self.graph,
+            self.configuration.demand,
+            "__congested_time__",
+            {},
+            self.results.cores,
+            field_values=self.network.field_values,
+            skim_fields=fields + ["__congested_time__", "__assignment_cost__"],
+            cost_name="__assignment_cost__",
+            heap=self.configuration.heap,
+        )
+        inputs.update_costs(self.congested_time, self.fixed_cost)
+        # FIXME: Use a separate skim-only driver when one is available.
+        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        self.congested_skims = inputs.report_skims(output)
+        return self.congested_skims

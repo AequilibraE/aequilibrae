@@ -3,7 +3,7 @@ import re
 import numpy as np
 import pytest
 
-from aequilibrae import VDF, Graph, TrafficAssignment, TrafficClass
+from aequilibrae import VDF, TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import (
     AKCELIK,
     BPR,
@@ -24,92 +24,85 @@ from aequilibrae.paths.vdf import (
 
 @pytest.fixture
 def project(sioux_falls_example):
-    sioux_falls_example.network.build_graphs()
     return sioux_falls_example
 
 
 @pytest.fixture
-def car_graph(project):
-    graph: Graph = project.network.graphs["c"]
-    graph.set_graph("free_flow_time")
-    graph.set_blocked_centroid_flows(False)
-    return graph
+def make_assignment(project):
+    demand = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand)
+    network = project.network
 
+    def make(vdf, name_mapping):
+        assignment = TrafficAssignment(
+            network=network,
+            classes=[traffic],
+            time_field="free_flow_time",
+            capacity_field="capacity",
+            vdf=vdf,
+            name_mapping=name_mapping,
+            algorithm="msa",
+        )
+        assignment.execute(max_iterations=1, cores=1)
+        return assignment
 
-@pytest.fixture
-def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-    return mat
-
-
-@pytest.fixture
-def traffic_class(car_graph, matrix):
-    return TrafficClass("car", car_graph, matrix)
-
-
-@pytest.fixture
-def assignment(project):
-    return TrafficAssignment(project)
+    return make
 
 
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
-        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": "b", "beta": "power"}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        ("inrets", {"alpha": "b"}),
+        ("inrets", {"alpha": 0.15}),
         ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
         ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
         ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
-def test_set_vdf_with_parameters(
-    assignment: TrafficAssignment,
-    traffic_class: TrafficClass,
+def test_assignment_vdf_parameters(
+    make_assignment,
     vdf_name: str,
     name_mapping: dict[str, str | float],
 ):
-    assignment.add_class(traffic_class)
     function, derivative = FUNCTION_MAP[vdf_name]
     vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
-    assignment.set_vdf(vdf, name_mapping=name_mapping)
+    make_assignment(vdf, name_mapping)
 
 
 @pytest.mark.parametrize(
     "vdf_name,name_mapping",
     [
-        *[(k, {"alpha": -1, "beta": "power"}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
-        *[(k, {"alpha": -1, "beta": 4.0}) for k in FUNCTION_MAP if (k != "akcelik" and k != "conical")],
+        *[(k, {"alpha": -1, "beta": "power"}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
+        *[(k, {"alpha": -1, "beta": 4.0}) for k in FUNCTION_MAP if k in ("bpr", "bpr2")],
         ("akcelik", {"alpha": -1, "tau": "power", "length": "distance"}),
+        ("inrets", {"alpha": -1}),
         ("akcelik", {"alpha": -1, "tau": 0.1 * 8.0, "length": "distance"}),
     ],
 )
 def test_check_bounds_of_vdfs_inclusive(
-    assignment: TrafficAssignment,
-    traffic_class: TrafficClass,
+    make_assignment,
     vdf_name: str,
     name_mapping: dict[str, str | float],
 ):
-    assignment.add_class(traffic_class)
     function, derivative = FUNCTION_MAP[vdf_name]
     vdf = VDF(vdf_name, function, DEFAULT_PRESET_SPECS[vdf_name], derivative)
     with pytest.raises(ValueError, match="At least one alpha is less than 0.0"):
-        assignment.set_vdf(vdf, name_mapping=name_mapping)
+        make_assignment(vdf, name_mapping)
 
 
 def test_check_bounds_of_vdfs_exclusive(
-    assignment: TrafficAssignment,
-    traffic_class: TrafficClass,
+    make_assignment,
 ):
-    assignment.add_class(traffic_class)
-
     exclusive_bound_vdf = VDF(
         "ebv", lambda x: x, {"param": {"bounds": (0.0, 1.0), "inclusive_lower": False, "inclusive_upper": False}}
     )
     with pytest.raises(ValueError, match="At least one param is less than or equal to 0.0"):
-        assignment.set_vdf(exclusive_bound_vdf, name_mapping={"param": -1})
+        make_assignment(exclusive_bound_vdf, {"param": -1})
 
     with pytest.raises(ValueError, match="At least one param is greater than or equal to 1.0"):
-        assignment.set_vdf(exclusive_bound_vdf, name_mapping={"param": 2})
+        make_assignment(exclusive_bound_vdf, {"param": 2})
 
 
 def test_make_preset_vdfs():

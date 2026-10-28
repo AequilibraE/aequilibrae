@@ -20,7 +20,11 @@ def make_heuristic_context(node_ids, coordinates, lonlat, heuristic, scale):
         raise TypeError("coordinates must be a DataFrame indexed by external node ID")
 
     columns = ["x", "y"] if heuristic == "euclidean" else ["lon", "lat"]
-    if frame is None or not all(column in frame.columns for column in columns):
+
+    if frame is None:
+        raise ValueError("coordinates must include every graph node ID")
+
+    if not all(column in frame.columns for column in columns):
         raise ValueError(f"{heuristic} requires coordinate columns {columns}")
 
     if not frame.index.is_unique:

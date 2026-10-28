@@ -10,7 +10,8 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Graph, TrafficAssignment
+from aequilibrae.paths import Network, TrafficAssignment
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import bpr
@@ -131,7 +132,7 @@ def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
     return mat
 
 
-def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Graph:
+def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> GraphBase:
     header = parse_tntp_header(folder, model_stub)
     first_thru_node = header.get("FIRST THRU NODE", 2)
 
@@ -164,7 +165,7 @@ def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Gra
     network["link_id"] = network.index + 1
     network["free_flow_time"] = network["free_flow_time"].astype(np.float64)
 
-    g = Graph()
+    g = GraphBase()
     g.cost = net["free_flow_time"].values
     g.capacity = net["capacity"].values
     g.free_flow_time = net["free_flow_time"].values
@@ -298,27 +299,33 @@ def run_validation(
 
     # --- factory for a clean TrafficAssignment per trial ---
     def _make_assignment():
-        tc = TrafficClass("car", graph, matrix)
-        tc.set_heap(heap)
-        if "toll" in graph.network.columns:
-            tc.set_fixed_cost("toll")
-            tc.set_vot(1.0)
-
-        a = TrafficAssignment()
-        a.set_classes([tc])
-        a.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-        a.set_capacity_field("capacity")
-        a.set_time_field("free_flow_time")
-        a.max_iter = ITERATIONS
-        a.rgap_target = RGAP_TARGET
-        a.set_algorithm(algorithm)
-        return a
+        tc = TrafficClass(
+            name="car",
+            mode="c",
+            cost="free_flow_time",
+            demand=matrix,
+            heap=heap,
+            fixed_cost_field="toll" if "toll" in graph.network else None,
+            block_centroid_flows=graph.block_centroid_flows,
+        )
+        network = Network(
+            graph.network.assign(modes="c"), centroids=graph.centroids, turn_restrictions=graph._turn_restrictions
+        )
+        return TrafficAssignment(
+            network=network,
+            classes=[tc],
+            vdf=bpr,
+            algorithm=algorithm,
+            time_field="free_flow_time",
+            capacity_field="capacity",
+            name_mapping={"alpha": "b", "beta": "power"},
+        )
 
     trials: list[pd.DataFrame] = []
 
     def _benchmarked():
         assig: TrafficAssignment = _make_assignment()
-        assig.execute()
+        assig.execute(max_iterations=ITERATIONS, rgap=RGAP_TARGET)
         trials.append(assig.report())
         return assig
 

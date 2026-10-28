@@ -13,6 +13,7 @@ from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.workspaces import AStarWorkspace, SearchWorkspace
 
 from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
+from aequilibrae.paths.graph import freeze_graph
 from aequilibrae.paths.results import path_results as path_results_module
 from aequilibrae.paths.routing_context import make_routing_context
 
@@ -40,33 +41,35 @@ def run(context, origin, destination, heuristic, heap="4ary", results=None):
 
 
 def test_compact_a_star_allows_return_through_another_chain():
-    graph = compressed_uturn_graph()
-    assert 4 not in graph.compact_all_nodes
-    assert 5 not in graph.compact_all_nodes
+    graph_base = compressed_uturn_graph()
+    assert 4 not in graph_base.compact_all_nodes
+    assert 5 not in graph_base.compact_all_nodes
+    graph = freeze_graph(graph_base, compact=False)
     np.testing.assert_array_equal(graph.compute_path(1, 6).path_nodes, [1, 2, 4, 3, 5, 2, 6])
 
-    context = make_routing_context(graph, compact=True)
-    origin = graph.compact_nodes_to_indices[1]
-    destination = graph.compact_nodes_to_indices[6]
+    context = make_routing_context(graph_base, compact=True)
+    origin = graph_base.compact_nodes_to_indices[1]
+    destination = graph_base.compact_nodes_to_indices[6]
     results = run(context, origin, destination, heuristic_for(context, "euclidean"))
 
     # Links 2/3 form the outward chain and links 4/5 are the return via 5.
-    forward = graph.graph.loc[graph.graph.direction == 1].set_index("link_id")
+    forward = graph_base.graph.loc[graph_base.graph.direction == 1].set_index("link_id")
     expected_links = forward.loc[[1, 2, 4, 6], "__compressed_id__"].to_numpy()
     np.testing.assert_array_equal(results.path_links_to(destination), expected_links)
     assert results.path_cost_to(destination) == 6.0
 
 
 def test_compact_a_star_bans_reversal_through_same_chain():
-    graph = compressed_uturn_graph(with_return_chain=False)
+    graph_base = compressed_uturn_graph(with_return_chain=False)
 
     # Without 3 -> 5 -> 2, the only return is 3 -> 4 -> 3, so 6 is unreachable.
+    graph = freeze_graph(graph_base, compact=False)
     assert graph.compute_path(1, 6).path is None
 
     # Check compact as well
-    context = make_routing_context(graph, compact=True)
-    origin = graph.compact_nodes_to_indices[1]
-    destination = graph.compact_nodes_to_indices[6]
+    context = make_routing_context(graph_base, compact=True)
+    origin = graph_base.compact_nodes_to_indices[1]
+    destination = graph_base.compact_nodes_to_indices[6]
     results = run(context, origin, destination, heuristic_for(context, "euclidean"))
     assert not results.reachable_to(destination)
 
@@ -223,8 +226,9 @@ def coordinates_for(graph):
 
 
 def test_path_results_owns_only_the_active_workspace():
-    graph = diamond(False)
-    result = PathResults(graph, 10, 20, coordinates=coordinates_for(graph), a_star=True, heuristic_scale=0)
+    graph_base = diamond(False)
+    graph = freeze_graph(graph_base, compact=False)
+    result = PathResults(graph, 10, 20, coordinates=coordinates_for(graph_base), a_star=True, heuristic_scale=0)
     assert isinstance(result._workspace, AStarWorkspace)
     first = result._workspace
     result.compute_path(10, 40)
@@ -247,8 +251,9 @@ def test_path_results_owns_only_the_active_workspace():
 @pytest.mark.parametrize("name", ["euclidean", "haversine"])
 @pytest.mark.parametrize("turn", [False, True])
 def test_path_results_snapshot_skims_and_update_trace(heap, name, turn, monkeypatch):
-    graph = diamond(turn)
-    coordinates = coordinates_for(graph)
+    graph_base = diamond(turn)
+    coordinates = coordinates_for(graph_base)
+    graph = freeze_graph(graph_base, compact=False)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=name)
     result = PathResults(
         graph, 10, 20, coordinates=coordinates, a_star=True, heuristic=name, heuristic_scale=scale, heap=heap
@@ -259,8 +264,8 @@ def test_path_results_snapshot_skims_and_update_trace(heap, name, turn, monkeypa
     assert_state_tree(result.context, result.search_results)
     # Mutating all sources must not affect a later search of the snapshot.
     coordinates.loc[:, :] = np.nan
-    graph.lonlat_index.loc[:, :] = np.nan
-    graph.cost[:] = 1000
+    graph_base.lonlat_index.loc[:, :] = np.nan
+    graph_base.cost[:] = 1000
     called = []
     original = path_results_module.run_a_star
 
@@ -290,15 +295,17 @@ def test_path_results_snapshot_skims_and_update_trace(heap, name, turn, monkeypa
 
 @pytest.mark.parametrize("scale", [None, -1, np.inf, np.nan])
 def test_requires_valid_explicit_scale(scale):
-    graph = diamond()
+    graph_base = diamond()
+    graph = freeze_graph(graph_base, compact=False)
     with pytest.raises(ValueError, match="heuristic_scale"):
-        PathResults(graph, 10, 40, a_star=True, coordinates=coordinates_for(graph), heuristic_scale=scale)
+        PathResults(graph, 10, 40, a_star=True, coordinates=coordinates_for(graph_base), heuristic_scale=scale)
 
 
 @pytest.mark.parametrize("problem", ["missing", "duplicate", "nonfinite", "columns"])
 def test_coordinate_validation_is_deferred_for_dijkstra(problem):
-    graph = diamond()
-    coordinates = coordinates_for(graph)
+    graph_base = diamond()
+    graph = freeze_graph(graph_base, compact=False)
+    coordinates = coordinates_for(graph_base)
     if problem == "missing":
         coordinates = coordinates.drop(20)
     elif problem == "duplicate":
@@ -314,35 +321,42 @@ def test_coordinate_validation_is_deferred_for_dijkstra(problem):
 
 
 def test_missing_coordinates_and_heuristic_selection():
-    graph = diamond()
+    graph_base = diamond()
+    # Note: Don't call coordinates_for() before freeze_graph() since this test
+    # tests setting coordinates after PathResults is created
+    graph = freeze_graph(graph_base, compact=False)
     result = PathResults(graph, 10, 40)
-    with pytest.raises(ValueError, match="coordinate columns"):
+    with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
         result.compute_path(10, 40, a_star=True, heuristic_scale=1)
-    with pytest.raises(ValueError, match="coordinate columns"):
+    with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
         result.compute_path(10, 40, a_star=True, heuristic="haversine", heuristic_scale=1)
     with pytest.raises(ValueError, match="heuristic must be"):
         result.set_heuristic("equirectangular")
-    coordinates = coordinates_for(graph)
+    # Now set coordinates explicitly via coordinates parameter
+    coordinates = pd.DataFrame({"x": [0.0, 1.0, 0.0, 2.0], "y": [0.0, 0.0, 1.0, 0.0]}, index=[10, 20, 30, 40])
+    coordinates_for(graph_base)  # Also call it to set graph_base.lonlat_index
     result.set_graph_data(graph, coordinates=coordinates)
-    result.set_heuristic("haversine")
+    result.set_heuristic("euclidean")  # Use euclidean since we have x,y coordinates
     result.compute_path(10, 40, a_star=True, heuristic_scale=0)
-    assert isinstance(result._a_star_context, HaversineContext)
+    assert isinstance(result._a_star_context, EuclideanContext)
 
 
 def test_haversine_constructor_selection_and_coordinate_snapshot():
-    graph = diamond()
-    coordinates_for(graph)
+    graph_base = diamond()
+    coordinates_for(graph_base)  # Must be called before freeze_graph() to capture lonlat
+    graph = freeze_graph(graph_base, compact=False)
     result = PathResults(graph, 10, 40, heuristic="haversine")
     # Coordinates must be copied even when the initial search is Dijkstra.
-    graph.lonlat_index.loc[:, :] = np.nan
+    graph_base.lonlat_index.loc[:, :] = np.nan
     result.compute_path(10, 40, a_star=True, heuristic_scale=0)
     assert isinstance(result._a_star_context, HaversineContext)
     assert result.milepost[-1] == 2
 
 
 def test_scale_helper_bounds_and_no_automatic_clamping():
-    graph = diamond()
-    coordinates = coordinates_for(graph)
+    graph_base = diamond()
+    graph = freeze_graph(graph_base, compact=False)
+    coordinates = coordinates_for(graph_base)
     scale = estimate_heuristic_scale(graph, coordinates)
     assert scale == pytest.approx(2 / np.sqrt(5))
     # The helper does not change graph costs or supplied coordinates.
@@ -350,11 +364,14 @@ def test_scale_helper_bounds_and_no_automatic_clamping():
     assert np.all(np.isfinite(coordinates))
     result = PathResults(graph, 10, 40, a_star=True, coordinates=coordinates, heuristic_scale=100)
     assert result._a_star_context.scale == 100
-    graph.cost[0] = 0
+    # Use set_costs() instead of direct assignment since costs are read-only
+    zero_costs = np.zeros(len(graph.cost))
+    zero_costs[0] = 0
+    graph.set_costs(zero_costs)
     assert estimate_heuristic_scale(graph, coordinates) == 0
-    graph.cost[:] = np.inf
+    graph.set_costs(np.full(len(graph.cost), np.inf))
     assert estimate_heuristic_scale(graph, coordinates) == 0
-    graph.cost[:] = 1
+    graph.set_costs(np.ones(len(graph.cost)))
     coordinates.loc[:, :] = 0
     assert estimate_heuristic_scale(graph, coordinates) == 0
 
@@ -362,8 +379,9 @@ def test_scale_helper_bounds_and_no_automatic_clamping():
 def test_helper_is_not_called_by_path_results(monkeypatch):
     from aequilibrae.paths import path_heuristics
 
-    graph = diamond()
-    coordinates = coordinates_for(graph)
+    graph_base = diamond()
+    graph = freeze_graph(graph_base, compact=False)
+    coordinates = coordinates_for(graph_base)
 
     def fail(*args, **kwargs):
         pytest.fail("A* must not estimate a scale automatically")

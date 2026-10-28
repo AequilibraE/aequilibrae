@@ -15,8 +15,8 @@ from aequilibrae.paths.cython.parallel_numpy import (
 )
 
 if TYPE_CHECKING:
+    from aequilibrae.paths.assignment_context import PreparedTrafficClass
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
-    from aequilibrae.paths.traffic_class import TrafficClass
 
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -67,22 +67,7 @@ class LinearApproximation(WorkerThread):
 
         self.assig: TrafficAssignment = assig_spec
 
-        if assig_spec.classes is None:
-            raise ValueError(
-                "Traffic classes parameter missing. Setting the algorithm is the last thing to do when assigning."
-            )
-        elif assig_spec.vdf is None:
-            raise ValueError(
-                "vdf has not been specified. Setting the algorithm is the last thing to do when assigning."
-            )
-        elif assig_spec.vdf_parameters is None:
-            raise ValueError("vdf_parameters missing. Setting the algorithm is the last thing to do when assigning.")
-        elif assig_spec.capacity_field is None:
-            raise ValueError("capacity field is not set in TrafficAssignment.")
-        elif assig_spec.time_field is None:
-            raise ValueError("time field is not set in TrafficAssignment.")
-
-        self.traffic_classes: list[TrafficClass] = assig_spec.classes
+        self.traffic_classes: list[PreparedTrafficClass] = assig_spec._class_states
         self.num_classes = len(assig_spec.classes)
 
         self.time_field = assig_spec.time_field
@@ -112,10 +97,7 @@ class LinearApproximation(WorkerThread):
         self.betas = np.array([1.0, 0.0, 0.0])
 
         # Creates preload vector from preloads
-        self.preload = None
-        if assig_spec.preloads is not None:
-            cols = assig_spec.preloads.columns.difference(["link_id", "direction"])
-            self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
+        self.preload = assig_spec._prepare_preload()
 
         self.free_flow_tt = assig_spec.free_flow_tt
         self.total_flow = assig_spec.total_flow
@@ -534,7 +516,16 @@ class LinearApproximation(WorkerThread):
             if c.results.save_path_file or c._aon_results.save_path_file:
                 raise NotImplementedError("Path file saving is not supported by the prepared assignment driver")
             inputs = AssignmentInputs(
-                c.graph, c.matrix, self.time_field, c._selected_links, self.cores, heap=c.results._heap
+                c.graph,
+                c.configuration.demand,
+                self.time_field,
+                c._selected_links,
+                self.cores,
+                heap=c.results._heap,
+                select_link_od=c.configuration.select_link_od,
+                field_values=c.fields.__getitem__,
+                skim_fields=c.configuration.skimming,
+                cost_name=c.configuration.cost,
             )
             self.inputs[c._id] = inputs
             for results in (c.results, c._aon_results):
@@ -550,11 +541,14 @@ class LinearApproximation(WorkerThread):
                 )
 
             c.congested_skims = None
-            c.fixed_cost.fill(0)
-            if c.fixed_cost_field:
-                values = c.graph.graph[c.fixed_cost_field].to_numpy()
-                c.fixed_cost[inputs.mapping.graph_ids] = values * c.fc_multiplier / c.vot
-                c.fixed_cost[np.isnan(c.fixed_cost)] = 0
+            c.fixed_cost[:] = c.fields[c.configuration.cost] - self.free_flow_tt
+            if c.configuration.fixed_cost_field:
+                values = c.fields[c.configuration.fixed_cost_field]
+                c.fixed_cost += (
+                    np.where(np.isnan(values), 0.0, values)
+                    * c.configuration.fixed_cost_multiplier
+                    / c.configuration.vot
+                )
 
     def execute(self):
         self.__start_time = time.perf_counter()
@@ -586,7 +580,7 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
 
-            for c in self.traffic_classes:  # type: TrafficClass
+            for c in self.traffic_classes:  # type: PreparedTrafficClass
                 msg = f"All-or-Nothing - Traffic Class: {c._id}"
                 self.signal.emit(["set_text", msg])
                 inputs = self.inputs[c._id]
@@ -647,8 +641,10 @@ class LinearApproximation(WorkerThread):
             msg = f"Equilibrium Assignment - Iteration: {self.iter}/{self.max_iter} - RGap: {self.rgap:.6}"
             self.signal.emit(["set_text", msg])
 
+        congested_time = self.congested_time.copy()
+        congested_time.flags.writeable = False
         for c in self.traffic_classes:
-            c.congested_time = self.congested_time.copy()
+            c.congested_time = congested_time
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

@@ -63,29 +63,21 @@ beta = 1.1  # PSL parameter
 
 # %%
 # Let's build all graphs
-project.network.build_graphs()
+network = project.network.build()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
 # We grab the graph for cars
-graph = project.network.graphs["c"]
-
-# %%
-# We also see what graphs are available
-project.network.graphs.keys()
+network.modes
 # %%
 # Let's say that utility is just a function of distance.
 # So we build our *utility* field as the :math:`distance * theta`.
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
+network.links["utility"] = network.links.distance * theta
 
 # %%
-# Prepare the graph with all nodes of interest as centroids
-graph.prepare_graph(graph.centroids)
-
-# %%
-# And set the cost of the graph the as the utility field just created
-graph.set_graph("utility")
+# Prepare a compact graph for the project centroids.
+graph = network.build_graph(mode="c", cost="utility", compact=True)
 
 # %%
 # Mock demand matrix
@@ -141,8 +133,7 @@ demand
 # %%
 # We'll re-prepare our graph but with our new "external" ODs.
 new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
-graph.prepare_graph(new_centroids)
-graph.set_graph("utility")
+graph = network.build_graph(mode="c", cost="utility", centroids=new_centroids, compact=True)
 new_centroids
 
 # %%
@@ -222,13 +213,13 @@ inside_nodes.head()
 # %%
 # Let's filter those network links to graph links, dropping any dead ends and creating a `link_id`,
 # `dir` multi-index.
-g = (
-    graph.graph.set_index("link_id")
-    .loc[inner_links.link_id]
-    .drop(graph.dead_end_links, errors="ignore")
-    .reset_index()
-    .set_index(["link_id", "direction"])
-)
+retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+g = pd.DataFrame({
+    "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
+    "a_node": graph.full_node_ids[graph.full_tails[retained]],
+    "b_node": graph.full_node_ids[graph.full_heads[retained]],
+})
+g = g.loc[g.link_id.isin(inner_links.link_id)].set_index(["link_id", "direction"])
 g.head()
 
 # %%
@@ -247,18 +238,15 @@ map
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists
 # our polygon. To do so we perform a select link analysis on all links and pairs of links that cross
 # the boundary. We create them as tuples of tuples to make represent the select link AND sets.
-edge_pairs = {x: (x,) for x in itertools.permutations(g.index, r=2)}
+entering = g.loc[~g.a_node.isin(inside_nodes.index) & g.b_node.isin(inside_nodes.index)].index
+exiting = g.loc[g.a_node.isin(inside_nodes.index) & ~g.b_node.isin(inside_nodes.index)].index
+edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
 single_edges = {x: ((x,),) for x in g.index}
 f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 
 # %%
 # Let's prepare our graph once again
-project.network.build_graphs()
-graph = project.network.graphs["c"]
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
-graph.prepare_graph(graph.centroids)
-graph.set_graph("utility")
-graph.set_blocked_centroid_flows(False)
+graph = network.build_graph(mode="c", cost="utility", compact=True, block_centroid_flows=False)
 
 # %%
 # This object construction might take a minute depending on the size of the graph due to the
@@ -318,16 +306,16 @@ exited = defaultdict(float)
 for (link_id, dir), v in edge_totals.items():
     link = g.loc[link_id, dir]
     for (o, d), load in v.todok().items():
-        o = graph.all_nodes[o]
-        d = graph.all_nodes[d]
+        o = graph.centroids[o]
+        d = graph.centroids[d]
 
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
 
         if o_inside and not d_inside:
-            exited[o, graph.all_nodes[link.b_node]] += load
+            exited[o, link.b_node] += load
         elif not o_inside and d_inside:
-            entered[graph.all_nodes[link.a_node], d] += load
+            entered[link.a_node, d] += load
         elif not o_inside and not d_inside:
             pass
 
@@ -347,11 +335,13 @@ for (l1, l2), v in edge_pair_values.items():
     link2 = g.loc[l2]
 
     for (o, d), load in v.todok().items():
+        o = graph.centroids[o]
+        d = graph.centroids[d]
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
 
         if not o_inside and not d_inside:
-            through[graph.all_nodes[link1.a_node], graph.all_nodes[link2.b_node]] += load
+            through[link1.a_node, link2.b_node] += load
 
 through
 
@@ -365,13 +355,13 @@ demand = pd.DataFrame(
     ),
     columns=["demand"],
 ).sort_index()
+demand.index = demand.index.set_levels([level.astype(np.int64) for level in demand.index.levels])
 demand.head()
 
 # %%
 # We'll re-prepare our graph but with our new "external" ODs.
-new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
-graph.prepare_graph(new_centroids)
-graph.set_graph("utility")
+new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy(dtype=np.int64).reshape(-1))
+graph = network.build_graph(mode="c", cost="utility", centroids=new_centroids, compact=True)
 new_centroids
 
 # %%

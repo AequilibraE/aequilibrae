@@ -139,22 +139,23 @@ The U-turn setting is managed through the project's ``about`` table:
 
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
-    # Rebuild graphs to apply the change
-    >>> project.network.build_graphs()
+    # Rebuild network and build graphs to apply the change
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you call ``build_graphs()``, turn restrictions are automatically loaded
-from the database and applied to all generated graphs:
+When you build a graph, turn restrictions are automatically loaded from the
+database and applied:
 
 .. code-block:: python
 
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
     # Check if a graph has turn restrictions
-    >>> graph = project.network.graphs['c']
-    >>> print(graph.has_turn_restrictions)
+    >>> print(graph._has_turn_restrictions)
     True
 
 Manual Turn Restriction Setup
@@ -192,20 +193,25 @@ time costs during the equilibration process.
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> project.network.build_graphs()
-    >>> graph = project.network.graphs['c']
-    >>> graph.set_graph('free_flow_time')
-
-    # Turn restrictions are automatically included
+    >>> network = project.network.build()
     >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
-    >>> traffic_class = TrafficClass('car', graph, demand_matrix)
+    >>> traffic_class = TrafficClass(
+    ...     mode='c',
+    ...     cost='distance',
+    ...     demand=demand_matrix,
+    ...     name='car',
+    ...     skimming=('distance',),
+    ... )
 
-    >>> assignment = TrafficAssignment()
-    >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
-    >>> assignment.set_capacity_field('capacity')
-    >>> assignment.set_time_field('free_flow_time')
-    >>> assignment.set_algorithm('bfw')
+    >>> assignment = TrafficAssignment(
+    ...     network=network,
+    ...     classes=[traffic_class],
+    ...     time_field='distance',
+    ...     capacity_field='capacity',
+    ...     vdf=bpr,
+    ...     algorithm='bfw',
+    ...     name_mapping={'alpha': 0.15, 'beta': 4.0},
+    ... )
     >>> assignment.execute()
 
 Route Choice with Turn Restrictions

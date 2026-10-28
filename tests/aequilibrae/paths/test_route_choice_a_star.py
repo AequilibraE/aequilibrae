@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths import RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths import Network
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
@@ -18,7 +19,6 @@ def coordinates_for(graph):
         {"x": np.arange(graph.num_nodes, dtype=float), "y": np.zeros(graph.num_nodes)},
         index=graph.all_nodes,
     )
-    graph.lonlat_index = coordinates.rename(columns={"x": "lon", "y": "lat"}) * 0.01
     # External IDs, not row order, determine the compact coordinate mapping.
     return coordinates.iloc[::-1]
 
@@ -34,9 +34,8 @@ def sorted_results(choice):
 @pytest.mark.parametrize("turn_penalty", [None, 5.0, np.inf])
 @pytest.mark.parametrize("cores", [1, 2])
 def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, cores):
-    graph = junction(5.0 if turn_penalty is None else turn_penalty)
-    if turn_penalty is None:
-        graph.clear_turn_restrictions()
+    lonlat = pd.DataFrame({"lon": np.arange(4) * 0.01, "lat": np.zeros(4)}, index=[10, 20, 30, 40])
+    graph = junction(turn_penalty, lonlat=lonlat)
     coordinates = coordinates_for(graph)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
     assert scale > 0
@@ -71,8 +70,7 @@ def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, c
 
 
 def compressed_graph(turn):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [71, 72, 12, 55, 56, 24],
             "a_node": [10, 20, 30, 10, 40, 50],
@@ -81,21 +79,12 @@ def compressed_graph(turn):
             "time": [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
         }
     )
-    graph.prepare_graph(np.array([10, 60]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    if turn:
-        graph.set_turn_restrictions(
-            pd.DataFrame(
-                {
-                    "from_node": [20],
-                    "via_node": [30],
-                    "to_node": [60],
-                    "penalty": [5.0],
-                }
-            )
-        )
-    assert graph.compact_num_nodes < graph.num_nodes
+    turns = pd.DataFrame({"from_node": [20], "via_node": [30], "to_node": [60], "penalty": [5.0]}) if turn else None
+    lonlat = pd.DataFrame({"lon": np.arange(6) * 0.01, "lat": np.zeros(6)}, index=[10, 20, 30, 40, 50, 60])
+    graph = Network(links, centroids=np.array([10, 60]), turn_restrictions=turns, lonlat=lonlat).build_graph(
+        "c", cost="time", compact=True, block_centroid_flows=False
+    )
+    assert graph.num_nodes < len(graph.full_node_ids)
     return graph
 
 
@@ -106,8 +95,7 @@ def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
     graph = compressed_graph(turn)
     coordinates = coordinates_for(graph)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
-    coordinates = coordinates.loc[graph.compact_all_nodes].iloc[::-1]
-    graph.lonlat_index = graph.lonlat_index.loc[graph.compact_all_nodes].iloc[::-1]
+    coordinates = coordinates.loc[graph.all_nodes].iloc[::-1]
     choice = RouteChoice(graph, coordinates=coordinates)
     choice.set_cores(1)
     options = {"max_routes": 2, "max_depth": 6, "penalty": 4.0}
@@ -117,7 +105,6 @@ def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
 
     # Coordinate changes after construction must not change this snapshot.
     coordinates.loc[:, :] = np.nan
-    graph.lonlat_index.loc[:, :] = np.nan
     for scale_value in [scale, 0.0]:
         choice.set_choice_set_generation(
             algorithm, **options, a_star=True, heuristic=heuristic, heuristic_scale=scale_value
@@ -137,11 +124,8 @@ def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
 @pytest.mark.parametrize("heuristic", ["euclidean", "haversine"])
 @pytest.mark.parametrize("turn", [False, True])
 def test_explicit_scale_controls_search(algorithm, heuristic, turn):
-    graph = diamond()
-    if not turn:
-        graph.clear_turn_restrictions()
     coordinates = pd.DataFrame({"x": [0.0, 1.0, 0.0, 0.0], "y": [0.0] * 4}, index=[10, 20, 30, 40])
-    graph.lonlat_index = coordinates.rename(columns={"x": "lon", "y": "lat"})
+    graph = diamond(0.5 if turn else None, lonlat=coordinates.rename(columns={"x": "lon", "y": "lat"}))
     choice = RouteChoice(graph, coordinates=coordinates if heuristic == "euclidean" else None)
     choice.set_cores(1)
     choice.set_choice_set_generation(algorithm, max_routes=1)
@@ -185,7 +169,7 @@ def test_invalid_search_options_rejected_at_both_entry_points(options, match):
 @pytest.mark.parametrize(
     "problem,match",
     [
-        ("missing", "requires coordinate columns"),
+        ("missing", "every graph node ID"),
         ("node", "every graph node ID"),
         ("duplicate", "node IDs must be unique"),
         ("nonfinite", "coordinates must be finite"),

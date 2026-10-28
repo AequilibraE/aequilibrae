@@ -5,7 +5,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, estimate_heuristic_scale
+from aequilibrae.paths import estimate_heuristic_scale
+from aequilibrae.paths.graph import GraphBase, freeze_graph
+from .routing_helpers import build_graph_tables
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
 
@@ -16,8 +18,7 @@ def test_graph(test_data_path):
 
 
 def graph_for_project(project):
-    project.network.build_graphs(modes=["c"])
-    return project.network.graphs["c"]
+    return build_graph_tables(project)
 
 
 def sample_turn_from_path(graph, origin, destination):
@@ -31,7 +32,7 @@ def test_upper_case_variables(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     network = graph.network
     network.columns = network.columns.str.upper()
-    g = Graph()
+    g = GraphBase()
     g.network = network
     assert g.network.columns.tolist() == graph.network.columns.tolist(), "Graph columns are not lower case"
 
@@ -56,7 +57,7 @@ def test_prepare_graph_no_centroids(sioux_falls_example):
 
 
 def test_prepare_graph_first_node_has_no_outgoing_links():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame({"link_id": [1, 2], "a_node": [2, 2], "b_node": [1, 3], "direction": [1, 1]})
     graph.prepare_graph()
 
@@ -66,7 +67,7 @@ def test_prepare_graph_first_node_has_no_outgoing_links():
 
 @pytest.mark.parametrize("centroids", [[99, 1, 3], [99, 98, 1, 3]])
 def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
-    graph = Graph()
+    graph = GraphBase()
     network = pd.DataFrame({"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "id": [0, 1]})
     # Test adjacency construction without invoking dead-end removal or compression.
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
@@ -79,7 +80,7 @@ def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
 
 @pytest.mark.parametrize("centroids", [[99, 1, 3], [1, 2, 3, 99]])
 def test_compression_preserves_isolated_centroids(centroids):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "cost": [1.0, 1.0]}
     )
@@ -93,7 +94,7 @@ def test_compression_preserves_isolated_centroids(centroids):
     np.testing.assert_array_equal(graph.compact_nodes_to_indices[centroids], np.arange(len(centroids)))
     isolated = graph.compact_nodes_to_indices[99]
     assert graph.compact_fs[isolated] == graph.compact_fs[isolated + 1]
-    skims = graph.compute_skims().results.skims["cost"]
+    skims = freeze_graph(graph, compact=True).compute_skims().results.skims["cost"]
     assert skims[centroids.index(1), centroids.index(3)] == 2.0
     assert np.isinf(skims[centroids.index(1), centroids.index(99)])
 
@@ -134,7 +135,7 @@ def test_compression_preserves_isolated_centroids(centroids):
     ],
 )
 def test_empty_compact_graph(links, centroids):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(links)
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
         graph.prepare_graph(np.array(centroids))
@@ -151,11 +152,11 @@ def test_empty_compact_graph(links, centroids):
     idx, data, _ = graph.create_compressed_link_network_mapping()
     np.testing.assert_array_equal(idx, [0, len(links["link_id"])])
     np.testing.assert_array_equal(data, graph.graph["__supernet_id__"])
-    assert np.isinf(graph.compute_skims().results.skims["cost"][0, 1])
+    assert np.isinf(freeze_graph(graph, compact=True).compute_skims().results.skims["cost"][0, 1])
 
 
 def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4, 5],
@@ -172,7 +173,8 @@ def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
     graph.set_graph("cost")
     graph.set_skimming(["cost"])
 
-    path = graph.compute_path(1, 6)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(1, 6)
     np.testing.assert_array_equal(path.path, [1, 3, 4, 5, 2])
     np.testing.assert_array_equal(path.path_nodes, [1, 2, 4, 5, 2, 6])
     assert path.milepost[-1] == 5.0
@@ -181,11 +183,11 @@ def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
     assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
     assert (graph.graph["__compressed_id__"] < graph.compact_num_links).all()
     graph.create_compressed_link_network_mapping()
-    assert graph.compute_skims().results.skims["cost"][0, 1] == 5.0
+    assert prepared.compute_skims().results.skims["cost"][0, 1] == 5.0
 
 
 def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -202,16 +204,17 @@ def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
 
     # The two parallel bidirectional links form 2 -> 4 -> 2. This returns to
     # the same previous node, so it is a U-turn, not a way around the ban.
-    path = graph.compute_path(1, 6)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(1, 6)
     assert path.path is None
     assert 4 in graph.compact_all_nodes
     assert {3, 4}.issubset(graph.compact_graph.link_id)
     assert not (graph.compact_graph.a_node == graph.compact_graph.b_node).any()
-    assert np.isinf(graph.compute_skims().results.skims["cost"][0, 1])
+    assert np.isinf(prepared.compute_skims().results.skims["cost"][0, 1])
 
 
 def graph_with_required_self_loop():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -232,14 +235,15 @@ def test_compaction_keeps_real_self_loop_needed_to_avoid_turn_ban():
     graph = graph_with_required_self_loop()
     # Links 1 -> 2 -> 3 approach the turn. Link 3 exits to 4, but the
     # restriction bans 2 -> 3 -> 4. Link 4 is a genuine loop at node 3.
-    path = graph.compute_path(1, 4)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(1, 4)
     np.testing.assert_array_equal(path.path, [1, 2, 4, 3])
     np.testing.assert_array_equal(path.path_nodes, [1, 2, 3, 3, 4])
     assert path.milepost[-1] == 5.0
     assert 2 not in graph.compact_all_nodes  # The separate chain 1 -> 2 -> 3 is compressed.
     loops = graph.compact_graph.loc[graph.compact_graph.a_node == graph.compact_graph.b_node]
     np.testing.assert_array_equal(loops.link_id, [4])
-    assert graph.compute_skims().results.skims["cost"][0, 1] == 5.0
+    assert prepared.compute_skims().results.skims["cost"][0, 1] == 5.0
 
 
 def test_set_graph(sioux_falls_example):
@@ -260,10 +264,10 @@ def test_load_from_disk(sioux_falls_example, test_graph):
     graph_file = sioux_falls_example.project_base_path / "aequilibrae_test_graph.aeg"
     graph = graph_for_project(sioux_falls_example)
     graph.save_to_disk(graph_file)
-    reference_graph = Graph()
+    reference_graph = GraphBase()
     reference_graph.load_from_disk(test_graph)
 
-    new_graph = Graph()
+    new_graph = GraphBase()
     new_graph.load_from_disk(graph_file)
 
 
@@ -286,10 +290,7 @@ def test_available_skims(sioux_falls_example):
 
 
 def test_compute_path(sioux_falls_example):
-    graph = graph_for_project(sioux_falls_example)
-    graph.prepare_graph()
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    graph = sioux_falls_example.network.build().build_graph("c", cost="distance", block_centroid_flows=False)
 
     res = graph.compute_path(1, 6)
     assert list(res.path) == [1, 4], "Number of path links is not correct"
@@ -297,10 +298,8 @@ def test_compute_path(sioux_falls_example):
 
 
 def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
-    graph = graph_for_project(sioux_falls_example)
-    graph.prepare_graph()
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    network = sioux_falls_example.network.build()
+    graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
 
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
     turn_restrictions = pd.DataFrame(
@@ -308,12 +307,12 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
     )
 
     with pytest.raises(ValueError, match="Negative turn penalties"):
-        graph.set_turn_restrictions(turn_restrictions)
+        network.build_graph("c", cost="distance", turn_restrictions=turn_restrictions)
 
 
 @pytest.fixture
 def turn_graph():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -375,7 +374,7 @@ def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
 
 
 def test_dead_end_removal_preserves_turn_via_node():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -404,14 +403,15 @@ def test_dead_end_removal_preserves_turn_via_node():
     assert 3 in graph.compact_all_nodes
     assert graph.dead_end_links.size == 0
 
-    path = graph.compute_path(1, 4)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(1, 4)
     np.testing.assert_array_equal(path.path_nodes, [1, 2, 3, 2, 4])
     assert path.milepost[-1] == 9.0
-    assert graph.compute_skims().results.skims["cost"][0, 1] == 9.0
+    assert prepared.compute_skims().results.skims["cost"][0, 1] == 9.0
 
 
 def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -434,7 +434,7 @@ def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
 
 
 def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -454,16 +454,17 @@ def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
 
     # The direct movement is banned. Reaching 3 requires entering the spur,
     # reversing at node 2, then taking the now-allowed movement at node 1.
-    path = graph.compute_path(4, 3)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(4, 3)
     np.testing.assert_array_equal(path.path_nodes, [4, 1, 2, 1, 3])
     np.testing.assert_array_equal(path.path, [1, 3, 3, 2])
     assert path.milepost[-1] == 4.0
     assert graph.dead_end_links.size == 0
-    assert graph.compute_skims().results.skims["cost"][0, 1] == 4.0
+    assert prepared.compute_skims().results.skims["cost"][0, 1] == 4.0
 
 
 def test_dead_end_removal_stops_at_turn_via_node():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -492,7 +493,7 @@ def test_dead_end_removal_stops_at_turn_via_node():
 
 @pytest.mark.parametrize("penalty", [5.0, np.inf])
 def test_turn_restrictions_allow_compressed_neighbour_nodes(penalty):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -514,12 +515,13 @@ def test_turn_restrictions_allow_compressed_neighbour_nodes(penalty):
     assert 2 not in graph.compact_all_nodes
     assert 4 not in graph.compact_all_nodes
     np.testing.assert_array_equal(graph.compact_turn_penalties, [penalty])
-    path = graph.compute_path(1, 5)
+    prepared = freeze_graph(graph, compact=True)
+    path = prepared.compute_path(1, 5)
     if np.isfinite(penalty):
         assert path.milepost[-1] == 4.0 + penalty
     else:
         assert path.path is None
-    skims = graph.compute_skims().results.skims["cost"]
+    skims = prepared.compute_skims().results.skims["cost"]
     assert skims[0, 1] == 4.0 + penalty
     assert skims[1, 0] == 4.0
 
@@ -545,15 +547,13 @@ def test_prepare_graph_rejects_invalid_existing_turns(turn_graph, turn, message)
 
 
 def test_a_star_with_turn_restrictions(sioux_falls_example):
-    graph = graph_for_project(sioux_falls_example)
-    graph.prepare_graph()
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
+    network = sioux_falls_example.network.build()
+    graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
     turn_restrictions = pd.DataFrame(
         {"from_node": [from_node], "via_node": [via_node], "to_node": [to_node], "penalty": [np.inf]}
     )
-    graph.set_turn_restrictions(turn_restrictions)
+    graph = network.build_graph("c", cost="distance", turn_restrictions=turn_restrictions, block_centroid_flows=False)
 
     scale = estimate_heuristic_scale(graph, heuristic="haversine")
     result = graph.compute_path(1, 6, a_star=True, heuristic="haversine", heuristic_scale=scale)
@@ -563,29 +563,27 @@ def test_a_star_with_turn_restrictions(sioux_falls_example):
 
 
 def test_compute_skims(sioux_falls_example):
-    graph = graph_for_project(sioux_falls_example)
-    graph.prepare_graph()
-    graph.set_graph("distance")
-    graph.set_skimming(["distance", "free_flow_time"])
-    graph.set_blocked_centroid_flows(False)
+    graph = sioux_falls_example.network.build().build_graph(
+        "c", cost="distance", skimming=["distance", "free_flow_time"], block_centroid_flows=False
+    )
 
     skm = graph.compute_skims()
     skims = skm.results.skims
     assert len(skims) == 2, "Number of matrices is not correct"
-    assert list(skims) == ["distance", "free_flow_time"], "Matrices names are not correct"
+    assert set(skims) == {"distance", "free_flow_time"}, "Matrices names are not correct"
 
 
 def test_exclude_links(sioux_falls_example):
-    # excludes a link before any setting or preparation
-    graph = graph_for_project(sioux_falls_example)
-    graph.set_blocked_centroid_flows(False)
+    network = sioux_falls_example.network.build()
+    graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
     origin = 20
     destination = 21
-    graph.set_graph("distance")
     r1 = PathResults(graph, origin, destination)
     assert list(r1.path) == [62]
 
-    graph.exclude_links([62])
+    costs = network.field_values("distance").copy()
+    costs[network.link_ids == 62] = np.inf
+    graph.set_costs(costs)
     r1 = PathResults(graph, origin, destination)
     assert list(r1.path) == [63, 69]
 
@@ -624,7 +622,7 @@ def compressed_graph(test_data_path, tmp_path):
     link_df = pd.read_csv(tmp_path / "links_modified.csv")
     centroids_array = np.array([7, 8, 11])
 
-    graph = Graph()
+    graph = GraphBase()
     graph.network = link_df
     graph.mode = "a"
     graph.prepare_graph(centroids_array)
@@ -662,8 +660,7 @@ def test_dead_end_removal(compressed_graph):
 def test_turn_restrictions_match_networkx(coquimbo_example):
     nx = pytest.importorskip("networkx")
 
-    coquimbo_example.network.build_graphs(modes=["c"])
-    graph = coquimbo_example.network.graphs["c"]
+    graph = build_graph_tables(coquimbo_example)
     graph.prepare_graph()
     graph.set_graph("distance")
     graph.set_blocked_centroid_flows(False)
@@ -698,7 +695,7 @@ def test_turn_restrictions_match_networkx(coquimbo_example):
     assert base_path_nx is not None
     base_cost_nx = nx.shortest_path_length(base_graph, origin, destination, weight="weight")
 
-    res_before = graph.compute_path(origin, destination)
+    res_before = freeze_graph(graph, compact=False).compute_path(origin, destination)
     _, base_cost_aeq = aeq_directed_path(res_before.path_nodes, res_before.path)
     assert base_cost_aeq == pytest.approx(base_cost_nx)
 
@@ -715,7 +712,7 @@ def test_turn_restrictions_match_networkx(coquimbo_example):
     )
 
     graph.set_turn_restrictions(turn_restrictions, allow_path_uturns=False)
-    res_after = graph.compute_path(origin, destination)
+    res_after = freeze_graph(graph, compact=False).compute_path(origin, destination)
     directed_after_aeq, restricted_cost_aeq = aeq_directed_path(res_after.path_nodes, res_after.path)
 
     penalty_lookup = {
@@ -796,7 +793,7 @@ def test_degree_two_sink_is_not_compressed():
         }
     )
 
-    graph = Graph()
+    graph = GraphBase()
     graph.network = network
     graph.prepare_graph(np.array([1, 2]))
     graph.set_graph("cost")
@@ -808,5 +805,6 @@ def test_degree_two_sink_is_not_compressed():
     assert graph.graph[graph.graph.link_id.isin([4, 5])].__compressed_id__.unique().tolist() == [dummy_id]
 
     # The only way from 1 to 2 is over link 3, on the compact graph just as on the full one
-    assert graph.compute_skims().results.skims["cost"][0, 1] == 12.0
-    assert graph.compute_path(1, 2).milepost[-1] == 12.0
+    prepared = freeze_graph(graph, compact=True)
+    assert prepared.compute_skims().results.skims["cost"][0, 1] == 12.0
+    assert prepared.compute_path(1, 2).milepost[-1] == 12.0

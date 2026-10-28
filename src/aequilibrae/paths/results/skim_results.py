@@ -15,16 +15,13 @@ class SkimResults:
           >>> from aequilibrae.paths.results import SkimResults
 
           >>> project = create_example(project_path)
-          >>> project.network.build_graphs()
 
           # Mode c is car in this project
-          >>> car_graph = project.network.graphs['c']
-
           # minimize travel time
-          >>> car_graph.set_graph('free_flow_time')
-
           # Skims travel time and distance
-          >>> car_graph.set_skimming(['free_flow_time', 'distance'])
+          >>> car_graph = project.network.build_graph(
+          ...     'c', 'free_flow_time', skimming=['free_flow_time', 'distance'], compact=True
+          ... )
 
           >>> res = SkimResults()
           >>> res.prepare(car_graph)
@@ -50,8 +47,10 @@ class SkimResults:
             **output** (:obj:`SkimmingOutputs`, *Optional*): Existing output buffer to share.
         """
 
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         if not graph.cost_field:
-            raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
+            raise ValueError("Build the graph with a cost field before skimming")
 
         if output is None:
             output = SkimmingOutputs(graph.num_zones, graph.num_zones, graph.skim_fields)

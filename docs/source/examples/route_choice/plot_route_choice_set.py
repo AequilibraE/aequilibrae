@@ -46,22 +46,20 @@ od_pairs_of_interest = [(71645, 79385), (77011, 74089)]
 nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
-# Let's build all graphs
-project.network.build_graphs()
+# Load the network snapshot
+network = project.network
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars
-graph = project.network.graphs["c"]
+# Build the car graph with distance as the cost field.
+graph = network.build_graph(mode="c", cost="distance", centroids=np.array(nodes_of_interest), compact=True)
 
-# we also see what graphs are available
-project.network.graphs.keys()
-
-graph.set_graph("distance")
+# Available network modes:
+network.list_modes()
 
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
-graph.prepare_graph(np.array(nodes_of_interest))
+graph.centroids
 
 # %%
 # Route Choice class

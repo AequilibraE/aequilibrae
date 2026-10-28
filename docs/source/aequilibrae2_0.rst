@@ -82,10 +82,10 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
 .. doctest::
 
     >>> project = create_example(project_path)
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
-    # We get the graphs for cars and trucks
-    >>> graph = project.network.graphs['c']
+    # Check for disconnected nodes
     >>> graph.disconnected_nodes()
     array([], dtype=int64)
 

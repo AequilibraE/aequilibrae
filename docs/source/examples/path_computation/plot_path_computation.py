@@ -43,26 +43,18 @@ basic_config()
 # ----------------
 
 # %%
-# We build all graphs
-project.network.build_graphs()
+# Load the network snapshot
+network = project.network
 # We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars,
-graph = project.network.graphs["c"]
+# We grab the graph for cars, minimize distance, and skim time and distance.
+graph = network.build_graph(mode="c", cost="distance", skimming=["travel_time", "distance"])
 
 # %%
-# we'll also see what graphs are available.
-project.network.graphs.keys()
-
-# %%
-# Let's say we want to minimise the distance,
-graph.set_graph("distance")
-
-# %%
-# and will skim time and distance while we are at it.
-graph.set_skimming(["travel_time", "distance"])
+# we'll also see what modes are available.
+network.list_modes()
 
 # %%
 # Let's create a path results object from the graph and compute a path from

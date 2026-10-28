@@ -68,26 +68,21 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Let's build all graphs
-project.network.build_graphs()
+network = project.network
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
 # We also see what graphs are available
-project.network.graphs.keys()
+network.list_modes()
 
 # %%
-# We grab the graph for cars
-graph = project.network.graphs["c"]
-
-# Let's say that utility is just a function of distance, so we build our 'utility' field as distance * theta
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
-
-# Prepare the graph with all nodes of interest as centroids
-graph.prepare_graph(np.array(nodes_of_interest))
-
-# And set the cost of the graph the as the utility field just created
-graph.set_graph("utility")
+# Add the utility field to the source network before graph preparation.
+network = network.build()
+network.links["utility"] = network.links.distance * theta
+graph = network.build_graph(
+    mode="c", cost="utility", centroids=np.array(nodes_of_interest), compact=True
+)
 
 # %%
 # Mock demand matrix

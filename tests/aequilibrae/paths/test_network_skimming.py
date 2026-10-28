@@ -1,22 +1,16 @@
-from types import SimpleNamespace
-
 import numpy as np
 import pandas as pd
 import pytest
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths import Network
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import PathResults, SkimResults
 
 
 def test_network_skimming(sioux_falls_example):
-    network = sioux_falls_example.network
-    network.build_graphs()
-    graph = network.graphs["c"]
-    graph.set_graph(cost_field="distance")
-    graph.set_skimming("distance")
-    graph.set_blocked_centroid_flows(False)
+    network = sioux_falls_example.network.build()
+    graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 
     # skimming results
     res = SkimResults()
@@ -44,9 +38,12 @@ def test_network_skimming(sioux_falls_example):
 
 
 def test_prepare_shares_existing_output():
-    graph = SimpleNamespace(
-        cost_field="time", num_zones=2, centroids=np.array([30, 10]), skim_fields=["time", "distance"]
-    )
+    graph = Network(
+        pd.DataFrame(
+            {"link_id": [1], "a_node": [10], "b_node": [30], "direction": [0], "time": [1.0], "distance": [2.0]}
+        ),
+        centroids=np.array([30, 10]),
+    ).build_graph("c", cost="time", skimming=["time", "distance"])
     output = SkimmingOutputs(2, 2, ["distance", "time"])
     results = SkimResults()
     results.prepare(graph, output=output)
@@ -56,9 +53,9 @@ def test_prepare_shares_existing_output():
 
 
 def test_empty_network_skimming():
-    graph = SimpleNamespace(
-        cost_field="time", num_zones=0, centroids=np.array([], dtype=np.int64), skim_fields=["time"]
-    )
+    graph = Network(
+        pd.DataFrame({"link_id": [1], "a_node": [10], "b_node": [30], "direction": [0], "time": [1.0]})
+    ).build_graph("c", cost="time", skimming=["time"])
     skim = NetworkSkimming(graph)
     skim.execute()
     assert skim.results.skims["time"].shape == (0, 0)
@@ -69,8 +66,7 @@ def test_empty_network_skimming():
 @pytest.mark.parametrize("turn_penalty", [None, 0.5, 4.0])
 @pytest.mark.parametrize("skim_fields", [["time", "distance"], ["distance", "time"]])
 def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, skim_fields):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
             "a_node": [10, 20, 10, 30],
@@ -80,14 +76,14 @@ def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, 
             "distance": [3.0, 4.0, 5.0, 6.0],
         }
     )
-    graph.prepare_graph(np.array([10, 20, 30, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    graph.set_skimming(skim_fields)
-    if turn_penalty is not None:
-        graph.set_turn_restrictions(
-            pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [turn_penalty]})
-        )
+    turns = (
+        None
+        if turn_penalty is None
+        else pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [turn_penalty]})
+    )
+    graph = Network(links, centroids=np.array([10, 20, 30, 40]), turn_restrictions=turns).build_graph(
+        "c", cost="time", skimming=skim_fields, block_centroid_flows=False
+    )
 
     skim = NetworkSkimming(graph)
     skim.set_cores(cores)
@@ -111,13 +107,9 @@ def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, 
 
 
 def test_network_skimming_no_project(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.network.build()
 
-    network.build_graphs()
-    graph = network.graphs["c"]
-    graph.set_graph(cost_field="distance")
-    graph.set_skimming("distance")
-    graph.set_blocked_centroid_flows(False)
+    graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 
     # skimming results
     skm = NetworkSkimming(graph)

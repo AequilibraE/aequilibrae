@@ -25,14 +25,14 @@ class SubAreaAnalysis:
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
 
         This class aims to provide a semi-automated method for constructing the sub-area matrix.
-        The user should provide the Graph object, demand matrix, and a GeoDataFrame whose geometry
+        The user should provide a graph, demand matrix, and a GeoDataFrame whose geometry
         union represents the desired sub-area. Perform a route choice assignment, then call the
         ``post_process`` method to obtain a sub-area matrix.
 
         Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
 
         :Arguments:
-            **graph** (:obj:`Graph`): AequilibraE graph object to use
+            **graph** (:obj:`Graph`): The caller's graph. Prepared graphs must use compact topology.
 
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
@@ -41,6 +41,8 @@ class SubAreaAnalysis:
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         self.graph = graph
         self.sub_area_demand = None
 
@@ -50,19 +52,37 @@ class SubAreaAnalysis:
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        self.interior_graph = (
-            self.graph.graph.set_index("link_id")
-            .loc[self.interior_links.link_id]
-            .drop(self.graph.dead_end_links, errors="ignore")
-            .reset_index()
-            .set_index(["link_id", "direction"])
+        if isinstance(graph, Graph):
+            self.node_ids = graph.full_node_ids
+            retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+            edges = pd.DataFrame({
+                "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
+                "a_node": graph.full_tails[retained], "b_node": graph.full_heads[retained],
+            })
+        else:
+            self.node_ids = graph.all_nodes
+            edges = graph.graph.loc[
+                ~graph.graph.link_id.isin(graph.dead_end_links), ["link_id", "direction", "a_node", "b_node"]
+            ]
+        self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
+            ["link_id", "direction"]
         )
 
-        self.edge_pairs = {x: (x,) for x in itertools.permutations(self.interior_graph.index, r=2)}
+        entering = [
+            edge for edge, link in self.interior_graph.iterrows()
+            if self.node_ids[link.a_node] not in self.interior_nodes.index
+            and self.node_ids[link.b_node] in self.interior_nodes.index
+        ]
+        exiting = [
+            edge for edge, link in self.interior_graph.iterrows()
+            if self.node_ids[link.a_node] in self.interior_nodes.index
+            and self.node_ids[link.b_node] not in self.interior_nodes.index
+        ]
+        self.edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
         self.single_edges = {x: ((x,),) for x in self.interior_graph.index}
         logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
 
-        self.rc = RouteChoice(self.graph)
+        self.rc = RouteChoice(self.graph, project=project)
         self.rc.add_demand(demand)
         self.rc.set_select_links(self.single_edges | self.edge_pairs, link_loading=False)
 
@@ -97,17 +117,17 @@ class SubAreaAnalysis:
             for (link_id, dir), v in edge_totals.items():
                 link = self.interior_graph.loc[link_id, dir]
                 for (o, d), load in v.todok().items():
-                    o = self.graph.all_nodes[o]
-                    d = self.graph.all_nodes[d]
+                    o = self.graph.centroids[o]
+                    d = self.graph.centroids[d]
 
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if o_inside and not d_inside:
-                        exited[(o, self.graph.all_nodes[link.b_node]) + original_ods] += load
+                        exited[(o, self.node_ids[link.b_node]) + original_ods] += load
                     elif not o_inside and d_inside:
-                        entered[(self.graph.all_nodes[link.a_node], d) + original_ods] += load
+                        entered[(self.node_ids[link.a_node], d) + original_ods] += load
                     elif not o_inside and not d_inside:
                         pass
 
@@ -117,13 +137,15 @@ class SubAreaAnalysis:
                 link2 = self.interior_graph.loc[l2]
 
                 for (o, d), load in v.todok().items():
+                    o = self.graph.centroids[o]
+                    d = self.graph.centroids[d]
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
                         through[
-                            (self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods
+                            (self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods
                         ] += load
 
             sub_area_demand.append(
@@ -153,4 +175,12 @@ class SubAreaAnalysis:
             )
 
         self.sub_area_demand = pd.concat([self.sub_area_demand, interior]).sort_index()
+        # Boundary nodes and demand centroids can have different integer dtypes.
+        self.sub_area_demand.index = pd.MultiIndex.from_arrays(
+            [
+                self.sub_area_demand.index.get_level_values(name).to_numpy(dtype="int64")
+                for name in self.sub_area_demand.index.names
+            ],
+            names=self.sub_area_demand.index.names,
+        )
         return self.sub_area_demand

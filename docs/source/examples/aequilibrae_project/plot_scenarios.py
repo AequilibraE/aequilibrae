@@ -87,32 +87,24 @@ with project.db_connection as conn:
 # %%
 # Let's perform a traffic assignment in this scenario with lowered capacity
 
-# Build the network graph
-project.network.build_graphs(fields=["distance", "capacity_ab", "capacity_ba"], modes=["c"])
-graph = project.network.graphs["c"]
-graph.set_graph("distance")
-graph.set_blocked_centroid_flows(False)
+# Load the network snapshot
+network = project.network
 
 # Get the demand matrix
 mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # Create traffic assignment with alternative parameters
-assigclass = TrafficClass("car", graph, mat)
-assignment = TrafficAssignment(project)
-assignment.add_class(assigclass)
-assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
-assignment.set_time_field("distance")
-assignment.set_capacity_field("capacity")
-
-assignment.max_iter = 10
-assignment.set_algorithm("msa")
-
-assignment.execute()
+traffic = TrafficClass(name="car", mode="c", cost="distance", demand=mat, block_centroid_flows=False)
+assignment = TrafficAssignment(
+    network=network, classes=[traffic], time_field="distance", capacity_field="capacity",
+    vdf=bpr, name_mapping={"alpha": 0.15, "beta": 4.0}, algorithm="msa", project=project,
+)
+assignment.execute(max_iterations=10)
 
 # Save results specific to this scenario
 assignment.save_results("alternative_assignment")
 
-print(f"Assignment completed. Total flow: {assigclass.results.total_link_loads.sum():.2f}")
+print(f"Assignment completed. Total flow: {assignment.class_results['car'].total_link_loads.sum():.2f}")
 
 # %%
 # Switch to empty scenario for modifications

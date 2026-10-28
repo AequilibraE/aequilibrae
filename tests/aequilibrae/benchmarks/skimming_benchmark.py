@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.graph import freeze_graph
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.routing_context import make_routing_context
 
@@ -78,7 +79,7 @@ def run_skimming_benchmark(benchmark, graph, model_stub, model_folder, routing_c
                 assert np.isinf(penalties).all()
                 assert penalties.size >= MIN_LEFT_TURNS[model_stub] + MIN_CENTROID_BANS[model_stub]
 
-        skim = NetworkSkimming(graph)
+        skim = NetworkSkimming(freeze_graph(graph, compact=True))
         benchmark(skim.execute)
     finally:
         graph.clear_turn_restrictions()
