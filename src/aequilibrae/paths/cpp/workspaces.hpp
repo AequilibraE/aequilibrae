@@ -4,6 +4,7 @@
 #include <utility>
 #include <variant>
 
+#include "outputs.hpp"
 #include "pq_4ary_heap.hpp"
 #include "pq_pairing_heap.hpp"
 #include "pq_std_priority_queue_adapter.hpp"
@@ -12,17 +13,17 @@ namespace aequilibrae::paths::cpp::routing {
 
 enum class SearchHeap { FourAry, Pairing, Std };
 
-class SearchHeapStorage {
+template <typename T> class SearchHeapStorage {
 public:
   SearchHeapStorage(std::size_t state_count, SearchHeap type) {
     switch (type) {
     case SearchHeap::FourAry:
       break; // The variant defaults to this alternative.
     case SearchHeap::Pairing:
-      heap.emplace<cpp::PairingHeap>();
+      heap.template emplace<cpp::PairingHeap<T>>();
       break;
     case SearchHeap::Std:
-      heap.emplace<cpp::StdPriorityQueueAdapter>();
+      heap.template emplace<cpp::StdPriorityQueueAdapter<T>>();
       break;
     }
     std::visit([state_count](auto &queue) { queue.alloc_heap(state_count); },
@@ -34,20 +35,21 @@ public:
   }
 
 private:
-  std::variant<cpp::FourAryHeap, cpp::PairingHeap, cpp::StdPriorityQueueAdapter>
+  std::variant<cpp::FourAryHeap<T>, cpp::PairingHeap<T>,
+               cpp::StdPriorityQueueAdapter<T>>
       heap;
 };
 
 // Scratch heap for Dijkstra.
-struct SearchWorkspace {
-  SearchHeapStorage *heap = nullptr;
+template <typename T> struct SearchWorkspace {
+  SearchHeapStorage<T> *heap = nullptr;
 };
 
 // A* also  needs tentative costs and per-node heuristic estimates.
-struct AStarWorkspace {
-  SearchWorkspace search;
-  double *costs = nullptr;     // [states]
-  double *estimates = nullptr; // [nodes]
+template <typename T> struct AStarWorkspace {
+  SearchWorkspace<T> search;
+  T *costs = nullptr;     // [states]
+  T *estimates = nullptr; // [nodes]
 };
 
 // Ordinary and selected loading can reuse this cascade scratch sequentially
@@ -76,10 +78,11 @@ struct SelectLinkWorkspace {
 // Group worker scratch for the assignment driver. Each kernel accepts only
 // the small workspace it needs; none depends on this aggregate.
 template <typename T> struct AoNWorkspace {
-  SearchWorkspace search;
+  SearchWorkspace<T> search;
   LoadingWorkspace<T> loading;
   SkimmingWorkspace<T> skimming;
   SelectLinkWorkspace select_link;
+  SelectLinkODOutputsView<T> selected_od;
 };
 
 } // namespace aequilibrae::paths::cpp::routing

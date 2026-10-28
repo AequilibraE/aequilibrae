@@ -6,6 +6,8 @@ import logging
 import operator
 
 import numpy as np
+from scipy.sparse import csr_array
+from aequilibrae.matrix.cython.sparse_matrix_builder cimport SparseMatrixBuilder
 cimport cython
 from libc.math cimport isfinite
 from libcpp.algorithm cimport copy_n
@@ -84,8 +86,8 @@ cdef void _validate_selected_od_source(SelectLinkODOutputs output, SelectLinkODO
         or output.class_count != source.class_count
     ):
         raise ValueError("source and output select-link OD dimensions must match")
-    if output.set_names != source.set_names:
-        raise ValueError("source and output selection names and order must match")
+    if output.set_names != source.set_names or output.field_names != source.field_names:
+        raise ValueError("source and output selection and field names and order must match")
 
 
 cdef void _validate_selected_source(SelectLinkOutputs output, SelectLinkOutputs source) except *:
@@ -108,19 +110,6 @@ cdef void _validate_aon_source(AoNOutputs output, AoNOutputs source) except *:
         _validate_skimming_source(output.skimming, source.skimming)
     if output.select_link is not None:
         _validate_selected_source(output.select_link, source.select_link)
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cdef double[:, :, ::1] _selected_od_blend_view(SelectLinkODOutputs output):
-    """Fold adjacent origin and set axes without copying. The caller excludes empty buffers."""
-    cdef Py_ssize_t rows = output.origin_count * output.set_count
-    cdef Py_ssize_t destinations = output.destination_count
-    cdef Py_ssize_t classes = output.class_count
-
-    # Contiguous storage lets one 3D view distribute work across every origin
-    # and selection set rather than loop over the 4th axis.
-    return <double[:rows, :destinations, :classes]> &output.demand_buffer[0, 0, 0, 0]
 
 
 cdef class LoadingOutputs:
@@ -500,8 +489,8 @@ def _validate_selection_names(set_names):
         raise TypeError("set_names must be a sequence of names, not a string")
 
     names = tuple(set_names)
-    if any(not isinstance(name, str) or not name for name in names):
-        raise ValueError("selection names must be nonempty strings")
+    if any(isinstance(name, str) and not name for name in names):
+        raise ValueError("selection names must not be empty strings")
     if len(set(names)) != len(names):
         raise ValueError("selection names must be unique")
 
@@ -638,60 +627,67 @@ cdef class SelectLinkLoadingOutputs:
 
 
 cdef class SelectLinkODOutputs:
-    """Holds selected-link demand by origin, selection set, destination, and class.
+    """Holds selected-link demand by origin, selection set, destination, and class."""
 
-    Each named selection set receives a demand matrix showing the trips whose
-    routes meet that selection. Routing writes the results one origin at a time,
-    and ``matrices`` provides the current matrix for each selection name.
-    """
-
-    def __init__(self, origin_count, destination_count, class_count, set_names):
+    def __init__(self, origin_count, destination_count, field_names, set_names):
         if self.set_names is not None:
             raise RuntimeError("SelectLinkODOutputs cannot be reinitialised")
 
-        origin_count, destination_count, class_count = map(
-            operator.index, (origin_count, destination_count, class_count)
-        )
-        if origin_count < 0 or destination_count < 0 or class_count < 0:
-            raise ValueError("origin_count, destination_count and class_count must be nonnegative")
+        origin_count, destination_count = map(operator.index, (origin_count, destination_count))
+        if origin_count < 0 or destination_count < 0:
+            raise ValueError("origin_count and destination_count must be nonnegative")
 
-        names = _validate_selection_names(set_names)
         self.origin_count = origin_count
         self.destination_count = destination_count
-        self.class_count = class_count
-        self.set_count = len(names)
-        self.demand_buffer = array[double](
-            (origin_count, self.set_count, destination_count, class_count), True, 0
-        )
-        self.set_names = names
+        self.field_names = _validate_skim_names(field_names)
+        self.class_count = len(self.field_names)
+        self.set_names = _validate_selection_names(set_names)
+        self.set_count = len(self.set_names)
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
+        # We want to keep one builder for each select link set allocated for
+        # the lifetime of this object.
+        cdef SparseMatrixBuilder builder
+        self.builders = tuple(
+            SparseMatrixBuilder(self.destination_count, self.field_names, origin_count=self.origin_count)
+            for _ in self.set_names
+        )
+
+        # We grab the views here so we can access them without the gil later.
+        for builder in self.builders:
+            self.builder_views.push_back(builder.view[double]())
+        self.reset()
+
     cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil:
         cdef CppSelectLinkODOutputsView[double] output
-        output.origin_count = self.origin_count
-        output.set_count = self.set_count
-        output.destination_count = self.destination_count
-        output.class_count = self.class_count
-
-        if self.origin_count and self.set_count and self.destination_count and self.class_count:
-            output.data = &self.demand_buffer[0, 0, 0, 0]
-
+        output.set_count = self.builder_views.size()
+        output.builders = self.builder_views.data()
         return output
 
     def reset(self):
-        with nogil:
-            self.view().reset()
+        """Clear reusable COO buffers and replace results with empty CSR arrays."""
+        cdef SparseMatrixBuilder builder
+        for builder in self.builders:
+            builder.reset()
 
-    @cython.boundscheck(False)
+        self._matrices = {
+            name: {
+                field: csr_array((self.origin_count, self.destination_count), dtype=np.float64)
+                for field in self.field_names
+            }
+            for name in self.set_names
+        }
+
+    def update_matrices(self):
+        """Snapshot persistent COO buffers as independent CSR arrays."""
+        self._matrices = {name: builder.to_scipy() for name, builder in zip(self.set_names, self.builders)}
+
     def copy_from(self, SelectLinkODOutputs source not None):
-        """Copy selected demand with matching dimensions and ordered set names."""
+        """Copy selected demand with matching dimensions and ordered set and field names."""
         _validate_selected_od_source(self, source)
-
-        cdef size_t count = self.origin_count * self.set_count * self.destination_count * self.class_count
-        if count and source is not self:
-            with nogil:
-                copy_n(&source.demand_buffer[0, 0, 0, 0], count, &self.demand_buffer[0, 0, 0, 0])
+        self._matrices = {
+            name: {field: values.copy() for field, values in matrices.items()}
+            for name, matrices in source._matrices.items()
+        }
         return self
 
     def blend_cfw(
@@ -705,8 +701,11 @@ cdef class SelectLinkODOutputs:
     ):
         """self = conjugate_weight * previous_direction + (1 - conjugate_weight) * aon."""
         return self.blend_result(
-            previous_direction, aon, conjugate_weight,
-            cores=cores, threading_threshold=threading_threshold,
+            previous_direction,
+            aon,
+            conjugate_weight,
+            cores=cores,
+            threading_threshold=threading_threshold
         )
 
     def blend_bfw(
@@ -726,18 +725,20 @@ cdef class SelectLinkODOutputs:
         _validate_selected_od_source(self, aon)
         _validate_selected_od_source(self, previous_direction)
         _validate_selected_od_source(self, older_direction)
-        cdef const double[::1] coefficients = _bfw_weights(weights, cores)
-        cdef double[:, :, ::1] target, first, second, third
+        coefficients = _bfw_weights(weights, cores)
 
-        if self.origin_count and self.set_count and self.destination_count and self.class_count:
-            target = _selected_od_blend_view(self)
-            first = _selected_od_blend_view(aon)
-            second = _selected_od_blend_view(previous_direction)
-            third = _selected_od_blend_view(older_direction)
-            with nogil:
-                triple_linear_combination_skims[double](
-                    target, first, second, third, coefficients, cores, threading_threshold,
+        # Build the complete replacement before assignment: self may be a source.
+        self._matrices = {
+            name: {
+                field: (
+                    coefficients[0] * aon._matrices[name][field]
+                    + coefficients[1] * previous_direction._matrices[name][field]
+                    + coefficients[2] * older_direction._matrices[name][field]
                 )
+                for field in self.field_names
+            }
+            for name in self.set_names
+        }
         return self
 
     def blend_result(
@@ -756,27 +757,24 @@ cdef class SelectLinkODOutputs:
         _validate_selected_od_source(self, direction)
         _validate_selected_od_source(self, previous_result)
         _validate_blend(stepsize, cores)
-        cdef double[:, :, ::1] target, first, second
 
-        if self.origin_count and self.set_count and self.destination_count and self.class_count:
-            target = _selected_od_blend_view(self)
-            first = _selected_od_blend_view(direction)
-            second = _selected_od_blend_view(previous_result)
-            with nogil:
-                linear_combination_skims[double](
-                    target, first, second, stepsize, cores, threading_threshold,
+        self._matrices = {
+            name: {
+                field: (
+                    stepsize * direction._matrices[name][field]
+                    + (1 - stepsize) * previous_result._matrices[name][field]
                 )
+                for field in self.field_names
+            }
+            for name in self.set_names
+        }
+
         return self
 
     @property
-    def demand(self):
-        return readonly_view(self.demand_buffer)
-
-    @property
     def matrices(self):
-        """Named [origins, destinations, classes] views. These may be strided."""
-        values = self.demand
-        return {name: values[:, index] for index, name in enumerate(self.set_names)}
+        """Named selection sets containing ordered demand-field CSR arrays."""
+        return {name: dict(matrices) for name, matrices in self._matrices.items()}
 
 
 cdef class SelectLinkOutputs:
@@ -788,8 +786,18 @@ cdef class SelectLinkOutputs:
     demand.
     """
 
-    def __init__(self, link_count, destination_count, class_count, set_names, *,
-                 origin_count=1, link_loads=True, od=True):
+    def __init__(
+        self,
+        link_count,
+        destination_count,
+        class_count,
+        set_names,
+        *,
+        origin_count=1,
+        link_loads=True,
+        od=True,
+        demand_names=None,
+    ):
         if self.initialised:
             raise RuntimeError("SelectLinkOutputs cannot be reinitialised")
 
@@ -799,11 +807,18 @@ cdef class SelectLinkOutputs:
         if min(link_count, destination_count, class_count, origin_count) < 0:
             raise ValueError("output dimensions must be nonnegative")
 
+        if od and demand_names is None:
+            raise ValueError("demand_names must be provided when od is True")
+
         names = _validate_selection_names(set_names)
         if link_loads:
             self.loading = SelectLinkLoadingOutputs(link_count, class_count, names)
+
         if od:
-            self.od = SelectLinkODOutputs(origin_count, destination_count, class_count, names)
+            if len(demand_names) != class_count:
+                raise ValueError("demand_names must match class_count")
+
+            self.od = SelectLinkODOutputs(origin_count, destination_count, demand_names, names)
 
         self.initialised = True
 
@@ -818,10 +833,13 @@ cdef class SelectLinkOutputs:
     def copy_from(self, SelectLinkOutputs source not None):
         """Copy matching enabled components, checking the entire group first."""
         _validate_selected_source(self, source)
+
         if self.loading is not None:
             self.loading.copy_from(source.loading)
+
         if self.od is not None:
             self.od.copy_from(source.od)
+
         return self
 
     def blend_cfw(
@@ -843,6 +861,7 @@ cdef class SelectLinkOutputs:
                 aon.loading, previous_direction.loading, conjugate_weight,
                 cores=cores, threading_threshold=threading_threshold,
             )
+
         if self.od is not None:
             self.od.blend_cfw(
                 aon.od, previous_direction.od, conjugate_weight,
@@ -874,6 +893,7 @@ cdef class SelectLinkOutputs:
                 aon.loading, previous_direction.loading, older_direction.loading, coefficients,
                 cores=cores, threading_threshold=threading_threshold,
             )
+
         if self.od is not None:
             self.od.blend_bfw(
                 aon.od, previous_direction.od, older_direction.od, coefficients,
@@ -903,6 +923,7 @@ cdef class SelectLinkOutputs:
                 direction.loading, previous_result.loading, stepsize,
                 cores=cores, threading_threshold=threading_threshold,
             )
+
         if self.od is not None:
             self.od.blend_result(
                 direction.od, previous_result.od, stepsize,
@@ -930,6 +951,7 @@ cdef class AoNOutputs:
         select_link_names=(),
         select_link_loads=True,
         select_link_od=True,
+        demand_names=None,
     ):
         if self.loading is not None:
             raise RuntimeError("AoNOutputs cannot be reinitialised")
@@ -955,10 +977,11 @@ cdef class AoNOutputs:
                 origin_count=zones,
                 link_loads=select_link_loads,
                 od=select_link_od,
+                demand_names=demand_names,
             )
 
-    cdef CppAoNOutputsView view(self) noexcept nogil:
-        cdef CppAoNOutputsView output
+    cdef CppAoNOutputsView[double] view(self) noexcept nogil:
+        cdef CppAoNOutputsView[double] output
 
         output.loading = self.loading.view()
 
@@ -978,6 +1001,8 @@ cdef class AoNOutputs:
         with nogil:
             self.view().reset()
 
+        if self.select_link is not None and self.select_link.od is not None:
+            self.select_link.od.reset()
         self.turn_cost_total = 0
         self.unassigned_demand = 0
 

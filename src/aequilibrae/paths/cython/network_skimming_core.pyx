@@ -15,7 +15,7 @@ from aequilibrae.paths.cython.context cimport (
 from aequilibrae.paths.cython.dijkstra cimport RoutingContext, cpp_dijkstra
 from aequilibrae.paths.cython.dijkstra import validate_routing_heap
 from aequilibrae.paths.cython.outputs cimport SkimmingOutputs, CppSkimmingOutputsView
-from aequilibrae.paths.cython.queries cimport CppSearchQuery
+from aequilibrae.paths.cython.search_query cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults, CppMutableSearchResults
 from aequilibrae.paths.cython.skimming cimport cpp_skimming
 from aequilibrae.paths.cython.workspaces cimport (
@@ -28,8 +28,8 @@ cdef void skim_origin(
     size_t row,
     size_t node,
     const CppSkimmingContext[double] &fields,
-    const CppMutableSearchResults &search,
-    const CppSearchWorkspace &search_scratch,
+    const CppMutableSearchResults[double] &search,
+    const CppSearchWorkspace[double] &search_scratch,
     const CppSkimmingWorkspace[double] &scratch,
     const CppSkimmingOutputsView[double] &output,
 ) noexcept nogil:
@@ -50,8 +50,8 @@ cdef void skim_origins(
     const size_t[::1] rows,
     const size_t[::1] nodes,
     const CppSkimmingContext[double] &fields,
-    CppMutableSearchResults *workers,
-    CppSearchWorkspace *search_scratch,
+    CppMutableSearchResults[double] *workers,
+    CppSearchWorkspace[double] *search_scratch,
     CppSkimmingWorkspace[double] *scratch,
     const CppSkimmingOutputsView[double] &output,
     int cores,
@@ -84,8 +84,8 @@ def skimming_parallel(
 
     cdef int thread_count = cores
     validate_routing_heap(heap)
-    cdef vector[CppMutableSearchResults] workers
-    cdef vector[CppSearchWorkspace] search_scratch
+    cdef vector[CppMutableSearchResults[double]] workers
+    cdef vector[CppSearchWorkspace[double]] search_scratch
     cdef vector[CppSkimmingWorkspace[double]] scratch
     cdef CppSkimmingContext[double] skim_view
     cdef CppSkimmingOutputsView[double] output_view

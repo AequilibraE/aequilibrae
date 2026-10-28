@@ -113,6 +113,8 @@ The code below allows you to reproduce the same experiment that resulted in the 
     import numpy as np
     import pandas as pd
 
+    from aequilibrae.matrix import from_dict
+    from aequilibrae.paths.cython.demand import assignment_demand
     from aequilibrae.paths.cython.public_transport import HyperpathGenerating
     from numba import jit
 
@@ -171,10 +173,19 @@ The code below allows you to reproduce the same experiment that resulted in the 
             edges["freq"] = edges.freq_base / alpha
 
         # Spiess & Florian
+        centroids = np.array([0, n * n - 1], dtype=np.int64)
         sf = HyperpathGenerating(
-            edges, tail="tail", head="head", trav_time="trav_time", freq="freq"
+            edges,
+            tail="tail",
+            head="head",
+            trav_time="trav_time",
+            freq="freq",
+            o_vert_ids=centroids,
+            d_vert_ids=centroids,
+            nodes_to_indices=np.arange(n * n, dtype=np.int64),
         )
-        sf.run(origin=0, destination=n * n - 1, volume=1.0)
+        demand = from_dict({"passengers": np.array([[0.0, 1.0], [0.0, 0.0]])}, index=centroids)
+        sf.assign(assignment_demand(demand, centroids, transpose=True), threads=1)
 
         return sf
 

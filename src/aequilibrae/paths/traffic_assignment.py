@@ -12,7 +12,7 @@ import pandas as pd
 from numpy import dtype, nan_to_num, ndarray
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
@@ -859,7 +859,7 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
+            uclass["matrix_totals"] = cls.matrix.totals()
             uclass["network mode"] = cls.graph.mode
             uclass["Value-of-time"] = cls.vot
             uclass["PCE"] = cls.pce
@@ -1039,14 +1039,14 @@ class TrafficAssignment(AssignmentBase):
             if selected is None:
                 continue
             for name, values in selected.matrices.items():
-                for column, class_name in enumerate(cls.results.classes["names"]):
+                for class_name, matrix in values.items():
                     key = f"{name}_{cls._id}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    matrices[key] = values[:, :, column]
+                    matrices[key] = matrix
         if not matrices:
             return
-        out_skims = AequilibraeMatrix(index=self.classes[0].graph.centroids)
+        out_skims = AequilibraeSparseMatrix(index=self.classes[0].graph.centroids)
         out_skims.update(matrices)
         out_skims.metadata["description"] = f"Select link matrix from procedure ID {self.procedure_id}_sl."
         out_skims.save_as_omx(export_name)
@@ -1133,7 +1133,7 @@ class TransitAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
+            uclass["matrix_totals"] = cls.matrix.totals()
             uclass["network mode"] = cls.graph.mode
 
             classes[cls._id] = uclass

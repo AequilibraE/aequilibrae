@@ -159,9 +159,7 @@ assig.set_frequency_field("freq")
 assig.set_algorithm("os")
 
 # %%
-# When there's multiple matrix cores we'll also need to set the core to use for the demand as we can only assign one
-# at a time.
-assigclass.set_demand_matrix_core("pt")
+# Each transit class requires exactly one demand matrix. Use mat.subset(["pt"]) if the input contains more.
 
 # %%
 # Let's perform the assignment for the transit classes added

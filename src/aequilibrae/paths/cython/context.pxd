@@ -4,22 +4,22 @@ from libcpp.vector cimport vector
 
 
 cdef extern from "context.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
-    cdef cppclass CppNodeBasedContext "aequilibrae::paths::cpp::routing::NodeBasedContext":
+    cdef cppclass CppNodeBasedContext "aequilibrae::paths::cpp::routing::NodeBasedContext"[T]:
         CppNodeBasedContext() noexcept
         size_t node_count
         size_t link_count
         const size_t *fs
         const size_t *heads
-        const double *costs
+        const T *costs
         size_t blocked_centroid_count
 
-    cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::routing::TurnBasedContext":
+    cdef cppclass CppTurnBasedContext "aequilibrae::paths::cpp::routing::TurnBasedContext"[T]:
         CppTurnBasedContext() noexcept
-        CppNodeBasedContext graph
+        CppNodeBasedContext[T] graph
         const size_t *tails
         const size_t *turn_fs
         const size_t *turn_to_links
-        const double *turn_penalties
+        const T *turn_penalties
         const size_t *first_nodes
         const size_t *last_nodes
         cpp_bool allow_uturns
@@ -52,11 +52,11 @@ cdef class GraphContext:
     cdef const double[::1] costs_buffer
     cdef readonly size_t blocked_centroid_count
     cpdef update_costs(self, object costs)
-    cdef CppNodeBasedContext graph_view(self) noexcept nogil
+    cdef CppNodeBasedContext[double] graph_view(self) noexcept nogil
 
 
 cdef class NodeBasedContext(GraphContext):
-    cdef CppNodeBasedContext view(self) noexcept nogil
+    cdef CppNodeBasedContext[double] view(self) noexcept nogil
 
 
 cdef class TurnBasedContext(GraphContext):
@@ -64,7 +64,7 @@ cdef class TurnBasedContext(GraphContext):
     cdef const size_t[::1] first_nodes_buffer, last_nodes_buffer
     cdef double[::1] turn_penalties_buffer
     cdef cpp_bool uturns_allowed
-    cdef CppTurnBasedContext view(self) noexcept nogil
+    cdef CppTurnBasedContext[double] view(self) noexcept nogil
 
 
 cdef class SkimmingContext:

@@ -40,9 +40,9 @@ cdef class SearchResults:
         self.distances_buffer = array[double](state_count, True, np.inf)
         self.turn_costs_buffer = array[double](state_count, True, np.inf)
 
-    cdef CppMutableSearchResults view(self) noexcept nogil:
+    cdef CppMutableSearchResults[double] view(self) noexcept nogil:
         """Borrow writable buffers and the owner's metadata for a search."""
-        cdef CppMutableSearchResults result
+        cdef CppMutableSearchResults[double] result
         result.node_count = self.node_count
         result.state_count = self.state_count
         result.link_count = self.link_count
@@ -55,7 +55,7 @@ cdef class SearchResults:
         result.metadata = &self.metadata
         return result
 
-    cdef CppSearchResults read_view(self) noexcept nogil:
+    cdef CppSearchResults[double] read_view(self) noexcept nogil:
         """Downstream operations may read paths, but must not change them."""
         return self.view().read_view()
 

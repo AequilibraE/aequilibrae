@@ -30,7 +30,7 @@ struct SearchMetadata {
 // Unsettled states have invalid indices and infinite labels; an invalid
 // terminal means no finalized path is available, not necessarily unreachable.
 // Distances include turn costs. Consumers must not add the two labels together.
-struct SearchResults {
+template <typename T> struct SearchResults {
   std::size_t node_count = 0;
   std::size_t state_count = 0;
   std::size_t link_count = 0;
@@ -38,14 +38,14 @@ struct SearchResults {
   const std::size_t *connectors = nullptr;
   const std::size_t *settlement_order = nullptr;
   const std::size_t *terminal_states = nullptr;
-  const double *distances = nullptr;
-  const double *turn_costs = nullptr;
+  const T *distances = nullptr;
+  const T *turn_costs = nullptr;
   const SearchMetadata *metadata = nullptr;
 };
 
 // Only routing needs writable search buffers. Neither view owns storage;
 // the Cython owner must remain alive throughout every call using a view.
-struct MutableSearchResults {
+template <typename T> struct MutableSearchResults {
   std::size_t node_count = 0;
   std::size_t state_count = 0;
   std::size_t link_count = 0;
@@ -53,13 +53,13 @@ struct MutableSearchResults {
   std::size_t *connectors = nullptr;
   std::size_t *settlement_order = nullptr;
   std::size_t *terminal_states = nullptr;
-  double *distances = nullptr;
-  double *turn_costs = nullptr;
+  T *distances = nullptr;
+  T *turn_costs = nullptr;
   SearchMetadata *metadata = nullptr;
 
   void reset() const noexcept {
     *metadata = SearchMetadata{};
-    const auto infinity = std::numeric_limits<double>::infinity();
+    const auto infinity = std::numeric_limits<T>::infinity();
     std::fill_n(predecessors, state_count, invalid_state);
     std::fill_n(connectors, state_count, invalid_state);
     std::fill_n(settlement_order, state_count, invalid_state);
@@ -68,7 +68,7 @@ struct MutableSearchResults {
     std::fill_n(turn_costs, state_count, infinity);
   }
 
-  SearchResults read_view() const noexcept {
+  SearchResults<T> read_view() const noexcept {
     return {node_count, state_count,      link_count,      predecessors,
             connectors, settlement_order, terminal_states, distances,
             turn_costs, metadata};

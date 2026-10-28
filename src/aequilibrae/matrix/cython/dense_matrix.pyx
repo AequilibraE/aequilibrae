@@ -1,120 +1,121 @@
 """Packed dense matrices for native code and shared Python results."""
 
-import operator
+from collections.abc import Mapping
 
 import numpy as np
 
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, _validate_matrix_key
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+
+cimport cython
+from .matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array
 
 
-cdef class DenseMatrix:
-    """Hold matrices in [origins, destinations, fields] order.
-
-    zone_count sets the destination count. The origin count defaults to it.
-
-    Zone IDs and metadata belong to the Python result, not this buffer.
-    Only float32 and float64 are supported, with one dtype for the whole
-    buffer. Native callers use view[float]() or view[double]() and must keep
-    this object alive while using the view.
-
-    to_matrix() shares writable, named slices of the buffer. The returned
-    AequilibraeMatrix keeps the buffer alive after this object is discarded.
-    Adding or replacing matrices in that result does not change this buffer.
-    """
+@cython.final
+cdef class DenseMatrix(_MatrixBase):
+    """Hold matrices in [origins, destinations, fields] order."""
 
     def __init__(self, zone_count, field_names, dtype=np.float64, fill_value=np.inf, *, origin_count=None):
-        if self._values is not None:
-            raise RuntimeError("DenseMatrix cannot be reinitialised")
-        zone_count = operator.index(zone_count)
-        if zone_count < 0:
-            raise ValueError("zone_count must be nonnegative")
-        origin_count = zone_count if origin_count is None else operator.index(origin_count)
-        if origin_count < 0:
-            raise ValueError("origin_count must be nonnegative")
-        if isinstance(field_names, str):
-            raise TypeError("field_names must be a sequence of names, not a string")
+        super().__init__(zone_count=zone_count, field_names=field_names, dtype=dtype, origin_count=origin_count)
 
-        names = tuple(field_names)
-        for name in names:
-            _validate_matrix_key(name)
-        if len(set(names)) != len(names):
-            raise ValueError("field_names must be unique")
-
-        dtype = np.dtype(dtype)
-        if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
-            raise TypeError("dtype must be float32 or float64")
-
-        shape = (origin_count, zone_count, len(names))
         cdef float[:, :, ::1] values32
         cdef double[:, :, ::1] values64
-        self._float32 = dtype == np.dtype(np.float32)
+        self._float32 = self.dtype == np.dtype(np.float32)
+
+        shape = (self.origin_count, self.destination_count, self.field_count)
+
         if self._float32:
             values = array[float](shape, True, fill_value)
             values32 = values
-            if origin_count and zone_count and names:
+            if self.origin_count and self.destination_count and self.field_names:
                 self._data = &values32[0, 0, 0]
         else:
             values = array[double](shape, True, fill_value)
             values64 = values
-            if origin_count and zone_count and names:
+            if self.origin_count and self.destination_count and self.field_names:
                 self._data = &values64[0, 0, 0]
 
-        self.origin_count = origin_count
-        self.destination_count = zone_count
-        self.field_count = len(names)
-        self.field_names = names
-        self.dtype = dtype
         self._values = values
 
     @classmethod
-    def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order.
-
-        An omitted dtype requires matching float32 or float64 source dtypes.
-        Supply a dtype to convert values. An empty matrix defaults to float64.
-        The source is not changed. Its index and metadata are not retained.
-        """
+    def from_matrix(cls, matrix, dtype=None, *, transpose=False):
+        """Copy all named matrices into one packed buffer, keeping their order, optionally transposed."""
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
-        names = tuple(matrix)
+
+        for _name, values in matrix.items():
+            if values.shape != matrix.shape:
+                raise ValueError("matrix fields must match the zone index shape")
+            if (
+                not np.issubdtype(values.dtype, np.number)
+                or np.iscomplexobj(values)
+                or np.issubdtype(values.dtype, np.bool_)
+            ):
+                raise TypeError("Matrix values must be real numbers")
+
+        if not matrix:
+            return cls(matrix.shape[0], (), dtype=np.float64 if dtype is None else dtype)
+        return cls.from_dict({name: matrix[name] for name in matrix}, dtype=dtype, transpose=transpose)
+
+    @classmethod
+    def from_dict(cls, matrices, dtype=None, *, transpose=False):
+        """Copy named two-dimensional arrays into one packed buffer, optionally transposed."""
+        if not isinstance(matrices, Mapping):
+            raise TypeError("matrices must be a mapping of names to arrays")
+
+        if not matrices:
+            raise ValueError("matrices must contain at least one array")
+
+        names = tuple(matrices)
+        sources = {name: np.asarray(matrices[name]) for name in names}
+        shape = next(iter(sources.values())).shape
+
+        for name, values in sources.items():
+            if values.ndim != 2:
+                raise ValueError(f"matrix {name!r} must be two-dimensional, got {values.shape}")
+            if values.shape != shape:
+                raise ValueError(
+                    f"all matrices must have the same shape; {name!r} has shape {values.shape}, expected {shape}"
+                )
+
         if dtype is None:
-            dtypes = {matrix[name].dtype for name in names}
+            dtypes = {values.dtype for values in sources.values()}
             if len(dtypes) > 1:
                 raise TypeError("source matrices have mixed dtypes; supply dtype explicitly")
+
             dtype = next(iter(dtypes), np.dtype(np.float64))
 
-        cdef DenseMatrix output = cls(matrix.shape[0], names, dtype=dtype)
+        if transpose:
+            shape = shape[::-1]
+
+        cdef DenseMatrix output = cls(shape[1], names, dtype=dtype, origin_count=shape[0])
         values = np.asarray(output._values)
         for field, name in enumerate(names):
-            np.copyto(values[:, :, field], matrix[name], casting="same_kind")
+            np.copyto(values[:, :, field], sources[name].T if transpose else sources[name], casting="same_kind")
+
         return output
 
     def to_matrix(self, index, index_name="main_index"):
-        """Return an AequilibraeMatrix sharing this buffer without copying values.
-
-        Only square buffers can be returned. Named arrays may be strided.
-        The supplied index is copied, and normal assignment in the returned
-        matrix keeps its usual copy rules.
-        """
+        """Return an AequilibraeMatrix sharing this buffer without copying values."""
         if self.origin_count != self.destination_count:
             raise ValueError("only square buffers can be returned as an AequilibraeMatrix")
+
         if len(index) != self.origin_count:
             raise ValueError("index length must match zone_count")
+
         values = np.asarray(self._values)
         arrays = {name: values[:, :, field] for field, name in enumerate(self.field_names)}
         return AequilibraeMatrix._from_shared_arrays(arrays, index, index_name)
 
-    cdef CppDenseMatrixView[MatrixFloat] view(self, MatrixFloat _type=0) except * nogil:
-        """Borrow a typed view. The default argument allows view[float/double]()."""
+    cdef CppDenseMatrix[cython.floating] view(self, cython.floating _type=0) except * nogil:
         # Cython needs the fused type in an argument to specialise the method.
-        if (MatrixFloat is float and not self._float32) or (MatrixFloat is double and self._float32):
+        if (cython.floating is float and not self._float32) or (cython.floating is double and self._float32):
             with gil:
                 raise TypeError("view type must match the DenseMatrix dtype")
 
-        cdef CppDenseMatrixView[MatrixFloat] output
+        cdef CppDenseMatrix[cython.floating] output
         output.origin_count = self.origin_count
         output.destination_count = self.destination_count
         output.field_count = self.field_count
-        output.data = <MatrixFloat *>self._data
+        output.data = <cython.floating *>self._data
         return output

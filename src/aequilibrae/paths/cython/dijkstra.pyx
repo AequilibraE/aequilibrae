@@ -44,8 +44,8 @@ def dijkstra(
         raise ValueError("workspace dimensions do not match context")
 
     cdef CppSearchQuery cpp_query = query.view()
-    cdef CppMutableSearchResults cpp_results = results.view()
-    cdef CppSearchWorkspace cpp_workspace = workspace.view()
+    cdef CppMutableSearchResults[double] cpp_results = results.view()
+    cdef CppSearchWorkspace[double] cpp_workspace = workspace.view()
     with nogil:
         cpp_dijkstra(context.view(), cpp_query, cpp_results, cpp_workspace)
 
