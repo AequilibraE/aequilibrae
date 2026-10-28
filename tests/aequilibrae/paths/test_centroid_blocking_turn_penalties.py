@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.routing_context import make_routing_context
 
 from .routing_helpers import search
@@ -14,7 +14,7 @@ from .routing_helpers import search
 def shared_junction_graph():
     # Centroids 1 and 2 meet at ordinary junction 3. Centroid 5 connects
     # junctions 3 and 4, but must not serve as a shortcut between them.
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [13, 32, 14, 43, 35, 54, 36, 64],
@@ -61,7 +61,7 @@ def test_centroid_blocking_with_turn_penalty_only_bans_centroid_traversal():
 
 @pytest.mark.parametrize("allow_path_uturns", [False, True])
 def test_single_bidirectional_connector_only_needs_ban_when_uturns_allowed(allow_path_uturns):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [13, 34, 36],

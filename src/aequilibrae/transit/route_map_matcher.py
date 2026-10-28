@@ -9,7 +9,7 @@ from shapely import LineString
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -44,8 +44,8 @@ class RouteMapMatcher(WorkerThread):
         self.node_corresp = []
         self.__all_links = {}
 
-        self.graph: Graph = Graph()
-        self.reverse_graph: Graph = Graph()
+        self.graph: GraphBase = GraphBase()
+        self.reverse_graph: GraphBase = GraphBase()
         self.crs: str = utm_zone
 
         self.stop_ids: gpd.GeoDataFrame = self.stops[["stop_id", "real_stop_id"]]

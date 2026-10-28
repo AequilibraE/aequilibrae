@@ -23,7 +23,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 if TYPE_CHECKING:
-    from aequilibrae.paths.graph import PreparedGraph
+    from aequilibrae.paths.graph import Graph
     from aequilibrae.project import Project
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,7 @@ class Network(WorkerThread):
         compact=False,
         turn_restrictions=None,
         allow_uturns=None,
-    ) -> "PreparedGraph":
+    ) -> "Graph":
         """Build a standalone graph without retaining project connections."""
         if isinstance(skimming, str):
             skimming = [skimming]

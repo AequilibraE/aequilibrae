@@ -12,7 +12,7 @@ from aequilibrae.paths.cython.aon_context import PreparedAoN
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
-from aequilibrae.paths.graph import AssignmentMapping, PreparedGraph
+from aequilibrae.paths.graph import AssignmentMapping, Graph
 
 if TYPE_CHECKING:
     from aequilibrae.paths.cython.outputs import AoNOutputs
@@ -108,7 +108,7 @@ class AssignmentInputs:
 
     def __init__(
         self,
-        graph: PreparedGraph,
+        graph: Graph,
         matrix: AequilibraeMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
@@ -182,11 +182,12 @@ class AssignmentInputs:
 class PreparedTrafficClass:
     """Per-class state over an execution's shared network and compact graph."""
 
-    def __init__(self, configuration, network):
+    def __init__(self, configuration, network, fields):
         from aequilibrae.paths.results import AssignmentResults
 
         self.configuration = configuration
         self.network = network
+        self.fields = fields
         self.graph = network._assignment_graph(configuration)
         self.results = AssignmentResults()
         self._aon_results = AssignmentResults()

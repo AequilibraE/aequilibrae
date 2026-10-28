@@ -5,7 +5,7 @@ from uuid import uuid4
 import numpy as np
 
 from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
-from aequilibrae.paths.graph import GraphBase, freeze_graph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -44,7 +44,9 @@ class NetworkSkimming(WorkerThread):
 
     signal = SIGNAL(object)
 
-    def __init__(self, graph, origins=None, project=None):
+    def __init__(self, graph: Graph, origins=None, project=None):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         WorkerThread.__init__(self, None)
         self.project = project
         self.origins = origins
@@ -76,7 +78,7 @@ class NetworkSkimming(WorkerThread):
             self.signal.emit(["finished"])
             return
 
-        graph = freeze_graph(self.graph, compact=True) if isinstance(self.graph, GraphBase) else self.graph
+        graph = self.graph
         routing = make_routing_context(graph)
 
         # The routing objective includes turn penalties. Other fields are plain

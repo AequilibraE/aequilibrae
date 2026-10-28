@@ -21,56 +21,64 @@ def _analysis(anodes: np.ndarray, bnodes: np.ndarray, num_nodes: int = 0) -> np.
     return np.where(labels != max_label)[0]
 
 
-def non_blocking_through_centroids(graph) -> np.ndarray:
-    anodes = graph.graph.a_node.to_numpy()
-    bnodes = graph.graph.b_node.to_numpy()
-    disconnected = _analysis(anodes, bnodes, len(graph.all_nodes))
-    return graph.all_nodes[disconnected]
+def disconnected_analysis(
+    anodes: np.ndarray,
+    bnodes: np.ndarray,
+    all_nodes: np.ndarray,
+    block_centroid_flows: bool,
+    centroids: np.ndarray,
+) -> np.ndarray:
+    """Identify disconnected nodes using strongly connected components analysis.
 
+    Args:
+        anodes: Array of link tail node indices (in compact routing order)
+        bnodes: Array of link head node indices (in compact routing order)
+        all_nodes: Array of all node IDs in network order
+        block_centroid_flows: Whether to block flows through centroids
+        centroids: Array of centroid node IDs
 
-def blocking_through_centroids(graph) -> np.ndarray:
-    edges = graph.graph
+    Returns:
+        Array of disconnected node IDs
+    """
+    if block_centroid_flows:
+        # Turn restrictions: find links entering and leaving each non-centroid node
+        nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
+        nodes_to_indices[all_nodes] = np.arange(len(all_nodes))
+        centroid_set = set(centroids)
 
-    turns = (
-        edges[["id", "b_node"]]
-        .rename(columns={"id": "in_link", "b_node": "node"})
-        .merge(
-            edges[["id", "a_node"]].rename(columns={"id": "out_link", "a_node": "node"}),
-            on="node",
-            how="inner",
-        )
-    )
+        # Find which compact links form turn transitions through non-centroid nodes
+        in_links = {}
+        out_links = {}
+        for i, (a, b) in enumerate(zip(anodes, bnodes, strict=True)):
+            node = all_nodes[int(b)]
+            if node not in centroid_set:
+                out_links.setdefault(node, []).append(i)
+            node = all_nodes[int(a)]
+            if node not in centroid_set:
+                in_links.setdefault(node, []).append(i)
 
-    turns = turns[turns["in_link"] != turns["out_link"]]
-    turns = turns[turns["node"] >= graph.centroids.shape[0]]
+        # Build transition graph: links that can follow each link
+        turn_anodes = []
+        turn_bnodes = []
+        for node in (set(in_links.keys()) & set(out_links.keys())):
+            for in_link in in_links[node]:
+                for out_link in out_links[node]:
+                    if in_link != out_link:
+                        turn_anodes.append(in_link)
+                        turn_bnodes.append(out_link)
 
-    anodes = turns.in_link.to_numpy()
-    bnodes = turns.out_link.to_numpy()
-
-    disconnected = _analysis(anodes, bnodes)
-    if disconnected.shape[0] == 0:
-        return disconnected
-    disconnected = graph.graph[graph.graph["id"].isin(disconnected)]["a_node"].to_numpy()
-    return graph.all_nodes[disconnected]
-
-
-def disconnected_analysis(graph) -> np.ndarray:
-    from types import SimpleNamespace
-
-    from aequilibrae.paths.graph import PreparedGraph
-
-    if isinstance(graph, PreparedGraph):
-        import pandas as pd
-
-        active = np.isfinite(graph.cost)
-        tails = np.repeat(np.arange(graph.num_nodes), np.diff(graph.routing.fs).astype(np.int64))
-        graph = SimpleNamespace(
-            graph=pd.DataFrame({
-                "id": np.arange(active.sum()), "a_node": tails[active],
-                "b_node": graph.routing.heads[active].astype(np.int64),
-            }),
-            all_nodes=graph.all_nodes, centroids=graph.centroids, block_centroid_flows=graph.block_centroid_flows,
-        )
-    if graph.block_centroid_flows:
-        return blocking_through_centroids(graph)
-    return non_blocking_through_centroids(graph)
+        if turn_anodes:
+            disconnected = _analysis(
+                np.array(turn_anodes, dtype=np.int64),
+                np.array(turn_bnodes, dtype=np.int64),
+            )
+            if disconnected.size > 0:
+                disconnected_links = disconnected
+                # Map back to nodes
+                disconnected_nodes = np.unique(all_nodes[anodes[disconnected_links]])
+                return all_nodes[np.isin(all_nodes, disconnected_nodes)]
+        return np.array([], dtype=np.int64)
+    else:
+        # Non-blocking: find nodes in largest strongly connected component
+        disconnected_indices = _analysis(anodes, bnodes, len(all_nodes))
+        return all_nodes[disconnected_indices]

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.results import PathResults, SkimResults
 
@@ -65,7 +65,7 @@ def test_empty_network_skimming():
 @pytest.mark.parametrize("turn_penalty", [None, 0.5, 4.0])
 @pytest.mark.parametrize("skim_fields", [["time", "distance"], ["distance", "time"]])
 def test_network_skimming_uses_routing_cost_and_turn_paths(cores, turn_penalty, skim_fields):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],

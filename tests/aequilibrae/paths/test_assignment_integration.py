@@ -9,7 +9,8 @@ import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
-from aequilibrae import Graph, Network, TrafficAssignment, TrafficClass
+from aequilibrae import Network, TrafficAssignment, TrafficClass
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
 from aequilibrae.paths.vdf import bpr
@@ -17,7 +18,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 
 
 def diamond(turn=False):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
@@ -268,8 +269,20 @@ def test_repeated_execution_clears_history_and_preserves_old_output_views():
 
 def test_shared_graph_classes_have_independent_cost_buffers():
     graph = diamond()
-    first = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    second = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
+    network = Network(graph.network.assign(modes="c"))
+    configuration = TrafficClass(mode="c", cost="time", demand=matrix_for(graph), block_centroid_flows=False)
+    prepared = network._assignment_graph(configuration)
+    assert network._assignment_graph(replace(configuration, name="trucks")) is prepared
+    first, second = [
+        AssignmentInputs(
+            prepared, configuration.demand, "time", {}, 1,
+            field_values=network.field_values, skim_fields=graph.skim_fields,
+        )
+        for _ in range(2)
+    ]
+    assert first.mapping is second.mapping is prepared.mapping
+    assert np.shares_memory(first.routing.fs, second.routing.fs)
+    assert np.shares_memory(first.routing.heads, second.routing.heads)
     first.update_costs(np.ones(graph.num_links), np.zeros(graph.num_links))
     second.update_costs(np.full(graph.num_links, 3.0), np.zeros(graph.num_links))
     assert not np.shares_memory(first.costs, second.costs)
@@ -304,7 +317,7 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
 
 
 def test_compressed_chain_and_removed_link_project_without_dummy_storage():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [9, 2, 7],
@@ -397,7 +410,7 @@ def test_translation_preserves_existing_centroid_blocking_branch(turn):
     graph = diamond(turn)
     graph.set_blocked_centroid_flows(True)
     inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    # The existing turn branch relies on Graph's generated connector bans,
+    # The existing turn branch relies on the builder's generated connector bans,
     # rather than adding the routing context's blocked centroid prefix.
     expected = 0 if graph.has_turn_restrictions else graph.num_zones
     assert inputs.routing.blocked_centroid_count == expected

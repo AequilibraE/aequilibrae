@@ -2,7 +2,7 @@ from typing import List
 
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.dijkstra import HEAP_MAP
-from aequilibrae.paths.graph import GraphBase, PreparedGraph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
@@ -37,7 +37,7 @@ class SkimResults:
 
         self._heap = "4ary"
 
-    def prepare(self, graph: GraphBase | PreparedGraph, output: SkimmingOutputs | None = None):
+    def prepare(self, graph: Graph, output: SkimmingOutputs | None = None):
         """
         Prepares the object with dimensions corresponding to the graph objects
 
@@ -47,6 +47,8 @@ class SkimResults:
             **output** (:obj:`SkimmingOutputs`, *Optional*): Existing output buffer to share.
         """
 
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         if not graph.cost_field:
             raise ValueError("Build the graph with a cost field before skimming")
 

@@ -169,7 +169,6 @@ class TrafficAssignment(AssignmentBase):
 
         # skims are here
         >>> avg_skims = assig.class_results['car'].skims # blended ones
-        >>> last_skims = assig._class_states[0]._aon_results.skims # those for the last iteration
 
         >>> project.close()
 
@@ -249,6 +248,8 @@ class TrafficAssignment(AssignmentBase):
         }
         self.network = self._load_network()
         self._validate_network_configuration(self.network)
+        for cls in self.classes:
+            validate_assignment_demand(cls.demand, cls.demand.index)
 
     @property
     def class_results(self):
@@ -261,7 +262,14 @@ class TrafficAssignment(AssignmentBase):
         return {name: results.skims for name, results in self.class_results.items()}
 
     def _validate_network_configuration(self, network):
-        field_values = network.field_values
+        fields = [self.time_field, self.capacity_field]
+        for cls in self.classes:
+            fields.extend([cls.cost, *cls.skimming])
+            if cls.fixed_cost_field:
+                fields.append(cls.fixed_cost_field)
+        fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
+        field_arrays = network._field_arrays(fields)
+        field_values = field_arrays.__getitem__
         for field in (self.time_field, self.capacity_field):
             values = field_values(field)
             if not np.isfinite(values).all() or np.any(values <= 0):
@@ -272,7 +280,6 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"No links are available for mode '{cls.mode}'")
             network.validate_centroids(cls.demand.index)
             network._validate_turns(cls.mode)
-            validate_assignment_demand(cls.demand, cls.demand.index)
             for field in [cls.cost, *cls.skimming]:
                 values = field_values(field)
                 if not np.isfinite(values).all() or np.any(values < 0):
@@ -298,6 +305,7 @@ class TrafficAssignment(AssignmentBase):
             arrays[name] = field_values(value) if isinstance(value, str) else np.array([value], dtype=float)
         self._validate_vdf_arrays(arrays)
         self._validate_network_preload(network)
+        return field_arrays
 
     def _validate_network_preload(self, network):
         preload = self.preload
@@ -384,7 +392,7 @@ class TrafficAssignment(AssignmentBase):
         if isinstance(cores, bool):
             raise ValueError("cores must be an integer")
         network = self.network.copy()
-        self._validate_network_configuration(network)
+        fields = self._validate_network_configuration(network)
         self.max_iter = max_iterations
         self.rgap_target = float(rgap)
         self.bfw_conjugacy = bfw_conjugacy.lower()
@@ -393,7 +401,7 @@ class TrafficAssignment(AssignmentBase):
         self._prepared_network = network
         states = []
         for cls in self.classes:
-            state = PreparedTrafficClass(cls, network)
+            state = PreparedTrafficClass(cls, network, fields)
             for results in (state.results, state._aon_results):
                 results.set_cores(self.cores, threading_threshold, elementwise_cores)
             states.append(state)
@@ -401,12 +409,13 @@ class TrafficAssignment(AssignmentBase):
         first = states[0]
         self.elementwise_cores = first.results.elementwise_cores
         self.threading_threshold = first.results.threading_threshold
-        self.free_flow_tt = self._network_field(self.time_field)
-        self.capacity = self._network_field(self.capacity_field)
+        # VDF memoryviews need writable buffers, separate from shared class attributes.
+        self.free_flow_tt = fields[self.time_field].copy()
+        self.capacity = fields[self.capacity_field].copy()
         self.total_flow = np.zeros_like(self.free_flow_tt)
         self.congested_time = self.free_flow_tt.copy()
         self.vdf_parameters = {
-            name: self._network_field(value) if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
+            name: fields[value].copy() if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
             for name, value in self._vdf_sources.items()
         }
         self.assignment = LinearApproximation(self, self.algorithm, project=self.project)
@@ -433,11 +442,6 @@ class TrafficAssignment(AssignmentBase):
             fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
             return self.network.build(fields=list(dict.fromkeys(fields)))
         return self.network.copy()
-
-    def _network_field(self, field):
-        # VDF callables receive writable memoryviews. Keep their buffers separate
-        # from the immutable attributes shared by class routing inputs.
-        return self._prepared_network.field_values(field).copy()
 
     def _prepare_preload(self):
         if self.preload is None:

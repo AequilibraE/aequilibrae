@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.matrix import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.route_choice import RouteChoice
@@ -12,7 +12,7 @@ from aequilibrae.utils.cython.bridge import Bridge
 
 
 def junction(penalty):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14],
@@ -88,7 +88,7 @@ def test_batched_finite_turn_penalty_changes_route_and_cost(bfsle):
 
 
 def diamond(penalty=0.5):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
@@ -126,7 +126,7 @@ def test_generated_routes_keep_original_cost_and_turns(algorithm):
 
 
 def test_shared_turn_cost_counts_towards_overlap():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14, 15],
@@ -238,7 +238,7 @@ def test_recomputed_psl_all_routes_banned(caplog):
 
 @pytest.mark.parametrize("allow_explicit_uturn", [False, True])
 def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14],
@@ -606,7 +606,7 @@ def test_imported_routes_use_graph_prepared_before_route_choice():
 
 
 def compressed_chain():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [11, 12, 13],
@@ -709,7 +709,7 @@ def test_without_psl_does_not_validate_or_recost(caplog):
 
 
 def test_recompute_psl_blocks_intermediate_centroid(caplog):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [11, 12, 13],

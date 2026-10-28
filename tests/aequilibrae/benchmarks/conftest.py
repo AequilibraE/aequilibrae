@@ -10,7 +10,8 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Graph, Network, TrafficAssignment
+from aequilibrae.paths import Network, TrafficAssignment
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import bpr
@@ -131,7 +132,7 @@ def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
     return mat
 
 
-def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Graph:
+def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> GraphBase:
     header = parse_tntp_header(folder, model_stub)
     first_thru_node = header.get("FIRST THRU NODE", 2)
 
@@ -164,7 +165,7 @@ def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Gra
     network["link_id"] = network.index + 1
     network["free_flow_time"] = network["free_flow_time"].astype(np.float64)
 
-    g = Graph()
+    g = GraphBase()
     g.cost = net["free_flow_time"].values
     g.capacity = net["capacity"].values
     g.free_flow_time = net["free_flow_time"].values

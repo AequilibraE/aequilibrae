@@ -306,7 +306,7 @@ understand, and then we'll perform the assignment.
     from quetzal.model import stepmodel
 
     from aequilibrae.matrix import AequilibraeMatrix, from_file
-    from aequilibrae.paths import Graph, TrafficAssignment
+    from aequilibrae.paths import Network, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
     from aequilibrae.paths.vdf import bpr
 
@@ -409,10 +409,7 @@ understand, and then we'll perform the assignment.
         return mat
 
 
-    def build_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Graph:
-        header = parse_tntp_header(folder, model_stub)
-        first_thru_node = header.get("FIRST THRU NODE", 2)
-
+    def build_network(folder: Path, model_stub: str, centroids: np.ndarray) -> Network:
         net = pd.read_csv(folder / f"{model_stub}_net.tntp", skiprows=7, sep="\t")
         cols = [
             "init_node",
@@ -442,19 +439,9 @@ understand, and then we'll perform the assignment.
         network["link_id"] = network.index + 1
         network["free_flow_time"] = network["free_flow_time"].astype(np.float64)
 
-        g = Graph()
-        g.cost = net["free_flow_time"].values
-        g.capacity = net["capacity"].values
-        g.free_flow_time = net["free_flow_time"].values
-
-        g.network = network
-        g.network.loc[g.network["power"] < 1, "power"] = 1
-        g.network.loc[g.network["free_flow_time"] == 0, "free_flow_time"] = 0.01
-        g.prepare_graph(centroids)
-        g.set_graph("free_flow_time")
-        g.set_skimming(["free_flow_time"])
-        g.set_blocked_centroid_flows(first_thru_node > 1)
-        return g
+        network.loc[network["power"] < 1, "power"] = 1
+        network.loc[network["free_flow_time"] == 0, "free_flow_time"] = 0.01
+        return Network(network, centroids=centroids)
 
 
     def _base_quetzal_links(network: pd.DataFrame) -> pd.DataFrame:
@@ -624,20 +611,23 @@ understand, and then we'll perform the assignment.
         return sm
 
 
-    def assign_aeq(g: Graph, mat: AequilibraeMatrix, method: str) -> TrafficAssignment:
+    def assign_aeq(
+        network: Network, mat: AequilibraeMatrix, method: str, first_thru_node: int,
+    ) -> TrafficAssignment:
         assig_class = TrafficClass(
             mode="c",
             cost="free_flow_time",
             demand=mat,
             name="car",
-            fixed_cost_field="toll" if "toll" in g.network.columns else None,
+            fixed_cost_field="toll" if "toll" in network.links.columns else None,
             fixed_cost_multiplier=1.0,
             vot=1.0,
             skimming=("free_flow_time",),
+            block_centroid_flows=first_thru_node > 1,
         )
 
         assig = TrafficAssignment(
-            network=g,
+            network=network,
             classes=[assig_class],
             time_field="free_flow_time",
             capacity_field="capacity",
@@ -1004,9 +994,9 @@ understand, and then we'll perform the assignment.
             print(f"Quetzal build mode: {quetzal_mode}")
 
             mat = build_matrix(data_folder, model_stub)
-            g = build_graph(data_folder, model_stub, mat.index)
+            network = build_network(data_folder, model_stub, mat.index)
             tntp = known_results(data_folder, model_stub)
-            link_lookup = g.network[["link_id", "a_node", "b_node"]].set_index("link_id")
+            link_lookup = network.links[["link_id", "a_node", "b_node"]].set_index("link_id")
 
             for method in METHODS:
                 print(f"\n{'-' * 60}")
@@ -1016,7 +1006,7 @@ understand, and then we'll perform the assignment.
                 # --- AequilibraE ---
                 print(f"  Running AequilibraE ({method})...")
                 t0 = perf_counter()
-                assig = assign_aeq(g, mat, method)
+                assig = assign_aeq(network, mat, method, first_thru_node)
                 t_aeq = perf_counter() - t0
                 aeq_report = assig.report()
                 aeq_results = assig.results()  # indexed by link_id; PCE_AB for direction=1
@@ -1042,7 +1032,7 @@ understand, and then we'll perform the assignment.
                     aeq_road_flows = None
                 else:
                     print("  Building Quetzal model...")
-                    sm = build_quetzal_model(g.network, first_thru_node, mat)
+                    sm = build_quetzal_model(network.links, first_thru_node, mat)
                     print(f"  Running Quetzal ({method})...")
                     t0 = perf_counter()
                     assign_quetzal(sm, method)

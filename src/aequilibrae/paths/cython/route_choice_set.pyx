@@ -50,7 +50,7 @@ from aequilibrae.paths.cython.route_choice_types cimport (
 )
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport SearchWorkspace, AStarWorkspace, CppAStarWorkspace
-from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.cython.route_choice_set_results cimport (
@@ -81,9 +81,9 @@ cdef class RouteChoiceSet:
     See the module documentation for the algorithms and reference.
     """
 
-    def __init__(self, graph: PreparedGraph, *, coordinates: pd.DataFrame | None = None):
-        if isinstance(graph, GraphBase):
-            graph = freeze_graph(graph, compact=True)
+    def __init__(self, graph: Graph, *, coordinates: pd.DataFrame | None = None):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         self.graph = graph
         self.routing = make_routing_context(graph)
         self.coordinates = coordinates.copy() if coordinates is not None else None

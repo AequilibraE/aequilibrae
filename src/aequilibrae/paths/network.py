@@ -83,21 +83,29 @@ class Network:
 
     def field_values(self, field):
         """Return numeric values in ascending link-ID and direction order."""
-        if field not in self.fields:
-            raise ValueError(f"'{field}' not in network")
+        return self._field_arrays([field])[field]
+
+    def _field_arrays(self, fields):
+        """Read a batch of fields with one directed-link sort, without caching mutable tables."""
         rows, directions = self._directed_indices()
-        values = np.empty(len(rows), dtype=np.float64)
-        for direction, suffix in ((1, "_ab"), (-1, "_ba")):
-            column = field + suffix if field + suffix in self.links else field
-            mask = directions == direction
-            try:
-                values[mask] = pd.to_numeric(self.links.iloc[rows[mask]][column], errors="raise").to_numpy(
-                    dtype=np.float64
-                )
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"Field {field} must contain numeric values") from exc
-        values.flags.writeable = False
-        return values
+        available = self.fields
+        arrays = {}
+        for field in dict.fromkeys(fields):
+            if field not in available:
+                raise ValueError(f"'{field}' not in network")
+            values = np.empty(len(rows), dtype=np.float64)
+            for direction, suffix in ((1, "_ab"), (-1, "_ba")):
+                column = field + suffix if field + suffix in self.links else field
+                mask = directions == direction
+                try:
+                    values[mask] = pd.to_numeric(self.links.iloc[rows[mask]][column], errors="raise").to_numpy(
+                        dtype=np.float64
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"Field {field} must contain numeric values") from exc
+            values.flags.writeable = False
+            arrays[field] = values
+        return arrays
 
     def validate_mode(self, mode):
         if not isinstance(mode, str) or not mode or (self.modes is not None and mode not in self.modes):
@@ -169,10 +177,13 @@ class Network:
             self.validate_centroids(centroids)
         if compact and centroids is None:
             raise ValueError("Compact graphs require centroids")
-        if isinstance(skimming, str):
-            skimming = [skimming]
-        fields = {name: self.field_values(name) for name in dict.fromkeys(skimming)}
-        costs = np.zeros(len(self.link_ids)) if cost is None else self.field_values(cost)
+        skimming = [skimming] if isinstance(skimming, str) else list(skimming)
+        field_names = skimming.copy()
+        if cost is not None:
+            field_names.append(cost)
+        arrays = self._field_arrays(field_names)
+        fields = {name: arrays[name] for name in skimming}
+        costs = np.zeros(len(self.link_ids)) if cost is None else arrays[cost]
         if np.isnan(costs).any() or np.any(costs < 0):
             raise ValueError("Graph costs must be nonnegative and cannot contain NaN")
         builder = GraphBase()

@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, estimate_heuristic_scale
+from aequilibrae.paths import estimate_heuristic_scale
+from aequilibrae.paths.graph import GraphBase
 from .routing_helpers import build_graph_tables
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
@@ -31,7 +32,7 @@ def test_upper_case_variables(sioux_falls_example):
     graph = graph_for_project(sioux_falls_example)
     network = graph.network
     network.columns = network.columns.str.upper()
-    g = Graph()
+    g = GraphBase()
     g.network = network
     assert g.network.columns.tolist() == graph.network.columns.tolist(), "Graph columns are not lower case"
 
@@ -56,7 +57,7 @@ def test_prepare_graph_no_centroids(sioux_falls_example):
 
 
 def test_prepare_graph_first_node_has_no_outgoing_links():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame({"link_id": [1, 2], "a_node": [2, 2], "b_node": [1, 3], "direction": [1, 1]})
     graph.prepare_graph()
 
@@ -66,7 +67,7 @@ def test_prepare_graph_first_node_has_no_outgoing_links():
 
 @pytest.mark.parametrize("centroids", [[99, 1, 3], [99, 98, 1, 3]])
 def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
-    graph = Graph()
+    graph = GraphBase()
     network = pd.DataFrame({"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "id": [0, 1]})
     # Test adjacency construction without invoking dead-end removal or compression.
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
@@ -79,7 +80,7 @@ def test_directed_graph_offsets_with_isolated_first_centroids(centroids):
 
 @pytest.mark.parametrize("centroids", [[99, 1, 3], [1, 2, 3, 99]])
 def test_compression_preserves_isolated_centroids(centroids):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {"link_id": [1, 2], "a_node": [1, 2], "b_node": [2, 3], "direction": [1, 1], "cost": [1.0, 1.0]}
     )
@@ -134,7 +135,7 @@ def test_compression_preserves_isolated_centroids(centroids):
     ],
 )
 def test_empty_compact_graph(links, centroids):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(links)
     with pytest.warns(UserWarning, match="Found centroids not present in the graph"):
         graph.prepare_graph(np.array(centroids))
@@ -155,7 +156,7 @@ def test_empty_compact_graph(links, centroids):
 
 
 def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4, 5],
@@ -185,7 +186,7 @@ def test_compaction_preserves_cycle_needed_to_avoid_turn_ban():
 
 
 def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -211,7 +212,7 @@ def test_parallel_link_round_trip_is_not_a_turn_restriction_detour():
 
 
 def graph_with_required_self_loop():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -260,10 +261,10 @@ def test_load_from_disk(sioux_falls_example, test_graph):
     graph_file = sioux_falls_example.project_base_path / "aequilibrae_test_graph.aeg"
     graph = graph_for_project(sioux_falls_example)
     graph.save_to_disk(graph_file)
-    reference_graph = Graph()
+    reference_graph = GraphBase()
     reference_graph.load_from_disk(test_graph)
 
-    new_graph = Graph()
+    new_graph = GraphBase()
     new_graph.load_from_disk(graph_file)
 
 
@@ -313,7 +314,7 @@ def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
 
 @pytest.fixture
 def turn_graph():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -375,7 +376,7 @@ def test_turn_restrictions_reject_missing_directed_legs(turn_graph, turn, leg):
 
 
 def test_dead_end_removal_preserves_turn_via_node():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -411,7 +412,7 @@ def test_dead_end_removal_preserves_turn_via_node():
 
 
 def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -434,7 +435,7 @@ def test_compaction_preserves_bidir_nodes_when_path_uturns_are_allowed():
 
 
 def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -463,7 +464,7 @@ def test_dead_end_removal_preserves_branch_needed_for_allowed_uturn():
 
 
 def test_dead_end_removal_stops_at_turn_via_node():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3],
@@ -492,7 +493,7 @@ def test_dead_end_removal_stops_at_turn_via_node():
 
 @pytest.mark.parametrize("penalty", [5.0, np.inf])
 def test_turn_restrictions_allow_compressed_neighbour_nodes(penalty):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4],
@@ -624,7 +625,7 @@ def compressed_graph(test_data_path, tmp_path):
     link_df = pd.read_csv(tmp_path / "links_modified.csv")
     centroids_array = np.array([7, 8, 11])
 
-    graph = Graph()
+    graph = GraphBase()
     graph.network = link_df
     graph.mode = "a"
     graph.prepare_graph(centroids_array)
@@ -795,7 +796,7 @@ def test_degree_two_sink_is_not_compressed():
         }
     )
 
-    graph = Graph()
+    graph = GraphBase()
     graph.network = network
     graph.prepare_graph(np.array([1, 2]))
     graph.set_graph("cost")

@@ -1,6 +1,6 @@
 import pytest
 
-from aequilibrae.paths.graph import Graph, _prepare_network_graph
+from aequilibrae.paths.graph import GraphBase, _prepare_network_graph
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
 
 
@@ -33,7 +33,7 @@ def test_simplify(project_with_graph, monkeypatch, legacy):
     graph = project_with_graph
     if legacy:
         links, centroids, turns, allow_uturns = net.network._load_graph_data()
-        graph = Graph()
+        graph = GraphBase()
         graph.network = links
         _prepare_network_graph(graph, "c", centroids, turns, False, allow_uturns)
         graph.set_graph("distance")

@@ -49,10 +49,10 @@ def test_select_link_names_replace_spaces_and_warn(tc, name):
     assert selections == {name: [(1, 0)]}
 
 
-def test_select_link_name_collision_keeps_last_set_like_base(tc):
+def test_select_link_name_collision_is_rejected(tc):
     with pytest.warns(UserWarning, match="Replacing with _"):
-        configured = replace(tc, select_link_sets={"screen line": [1], "screen_line": [2]})
-    assert dict(configured.select_link_sets) == {"screen_line": ((2, 0),)}
+        with pytest.raises(ValueError, match="Duplicate select-link set name"):
+            replace(tc, select_link_sets={"screen line": [1], "screen_line": [2]})
 
 
 def test_old_class_constructor_is_removed(tc):

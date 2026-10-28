@@ -523,7 +523,7 @@ class LinearApproximation(WorkerThread):
                 self.cores,
                 heap=c.results._heap,
                 select_link_od=c.configuration.select_link_od,
-                field_values=c.network.field_values,
+                field_values=c.fields.__getitem__,
                 skim_fields=c.configuration.skimming,
                 cost_name=c.configuration.cost,
             )
@@ -541,9 +541,9 @@ class LinearApproximation(WorkerThread):
                 )
 
             c.congested_skims = None
-            c.fixed_cost[:] = c.network.field_values(c.configuration.cost) - self.free_flow_tt
+            c.fixed_cost[:] = c.fields[c.configuration.cost] - self.free_flow_tt
             if c.configuration.fixed_cost_field:
-                values = c.network.field_values(c.configuration.fixed_cost_field)
+                values = c.fields[c.configuration.fixed_cost_field]
                 c.fixed_cost += (
                     np.where(np.isnan(values), 0.0, values)
                     * c.configuration.fixed_cost_multiplier

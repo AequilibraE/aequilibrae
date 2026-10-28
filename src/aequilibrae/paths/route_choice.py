@@ -21,7 +21,7 @@ from aequilibrae.paths.cython.route_choice_set_results import (
     RouteChoiceSetResults,
     check_disutility_cutoff_values,
 )
-from aequilibrae.paths.graph import GraphBase, PreparedGraph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.bridge import Bridge
 
@@ -52,7 +52,7 @@ class RouteChoice:
 
     demand_index_names = ["origin id", "destination id"]
 
-    def __init__(self, graph: GraphBase | PreparedGraph, project=None, *, coordinates: pd.DataFrame | None = None):
+    def __init__(self, graph: Graph, project=None, *, coordinates: pd.DataFrame | None = None):
         self.parameters = {}
         self.procedure_id = None
         self.procedure_date = None

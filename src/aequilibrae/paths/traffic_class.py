@@ -10,12 +10,12 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.graph import GraphBase, TransitGraph
+from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.paths.results import TransitAssignmentResults
 
 
 class TransportClassBase(ABC):  # noqa: B024
-    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class
 
@@ -143,6 +143,8 @@ class TrafficClass:
             if " " in name:
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = "_".join(name.split(" "))
+            if name in selections:
+                raise ValueError(f"Duplicate select-link set name after replacing spaces: {name}")
             links = []
             for member in members:
                 link, direction = (member, 0) if isinstance(member, (int, np.integer)) else member

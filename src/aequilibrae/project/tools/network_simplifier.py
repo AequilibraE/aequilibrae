@@ -13,7 +13,7 @@ from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import GraphBase, PreparedGraph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -33,7 +33,7 @@ class NetworkSimplifier(WorkerThread):
 
         logger.warning("This will alter your database in place. Make sure you have a backup.")
 
-    def simplify(self, graph: GraphBase | PreparedGraph, max_speed_ratio: float = 1.1):
+    def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
         Simplifies the network by merging links that are shorter than a given threshold
 
@@ -46,7 +46,8 @@ class NetworkSimplifier(WorkerThread):
         self.graph = graph
 
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation
-        if isinstance(graph, PreparedGraph):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
             if not graph.compact:
                 raise ValueError("Network simplification requires a compact graph")
             compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links

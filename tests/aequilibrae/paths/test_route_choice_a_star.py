@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Graph, RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths import RouteChoice, estimate_heuristic_scale
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
@@ -71,7 +72,7 @@ def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, c
 
 
 def compressed_graph(turn):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 72, 12, 55, 56, 24],
@@ -185,7 +186,7 @@ def test_invalid_search_options_rejected_at_both_entry_points(options, match):
 @pytest.mark.parametrize(
     "problem,match",
     [
-        ("missing", "requires coordinate columns"),
+        ("missing", "every graph node ID"),
         ("node", "every graph node ID"),
         ("duplicate", "node IDs must be unique"),
         ("nonfinite", "coordinates must be finite"),

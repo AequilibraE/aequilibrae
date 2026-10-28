@@ -28,7 +28,7 @@ from pandas.core.frame import DataFrame
 from scipy.spatial import KDTree
 
 from aequilibrae.paths import PathResults
-from aequilibrae.paths.graph import NewTransitGraph
+from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.utils.geo_utils import haversine
 
 logger = logging.getLogger(__name__)
@@ -1606,7 +1606,7 @@ class TransitGraphBuilder:
         cls.remove_vertices(pt_conn, period_id)
         cls.remove_config(project_conn, period_id)
 
-    def to_transit_graph(self) -> NewTransitGraph:
+    def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
 
         # TODO: Better required link type detections
@@ -1623,7 +1623,7 @@ class TransitGraphBuilder:
         assert self.od_node_mapping is not None
         assert self.vertices is not None
         assert self.edges is not None
-        g = NewTransitGraph(
+        g = TransitGraph(
             network=self.edges,
             centroids=self.vertices[
                 (

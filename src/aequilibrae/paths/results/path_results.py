@@ -9,7 +9,7 @@ from aequilibrae.paths.cython.queries import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.skimming import skimming
 from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace, SkimmingWorkspace
-from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
@@ -31,7 +31,7 @@ class PathResults:
 
     def __init__(
         self,
-        graph: GraphBase | PreparedGraph,
+        graph: Graph,
         origin: int,
         destination: int,
         early_exit: bool = False,
@@ -102,7 +102,7 @@ class PathResults:
         if heap is not None and heap not in available_heaps():
             raise ValueError(f"heap must be one of {available_heaps()}")
 
-    def set_graph_data(self, graph: GraphBase | PreparedGraph, *, coordinates: pd.DataFrame | None = None) -> None:
+    def set_graph_data(self, graph: Graph, *, coordinates: pd.DataFrame | None = None) -> None:
         """
         Prepare graph data for path and skim computation.
 
@@ -120,8 +120,8 @@ class PathResults:
             **ValueError**: If the graph does not have context-compatible IDs or a required node/link mapping is
                 invalid.
         """
-        if isinstance(graph, GraphBase):
-            graph = freeze_graph(graph, compact=False)
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         context = make_routing_context(graph)
         self._expansion = None
         mapping = GraphMapping(context, graph.all_nodes, graph.graph_mapping.link_ids, graph.graph_mapping.directions)

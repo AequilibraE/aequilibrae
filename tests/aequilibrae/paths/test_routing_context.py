@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 from .routing_helpers import make_context, search
@@ -13,7 +13,7 @@ from .test_assignment_integration import diamond
 
 
 def chain_graph(centroids=True):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 12, 55],
@@ -45,7 +45,7 @@ def compressed_uturn_graph(with_return_chain=True):
     provides a legal return; reversing 3 -> 4 is a banned U-turn.
     All link costs are 1. Chain compression removes the internal nodes.
     """
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [1, 2, 3, 4, 5, 6],

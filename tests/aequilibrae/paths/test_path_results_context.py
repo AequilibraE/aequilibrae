@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.results import PathResults
 
 from .test_assignment_integration import diamond
@@ -13,7 +13,7 @@ from .test_assignment_integration import diamond
 @pytest.mark.parametrize("early_exit", [False, True])
 @pytest.mark.parametrize("penalty", [0.5, 10.0, np.inf])
 def test_trace_uses_arrival_states_for_turn_paths_and_mileposts(early_exit, penalty):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 55, 24, 12],

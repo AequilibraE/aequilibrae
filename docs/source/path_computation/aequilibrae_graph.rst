@@ -3,199 +3,131 @@
 AequilibraE Graphs
 ==================
 
-The AequilibraE Graph is a computational representation of the network.
-The Graph object is rather complex, but the difference between the graph and the physical 
-links are the availability of three class member variables consisting of Pandas DataFrames:
-the *network*, the *graph*, and the *compressed_graph*.
+A ``Network`` stores source link attributes, modes, centroids, and turn restrictions.
+Its ``build_graph()`` method returns an array-backed ``Graph`` for routing.
+The graph has fixed topology. Its costs can change without a rebuild.
 
-.. code-block:: python
-
-    >>> from aequilibrae.paths import Graph
-
-    >>> g = Graph()
-
-    >>> g.network # doctest: +SKIP
-    >>> g.graph # doctest: +SKIP
-    >>> g.compressed_graph # doctest: +SKIP
-
-
-The network dataframe
----------------------
-
-Links in the *network* table (the Pandas representation of the project's *Links* table) are
-potentially bi-directional, and the directions allowed for traversal are dictated by the
-field *direction*, where -1 and 1 denote only BA and AB traversal respectively and 0 denotes
-bi-directionality.
-
-Direction-specific fields must be coded in fields **_AB** and **_BA**, where the name of
-the field in the graph will be equal to the prefix of the directional fields. For example:
-
-The fields *free_flow_travel_time_AB* and *free_flow_travel_time_BA* provide the same
-metric (*free_flow_travel_time*) for each of the directions of a link, and the field of
-the graph used to set computations (e.g. field to minimize during path-finding, skimming,
-etc.) will be *free_flow_travel_time*.
-
-The graph dataframe
+Graphs from a model
 -------------------
 
-The graph dataframe is a very simple transformation of the network where all links are **directed**.
-This is achieved by decomposing bi-direction links two different links in the graph, each one 
-representing a direction.
-
-As described above, fields are made uni-directional, with bi-directional fields being 
-transformed into a single field and all other fields remaining the same.
-
-The compressed graph dataframe
-------------------------------
-
-The purpose of the compressed graph is to optimize its performance for the more recurrent
-and time consuming computations in modelling, which are traffic assignment and skimming.
-
-The key characterist we can leverage to optimize performance for these operations is that paths
-are computed only between centroids, therefore two forms of compression are possible:
-
-1. Topological simplification
-2. Dead end removal
-
-Topological simplification consists in creating a topological equivalent of the graph
-by contracting sequences of links between intersections (extra nodes). These links are often common
-in long links.
-
-It is important to note that computations that cannot be handled at the compressed level without 
-loss of fidelity, for example the computation of congestion during traffic assignment, is done 
-at the uncompressed (graph) level, but we still extract the full benefits of the compression 
-at the path-computation stage, which is the most time-consuming portion of assignment.
-
-Dead end removal is an additional procedure, that consists in removing dead ends and fish 
-spines from the network. For those
-not familiar with the term, a fish spine is a road network with multiple smaller streets
-branching off from it, often leading to dead ends or cul-de-sacs, creating a pattern that
-resembles a fish spine.
-
-Whilst it's easy for humans to ignore dead ends when planning a route, the same cannot be
-said for computers. Dead end removal is done based on the observation that in a graph with
-non-negative weights a dead end will only ever appear in the results of a short(est) path if
-the origin or destination is present within that dead end.
-
-Dead end removal is applied before topological simplification and results in a distinctive
-network, topologically speaking. However, all centroids are preserved. More about dead end removal can be
-found `at this blog post <https://www.outerloop.io/blog/20240205_dead_end_removal/>`_.
-
-It should be noted that not all fields are compressed in this process, but only the cost field.
-
-Leveraging topological simplification
--------------------------------------
-
-Topological simplification is a powerful tool that may want to be leveraged for other purposes.
-As such, we make it available for users to access it.
-
-For this purpose, the user should be explicit in not removing dead ends from the graph, as that will
-result in simplification beyond pure topological simplification.
+A project network can supply the source tables:
 
 .. code-block:: python
 
     >>> project = create_example(project_path, "coquimbo")
     >>> network = project.network.build()
     >>> graph = network.build_graph('c', cost='distance')
-    >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32), remove_dead_ends=False)
 
+The source tables do not retain project connections. Later changes to project data
+do not change this network or its prepared graphs.
 
-Graphs from a model
--------------------
-
-Building graphs directly from an AequilibraE model is the easiest option for beginners
-or when using AequilibraE in anger, as much of the setup is done by default.
-
-.. code-block:: python
-
-    >>> network = project.network.build()
-    >>> graph = network.build_graph('c', cost='distance')
-
-Manipulating graphs in memory
------------------------------
-
-The AequilibraE Graph can be manipulated in memory, with all its components available 
-for editing. One of the simple tools available directly in the API is a method call for
-excluding one or more links from the Graph, **which is done in place**.
-
-.. code-block:: python
-
-    >>> graph.exclude_links([123, 975])
-
-When working with very large networks, it is possible to filter the database to a small
-area for computation by providing a polygon that delimits the desired area, instead of
-selecting the links for deletion. The selection of links and nodes is limited to a spatial
-index search, which is very fast but not accurate.
+To restrict the source data to an area, supply a polygon:
 
 .. code-block:: python
 
     >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
     >>> network = project.network.build(limit_to_area=polygon)  # doctest: +SKIP
 
-More sophisticated graph editing is also possible, but it is recommended that
-changes to be made in the network DataFrame. For example:
+The area filter uses a spatial index. It does not clip links to the polygon boundary.
+
+Source links and directed costs
+-------------------------------
+
+The ``network.links`` DataFrame contains one row per physical link.
+The ``direction`` field specifies the allowed directions:
+
+* ``1`` permits AB traversal.
+* ``-1`` permits BA traversal.
+* ``0`` permits both directions.
+
+Direction-specific fields use the suffixes ``_ab`` and ``_ba``.
+For example, ``free_flow_time_ab`` and ``free_flow_time_ba`` supply the graph field ``free_flow_time``.
+``Network`` converts column names to lowercase.
+
+``network.field_values(name)`` returns numeric values for directed links, sorted by link ID and then direction.
+``network.link_ids`` and ``network.directions`` use the same order.
+This order includes links that the graph's mode cannot use.
+
+Cost updates and link closures
+------------------------------
+
+To close links without a topology change, set their costs to positive infinity:
 
 .. code-block:: python
 
-    # We can add fields to our graph
-    >>> graph.network["link_type"] = project.network.links.data["link_type"]
+    >>> costs = network.field_values('distance').copy()
+    >>> costs[np.isin(network.link_ids, [123, 975])] = np.inf
+    >>> graph.set_costs(costs)
 
-    # And manipulate them
-    >>> graph.network.loc[graph.network.link_type == "motorway", "speed_ab"] = 100
-    >>> graph.network.loc[graph.network.link_type == "motorway", "speed_ba"] = 100
+``set_costs()`` requires one value per directed network link, not one value per graph link.
+A later call with finite costs can reopen the links.
+Negative costs and NaN values are invalid.
 
-Skimming settings
------------------
-
-Skimming the field of a graph when computing shortest path or performing
-traffic assignment must be done by setting the skimming fields in the
-Graph object, and there are no limits (other than memory) to the number
-of fields that can be skimmed.
+For changes to link attributes or topology, edit the source data and build a new graph:
 
 .. code-block:: python
 
-    >>> graph.set_skimming(["distance", "travel_time"])
+    >>> network.links.loc[network.links.link_type == 'motorway', 'speed_ab'] = 100
+    >>> network.links.loc[network.links.link_type == 'motorway', 'speed_ba'] = 100
+    >>> graph = network.build_graph('c', cost='distance')
 
-Setting centroids
------------------
+Changes to source attributes do not update an existing graph or calculate dependent attributes.
+For example, a speed change does not automatically change travel time.
 
-Like other elements of the AequilibraE Graph, the user can also manipulate the
-set of nodes interpreted by the software as centroids in the Graph itself.
-This brings the advantage of allowing the user to perform assignment of partial
-matrices, matrices of travel between arbitrary network nodes and to skim the network
-for an arbitrary number of centroids in parallel, which can be useful when using
-AequilibraE as part of more general analysis pipelines. As seen above, this is also
-necessary when the network has been manipulated in memory.
+Skimming and centroids
+----------------------
 
-**When setting regular network nodes as centroids, take care when enabling
-centroid-flow blocking.**
+Skim fields, centroids, and centroid-flow blocking are graph construction options:
 
 .. code-block:: python
 
-    >>> graph.prepare_graph(np.array([13, 169, 2197, 28561, 37123], np.int32))
-    >>> graph.set_blocked_centroid_flows(False)
+    >>> graph = network.build_graph(
+    ...     'c', cost='distance',
+    ...     centroids=network.centroids[:5],
+    ...     skimming=['distance'], block_centroid_flows=False,
+    ... )
+    >>> skimmer = graph.compute_skims()
 
-.. seealso::
+Without an explicit centroid array, the graph uses ``network.centroids``.
+Centroids must be unique, positive node IDs from the network.
+Their order determines the row and column order of skim matrices.
+To change centroids or skim fields, build a new graph.
 
-    * :func:`aequilibrae.paths.graph.Graph`
-        Class documentation
-    * :func:`aequilibrae.paths.graph.TransitGraph`
-        Class documentation
+Compact graphs
+--------------
+
+A compact graph contracts chains of links and removes dead ends that contain no centroids.
+This reduces routing work for traffic assignment and centroid-to-centroid skimming.
+Path results expand compact links back to source links.
+
+Compact graphs require centroids:
+
+.. code-block:: python
+
+    >>> compact = network.build_graph('c', cost='distance', compact=True)
+
+Traffic assignment builds compact graphs automatically.
+Congestion calculations still use individual directed network links.
 
 Blocking centroid flows
 -----------------------
 
-When using AequilibraE Graph, it is possible to configure whether paths may pass
-through centroid connector turns. In current versions, enabling blocked centroid
-flows applies automatic turn prohibitions between centroid connectors that meet at
-the same node (when a centroid has multiple connectors).
+By default, prepared graphs block paths through intermediate centroids.
+For turn-based routing, automatic turn prohibitions prevent traversal between centroid connectors at the same centroid.
 
-Suppose one wants to compute the shortest path between node N1 and centroid C3 in the
-figure below. An initial path guess would be N1 -> N3 -> C2 -> N6 -> C3 because all
-links are bi-directional. However, when blocked centroid flows are enabled, the
-connector-to-connector transition at C2 is prohibited, so that intermediary centroid
-traversal is prevented.
+Suppose a path from N1 to C3 follows N1 -> N3 -> C2 -> N6 -> C3 in the figure.
+Centroid-flow blocking prohibits the connector-to-connector transition at C2.
+The path must use another route.
+
+If regular network nodes serve as centroids, consider whether routes must pass through those nodes.
+Use ``block_centroid_flows=False`` to permit those routes.
 
 .. image:: ../_images/aequilibrae_graph-1.png
     :align: center
     :alt: example of aequilibrae graph
+
+.. seealso::
+
+    * :class:`aequilibrae.paths.network.Network`
+    * :class:`aequilibrae.paths.graph.Graph`
+    * :class:`aequilibrae.paths.graph.TransitGraph`
