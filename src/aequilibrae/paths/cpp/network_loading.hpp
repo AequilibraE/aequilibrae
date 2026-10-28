@@ -13,8 +13,8 @@ namespace aequilibrae::paths::cpp::routing {
 // Both ordinary and selected loading seed demand at terminal states. Parents
 // receive demand from all their children before loading their own connector.
 // Preserves turn arrival history.
-template <typename T>
-void cascade_loads(const SearchResults &results,
+template <typename T, typename Cost>
+void cascade_loads(const SearchResults<Cost> &results,
                    const LoadingWorkspace<T> &workspace,
                    const LoadingOutputs<T> &output) noexcept {
   const auto classes = workspace.class_count;
@@ -41,8 +41,8 @@ void cascade_loads(const SearchResults &results,
 
 // Load one origin. Scratch is replaced each call, while output accumulates
 // across origins. Missing terminals and intrazonal demand are ignored.
-template <typename T, typename DemandRow>
-void network_loading(const SearchResults &results, const DemandRow &query,
+template <typename T, typename DemandRow, typename Cost>
+void network_loading(const SearchResults<Cost> &results, const DemandRow &query,
                      const LoadingWorkspace<T> &workspace,
                      const LoadingOutputs<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);
@@ -69,8 +69,8 @@ void network_loading(const SearchResults &results, const DemandRow &query,
   cascade_loads(results, workspace, output);
 }
 
-template <typename T, typename DemandRow>
-T sum_weighted_turn_costs(const SearchResults &results,
+template <typename T, typename DemandRow, typename Cost>
+T sum_weighted_turn_costs(const SearchResults<Cost> &results,
                           const DemandRow &query) noexcept {
   T total = 0;
   for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {
@@ -89,8 +89,8 @@ T sum_weighted_turn_costs(const SearchResults &results,
 
 // Assignment searches every destination with demand. Missing terminals here
 // therefore mean unreachable demand, not targets omitted by an early stop.
-template <typename T, typename DemandRow>
-T sum_unassigned_demand(const SearchResults &results,
+template <typename T, typename DemandRow, typename Cost>
+T sum_unassigned_demand(const SearchResults<Cost> &results,
                         const DemandRow &query) noexcept {
   T total = 0;
   for (std::size_t entry = 0; entry < query.entry_count(); ++entry) {

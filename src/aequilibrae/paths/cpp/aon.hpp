@@ -16,20 +16,20 @@ template <typename DemandRow> struct AoNOrigin {
 
 // These views only group existing components for the assignment driver.
 // Operation kernels still accept their own small views, not these groups.
-struct AoNInputs {
-  SkimmingContext<double> skimming;
+template <typename T> struct AoNInputs {
+  SkimmingContext<T> skimming;
   SelectLinkContext selection;
 };
 
-struct AoNWorkerView {
-  MutableSearchResults search;
-  AoNWorkspace<double> workspace;
-  LoadingOutputs<double> loading;
-  SelectLinkLoadingOutputsView<double> selected_loading;
+template <typename T> struct AoNWorkerView {
+  MutableSearchResults<T> search;
+  AoNWorkspace<T> workspace;
+  LoadingOutputs<T> loading;
+  SelectLinkLoadingOutputsView<T> selected_loading;
   // Unlike the borrowed buffers, this scalar lives in the worker table itself.
   // Origin calls take that table entry by reference so additions persist.
-  double turn_cost_total = 0;
-  double unassigned_demand = 0;
+  T turn_cost_total = 0;
+  T unassigned_demand = 0;
 
   void reset() noexcept {
     loading.reset();

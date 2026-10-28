@@ -7,7 +7,7 @@ from aequilibrae.matrix.cython.views cimport CppDenseMatrixOriginView
 
 cdef extern from "skimming.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     void cpp_skimming "aequilibrae::paths::cpp::routing::skimming"[T](
-        const CppSearchResults &results,
+        const CppSearchResults[double] &results,
         const CppSkimmingContext[T] &context,
         const CppSkimmingWorkspace[T] &workspace,
         const CppDenseMatrixOriginView[T] &output,

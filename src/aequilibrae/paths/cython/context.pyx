@@ -120,9 +120,9 @@ cdef class GraphContext:
             other_turns.last_nodes_buffer = source_turns.last_nodes_buffer
         return other
 
-    cdef CppNodeBasedContext graph_view(self) noexcept nogil:
+    cdef CppNodeBasedContext[double] graph_view(self) noexcept nogil:
         """Build a C++ graph view that borrows this object's buffers."""
-        cdef CppNodeBasedContext graph
+        cdef CppNodeBasedContext[double] graph
         graph.fs = const_array_pointer(self.node_offsets)
         graph.heads = const_array_pointer(self.heads_buffer)
         graph.costs = const_array_pointer[double](self.costs_buffer)
@@ -165,7 +165,7 @@ cdef class GraphContext:
 cdef class NodeBasedContext(GraphContext):
     """Graph context whose search states are nodes."""
 
-    cdef CppNodeBasedContext view(self) noexcept nogil:
+    cdef CppNodeBasedContext[double] view(self) noexcept nogil:
         """Borrow the graph buffers for a node-based search."""
         return self.graph_view()
 
@@ -267,9 +267,9 @@ cdef class TurnBasedContext(GraphContext):
         if self.first_nodes_buffer.shape[0] != m or self.last_nodes_buffer.shape[0] != m:
             raise ValueError("boundary nodes must have one value per link")
 
-    cdef CppTurnBasedContext view(self) noexcept nogil:
+    cdef CppTurnBasedContext[double] view(self) noexcept nogil:
         """Borrow the graph and turn buffers for a turn-based search."""
-        cdef CppTurnBasedContext turns
+        cdef CppTurnBasedContext[double] turns
         turns.graph = self.graph_view()
         turns.tails = const_array_pointer(self.tails_buffer)
         turns.turn_fs = const_array_pointer(self.turn_offsets)

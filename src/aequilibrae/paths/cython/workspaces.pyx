@@ -31,7 +31,7 @@ cdef class SearchWorkspace:
         else:
             raise ValueError("heap must be one of ['4ary', 'pairing', 'std']")
 
-        self.heap_storage = new CppSearchHeapStorage(state_count, heap_type)
+        self.heap_storage = new CppSearchHeapStorage[double](state_count, heap_type)
         self.node_count = node_count
         self.state_count = state_count
         self.heap = heap
@@ -40,8 +40,8 @@ cdef class SearchWorkspace:
         if self.heap_storage != NULL:
             del self.heap_storage
 
-    cdef CppSearchWorkspace view(self) noexcept nogil:
-        cdef CppSearchWorkspace workspace
+    cdef CppSearchWorkspace[double] view(self) noexcept nogil:
+        cdef CppSearchWorkspace[double] workspace
         workspace.heap = self.heap_storage
         return workspace
 
@@ -54,8 +54,8 @@ cdef class AStarWorkspace(SearchWorkspace):
         self.costs_buffer = array[double](self.state_count, True, np.inf)
         self.estimates_buffer = array[double](self.node_count, True, -1.0)
 
-    cdef CppAStarWorkspace a_star_view(self) noexcept nogil:
-        cdef CppAStarWorkspace workspace
+    cdef CppAStarWorkspace[double] a_star_view(self) noexcept nogil:
+        cdef CppAStarWorkspace[double] workspace
         workspace.search = self.view()
         workspace.costs = array_pointer(self.costs_buffer)
         workspace.estimates = array_pointer(self.estimates_buffer)

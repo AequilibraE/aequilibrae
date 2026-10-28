@@ -51,8 +51,8 @@ cdef class EuclideanContext:
     def update_scale(self, scale: float):
         self.scale = validate_scale(scale)
 
-    cdef CppEuclideanContext view(self) noexcept nogil:
-        cdef CppEuclideanContext context
+    cdef CppEuclideanContext[double] view(self) noexcept nogil:
+        cdef CppEuclideanContext[double] context
         context.node_count = self.node_count
         context.x = const_array_pointer[double](self.x)
         context.y = const_array_pointer[double](self.y)
@@ -80,8 +80,8 @@ cdef class HaversineContext:
     def update_scale(self, scale: float):
         self.scale = validate_scale(scale)
 
-    cdef CppHaversineContext view(self) noexcept nogil:
-        cdef CppHaversineContext context
+    cdef CppHaversineContext[double] view(self) noexcept nogil:
+        cdef CppHaversineContext[double] context
         context.node_count = self.node_count
         context.longitudes = const_array_pointer[double](self.longitudes)
         context.latitudes = const_array_pointer[double](self.latitudes)
@@ -126,8 +126,8 @@ def a_star(
 
     cdef size_t target = destination
     cdef CppSearchQuery cpp_query = query.view()
-    cdef CppMutableSearchResults cpp_results = results.view()
-    cdef CppAStarWorkspace cpp_workspace = workspace.a_star_view()
+    cdef CppMutableSearchResults[double] cpp_results = results.view()
+    cdef CppAStarWorkspace[double] cpp_workspace = workspace.a_star_view()
 
     with nogil:
         cpp_a_star(context.view(), cpp_query, target, heuristic.view(), cpp_results, cpp_workspace)
@@ -136,7 +136,7 @@ def a_star(
 
 
 cdef double estimate_scale(
-    const CppNodeBasedContext &graph, const CppHeuristicContext &heuristic,
+    const CppNodeBasedContext[double] &graph, const CppHeuristicContext &heuristic,
 ) noexcept nogil:
     cdef size_t node, link
     cdef double distance, candidate, scale = -1.0

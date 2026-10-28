@@ -13,15 +13,15 @@ ctypedef fused RoutingContext:
 
 cdef extern from "dijkstra.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     void cpp_dijkstra "aequilibrae::paths::cpp::routing::dijkstra"(
-        const CppNodeBasedContext &context,
+        const CppNodeBasedContext[double] &context,
         const CppSearchQuery &query,
-        const CppMutableSearchResults &results,
-        const CppSearchWorkspace &workspace,
+        const CppMutableSearchResults[double] &results,
+        const CppSearchWorkspace[double] &workspace,
     ) noexcept
 
     void cpp_dijkstra "aequilibrae::paths::cpp::routing::dijkstra"(
-        const CppTurnBasedContext &context,
+        const CppTurnBasedContext[double] &context,
         const CppSearchQuery &query,
-        const CppMutableSearchResults &results,
-        const CppSearchWorkspace &workspace,
+        const CppMutableSearchResults[double] &results,
+        const CppSearchWorkspace[double] &workspace,
     ) noexcept

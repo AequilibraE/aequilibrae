@@ -56,15 +56,18 @@ cdef extern from "outputs.hpp" namespace "aequilibrae::paths::cpp::routing" nogi
         CppSelectLinkODOriginView[T] origin(size_t index) noexcept
         void reset() noexcept
 
-    cdef cppclass CppAoNOutputsView "aequilibrae::paths::cpp::routing::AoNOutputsView":
+    cdef cppclass CppAoNOutputsView "aequilibrae::paths::cpp::routing::AoNOutputsView"[T]:
         CppAoNOutputsView() noexcept
 
-        CppLoadingOutputs[double] loading
-        CppSkimmingOutputsView[double] skimming
-        CppSelectLinkLoadingOutputsView[double] selected_loading
-        CppSelectLinkODOutputsView[double] selected_od
+        CppLoadingOutputs[T] loading
+        CppSkimmingOutputsView[T] skimming
+        CppSelectLinkLoadingOutputsView[T] selected_loading
+        CppSelectLinkODOutputsView[T] selected_od
 
         void reset() noexcept
+
+
+# Existing Python output owners retain their float64 buffers.
 
 
 cdef class LoadingOutputs:
@@ -107,4 +110,4 @@ cdef class AoNOutputs:
     cdef readonly SkimmingOutputs skimming
     cdef readonly SelectLinkOutputs select_link
     cdef readonly double turn_cost_total, unassigned_demand
-    cdef CppAoNOutputsView view(self) noexcept nogil
+    cdef CppAoNOutputsView[double] view(self) noexcept nogil

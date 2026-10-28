@@ -14,27 +14,29 @@
 
 namespace aequilibrae::paths::cpp::routing {
 
-inline const NodeBasedContext &
-a_star_graph(const NodeBasedContext &context) noexcept {
+template <typename T>
+inline const NodeBasedContext<T> &
+a_star_graph(const NodeBasedContext<T> &context) noexcept {
   return context;
 }
 
-inline const NodeBasedContext &
-a_star_graph(const TurnBasedContext &context) noexcept {
+template <typename T>
+inline const NodeBasedContext<T> &
+a_star_graph(const TurnBasedContext<T> &context) noexcept {
   return context.graph;
 }
 
-template <class Queue, class RoutingContext, class HeuristicContext>
+template <class Queue, class RoutingContext, class HeuristicContext, typename T>
 void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
                        std::size_t destination,
                        const HeuristicContext &heuristic,
-                       const MutableSearchResults &results,
-                       const AStarWorkspace &workspace, Queue &queue) noexcept {
-  static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
-  constexpr bool turn_based = std::is_same_v<RoutingContext, TurnBasedContext>;
+                       const MutableSearchResults<T> &results,
+                       const AStarWorkspace<T> &workspace, Queue &queue) noexcept {
+  static_assert(std::is_base_of_v<PriorityQueueBase<Queue, T>, Queue>);
+  constexpr bool turn_based = std::is_same_v<RoutingContext, TurnBasedContext<T>>;
   const auto &graph = a_star_graph(context);
   const auto root = turn_based ? graph.link_count : query.origin;
-  const auto infinity = std::numeric_limits<double>::infinity();
+  const auto infinity = std::numeric_limits<T>::infinity();
   results.reset();
 
   auto &metadata = *results.metadata;
@@ -48,13 +50,13 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
   auto *costs = workspace.costs;
   auto *estimates = workspace.estimates;
   std::fill_n(costs, results.state_count, infinity);
-  std::fill_n(estimates, graph.node_count, -1.0);
-  const auto priority = [&](std::size_t node, double cost) {
+  std::fill_n(estimates, graph.node_count, T{-1});
+  const auto priority = [&](std::size_t node, T cost) {
     if (estimates[node] < 0.0) {
       estimates[node] = heuristic(node, destination);
     }
     // Overflow in the priority must not make a finite-cost path unreachable.
-    return std::min(cost + estimates[node], std::numeric_limits<double>::max());
+    return std::min(cost + estimates[node], std::numeric_limits<T>::max());
   };
 
   costs[root] = 0.0;
@@ -63,7 +65,7 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
 
   while (!queue.is_empty()) {
     const auto state = queue.extract_min();
-    const double cost = costs[state];
+    const T cost = costs[state];
     std::size_t node = state;
 
     if constexpr (turn_based) {
@@ -104,7 +106,7 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
         continue;
       }
 
-      double penalty = 0.0;
+      T penalty = 0;
       if constexpr (turn_based) {
         // Merge sorted sparse turn rows with the outgoing links.
         while (turn < turn_end && context.turn_to_links[turn] < link) {
@@ -113,19 +115,19 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
         const bool explicit_turn =
             turn < turn_end && context.turn_to_links[turn] == link;
 
-        penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
+        penalty = explicit_turn ? context.turn_penalties[turn] : T{0};
         if (state != root && !explicit_turn && !context.allow_uturns &&
             context.first_nodes[link] == context.last_nodes[state]) {
           continue;
         }
       }
 
-      const double next_cost = cost + graph.costs[link] + penalty;
+      const T next_cost = cost + graph.costs[link] + penalty;
       if (!std::isfinite(next_cost) || next_cost >= costs[next]) {
         continue;
       }
 
-      const double key = priority(next_node, next_cost);
+      const T key = priority(next_node, next_cost);
       if (next_state == NOT_IN_HEAP) {
         queue.insert(next, key);
       } else {
@@ -151,11 +153,11 @@ void a_star_with_queue(const RoutingContext &context, const SearchQuery &query,
   }
 }
 
-template <class RoutingContext, class HeuristicContext>
+template <class RoutingContext, class HeuristicContext, typename T>
 void a_star(const RoutingContext &context, const SearchQuery &query,
             std::size_t destination, const HeuristicContext &heuristic,
-            const MutableSearchResults &results,
-            const AStarWorkspace &workspace) noexcept {
+            const MutableSearchResults<T> &results,
+            const AStarWorkspace<T> &workspace) noexcept {
   workspace.search.heap->visit([&](auto &queue) {
     a_star_with_queue(context, query, destination, heuristic, results,
                       workspace, queue);

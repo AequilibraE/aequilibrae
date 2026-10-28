@@ -7,17 +7,17 @@ from aequilibrae.paths.cython.outputs cimport LoadingOutputs, CppLoadingOutputs
 
 cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     void cpp_network_loading "aequilibrae::paths::cpp::routing::network_loading"[T, DemandRow](
-        const CppSearchResults &results,
+        const CppSearchResults[double] &results,
         const DemandRow &query,
         const CppLoadingWorkspace[T] &workspace,
         const CppLoadingOutputs[T] &output,
     ) noexcept
 
     T _cpp_sum_weighted_turn_costs "aequilibrae::paths::cpp::routing::sum_weighted_turn_costs"[T, DemandRow](
-        const CppSearchResults &results, const DemandRow &query) noexcept
+        const CppSearchResults[double] &results, const DemandRow &query) noexcept
 
     T _cpp_sum_unassigned_demand "aequilibrae::paths::cpp::routing::sum_unassigned_demand"[T, DemandRow](
-        const CppSearchResults &results, const DemandRow &query) noexcept
+        const CppSearchResults[double] &results, const DemandRow &query) noexcept
 
     void cpp_reduce_loading_outputs "aequilibrae::paths::cpp::routing::reduce_loading_outputs"[T](
         const CppLoadingOutputs[T] *workers,
@@ -30,7 +30,7 @@ cdef extern from "network_loading.hpp" namespace "aequilibrae::paths::cpp::routi
 # fused type as an explicit C++ template argument so we explicitly do the fused
 # type dispatch. These are compile time conditionals.
 cdef inline double cpp_sum_weighted_turn_costs(
-    const CppSearchResults &results, const DemandRowView &query,
+    const CppSearchResults[double] &results, const DemandRowView &query,
 ) noexcept nogil:
     if DemandRowView is SparseDemandRow:
         return _cpp_sum_weighted_turn_costs[double, SparseDemandRow](results, query)
@@ -39,7 +39,7 @@ cdef inline double cpp_sum_weighted_turn_costs(
 
 
 cdef inline double cpp_sum_unassigned_demand(
-    const CppSearchResults &results, const DemandRowView &query,
+    const CppSearchResults[double] &results, const DemandRowView &query,
 ) noexcept nogil:
     if DemandRowView is SparseDemandRow:
         return _cpp_sum_unassigned_demand[double, SparseDemandRow](results, query)

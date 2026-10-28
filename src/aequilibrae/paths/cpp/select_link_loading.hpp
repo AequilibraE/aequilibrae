@@ -11,7 +11,8 @@
 namespace aequilibrae::paths::cpp::routing {
 
 // A path matches once it has used any state in this set.
-inline void mark_selected_paths(const SearchResults &results,
+template <typename Cost>
+inline void mark_selected_paths(const SearchResults<Cost> &results,
                                 const bool *selected_links,
                                 const SelectLinkWorkspace &workspace) noexcept {
   std::fill_n(workspace.selected_paths, workspace.state_count, false);
@@ -25,15 +26,16 @@ inline void mark_selected_paths(const SearchResults &results,
   }
 }
 
-inline bool selected_terminal(const SearchResults &results,
+template <typename Cost>
+inline bool selected_terminal(const SearchResults<Cost> &results,
                               std::size_t terminal,
                               const SelectLinkWorkspace &selection) noexcept {
   return terminal != invalid_state && terminal != results.metadata->root &&
          selection.selected_paths[terminal];
 }
 
-template <typename T, typename DemandRow>
-void write_selected_od(const SearchResults &results, const DemandRow &query,
+template <typename T, typename DemandRow, typename Cost>
+void write_selected_od(const SearchResults<Cost> &results, const DemandRow &query,
                        const SelectLinkWorkspace &selection,
                        const SelectLinkODOriginView<T> &od,
                        std::size_t set) noexcept {
@@ -55,8 +57,8 @@ void write_selected_od(const SearchResults &results, const DemandRow &query,
 
 // Seed each matched OD once, even if its path crosses several set members.
 // The cascade loading then loads the whole path.
-template <typename T, typename DemandRow>
-void load_selected_paths(const SearchResults &results, const DemandRow &query,
+template <typename T, typename DemandRow, typename Cost>
+void load_selected_paths(const SearchResults<Cost> &results, const DemandRow &query,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,
                          const LoadingOutputs<T> &output) noexcept {
@@ -83,8 +85,8 @@ void load_selected_paths(const SearchResults &results, const DemandRow &query,
   cascade_loads(results, loading, output);
 }
 
-template <typename T, typename DemandRow>
-void select_link_loading(const SearchResults &results, const DemandRow &query,
+template <typename T, typename DemandRow, typename Cost>
+void select_link_loading(const SearchResults<Cost> &results, const DemandRow &query,
                          const SelectLinkContext &context,
                          const SelectLinkWorkspace &selection,
                          const LoadingWorkspace<T> &loading,

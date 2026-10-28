@@ -7,43 +7,47 @@
 namespace aequilibrae::paths::cpp::routing {
 
 // Coordinates use local node order. Views borrow their Cython owner's arrays.
-struct EuclideanContext {
-  std::size_t node_count = 0;
-  const double *x = nullptr;
-  const double *y = nullptr;
-  double scale = 0.0;
+template <typename T> struct EuclideanContext {
+  using value_type = T;
 
-  double distance(std::size_t from, std::size_t to) const noexcept {
+  std::size_t node_count = 0;
+  const T *x = nullptr;
+  const T *y = nullptr;
+  T scale = 0;
+
+  T distance(std::size_t from, std::size_t to) const noexcept {
     return std::hypot(x[to] - x[from], y[to] - y[from]);
   }
 
-  double operator()(std::size_t node, std::size_t destination) const noexcept {
-    return scale == 0.0 ? 0.0 : scale * distance(node, destination);
+  T operator()(std::size_t node, std::size_t destination) const noexcept {
+    return scale == T{0} ? T{0} : scale * distance(node, destination);
   }
 };
 
-struct HaversineContext {
-  std::size_t node_count = 0;
-  const double *latitudes = nullptr;  // Radians.
-  const double *longitudes = nullptr; // Radians.
-  const double *cos_latitudes = nullptr;
-  double scale = 0.0;
+template <typename T> struct HaversineContext {
+  using value_type = T;
 
-  double distance(std::size_t from, std::size_t to) const noexcept {
-    constexpr double earth_radius_metres = 6371000.0;
-    const double sin_lat = std::sin((latitudes[to] - latitudes[from]) / 2.0);
-    const double sin_lon = std::sin((longitudes[to] - longitudes[from]) / 2.0);
-    const double a = sin_lat * sin_lat + cos_latitudes[from] *
+  std::size_t node_count = 0;
+  const T *latitudes = nullptr;  // Radians.
+  const T *longitudes = nullptr; // Radians.
+  const T *cos_latitudes = nullptr;
+  T scale = 0;
+
+  T distance(std::size_t from, std::size_t to) const noexcept {
+    constexpr T earth_radius_metres = T{6371000};
+    const T sin_lat = std::sin((latitudes[to] - latitudes[from]) / T{2});
+    const T sin_lon = std::sin((longitudes[to] - longitudes[from]) / T{2});
+    const T a = sin_lat * sin_lat + cos_latitudes[from] *
                                              cos_latitudes[to] * sin_lon *
                                              sin_lon;
 
     // Round-off near antipodal points must not put asin outside its domain.
-    return 2.0 * earth_radius_metres *
-           std::asin(std::sqrt(std::clamp(a, 0.0, 1.0)));
+    return T{2} * earth_radius_metres *
+           std::asin(std::sqrt(std::clamp(a, T{0}, T{1})));
   }
 
-  double operator()(std::size_t node, std::size_t destination) const noexcept {
-    return scale == 0.0 ? 0.0 : scale * distance(node, destination);
+  T operator()(std::size_t node, std::size_t destination) const noexcept {
+    return scale == T{0} ? T{0} : scale * distance(node, destination);
   }
 };
 

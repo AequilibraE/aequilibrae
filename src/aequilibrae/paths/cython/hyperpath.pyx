@@ -598,7 +598,7 @@ cdef void _SF_in_first_pass_full(
 
     cdef:
         int edge_count = tail_indices.shape[0]
-        FourAryHeap queue
+        FourAryHeap[double] queue
         ElementState edge_state
         size_t i, j, edge_idx, tail_vert_idx
         DATATYPE_t u_j_c_a, u_i, f_i, beta, u_i_new, f_a

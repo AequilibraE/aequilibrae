@@ -980,8 +980,8 @@ cdef class AoNOutputs:
                 demand_names=demand_names,
             )
 
-    cdef CppAoNOutputsView view(self) noexcept nogil:
-        cdef CppAoNOutputsView output
+    cdef CppAoNOutputsView[double] view(self) noexcept nogil:
+        cdef CppAoNOutputsView[double] output
 
         output.loading = self.loading.view()
 

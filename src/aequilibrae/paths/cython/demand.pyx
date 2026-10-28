@@ -28,12 +28,12 @@ def assignment_demand(matrix, centroids, *, transpose=False):
     return packed
 
 
-def validate_demand(demand, nodes):
-    """Check demand dimensions, dtype and values, and return its shape."""
+def validate_demand(demand, nodes, *, dtype=np.float64):
+    """Check demand dimensions, required dtype and values, and return its shape."""
     if not isinstance(demand, (DenseMatrix, SparseMatrix)):
         raise TypeError("demand must be a DenseMatrix or SparseMatrix")
-    if demand.dtype != np.dtype(np.float64):
-        raise TypeError("demand must have dtype float64")
+    if demand.dtype != np.dtype(dtype):
+        raise TypeError(f"demand must have dtype {np.dtype(dtype).name}")
 
     shape = (demand.origin_count, demand.destination_count, demand.field_count)
     if shape[0] != shape[1] or not 1 <= shape[0] <= nodes or shape[2] < 1:

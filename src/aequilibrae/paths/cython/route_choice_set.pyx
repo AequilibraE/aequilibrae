@@ -353,11 +353,11 @@ cdef class RouteChoiceSet:
             double [:, ::1] cost_matrix = np.zeros((c_cores, self.num_links), dtype=np.float64)
             bool [:, ::1] targets = np.zeros((c_cores, self.num_nodes), dtype=np.bool_)
             vector[CppSearchQuery] query_views
-            vector[CppMutableSearchResults] search_views
-            vector[CppAStarWorkspace] workspace_views
+            vector[CppMutableSearchResults[double]] search_views
+            vector[CppAStarWorkspace[double]] workspace_views
             SearchWorkspace workspace
-            vector[CppNodeBasedContext] node_views
-            vector[CppTurnBasedContext] turn_views
+            vector[CppNodeBasedContext[double]] node_views
+            vector[CppTurnBasedContext[double]] turn_views
             SearchResults search
 
         # Each worker keeps its own cost binding, target and result buffers.
@@ -968,7 +968,7 @@ cdef class RouteChoiceSet:
     @cython.wraparound(False)
     cdef RouteCandidate *trace_route(
         RouteChoiceSet self,
-        const CppMutableSearchResults &result,
+        const CppMutableSearchResults[double] &result,
         size_t destination,
         bint save_turns
     ) noexcept nogil:
@@ -995,10 +995,10 @@ cdef class RouteChoiceSet:
     cdef void path_find(
         RouteChoiceSet self,
         CppSearchQuery &query,
-        const CppMutableSearchResults &result,
-        const CppAStarWorkspace &workspace,
-        const CppNodeBasedContext &node_context,
-        const CppTurnBasedContext &turn_context,
+        const CppMutableSearchResults[double] &result,
+        const CppAStarWorkspace[double] &workspace,
+        const CppNodeBasedContext[double] &node_context,
+        const CppTurnBasedContext[double] &turn_context,
         size_t destination,
         const RouteChoiceHeuristic &heuristic
     ) noexcept nogil:
@@ -1040,10 +1040,10 @@ cdef class RouteChoiceSet:
         unsigned int max_misses,
         double [::1] thread_cost,
         CppSearchQuery &query,
-        const CppMutableSearchResults &result,
-        const CppAStarWorkspace &workspace,
-        const CppNodeBasedContext &node_context,
-        const CppTurnBasedContext &turn_context,
+        const CppMutableSearchResults[double] &result,
+        const CppAStarWorkspace[double] &workspace,
+        const CppNodeBasedContext[double] &node_context,
+        const CppTurnBasedContext[double] &turn_context,
         const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,
@@ -1210,10 +1210,10 @@ cdef class RouteChoiceSet:
         unsigned int max_misses,
         double [::1] thread_cost,
         CppSearchQuery &query,
-        const CppMutableSearchResults &result,
-        const CppAStarWorkspace &workspace,
-        const CppNodeBasedContext &node_context,
-        const CppTurnBasedContext &turn_context,
+        const CppMutableSearchResults[double] &result,
+        const CppAStarWorkspace[double] &workspace,
+        const CppNodeBasedContext[double] &node_context,
+        const CppTurnBasedContext[double] &turn_context,
         const RouteChoiceHeuristic &heuristic,
         double penalty,
         unsigned int seed,

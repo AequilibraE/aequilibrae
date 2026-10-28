@@ -13,8 +13,8 @@
 namespace aequilibrae::paths::cpp::routing {
 
 // Sum all supplied link fields in one walk of the state tree.
-template <typename T>
-void sum_skim_fields(const SearchResults &results,
+template <typename T, typename Cost>
+void sum_skim_fields(const SearchResults<Cost> &results,
                      const SkimmingContext<T> &context,
                      const SkimmingWorkspace<T> &workspace) noexcept {
   const auto width = context.additive_field_count;
@@ -46,8 +46,8 @@ void sum_skim_fields(const SearchResults &results,
 }
 
 // Copy each node's link sums from its terminal state.
-template <typename T>
-void skim_fields(const SearchResults &results,
+template <typename T, typename Cost>
+void skim_fields(const SearchResults<Cost> &results,
                  const SkimmingWorkspace<T> &workspace,
                  const DenseMatrixOriginView<T> &output) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
@@ -69,9 +69,10 @@ void skim_fields(const SearchResults &results,
 }
 
 // Copy labels rather than summing the objective again. This needs no scratch
-// and preserves the search's exact double values, including its turn costs.
-template <typename T>
-void project_skim_labels(const SearchResults &results, const double *labels,
+// and preserves the search's exact values when the output precision matches,
+// including its turn costs.
+template <typename T, typename Cost>
+void project_skim_labels(const SearchResults<Cost> &results, const Cost *labels,
                          const DenseMatrixOriginView<T> &output,
                          std::size_t field) noexcept {
   const T infinity = std::numeric_limits<T>::infinity();
@@ -89,23 +90,23 @@ void project_skim_labels(const SearchResults &results, const double *labels,
   }
 }
 
-template <typename T>
-void skim_costs(const SearchResults &results,
+template <typename T, typename Cost>
+void skim_costs(const SearchResults<Cost> &results,
                 const DenseMatrixOriginView<T> &output,
                 std::size_t field) noexcept {
   project_skim_labels(results, results.distances, output, field);
 }
 
-template <typename T>
-void skim_turn_costs(const SearchResults &results,
+template <typename T, typename Cost>
+void skim_turn_costs(const SearchResults<Cost> &results,
                      const DenseMatrixOriginView<T> &output,
                      std::size_t field) noexcept {
   project_skim_labels(results, results.turn_costs, output, field);
 }
 
 // Overwrite one output row using finalised paths.
-template <typename T>
-void skimming(const SearchResults &results, const SkimmingContext<T> &context,
+template <typename T, typename Cost>
+void skimming(const SearchResults<Cost> &results, const SkimmingContext<T> &context,
               const SkimmingWorkspace<T> &workspace,
               const DenseMatrixOriginView<T> &output) noexcept {
   static_assert(std::is_floating_point_v<T>);

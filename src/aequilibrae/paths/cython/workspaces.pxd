@@ -11,18 +11,18 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
         CPP_PAIRING "aequilibrae::paths::cpp::routing::SearchHeap::Pairing"
         CPP_STD "aequilibrae::paths::cpp::routing::SearchHeap::Std"
 
-    cdef cppclass CppSearchHeapStorage "aequilibrae::paths::cpp::routing::SearchHeapStorage":
+    cdef cppclass CppSearchHeapStorage "aequilibrae::paths::cpp::routing::SearchHeapStorage"[T]:
         CppSearchHeapStorage(size_t, CppSearchHeap) except +
 
-    cdef cppclass CppSearchWorkspace "aequilibrae::paths::cpp::routing::SearchWorkspace":
+    cdef cppclass CppSearchWorkspace "aequilibrae::paths::cpp::routing::SearchWorkspace"[T]:
         CppSearchWorkspace() noexcept
-        CppSearchHeapStorage *heap
+        CppSearchHeapStorage[T] *heap
 
-    cdef cppclass CppAStarWorkspace "aequilibrae::paths::cpp::routing::AStarWorkspace":
+    cdef cppclass CppAStarWorkspace "aequilibrae::paths::cpp::routing::AStarWorkspace"[T]:
         CppAStarWorkspace() noexcept
-        CppSearchWorkspace search
-        double *costs
-        double *estimates
+        CppSearchWorkspace[T] search
+        T *costs
+        T *estimates
 
     cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::routing::LoadingWorkspace"[T]:
         CppLoadingWorkspace() noexcept
@@ -43,7 +43,7 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
 
     cdef cppclass CppAoNWorkspace "aequilibrae::paths::cpp::routing::AoNWorkspace"[T]:
         CppAoNWorkspace() noexcept
-        CppSearchWorkspace search
+        CppSearchWorkspace[T] search
         CppLoadingWorkspace[T] loading
         CppSkimmingWorkspace[T] skimming
         CppSelectLinkWorkspace select_link
@@ -53,13 +53,13 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
 cdef class SearchWorkspace:
     cdef readonly size_t node_count, state_count
     cdef readonly object heap
-    cdef CppSearchHeapStorage *heap_storage
-    cdef CppSearchWorkspace view(self) noexcept nogil
+    cdef CppSearchHeapStorage[double] *heap_storage
+    cdef CppSearchWorkspace[double] view(self) noexcept nogil
 
 
 cdef class AStarWorkspace(SearchWorkspace):
     cdef double[::1] costs_buffer, estimates_buffer
-    cdef CppAStarWorkspace a_star_view(self) noexcept nogil
+    cdef CppAStarWorkspace[double] a_star_view(self) noexcept nogil
 
 
 cdef class LoadingWorkspace:

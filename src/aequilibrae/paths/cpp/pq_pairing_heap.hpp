@@ -7,19 +7,20 @@
 
 namespace aequilibrae::paths::cpp {
 
-class PairingHeap final : public PriorityQueueBase<PairingHeap> {
+template <typename T>
+class PairingHeap final : public PriorityQueueBase<PairingHeap<T>, T> {
 public:
   static constexpr const char *kName = "PairingHeap";
 
   PairingHeap() noexcept = default;
 
-  ~PairingHeap() { free_heap(); }
+  ~PairingHeap() { this->free_heap(); }
 
 private:
-  friend class PriorityQueueBase<PairingHeap>;
+  friend class PriorityQueueBase<PairingHeap<T>, T>;
 
   void init_heap_impl(std::size_t length) noexcept {
-    free_heap();
+    this->free_heap();
 
     length_ = length;
     size_ = 0;
@@ -31,7 +32,7 @@ private:
     }
   }
 
-  void alloc_heap_impl(std::size_t length) noexcept { init_heap(length); }
+  void alloc_heap_impl(std::size_t length) noexcept { this->init_heap(length); }
 
   void reset_heap_impl() noexcept {
     size_ = 0;
@@ -50,12 +51,12 @@ private:
     root_ = kNullIdx;
   }
 
-  void insert_impl(std::size_t element_idx, double key) noexcept {
+  void insert_impl(std::size_t element_idx, T key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
     // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
     assert(elements_[element_idx].state != IN_HEAP);
-    assert(key < kInfinity);
+    assert(key < kInfinity<T>);
 
     Element &element = elements_[element_idx];
     element.key = key;
@@ -68,7 +69,7 @@ private:
     ++size_;
   }
 
-  void decrease_key_impl(std::size_t element_idx, double key_new) noexcept {
+  void decrease_key_impl(std::size_t element_idx, T key_new) noexcept {
     assert(element_idx < length_);
     assert(elements_[element_idx].state == IN_HEAP);
     assert(key_new <= elements_[element_idx].key);
@@ -82,7 +83,7 @@ private:
     root_ = meld_roots(root_, element_idx);
   }
 
-  double peek_impl() const noexcept {
+  T peek_impl() const noexcept {
     assert(size_ > 0);
     assert(root_ != kNullIdx);
     return elements_[root_].key;
@@ -151,12 +152,12 @@ private:
     return elements_[element_idx].state;
   }
 
-  double element_key_impl(std::size_t element_idx) const noexcept {
+  T element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
   }
 
   struct Element {
-    double key;
+    T key;
     ElementState state;
     std::size_t child;
     std::size_t next;
@@ -171,7 +172,7 @@ private:
   std::size_t root_ = kNullIdx;
 
   void initialize_element(std::size_t element_idx) noexcept {
-    elements_[element_idx].key = kInfinity;
+    elements_[element_idx].key = kInfinity<T>;
     elements_[element_idx].state = NOT_IN_HEAP;
     elements_[element_idx].child = kNullIdx;
     elements_[element_idx].next = kNullIdx;
