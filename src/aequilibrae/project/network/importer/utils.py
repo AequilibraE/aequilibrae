@@ -1,22 +1,15 @@
 import math
 
-import geopandas as gpd
 import pandas as pd
 from pyproj import Geod
 
 NODE_ID_START = 100000
 
-# Use geodesic lengths when the extent is too wide for one UTM zone.
 _MAX_UTM_SPAN_DEGREES = 3.0
 
 
 def compute_lengths(geoms) -> pd.Series:
     """Lengths in metres, using local UTM or geodesic distance for wide extents."""
-    if not isinstance(geoms, gpd.GeoSeries):
-        geoms = gpd.GeoSeries(geoms, crs="EPSG:4326")
-    if geoms.crs is None:
-        geoms = geoms.set_crs("EPSG:4326")
-
     minx, miny, maxx, maxy = geoms.total_bounds
     span = max(float(maxx - minx), float(maxy - miny))
 
@@ -24,16 +17,8 @@ def compute_lengths(geoms) -> pd.Series:
         utm = geoms.estimate_utm_crs()
         return geoms.to_crs(utm).length.astype(float)
 
-    return _geodesic_lengths(geoms)
-
-
-def _geodesic_lengths(geoms) -> pd.Series:
     geod = Geod(ellps="WGS84")
     return pd.Series([float(geod.geometry_length(g)) for g in geoms], index=geoms.index, dtype=float)
-
-
-# Number of fractional sample positions used when comparing two geometries.
-_ALIGNMENT_SAMPLES = 16
 
 
 def bearing_degrees(start, end) -> float:
@@ -46,31 +31,24 @@ def angular_difference_degrees(a: float, b: float) -> float:
 
 def line_straightness(geom) -> float:
     """Chord/length ratio in [0, 1]; 1 means perfectly straight."""
-    coords = geom.coords
-    if len(coords) < 2:
-        return 1.0
-    chord = math.hypot(coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1])
-    length = float(geom.length)
+    length = geom.length
     if length <= 0.0:
         return 1.0
-    return max(0.0, min(1.0, chord / length))
+    coords = geom.coords
+    return min(1.0, math.hypot(coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1]) / length)
 
 
-def aligned_along_geometry(geom_a, geom_b, samples: int = _ALIGNMENT_SAMPLES) -> bool:
+def aligned_along_geometry(geom_a, geom_b, samples: int = 16) -> bool:
     """Return whether sampled points align better forward than in reverse."""
     fractions = [i / samples for i in range(samples + 1)]
     pts_a = [geom_a.interpolate(f, normalized=True) for f in fractions]
     pts_b = [geom_b.interpolate(f, normalized=True) for f in fractions]
-
-    forward_err = 0.0
-    reverse_err = 0.0
-    for k in range(samples + 1):
-        forward_err += pts_a[k].distance(pts_b[k])
-        reverse_err += pts_a[k].distance(pts_b[samples - k])
+    forward_err = sum(a.distance(b) for a, b in zip(pts_a, pts_b, strict=True))
+    reverse_err = sum(a.distance(b) for a, b in zip(pts_a, reversed(pts_b), strict=True))
     return forward_err <= reverse_err
 
 
-def compute_node_modes(node_ids, links: pd.DataFrame, fallback: str = "") -> list:
+def compute_node_modes(node_ids, links: pd.DataFrame, fallback: str = "c") -> list:
     nodes_col = pd.concat([links["a_node"], links["b_node"]], ignore_index=True)
     modes_col = pd.concat([links["modes"], links["modes"]], ignore_index=True).map(set)
     per_node = (

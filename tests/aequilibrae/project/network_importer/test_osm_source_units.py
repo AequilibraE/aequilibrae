@@ -2,6 +2,7 @@
 
 import geopandas as gpd
 import pytest
+from shapely import from_wkt
 from shapely.geometry import LineString, MultiLineString, Point
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
@@ -24,6 +25,11 @@ def test_first_last_points_multilinestring_spans_parts():
 def test_first_last_points_unsupported_geometry():
     assert _first_last_points(None) == (None, None)
     assert _first_last_points(Point(1, 1)) == (None, None)
+
+
+@pytest.mark.parametrize("wkt", ["MULTILINESTRING (EMPTY, (0 0, 1 1))", "MULTILINESTRING ((0 0, 1 1), EMPTY)"])
+def test_first_last_points_with_empty_endpoint_parts(wkt):
+    assert _first_last_points(from_wkt(wkt)) == (None, None)
 
 
 def _nodes_frame(ids, points):
