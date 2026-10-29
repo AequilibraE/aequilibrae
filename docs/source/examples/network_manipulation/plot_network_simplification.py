@@ -20,14 +20,15 @@ We use Folium to visualize the resulting network.
 # %%
 
 # Imports
+from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
+
 import branca
 import folium
-from uuid import uuid4
-from tempfile import gettempdir
-from os.path import join
 
-from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
+from aequilibrae.utils.create_example import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
 
@@ -47,9 +48,7 @@ centroid_count = nodes.data.query("is_centroid == 1").shape[0]
 
 if centroid_count == 0:
     arbitrary_node = nodes.data["node_id"][0]
-    nd = nodes.get(arbitrary_node)
-    nd.is_centroid = 1
-    nd.save()
+    nodes.update(arbitrary_node, is_centroid=1)
 
 # %%
 
@@ -70,8 +69,7 @@ graph.set_blocked_centroid_flows(False)
 
 # Let's revert to setting up that node as centroid in case we had to do it
 if centroid_count == 0:
-    nd.is_centroid = 0
-    nd.save()
+    nodes.update(arbitrary_node, is_centroid=0)
 
 # %%
 # We check the number of links and nodes our project has initially.
@@ -91,7 +89,6 @@ net = NetworkSimplifier(project)
 # and the output of this operation is
 
 net.simplify(graph)
-net.rebuild_network()
 
 # %%
 # Let's plot the previous and actual networks!
@@ -124,7 +121,6 @@ fig
 # Notice that this operation modifies the network in the neighborhood.
 
 net.collapse_links_into_nodes([903])
-net.rebuild_network()
 
 # %%
 # Let's plot the network once again and check the modifications!

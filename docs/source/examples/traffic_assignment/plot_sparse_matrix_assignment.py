@@ -35,6 +35,7 @@ from uuid import uuid4
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
 from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
@@ -78,8 +79,7 @@ proj_matrices.list()
 
 # %%
 # We get the demand matrix, and prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Let's perform the traffic assignment
@@ -93,14 +93,13 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 # Then we set these parameters, which an only be configured after adding one class to the assignment
-assig.set_vdf("BPR")  # This is not case-sensitive 
 
-# Then we set the volume delay function and its parameters
-assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+# Setting the volume delay function and its parameters
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
 # The capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
 
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")
@@ -118,7 +117,7 @@ skims = assig.skim_congested(["distance"], return_matrices=True)
 
 # Skims are returned as a dictionary, with the class names as keys
 # Let's see all skims we have inside it:
-print(skims["car"].names)
+print(skims["car"].field_names)
 
 # %%
 # We can save the skims, but we need to choose to only save the final ones, as the blended were not generated

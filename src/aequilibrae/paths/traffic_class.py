@@ -1,13 +1,14 @@
-import warnings
 import logging
-from copy import deepcopy
-from typing import Union, List, Tuple, Dict
+import warnings
 from abc import ABC
+from copy import deepcopy
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
+from aequilibrae.paths.graph import Graph, GraphBase, TransitGraph
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 logger = logging.getLogger(__name__)
@@ -25,11 +26,12 @@ class TransportClassBase(ABC):  # noqa: B024
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
+        if not isinstance(matrix, AequilibraeMatrix):
+            raise TypeError("Matrix must be an AequilibraeMatrix")
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-
-        if matrix.matrix_view.dtype != graph.default_types("float"):
-            raise TypeError("Matrix's computational view need to be of type np.float64")
+        if any(values.dtype != np.float64 for values in matrix.values()):
+            raise TypeError("Matrix values need to be of type np.float64")
         self._config = {}
         self.graph = graph
         self.matrix = matrix
@@ -44,17 +46,14 @@ class TransportClassBase(ABC):  # noqa: B024
         }
         self._config["Graph"] = str(graph_config)
 
+        matrix_names = tuple(matrix)
         mat_config = {
-            "Source": matrix.file_path or "",
-            "Number of centroids": matrix.zones,
-            "Matrix cores": matrix.view_names,
+            "Source": matrix.metadata.get("source", ""),
+            "Number of centroids": len(matrix.index),
+            "Matrix cores": matrix_names,
         }
         # Totals go into the config as plain floats, as NumPy scalars do not serialize cleanly
-        view = np.nan_to_num(matrix.matrix_view)
-        if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {nm: float(view.sum()) for nm in matrix.view_names}
-        else:
-            mat_config["Matrix totals"] = {nm: float(view[:, :, i].sum()) for i, nm in enumerate(matrix.view_names)}
+        mat_config["Matrix totals"] = {name: float(np.nan_to_num(matrix[name]).sum()) for name in matrix_names}
         self._config["Matrix"] = str(mat_config)
 
     @property
@@ -76,12 +75,12 @@ class TrafficClass(TransportClassBase):
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
         >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
         >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> # Set to True to apply automatic centroid-connector turn bans where needed
         >>> graph.set_blocked_centroid_flows(False)
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx")
-        >>> demand.computational_view()
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
         >>> tc = TrafficClass("car", graph, demand)
         >>> tc.set_pce(1.3)
@@ -112,6 +111,7 @@ class TrafficClass(TransportClassBase):
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.congested_time = np.array([])
+        self.congested_skims = None
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -119,9 +119,12 @@ class TrafficClass(TransportClassBase):
         :Arguments:
             **pce** (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
         """
-        if not isinstance(pce, (float, int)):
-            raise ValueError("PCE needs to be either integer or float ")
-        self.pce = pce
+        if isinstance(pce, bool) or not isinstance(pce, (float, int)):
+            raise ValueError("PCE must be a positive finite number")
+        value = float(pce)
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("PCE must be a positive finite number")
+        self.pce = value
 
     def set_heap(self, heap: str) -> None:
         """Sets the priority queue implementation used for path finding when assigning this class.
@@ -147,7 +150,8 @@ class TrafficClass(TransportClassBase):
 
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
-        if np.any(np.isnan(self.graph.graph[field_name].values)):
+        self.graph.graph[field_name] = pd.to_numeric(self.graph.graph[field_name], errors="raise").astype(np.float64)
+        if np.any(pd.isna(self.graph.graph[field_name].to_numpy())):
             logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:
@@ -162,7 +166,15 @@ class TrafficClass(TransportClassBase):
             **value_of_time** (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
         """
 
-        self.vot = float(value_of_time)
+        if isinstance(value_of_time, bool):
+            raise ValueError("Value of time must be a positive finite number")
+        try:
+            value = float(value_of_time)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Value of time must be a positive finite number") from exc
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("Value of time must be a positive finite number")
+        self.vot = value
 
     def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
         """Set the selected links. Checks if the links and directions are valid. Translates link_id and
@@ -173,7 +185,7 @@ class TrafficClass(TransportClassBase):
             **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
             Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
-        for name, link_set in links.items():
+        for name, link_set in (links or {}).items():
             if len(name.split(" ")) != 1:
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = str.join("_", name.split(" "))
@@ -203,22 +215,34 @@ class TrafficClass(TransportClassBase):
 
     def skim_congested(self, skim_fields=None):
         """
-        Skims the congested network. The user can add a list of skims to be computed, which
-        will be added to the congested time and the assignment cost from the last iteration of
-        the assignment.
+        Skims the congested network using the final assignment costs.
+
+        Congested time includes link travel time and turn delay. Assignment cost
+        also includes fixed costs, such as tolls converted to time units.
 
         :Arguments:
             **skim_fields** (:obj:`Union[None, str]`): Name of the skims to use. If None, uses default only
         """
-        self.graph.graph = self.graph.graph.assign(
-            __assignment_cost__=self.graph.cost, __congested_time__=self.congested_time
+        from aequilibrae.paths.assignment_context import AssignmentInputs
+
+        if self.congested_time.size == 0:
+            raise RuntimeError("Run the assignment before skimming congested costs")
+        fields = [skim_fields] if isinstance(skim_fields, str) else list(skim_fields or [])
+        inputs = AssignmentInputs(
+            self.graph,
+            self.matrix,
+            "__congested_time__",
+            {},
+            self.results.cores,
+            skim_fields=fields + ["__congested_time__"],
+            cost_name="__assignment_cost__",
+            heap=self.results._heap,
         )
-        skims = (skim_fields or []) + ["__assignment_cost__", "__congested_time__"]
-        pre_fields = self.graph.skim_fields
-        self.graph.set_skimming(skims)
-        skimmer = self.graph.compute_skims()
-        self.graph.set_skimming(pre_fields)
-        return skimmer
+        inputs.update_costs(self.congested_time, self.fixed_cost)
+        # FIXME: Use a separate skim-only driver when one is available.
+        output = inputs.driver.run(inputs.driver.make_outputs()).skimming
+        self.congested_skims = inputs.report_skims(output)
+        return self.congested_skims
 
     def __setattr__(self, key, value):
         if key not in [
@@ -238,6 +262,7 @@ class TrafficClass(TransportClassBase):
             "_selected_links",
             "_config",
             "congested_time",
+            "congested_skims",
         ]:
             raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value
@@ -249,8 +274,8 @@ class TransitClass(TransportClassBase):
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
 
-        if len(matrix.view_names) == 1:
-            self.matrix_core = matrix.view_names[0]
+        if len(matrix) == 1:
+            self.matrix_core = next(iter(matrix))
         else:
             self.matrix_core = None
 
@@ -260,6 +285,6 @@ class TransitClass(TransportClassBase):
 
         :Arguments:
             **core** (:obj:`str`):"""
-        if core not in self.matrix.view_names:
-            raise KeyError(f"'{core}' is not present in `matrix.view_names`")
+        if core not in self.matrix:
+            raise KeyError(f"'{core}' is not present in the matrix")
         self.matrix_core = core

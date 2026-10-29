@@ -64,8 +64,8 @@ graph.set_graph("length")  # sets the cost field for path computation
 
 graph.set_skimming(["length", "free_flow_time"]) # sets the skims to be computed
 
-graph.set_blocked_centroid_flows(False)  # we don't block flows through centroids because all nodes
-                                         # in the Sioux Falls network are centroids
+graph.set_blocked_centroid_flows(False)  # keep centroid connector turns allowed because all
+                                         # nodes in the Sioux Falls network are centroids
 
 # %%
 # Two of AequilibraE's new features consist in directly computing path or skims.
@@ -96,7 +96,7 @@ skm = graph.compute_skims()
 # %%
 # Let's get the values for 'free_flow_time' matrix.
 skims = skm.results.skims
-skims.get_matrix("free_flow_time")
+skims["free_flow_time"]
 
 # %%
 # Now we're all set!

@@ -33,8 +33,8 @@ requires-python = ">=3.11" # match classifiers above and ruff version below
 dependencies = [
   "cysignals",
   "geopandas",
-  "numpy>=2.0",
-  "openmatrix",
+  "numpy>=2.4.6",
+  "openmatrix>=0.4.0b1",
   "pandas>=3.0",
   "pyaml",
   "pyarrow",
@@ -44,9 +44,17 @@ dependencies = [
   "scipy>=1.4",
   "shapely>=2.0",
   "tqdm",
+  "numexpr",
 ]
 
 [project.optional-dependencies]
+
+create = [
+  "osmnx>=2.1,<3",
+  "pyrosm>=0.6.2",
+  "neatnet>=0.1.6",
+  "overturemaps>=1.0"
+]
 
 docs = [
   "enum34",
@@ -79,7 +87,9 @@ tests = [
   "wheel",
 ]
 
-dev = ['aequilibrae[tests, docs]']
+dev = [
+  "aequilibrae[tests, docs, create]"
+]
 
 [tool.uv.extra-build-dependencies]
 sphinx-autodoc-annotation = ["setuptools"]

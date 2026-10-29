@@ -26,7 +26,6 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
@@ -76,12 +75,11 @@ project.run["graph_summary"]()
 #
 # This function replicates the example in which we :ref:`create Delaunay lines <creating_delaunay_lines>`.
 func_string = """
-def create_delaunay(source: str, name: str, computational_view: str, result_name: str, overwrite: bool=False):\n
+def create_delaunay(source: str, name: str, matrix_core: str, result_name: str, overwrite: bool=False):\n
 \tfrom aequilibrae.utils.create_delaunay_network import DelaunayAnalysis\n
 \tproject = get_active_project()\n
 \tmatrix = project.matrices\n
-\tmat = matrix.get_matrix(name)\n
-\tmat.computational_view(computational_view)\n
+\tmat = matrix.get_matrix(name, subset=[matrix_core])\n
 \tda = DelaunayAnalysis(project)\n
 \tda.create_network(source, overwrite)\n
 \tda.assign_matrix(mat, result_name)\n
@@ -95,11 +93,11 @@ with open(join(folder, "run", "__init__.py"), "a") as file:
 # %%
 # Now we add new parameters to our model
 
-p = Parameters()
+p = project.project_parameters
 p.parameters["run"]["create_delaunay"] = {}
 p.parameters["run"]["create_delaunay"]["source"] = "zones"
 p.parameters["run"]["create_delaunay"]["name"] = "demand_omx"
-p.parameters["run"]["create_delaunay"]["computational_view"] = "matrix"
+p.parameters["run"]["create_delaunay"]["matrix_core"] = "matrix"
 p.parameters["run"]["create_delaunay"]["result_name"] = "my_run_module_example"
 p.write_back()
 

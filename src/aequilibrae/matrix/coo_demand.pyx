@@ -3,6 +3,8 @@ import pandas as pd
 import logging
 from scipy.sparse import coo_matrix as sp_coo_matrix
 
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+
 
 cdef class GeneralisedCOODemand:
     def __init__(self, origin_col: str, destination_col: str, nodes_to_indices, shape=None):
@@ -48,10 +50,11 @@ cdef class GeneralisedCOODemand:
         """
         Add an AequilibraE matrix to the existing demand in a sparse manner.
         """
+        if not isinstance(matrix, AequilibraeMatrix):
+            raise TypeError("matrix must be an AequilibraeMatrix")
         dfs = []
-        for i, name in enumerate(matrix.view_names):
+        for name, m in matrix.items():
             assert name not in self.df.columns, f"Matrix name ({name}) already exists in the matrix cube"
-            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
             if np.nansum(m) == 0:
                 continue
 

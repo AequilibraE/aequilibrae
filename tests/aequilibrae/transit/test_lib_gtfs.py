@@ -64,13 +64,13 @@ def test_map_match_int_exception(route_system_builder):
         route_system_builder.map_match(route_types=[3.5])
 
 
-def test_map_match(route_system_builder: GTFSRouteSystemBuilder):
+def test_map_match(build_gtfs_project, route_system_builder: GTFSRouteSystemBuilder):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.set_allow_map_match(True)
     route_system_builder.map_match([3, 1, 2])
     route_system_builder.save_to_disk()
 
-    with database_connection("transit") as transit_conn:
+    with build_gtfs_project.project.transit_connection as transit_conn:
         assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
 
 
@@ -111,11 +111,11 @@ def test_load_date_not_available_date_exception(route_system_builder):
         route_system_builder.load_date("2020-06-01")
 
 
-def test_save_to_disk(route_system_builder):
+def test_save_to_disk(build_gtfs_project, route_system_builder):
     route_system_builder.load_date("2016-04-13")
     route_system_builder.save_to_disk()
 
-    with database_connection("transit") as transit_conn:
-        assert len(transit_conn.execute("SELECT * FROM route_links").fetchall()) == 78
-        assert len(transit_conn.execute("SELECT * FROM trips;").fetchall()) == 360
-        assert len(transit_conn.execute("SELECT * FROM routes;").fetchall()) == 2
+    with build_gtfs_project.project.transit_connection as transit_conn:
+        assert len(transit_conn.execute("SELECT * FROM route_links").fetchall()) == 156
+        assert len(transit_conn.execute("SELECT * FROM trips;").fetchall()) == 720
+        assert len(transit_conn.execute("SELECT * FROM routes;").fetchall()) == 4

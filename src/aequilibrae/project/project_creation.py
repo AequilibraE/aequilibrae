@@ -1,10 +1,9 @@
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 from sqlite3 import Connection
 
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
-
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
@@ -35,26 +34,37 @@ def create_base_tables(conn: Connection, db_type: str) -> None:
     # For a new database construction all present migrations should have already been applied implicitly by the new
     # schema. So we mark them all as skipped.
     mm = MigrationManager(base_folder / "migrations" / "migrations.py")
-    mm.mark_all_as_seen(conn)
     for migration in mm.migrations.values():
         migration.mark_as(conn, MigrationStatus.SKIPPED)
 
 
-def add_triggers(conn: Connection, db_type: str) -> None:
+def add_triggers(conn: Connection, db_type: str, skip: set[str] | None = None) -> None:
     """Adds consistency triggers to the project"""
     spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
+    if skip:
+        all_trigger_sets = [x for x in all_trigger_sets if x not in skip]
+
     for f in all_trigger_sets:
         qry_file = spec_folder / f"{f}.sql"
         run_queries_from_sql_file(conn, qry_file)
 
 
-def remove_triggers(conn: Connection, db_type: str, use_aequilibrae_prefix: bool = True) -> None:
+def remove_triggers(
+    conn: Connection,
+    db_type: str,
+    use_aequilibrae_prefix: bool = True,
+    skip: set[str] | None = None,
+) -> None:
     spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
         all_trigger_sets = file_list.readlines()
+
+    all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
+    if skip:
+        all_trigger_sets = [x for x in all_trigger_sets if x not in skip]
 
     create_drop_regex = re.compile(r"create\s+trigger\s+(\w+)", flags=re.I)
     for table in all_trigger_sets:

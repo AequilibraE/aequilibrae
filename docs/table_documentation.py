@@ -13,15 +13,15 @@ if str(project_dir) not in sys.path:
 
 class CreateTablesSRC:
     def __init__(self, component: str, tgt_fldr: str):
-        from aequilibrae.project.project import Project
         from aequilibrae.project.database_connection import database_connection
+        from aequilibrae.project.project import Project
         from aequilibrae.transit import Transit
 
         # Create a new project
         self.proj_path = join(gettempdir(), f"aequilibrae_{uuid4().hex[:6]}")
         self.proj = Project()
         self.proj.new(self.proj_path)
-        Transit(self.proj)
+        self.proj.scenario.create_transit_database()
 
         self.__folder = "network" if component == "project_database" else "transit"
         self.stub = "data_model"
@@ -31,9 +31,7 @@ class CreateTablesSRC:
             *Path(realpath(__file__)).parts[:-1],
             f"../src/aequilibrae/project/database_specification/{self.__folder}/tables",
         )
-        self.doc_path = str(
-            Path(realpath(__file__)).parent / "source" / "aequilibrae_project" / tgt_fldr
-        )
+        self.doc_path = str(Path(realpath(__file__)).parent / "source" / "aequilibrae_project" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -51,7 +49,7 @@ class CreateTablesSRC:
             reference = f".. _{table_name}_{self.__folder}_data_model:\n"
 
             # Title of the page
-            title = f'**{table_name.replace("_", " ")}** table structure'
+            title = f"**{table_name.replace('_', ' ')}** table structure"
             txt = [reference, title, "=" * len(title), ""]
 
             docstrings = self.__get_docstrings(table_name)

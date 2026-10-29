@@ -13,10 +13,9 @@ TransitGraphBuilder Assumptions:
 
 from __future__ import annotations
 
-from aequilibrae.paths import PathResults
-
-from pandas.core.frame import DataFrame
-
+import json
+import logging
+import sqlite3
 import warnings
 
 import numpy as np
@@ -24,14 +23,15 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
-import json
-import sqlite3
 from pandas.api.types import is_integer_dtype
+from pandas.core.frame import DataFrame
+from scipy.spatial import KDTree
 
+from aequilibrae.paths import PathResults
+from aequilibrae.paths.graph import NewTransitGraph
 from aequilibrae.utils.geo_utils import haversine
-from scipy.spatial import KDTree, minkowski_distance
 
-from aequilibrae.paths import TransitGraph
+logger = logging.getLogger(__name__)
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -88,8 +88,8 @@ class TransitGraphBuilder:
         **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to
         ``np.inf``.
 
-        **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids.
-        Defaults to ``True``.
+        **blocking_centroid_flows** (:obj:`bool`): Whether to prevent OD connector-through traversal
+        by splitting OD nodes into origin/destination roles. Defaults to ``True``.
 
         **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1``
         for unlimited.
@@ -511,13 +511,13 @@ class TransitGraphBuilder:
         """Create OD vertices from zones.
 
         If zones have not previously been added, add zones from the project.
-        If ``self.blocking_centroid_flow`` is ``True``, a distinction is made between
+        If ``self.blocking_centroid_flows`` is ``True``, a distinction is made between
         ``origin`` and ``destination`` vertices. Otherwise, they are both classified as ``od``.
         """
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(x.zone_id, x.geometry) for x in self.project.zoning.all_zones().values()],
+                    [(zone.zone_id, zone.geometry) for zone in self.project.network.zones],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -875,7 +875,7 @@ class TransitGraphBuilder:
             # Build up a list of dataframes to concat, each dataframe corresponds to all connectors for a given OD
             connectors = []
             for i, verts in enumerate(results):
-                distance = minkowski_distance(od_geometries[i], stop_geometries[verts])
+                distance = np.linalg.norm(od_geometries[i] - stop_geometries[verts], axis=1)
                 df = stop_vertices["node_id"].iloc[verts].to_frame()
                 df["b_node"] = od_vertices.iloc[i]["node_id"]  # OD is tail node of access connector
                 df["trav_time"] = distance / self.walking_speed
@@ -1295,10 +1295,9 @@ class TransitGraphBuilder:
             ]
         elif method == "connector project match":
             # Check validity of project and nodes database
-            warnings.warn(
+            logger.warning(
                 'In its current implementation, the "connector project match" method may take '
-                "a while for large networks.",
-                stacklevel=2,
+                "a while for large networks."
             )
 
             nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
@@ -1521,7 +1520,8 @@ class TransitGraphBuilder:
             if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError("cannot save links into a database with existing links in the same period")
 
-            df = self.edges[SF_EDGE_COLS + ["geometry"]]
+            df = self.edges[SF_EDGE_COLS + ["geometry"]].copy()
+            df.loc[df.stop_id == "", "stop_id"] = None
             conn.executemany(
                 f"""\
                 INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_id)
@@ -1570,7 +1570,7 @@ class TransitGraphBuilder:
 
     def save(
         self,
-        robust=True,
+        robust=None,
         pt_conn: sqlite3.Connection | None = None,
         project_conn: sqlite3.Connection | None = None,
     ):
@@ -1583,8 +1583,16 @@ class TransitGraphBuilder:
 
             **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
         """
+        if robust is not None:
+            warnings.warn(
+                "the 'robust' argument is deprecated and no longer in use. Duplicate geometries are allowed "
+                "within the public transport database.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self.create_additional_db_fields(conn=pt_conn)
-        self.save_vertices(robust=robust, conn=pt_conn)
+        self.save_vertices(conn=pt_conn)
         self.save_edges(conn=pt_conn)
         self.save_config(conn=project_conn)
 
@@ -1599,7 +1607,7 @@ class TransitGraphBuilder:
         cls.remove_vertices(pt_conn, period_id)
         cls.remove_config(project_conn, period_id)
 
-    def to_transit_graph(self) -> TransitGraph:
+    def to_transit_graph(self) -> NewTransitGraph:
         """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
 
         # TODO: Better required link type detections
@@ -1616,25 +1624,22 @@ class TransitGraphBuilder:
         assert self.od_node_mapping is not None
         assert self.vertices is not None
         assert self.edges is not None
-        g = TransitGraph(config=self.config, od_node_mapping=self.od_node_mapping)
-        g.network = self.edges.copy(deep=True)
-        g.cost = g.network.trav_time.values
-        g.free_flow_time = g.network.trav_time.values
-
-        g.network["id"] = g.network.link_id
-        g.prepare_graph(
-            self.vertices[
+        g = NewTransitGraph(
+            network=self.edges,
+            centroids=self.vertices[
                 (
                     (self.vertices.node_type == "origin")
                     if self.blocking_centroid_flows
                     else (self.vertices.node_type == "od")
                 )
             ].node_id.values,
-            remove_dead_ends=False,
+            time_field="trav_time",
+            frequency_field="freq",
+            od_node_mapping=self.od_node_mapping,
+            a_node_field="a_node",
+            b_node_field="b_node",
+            config=self.config,
         )
-        g.set_graph("trav_time")
-        g.set_blocked_centroid_flows(True)
-        g.graph.__compressed_id__ = g.graph.__compressed_id__.astype("int32")
 
         return g
 

@@ -310,3 +310,25 @@ The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not
 possible to enforce that users do not change these two fields, as it is not
 possible to choose the trigger application sequence in SQLite.
+
+.. _turn_restrictions_trigger_behaviour:
+
+Turn restrictions trigger behaviour
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``turn_restrictions`` table also has consistency triggers that are relevant
+for network editing, especially when links or nodes move.
+
+- Node sequence consistency: the movement must define a valid
+  ``from_node -> via_node -> to_node`` sequence.
+- Mode integrity: mode codes in ``turn_restrictions.modes`` must exist in
+  ``modes.mode_id``.
+- Mode-overlap protection: duplicate restrictions with overlapping modes for the
+  same node-sequence movement are blocked.
+- Geometry maintenance: ``turn_restrictions.geometry`` is rebuilt from the
+  3-node movement using SpatiaLite geometry functions, with each leg
+  capped at 30 m and a small offset at the via node for loop movements.
+
+For efficiency and maintainability, geometry is computed in one trigger that
+fires on movement field updates; insert and node-move events delegate to this
+same update path.

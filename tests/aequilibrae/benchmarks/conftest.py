@@ -9,10 +9,11 @@ import pandas as pd
 import pytest as pytest
 from scipy.stats import linregress
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, from_file
 from aequilibrae.paths import Graph, TrafficAssignment
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 # pytest .\tests\aequilibrae\benchmarks\* -- benchmark
 
@@ -66,7 +67,6 @@ def tntp_root():
 def tntp_matrix(model_folder, model_stub):
     mat = load_tntp_matrix(model_folder, model_stub)
     yield mat
-    mat.close()
 
 
 @pytest.fixture(scope="module")
@@ -98,10 +98,7 @@ def parse_tntp_header(folder: Path, model_stub: str) -> dict:
 def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
     omx_name = folder / f"{model_stub}_trips.omx"
     if omx_name.exists():
-        mat = AequilibraeMatrix()
-        mat.load(omx_name)
-        mat.computational_view()
-        return mat
+        return from_file(omx_name)
 
     matfile = str(folder / f"{model_stub}_trips.tntp")
     with open(matfile, "r") as fh:
@@ -128,12 +125,9 @@ def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
         for j in range(zones):
             mat_data[i, j] = matrix[i + 1].get(j + 1, 0)
 
-    mat = AequilibraeMatrix()
-    mat.create_empty(zones=zones, matrix_names=["matrix"], memory_only=True)
-    mat.matrix["matrix"][:, :] = mat_data[:, :]
-    mat.index[:] = index[:]
-    mat.computational_view(["matrix"])
-    mat.export(str(omx_name))
+    mat = AequilibraeMatrix(index=index)
+    mat["matrix"] = mat_data
+    mat.save_as_omx(omx_name)
     return mat
 
 
@@ -312,8 +306,7 @@ def run_validation(
 
         a = TrafficAssignment()
         a.set_classes([tc])
-        a.set_vdf("BPR")
-        a.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        a.set_vdf(bpr, {"alpha": "b", "beta": "power"})
         a.set_capacity_field("capacity")
         a.set_time_field("free_flow_time")
         a.max_iter = ITERATIONS

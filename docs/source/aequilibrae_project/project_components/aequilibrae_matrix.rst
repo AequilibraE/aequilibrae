@@ -3,119 +3,79 @@
 AequilibraE Matrix
 ==================
 
-The AequilibraEMatrix class is the AequilibraE vehicle to all things matrices, and in the 
-following sections we'll cover the main points regarding them.
+AequilibraE provides ``AequilibraeMatrix`` for in-memory matrix work and
+``MatrixStore`` for reading and updating OMX files on disk. For the complete
+API, see :doc:`../../matrix`.
 
 ``AequilibraeMatrix``
 ---------------------
 
-This class allows the creation of a memory instance for a matrix, that can be used to load an existing
-matrix to the project, or to create a new one. 
+Create an in-memory matrix by providing its zone index, then assign named
+matrix arrays directly:
 
-There are three ways of creating an ``AequilibraeMatrix``:
+.. doctest::
 
-* from an OMX file;
-* from a trip list, which is nothing more than a CSV file containing the origins, destinations, and trip cores; 
-* from an empty matrix. In this case, the data type must be one of the following NumPy data types: 
-  ``np.int32``, ``np.int64``, ``np.float32``, ``np.float64``.
-    
-.. code-block:: python
+    >>> import numpy as np
+    >>> from pathlib import Path
+    >>> from tempfile import TemporaryDirectory
+    >>> from aequilibrae.matrix import AequilibraeMatrix, from_file
 
-    >>> from aequilibrae.matrix import AequilibraeMatrix
-    
-    >>> num_zones = 5
-    >>> index = np.arange(1, 6, dtype=np.int32)
-    >>> mtx = np.ones((5, 5), dtype=np.float32)
-    >>> names = ["only_ones"]
+    >>> index = np.arange(1, 6, dtype=np.uint64)
+    >>> values = np.ones((5, 5), dtype=np.float32)
+    >>> mat = AequilibraeMatrix(index=index, index_name="zones")
+    >>> mat["only_ones"] = values
 
-    >>> mat = AequilibraeMatrix()
-    >>> mat.create_empty(zones=num_zones, matrix_names=names) #memory_only parameter defaults to True
-
-    # `memory_only` parameter can be changed to `False` case you want to save the matrix in disk.
-	# This would, however, result in a file format that is being deprecated and will not be available on AequilibraE 2.0
-
-    # Adds the matrix indexes, which are going to be used for computation
-    >>> mat.index[:] = index[:]
-
-    # Adds the matricial data stored in `mtx` to a matrix named "only_ones"
-    >>> mat.matrix["only_ones"][:,:] = mtx[:,:]
-
-The following methods allow you to check the data in you AequilibraE matrix.
-
-.. code-block:: python
-
-    >>> mat.cores # displays the number of cores in the matrix
-    1
-
-    >>> mat.names # displays the names of the matrices
+    # Inspect its names and zone index.
+    >>> list(mat)
     ['only_ones']
-    
-    >>> mat.index # displays the IDs of the indexes
-    array([1, 2, 3, 4, 5])
-    
-    # To return an array with the selected matrix data
-    >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    >>> mat.index
+    array([1, 2, 3, 4, 5], dtype=uint64)
+    >>> mat["only_ones"]
     array([[1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.],
-           [1., 1., 1., 1., 1.]])
+           [1., 1., 1., 1., 1.]], dtype=float32)
 
-More than dealing with stored project data, AequilibraE matrices are objects necessary to run procedures,
-such as traffic assignment. Since a matrix object can hold multiple matrices (i.e. _matrix cores\_),
-it is necessary to specify which matrices will be used in computation, dubbed a computational view in 
-AequilibraE, which sets matrix data in memory in a way it can be used in parallelized algorithms.
+Use the named array directly in computations. ``subset()`` creates an
+independent in-memory copy containing only the requested matrices:
 
-Case you're using matricial data from an OMX file, this step also loads the data to memory.
+.. doctest::
 
-.. code-block:: python
+    >>> working = mat.subset(["only_ones"])
+    >>> working["only_ones"].shape
+    (5, 5)
 
-    >>> mat.computational_view(["only_ones"])
+Save an in-memory matrix as OMX with ``save_as_omx()`` and load it with
+``from_file()``. A single OMX index is inferred automatically; pass
+``index_name`` when the file has multiple indices and no ``main_index``.
 
-You can also export AequilibraE matrices, with your chosen set of _matrix cores\_, to different file 
-formats, such as CSV and OMX.
+.. doctest::
 
-.. code-block:: python
+    >>> matrix_tmpdir = TemporaryDirectory()
+    >>> omx_path = Path(matrix_tmpdir.name) / "matrix_example.omx"
+    >>> mat.save_as_omx(omx_path)
+    >>> loaded = from_file(omx_path, subset=["only_ones"])
+    >>> loaded["only_ones"].shape
+    (5, 5)
 
-    >>> mat.export(Path(my_folder_path) / 'my_new_omx_file.omx')
+A ``MatrixStore`` keeps data on disk and is useful when loading every matrix
+into memory is undesirable. Select a working subset directly with
+``from_file(..., subset=...)`` or use a store to inspect the file before
+selecting matrices:
 
-    >>> mat.export(Path(my_folder_path) / 'my_new_csv_file.csv')
+.. doctest::
 
-
-To avoid inconsistencies, once open, the same AequilibraE matrix can only be used once at a time in different
-procedures. To do so, you have to close the matrix.
-
-.. code-block:: python
-
-    >>> mat.close()
-
-AequilibraE matrices in disk can be reused and loaded once again.
-
-.. code-block:: python
-
-    >>> mat = AequilibraeMatrix()
-    >>> mat.load(Path(my_folder_path) / 'my_new_omx_file.omx')
-
-    >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
-    array([[1., 1., 1., 1., 1.],
-           [1., 1., 1., 1., 1.],
-           [1., 1., 1., 1., 1.],
-           [1., 1., 1., 1., 1.],
-           [1., 1., 1., 1., 1.]])
-
-.. seealso::
-
-    :func:`aequilibrae.matrix.aequilibrae_matrix.AequilibraeMatrix`
-        Class documentatiom
-    :ref:`plot_assignment_without_model`
-        Usage example 
+    >>> with from_file(omx_path, store=True) as store:
+    ...     list(store)
+    ['only_ones']
 
 OpenMatrix (OMX)
 ----------------
 
-AequilibraE uses OMX files as a standard format for storing its matrices. 
-If you're wondering what is OMX and what does
-it stand for, this section is for you. The text in this section is borrowed from 
+AequilibraE uses OMX files as a standard format for storing its matrices. If
+you're wondering what OMX is and what it stands for, this section is for you.
+The text in this section is borrowed from
 `OpenMatrix Wiki page <https://github.com/osPlanning/omx/wiki>`_.
 
 The OpenMatrix file format (or simply OMX) is a standard matrix format for storing and
@@ -124,7 +84,6 @@ the model development easier. It is a file capable of storing more than one matr
 at a time, including multiple indexes/lookups, and attributes (key/value pairs) for matrices and
 indexes.
 
-There are APIs in different programming languages that allow you to use OMX. In Python, we use
-``omx-python`` library. In its project page, you can find a 
-`brief tutorial <https://github.com/osPlanning/omx-python?tab=readme-ov-file#quick-start-sample-code>`_
-to OMX, and better understand how it works.
+There are APIs in different programming languages that allow you to use OMX.
+In Python, we use the ``omx-python`` library. See its project page for a
+`brief tutorial <https://github.com/osPlanning/omx-python?tab=readme-ov-file#quick-start-sample-code>`_.

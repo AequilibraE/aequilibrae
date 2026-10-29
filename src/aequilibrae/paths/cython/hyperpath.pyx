@@ -218,22 +218,22 @@ cdef void compute_SF_in_parallel(
 ):
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
     cdef:
-        uint32_t *thread_demand_origins
-        double *thread_demand_values
-        double *thread_edge_volume
+        uint32_t *thread_demand_origins = NULL
+        double *thread_demand_values = NULL
+        double *thread_edge_volume = NULL
         size_t demand_size
 
-        double *thread_u_i_vec
-        double *thread_f_i_vec
-        double *thread_u_j_c_a_vec
-        double *thread_v_i_vec
-        uint8_t *thread_h_a_vec
-        uint32_t *thread_edge_indices
-        uint32_t *thread_hyperpath_order
-        uint32_t *thread_hyperpath_ids
+        double *thread_u_i_vec = NULL
+        double *thread_f_i_vec = NULL
+        double *thread_u_j_c_a_vec = NULL
+        double *thread_v_i_vec = NULL
+        uint8_t *thread_h_a_vec = NULL
+        uint32_t *thread_edge_indices = NULL
+        uint32_t *thread_hyperpath_order = NULL
+        uint32_t *thread_hyperpath_ids = NULL
 
-        double *thread_skim_i_vec
-        double *thread_skim_j_vec
+        double *thread_skim_i_vec = NULL
+        double *thread_skim_j_vec = NULL
 
         # This is a shared buffer, all threads will write into separate slices depending on their threadid.
         # When writing all threads must increment!
@@ -304,7 +304,7 @@ cdef void compute_SF_in_parallel(
                     demand_size = demand_size + 1
             else:
                 demand_size = 0
-                for j in range(o_vert_ids_view.shape[0]):
+                for j in range(<size_t>o_vert_ids_view.shape[0]):
                     if nodes_to_indices[o_vert_ids_view[j]] == -1:
                         continue
 

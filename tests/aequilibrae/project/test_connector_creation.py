@@ -11,7 +11,7 @@ def initial_state(coquimbo_example):
     return {
         "nodes": project.network.nodes.data,
         "links": project.network.links.data,
-        "zones": project.zoning.data,
+        "zones": project.network.zones.data,
         "initial_connectors": project.network.links.data[project.network.links.data.link_type == "centroid_connector"],
     }
 
@@ -187,7 +187,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
     """Test connector creation with distance upper bound."""
     project = coquimbo_example
 
-    # Test with very small distance bound - should create fewer connectors
+    # Test with a small distance bound in metres - should create fewer connectors
     with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
@@ -197,7 +197,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
             modes=["c"],
             k_connectors=5,
             limit_to_zone=True,
-            distance_upper_bound=0.001,
+            distance_upper_bound=100,
         )
 
     updated_links_small = project.network.links.data

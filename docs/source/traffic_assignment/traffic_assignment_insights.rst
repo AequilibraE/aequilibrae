@@ -121,8 +121,11 @@ it for those looking to implement their own variations of this algorithm or to s
 purposes.
 
 * The relative gap is computed with the cost used to compute the All-or-Nothing portion of the iteration, 
-  and although the literature on this is obvious, we took some time to realize that we should re-compute the 
-  travel costs only **AFTER** checking for convergence.
+  using the accepted flow at that same iterate. Travel costs are recomputed only **AFTER** checking for convergence.
+
+* Every descent algorithm uses the same exact line search: the step size is the root of the directional
+  derivative of the Beckmann objective over ``[0, 1]``, which is the line search the conjugate-direction
+  theory assumes. No algorithm-specific cap is applied to the step.
 
 * In some instances, Frank-Wolfe is extremely unstable during the first iterations on assignment, resulting on 
   numerical errors on our line search. We found that setting the step size to the corresponding MSA value 

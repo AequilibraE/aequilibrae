@@ -1,6 +1,8 @@
+import numpy as np
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
 
@@ -24,16 +26,10 @@ def graph(coquimbo_example: Project):
 @pytest.fixture(scope="function")
 def demand(graph):
     n_zones = graph.centroids.shape[0]
-    matrix = AequilibraeMatrix()
-    matrix.create_empty(zones=n_zones, matrix_names=["car"])
-    matrix.index = graph.centroids
-
-    matrix.matrices[:, :, 0] = 5  # 5 trips from each OD should cause a little bit of congestion
-    matrix.computational_view("car")
+    matrix = AequilibraeMatrix(index=graph.centroids)
+    matrix["car"] = np.full((n_zones, n_zones), 5.0)  # 5 trips per OD cause a little congestion
 
     yield matrix
-
-    matrix.close()
 
 
 def _assignment(
@@ -43,11 +39,9 @@ def _assignment(
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
-
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("travel_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1  # AON assignment
     assignment.set_algorithm("msa")
 

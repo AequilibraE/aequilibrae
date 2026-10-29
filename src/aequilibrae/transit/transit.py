@@ -4,14 +4,13 @@ import shutil
 import sqlite3
 from os import PathLike
 from pathlib import Path
-from typing import Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List
 
 import pandas as pd
 
 if TYPE_CHECKING:
     from aequilibrae import Project
 
-from aequilibrae.utils.python_signal import PythonSignal
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
@@ -21,6 +20,7 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.get_table import get_geo_table
 from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.python_signal import PythonSignal
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,6 @@ class Transit(WorkerThread):
     }
     default_pces: dict[int | str, int | float] = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
     graphs: Dict[int, TransitGraphBuilder] = {}
-    pt_con: sqlite3.Connection
 
     def __init__(self, project: "Project"):
         """
@@ -51,9 +50,6 @@ class Transit(WorkerThread):
         super().__init__(None)
 
         self.project: "Project" = project
-        self.periods: Periods = project.network.periods
-
-        self.create_transit_database()
 
     def get_table(self, table_name: str) -> pd.DataFrame:
         with self.project.transit_connection as conn:
@@ -121,7 +117,7 @@ class Transit(WorkerThread):
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
         'project.network.Periods' for more details.
         """
-        period_id: int = kwargs.pop("period_id", self.periods.default_period.period_id)
+        period_id: int = kwargs.pop("period_id", self.project.network.periods.default_period.period_id)
 
         graph = TransitGraphBuilder(self.project, period_id, **kwargs)
         graph.create_graph()

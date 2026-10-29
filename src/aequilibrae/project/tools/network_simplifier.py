@@ -1,18 +1,16 @@
-import warnings
 import logging
 from copy import deepcopy
 from math import ceil
-from typing import List, TYPE_CHECKING, Optional, Literal
+from typing import TYPE_CHECKING, List, Literal, Optional
 
 if TYPE_CHECKING:
     from aequilibrae.project import Project
 
 import numpy as np
-import pandas as pd
 import numpy.typing as npt
+import pandas as pd
 from shapely.geometry.linestring import LineString
-from shapely.ops import linemerge
-from shapely.ops import substring
+from shapely.ops import linemerge, substring
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.graph import Graph
@@ -33,7 +31,7 @@ class NetworkSimplifier(WorkerThread):
         self.network = self.project.network
         self.link_layer = self.network.links.data
 
-        warnings.warn("This will alter your database in place. Make sure you have a backup.", stacklevel=2)
+        logger.warning("This will alter your database in place. Make sure you have a backup.")
 
     def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
@@ -104,7 +102,7 @@ class NetworkSimplifier(WorkerThread):
 
             new_geo = linemerge(geos)
             if not isinstance(new_geo, LineString):
-                warnings.warn(f"Failed to merge geometry for superlink around link {rec.link_id}", stacklevel=2)
+                logger.warning("Failed to merge geometry for superlink around link %s", rec.link_id)
                 continue
 
             break_into = ceil(new_geo.length)
@@ -190,7 +188,7 @@ class NetworkSimplifier(WorkerThread):
 
     def __execute_link_deletion_and_addition(self, new_links: list[dict], links_to_delete: pd.DataFrame | list):
         df = pd.DataFrame(new_links)
-        df = df.drop(columns=["a_node", "b_node", "geometry", "ogc_fid"]).rename({"geo": "geometry"}, axis=1)
+        df = df.drop(columns=["a_node", "b_node", "geometry"]).rename({"geo": "geometry"}, axis=1)
         cols = list(df.columns)
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
@@ -205,13 +203,12 @@ class NetworkSimplifier(WorkerThread):
             conn.commit()
 
         # Validate that we kept distances the same
-        old_dist = self.link_layer.geometry.length.sum()
-        new_layer = self.network.links
-        new_layer.refresh()
-        new_dist = new_layer.data.geometry.length.sum()
+        distance_crs = self.link_layer.estimate_utm_crs()
+        old_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
+        self.link_layer = self.network.links.data
+        new_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
 
-        logger.warning(f"Old distance: {old_dist}, new distance: {new_dist}. Difference: {old_dist - new_dist}")
-        self.link_layer = new_layer.data
+        logger.warning("Old distance: %s, new distance: %s. Difference: %s", old_dist, new_dist, old_dist - new_dist)
 
     def collapse_links_into_nodes(self, links: List[int]):
         """
@@ -233,12 +230,3 @@ class NetworkSimplifier(WorkerThread):
 
         self.link_layer = self.network.links.data
         logger.warning(f"{len(links)} links collapsed into nodes")
-
-    def rebuild_network(self):
-        """Rebuilds the network elements that would have to be rebuilt after massive network simplification"""
-
-        self.network.links.refresh()
-        self.network.nodes.refresh()
-
-        with commit_and_close(self.project.path_to_file, spatial=True) as conn:
-            conn.execute("VACUUM")

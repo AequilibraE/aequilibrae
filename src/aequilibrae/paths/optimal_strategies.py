@@ -3,7 +3,6 @@ import logging
 import numpy as np
 from scipy import sparse
 
-from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 logger = logging.getLogger(__name__)
 
@@ -22,54 +21,21 @@ class OptimalStrategies:
 
             self.__results[cls._id] = cls.results
             try:
-                # converts 0 based array with custom index to COO matrix, ignores custom index
-                idx = cls.matrix.view_names.index(cls.matrix_core)
-                demand = sparse.coo_matrix(
-                    (
-                        cls.matrix.matrix_view[:, :, idx]
-                        if len(cls.matrix.view_names) > 1
-                        else cls.matrix.matrix_view[:, :]
-                    ),
-                    dtype=np.float64,
-                )
-            except ValueError as e:
-                raise ValueError(
-                    f"matrix core {cls.matrix_core} not found in matrix view. "
-                    f"Ensure the matrix is prepared and the core exists"
-                ) from e
+                # Converts the named matrix to a 0-based COO matrix; the custom zone IDs are mapped below.
+                demand = sparse.coo_matrix(cls.matrix[cls.matrix_core], dtype=np.float64)
+            except KeyError as e:
+                raise ValueError(f"matrix core {cls.matrix_core} is not present in the matrix") from e
 
-            # Take the COO matrix and lookup the index values (taz_id)
-            taz_row = cls.matrix.index[demand.row]
-            taz_col = cls.matrix.index[demand.col]
-            # Since the aeq matrix indexes based on centroids, and the transit graph can make the distinction between
-            # origins and destinations, We need to translate the index of the cols in to the destination node_ids for
-            # the assignment
-            od_node_mapping = cls.graph.od_node_mapping.copy()
-            od_node_mapping["idx"] = od_node_mapping.index
-            od_node_mapping = od_node_mapping.set_index("taz_id")
+            hypergraph = cls.graph.context
 
-            o_key, d_key = (
-                ("node_id", "node_id") if len(cls.graph.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
-            )
-
-            # map taz_id, taz_id -> O, D, demand value triplet
+            # The HyperpathGenerating maps taz_id, taz_id -> O, D, we then take the COO matrix and index into that
             self.__demand_cols[cls._id] = {
-                "origin_column": od_node_mapping.loc[taz_row, o_key].to_numpy().astype(np.uint32),
-                "destination_column": od_node_mapping.loc[taz_col, d_key].values.astype(np.uint32),
+                "origin_column": hypergraph._o_vert_ids[demand.row].astype(np.uint32),
+                "destination_column": hypergraph._d_vert_ids[demand.col].astype(np.uint32),
                 "demand_column": demand.data,
             }
 
-            self.__classes[cls._id] = HyperpathGenerating(
-                cls.graph.graph,
-                head="a_node",
-                tail="b_node",
-                trav_time=self.__assig_spec._config["Time field"],
-                freq=self.__assig_spec._config["Frequency field"],
-                skim_cols=self.__assig_spec._config["Skimming Fields"],
-                o_vert_ids=od_node_mapping[o_key].to_numpy(),  # taz_id
-                d_vert_ids=od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
-                nodes_to_indices=cls.graph.nodes_to_indices,
-            )
+            self.__classes[cls._id] = hypergraph
 
         for cls in self.__assig_spec.classes:
             hyperpath = self.__classes[cls._id]

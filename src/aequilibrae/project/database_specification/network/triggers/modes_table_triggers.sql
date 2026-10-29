@@ -1,7 +1,9 @@
 -- Prevents a mode record to be changed when it is in use for any link
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_updating BEFORE UPDATE OF mode_id ON "modes"
 WHEN
-(Select count(*) from links where instr(modes, old.mode_id) > 0)>0
+(
+    (Select count(*) from links where instr(modes, old.mode_id) > 0)
+)>0
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
@@ -10,7 +12,9 @@ END;
 -- Prevents a mode record to be removed when it is in use for any link
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_deleting BEFORE DELETE ON "modes"
 WHEN
-(Select count(*) from links where instr(modes, old.mode_id) > 0)>0
+(
+    (Select count(*) from links where instr(modes, old.mode_id) > 0)
+)>0
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;

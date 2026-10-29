@@ -305,9 +305,10 @@ understand, and then we'll perform the assignment.
     from scipy.stats import linregress
     from quetzal.model import stepmodel
 
-    from aequilibrae.matrix import AequilibraeMatrix
+    from aequilibrae.matrix import AequilibraeMatrix, from_file
     from aequilibrae.paths import Graph, TrafficAssignment
     from aequilibrae.paths.traffic_class import TrafficClass
+    from aequilibrae.paths.vdf import bpr
 
 
     BASE = Path(r"C:\Users\jake\src\aequilibrae\TransportationNetworks")
@@ -379,10 +380,7 @@ understand, and then we'll perform the assignment.
     def build_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
         omx_name = folder / f"{model_stub}_trips.omx"
         if omx_name.exists():
-            mat = AequilibraeMatrix()
-            mat.load(omx_name)
-            mat.computational_view()
-            return mat
+            return from_file(omx_name)
 
         matfile = str(folder / f"{model_stub}_trips.tntp")
         with open(matfile, "r") as fh:
@@ -405,12 +403,9 @@ understand, and then we'll perform the assignment.
             for j in range(zones):
                 mat_data[i, j] = matrix[i + 1].get(j + 1, 0)
 
-        mat = AequilibraeMatrix()
-        mat.create_empty(zones=zones, matrix_names=["matrix"], memory_only=True)
-        mat.matrix["matrix"][:, :] = mat_data[:, :]
-        mat.index[:] = index[:]
-        mat.computational_view(["matrix"])
-        mat.export(str(omx_name))
+        mat = AequilibraeMatrix(index=index, index_name="zones")
+        mat["matrix"] = mat_data
+        mat.save_as_omx(str(omx_name))
         return mat
 
 
@@ -554,7 +549,7 @@ understand, and then we'll perform the assignment.
             {
                 "origin": np.repeat(zone_ids, n),
                 "destination": np.tile(zone_ids, n),
-                "car": mat.matrix_view.flatten(),
+                "car": mat["matrix"].flatten(),
             }
         )
         sm.volumes = sm.volumes[sm.volumes["car"] != 0.0].reset_index(drop=True)
@@ -636,9 +631,8 @@ understand, and then we'll perform the assignment.
             assig_class.set_vot(1.0)
 
         assig = TrafficAssignment()
-        assig.set_classes([assig_class])
-        assig.set_vdf("BPR")
-        assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        assig.set_classes([assigclass])
+        assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
         assig.set_capacity_field("capacity")
         assig.set_time_field("free_flow_time")
         assig.max_iter = MAX_ITER

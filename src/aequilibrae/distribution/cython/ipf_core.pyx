@@ -134,8 +134,8 @@ cpdef void _total_attra(cython.floating[:, :] flows,
                         const double[:] prod_tgt,
                         double[::1] attr_tot,
                         int cpus) noexcept:
-    cdef long i, j, jk
-    cdef double *local_buf
+    cdef long i, j = 0, jk
+    cdef double *local_buf = NULL
     cdef long n_rows = flows.shape[0]
     cdef long J = flows.shape[1]
 

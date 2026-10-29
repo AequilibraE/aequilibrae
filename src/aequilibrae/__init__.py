@@ -4,9 +4,8 @@ import logging
 from aequilibrae import distribution, matrix, paths, project, transit
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf, SyntheticGravityModel
 from aequilibrae.log import Log
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.assignment_paths import AssignmentPaths
 from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.network_skimming import NetworkSkimming
@@ -30,11 +29,11 @@ __all__ = [
     "GravityCalibration",
     "SyntheticGravityModel",
     "AequilibraeMatrix",
+    "MatrixStore",
     "distribution",
     "NetworkSkimming",
     "TrafficClass",
     "VDF",
-    "allOrNothing",
     "TrafficAssignment",
     "Graph",
     "AssignmentPaths",

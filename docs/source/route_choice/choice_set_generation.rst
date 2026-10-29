@@ -26,10 +26,35 @@ choices. Despite the optimisations implemented to reduce the computational load 
 route set generation overhead, computational time is still not trivial, as pathfinding remains the 
 dominant factor in determining runtime.
 
-Link-Penalization
+A* searches
+-----------
+
+Both methods use Dijkstra by default. To use A*, supply coordinates when constructing
+``RouteChoice`` and select the search options through ``set_choice_set_generation``:
+
+.. code-block:: python
+
+    from aequilibrae.paths import RouteChoice, estimate_heuristic_scale
+
+    # coordinates is a DataFrame with planar x/y columns indexed by external node ID.
+    scale = estimate_heuristic_scale(graph, coordinates)
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_choice_set_generation(
+        "bfsle", max_routes=5, a_star=True, heuristic="euclidean", heuristic_scale=scale
+    )
+
+Euclidean A* requires coordinates for every graph node in a planar coordinate system. For Haversine A*, use
+``heuristic="haversine"``.
+
+A* requires an explicit finite, nonnegative scale to convert distance to cost units.  A scale above a consistent bound
+can give non-shortest paths and change the route sets.  A consistent bound remains valid when links are removed or their
+costs increase.  Both heuristics support turn penalties and prohibited turns. Equal-cost paths may be selected
+differently from Dijkstra, which can also change later routes in the set.
+
+Link-Penalisation
 -----------------
 
-The link Penalization (LP) method is one of the most traditional approaches for generating route 
+The link penalisation (LP) method is one of the most traditional approaches for generating route
 choice sets. It consists of an iterative approach where, in each iteration, the shortest path 
 between the origin and the destination in question is computed. After each iteration, however, a 
 pre-defined penalty factor is applied to all links that are part of the path found, essentially 
@@ -37,7 +62,8 @@ modifying the graph to make the previously found path less attractive.
 
 The LP method is a simple and effective way to generate route choice sets, but it is sensitive to 
 the penalty factor, which can significantly affect the quality of the generated choice sets, 
-requiring experimentation during the model development/estimation stage.
+requiring experimentation during the model development/estimation stage. For both LP
+and BFS-LE, the factor must be finite and at least 1. A factor of 1 disables penalisation.
 
 The overhead of the LP method is negligible due to AequilibraE's internal data structures that 
 allow for easy data manipulation of the graph in memory.

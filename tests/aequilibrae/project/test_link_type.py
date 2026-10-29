@@ -19,26 +19,21 @@ def link_types(empty_no_triggers_project):
 
 
 def test_changing_link_type_id(no_triggers_test):
-    lt = random.choice(list(no_triggers_test.network.link_types.all_types().values()))
+    link_types = no_triggers_test.network.link_types
+    lt = random.choice(list(link_types))
+    other = next(candidate for candidate in link_types if candidate.link_type_id != lt.link_type_id)
 
-    with pytest.raises(ValueError):
-        lt.link_type_id = "test my description"
-
-    with pytest.raises(ValueError):
-        lt.link_type_id = "K"
+    with pytest.raises(IntegrityError, match="UNIQUE constraint failed: link_types.link_type_id"):
+        link_types.update(lt.link_type_id, link_type_id=other.link_type_id)
 
 
 def test_empty(link_types):
-    newt = link_types.new("Z")
-    with pytest.raises(IntegrityError):
-        newt.save()
+    with pytest.raises(IntegrityError, match="NOT NULL constraint failed: link_types.link_type"):
+        link_types.insert(link_type_id="Z")
 
 
 def test_save(empty_no_triggers_project, link_types, random_string):
-    newt = link_types.new("Z")
-    newt.link_type = random_string
-    newt.description = random_string[::-1]
-    newt.save()
+    link_types.insert(link_type_id="Z", link_type=random_string, description=random_string[::-1])
 
     with read_and_close(empty_no_triggers_project.path_to_file) as conn:
         sql = 'select description, link_type from link_types where link_type_id="Z"'

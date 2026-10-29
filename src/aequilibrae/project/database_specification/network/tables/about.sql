@@ -47,3 +47,7 @@ INSERT INTO 'about' (infoname) VALUES('license');
 
 --#
 INSERT INTO 'about' (infoname) VALUES('scenario_name');
+
+--#
+INSERT INTO 'about' (infoname, infovalue) VALUES('allow_uturns', '0');
+

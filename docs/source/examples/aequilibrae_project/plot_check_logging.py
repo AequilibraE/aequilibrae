@@ -22,6 +22,7 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 # sphinx_gallery_thumbnail_path = '../source/_images/logs_image.png'
 
 # %%
@@ -42,8 +43,7 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # We get our demand matrix from the project and create a computational view
 proj_matrices = project.matrices
-demand = proj_matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Now let's perform our traffic assignment
@@ -52,10 +52,10 @@ assig = TrafficAssignment()
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
 assig.add_class(assigclass)
-assig.set_vdf("BPR")
-assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-assig.set_capacity_field("capacity")
+assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
+
 assig.set_algorithm("bfw")
 assig.max_iter = 50
 assig.rgap_target = 0.001
@@ -74,7 +74,7 @@ with open(join(fldr, "aequilibrae.log")) as file:
 #
 # In lines 8-9 we get the Traffic Class specifications.
 # We can see that there is only one traffic class (car). Its **graph** key presents information
-# on blocked flow through centroids, number of centroids, links, and nodes.
+# on whether blocked centroid flows are enabled, plus the number of centroids, links, and nodes.
 # In the **matrix** key, we find information on where in the disk the matrix file is located.
 # We also have information on the number of centroids and nodes, as well as on the matrix/matrices
 # used for computation. In our example, we only have one matrix named matrix, and the total

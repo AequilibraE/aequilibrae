@@ -33,6 +33,7 @@ import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.paths.vdf import bpr
 
 # sphinx_gallery_thumbnail_number = 3
 # %%
@@ -82,9 +83,8 @@ proj_matrices = project.matrices
 proj_matrices.list()
 
 # %%
-# We get the demand matrix, and prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+# Load the demand matrix core for computation.
+demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
 # Let's perform the traffic assignment
@@ -98,13 +98,13 @@ assig = TrafficAssignment()
 assig.add_class(assigclass)
 
 # Then we set these parameters, which an only be configured after adding one class to the assignment
-assig.set_vdf("BPR")  # This is not case-sensitive 
+# Setting the volume delay function and its parameters
 
-# Then we set the volume delay function and its parameters
-assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
-# The capacity and free flow travel times as they exist in the graph
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 assig.set_capacity_field("capacity")
+
+
+# The free flow travel times as they exist in the graph
 assig.set_time_field("free_flow_time")
 
 # And the algorithm we want to use to assign
@@ -169,44 +169,32 @@ import numpy as np
 from aequilibrae.distribution import GravityCalibration
 
 # %%
-# We need the demand matrix and to prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx")
-demand.computational_view(["matrix"])
+# Load the demand matrix core for computation.
+demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
 # %%
-# We also need the skims we just saved into our project
-imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
-
-# We can check which matrix cores were created for our skims to decide which one to use
-imped.names
-
-# %%
-# Where ``free_flow_time_final`` is actually the congested time for the last iteration
-#
-# But before using the data, let's get some impedance for the intrazonals.
-# Let's assume it is 75% of the closest zone.
+# We also need the skims we just saved into our project. We select the congested-time core.
 imped_core = "free_flow_time_final"
-imped.computational_view([imped_core])
+imped = proj_matrices.get_matrix("base_year_assignment_skims_car", subset=[imped_core])
 
-# If we run the code below more than once, we will be overwriting the diagonal values with nonsensical data
-# so let's zero it first
-np.fill_diagonal(imped.matrix_view, 0)
-
-# We compute it with a little bit of NumPy magic
-intrazonals = np.amin(imped.matrix_view, where=imped.matrix_view > 0, initial=imped.matrix_view.max(), axis=1)
+# Where ``free_flow_time_final`` is the congested time for the last iteration.
+# Use 75% of the closest zone for intrazonal impedance.
+impedance_values = imped[imped_core].copy()
+np.fill_diagonal(impedance_values, 0)
+intrazonals = np.amin(
+    impedance_values, where=impedance_values > 0, initial=impedance_values.max(), axis=1
+)
 intrazonals *= 0.75
+np.fill_diagonal(impedance_values, intrazonals)
 
-# Then we fill in the impedance matrix
-np.fill_diagonal(imped.matrix_view, intrazonals)
-
-# %%
-# Since we are working with an OMX file, we cannot overwrite a matrix on disk. 
-# So let's give it a new name to save.
-imped.save(names=["final_time_with_intrazonals"])
-
-# %%
-# This also updates these new matrices as those being used for computation
-imped.view_names
+# Store the prepared core as a separate project matrix.
+del imped[imped_core]
+imped["final_time_with_intrazonals"] = impedance_values
+proj_matrices.create(
+    "base_year_assignment_skims_car_intrazonals",
+    "base_year_assignment_skims_car_intrazonals.omx",
+    matrix=imped,
+)
 
 # %%
 # Let's calibrate our Gravity Model
@@ -217,7 +205,10 @@ for function in ["power", "expo"]:
     # We save the model
     model.save(join(fldr, f"{function}_model.mod"))
 
-    _ = plot_tlfd(gc.result_matrix.matrix_view, imped.matrix_view, f"{function} model")
+    result_core = next(iter(gc.result_matrix))
+    _ = plot_tlfd(
+        gc.result_matrix[result_core], imped["final_time_with_intrazonals"], f"{function} model"
+    )
 
     # We can save the result of applying the model as well
     # We can also save the calibration report
@@ -227,7 +218,7 @@ for function in ["power", "expo"]:
 
 # %%
 # And let's plot a trip length frequency distribution for the demand itself
-plt = plot_tlfd(demand.matrix_view, imped.matrix_view, "demand")
+plt = plot_tlfd(demand["matrix"], imped["final_time_with_intrazonals"], "demand")
 plt.show()
 
 # %%
@@ -245,8 +236,8 @@ from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityMo
 # ~~~~~~~~~~~~~~~~~~~~~~
 # 
 # First thing to do is to compute the future vectors from our matrix.
-origins = np.sum(demand.matrix_view, axis=1)
-destinations = np.sum(demand.matrix_view, axis=0)
+origins = np.sum(demand["matrix"], axis=1)
+destinations = np.sum(demand["matrix"], axis=0)
 
 # Then grow them with some random growth between 0 and 10%, and balance them
 orig = origins * (1 + np.random.rand(origins.shape[0]) / 10)
@@ -280,13 +271,14 @@ ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 # ~~~~~~~~~
 # 
 # Let's get the base-year assignment skim for car we created before and prepare it for computation
-imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
-imped.computational_view(["final_time_with_intrazonals"])
+imped = proj_matrices.get_matrix(
+    "base_year_assignment_skims_car_intrazonals", subset=["final_time_with_intrazonals"]
+)
 
 # %%
 # If we wanted the main diagonal to not be considered...
 
-# np.fill_diagonal(imped.matrix_view, np.nan)
+# np.fill_diagonal(imped["final_time_with_intrazonals"], np.nan)
 
 # %%
 # Now we apply the Synthetic Gravity model
@@ -320,12 +312,11 @@ proj_matrices.list()
 # We'll perform traffic assignment for the future year.
 # Let's get our future demand matrix, which corresponds to the IPF result we just saved,
 # and see what is the core we ended up getting. It should be ``matrix``.
-demand = proj_matrices.get_matrix("demand_ipfd_omx")
-demand.names
+demand = proj_matrices.get_matrix("demand_ipfd_omx", subset=["matrix"])
+list(demand)
 
 # %%
-# Let's prepare our data for computation
-demand.computational_view("matrix")
+# The selected matrix core is ready for computation.
 
 # %%
 # The future year assignment is quite similar to the one we did for the base-year.
@@ -338,14 +329,12 @@ assig = TrafficAssignment()
 # Add at a list of traffic classes to be assigned
 assig.add_class(assigclass)
 
-assig.set_vdf("BPR")
-
 # Set the volume delay function and its parameters
-assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
+assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
 # Set the capacity and free flow travel times as they exist in the graph
-assig.set_capacity_field("capacity")
 assig.set_time_field("free_flow_time")
+assig.set_capacity_field("capacity")
 
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")

@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, PathResults
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.matrix import AequilibraeMatrix
 
 
@@ -15,17 +16,14 @@ def select_link_setup(sioux_falls_single_class):
     car_graph = sioux_falls_single_class.network.graphs["c"]  # type: Graph
     car_graph.set_graph("free_flow_time")
     car_graph.set_blocked_centroid_flows(False)
-    matrix = sioux_falls_single_class.matrices.get_matrix("demand_omx")
-    matrix.computational_view()
+    matrix = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
 
     assignment = TrafficAssignment()
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
 
@@ -36,8 +34,6 @@ def select_link_setup(sioux_falls_single_class):
         "assignment": assignment,
         "assignclass": assignclass,
     }
-
-    matrix.close()
 
 
 def test_multiple_link_sets(select_link_setup):
@@ -54,19 +50,9 @@ def test_multiple_link_sets(select_link_setup):
     assignment.execute()
 
     for key in assignclass._selected_links.keys():
-        od_mask, link_loading = create_od_mask(
-            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
     # Test if files are saved in the right place
     assignment.save_select_link_results("select_link_analysis")
@@ -78,8 +64,8 @@ def test_multiple_link_sets(select_link_setup):
     # Test if matrices are with the correct shape and are not empty
     sla = matrices.get_matrix("select_link_analysis_omx")
     num_zones = assignment.classes[0].graph.num_zones
-    for mat in sla.names:
-        m = sla.get_matrix(mat)
+    for mat in sla:
+        m = sla[mat]
         assert m.sum() > 0 and m.shape == (num_zones, num_zones)
 
     results = project.results.list()["table_name"].to_list()
@@ -99,19 +85,9 @@ def test_equals_demand_one_origin(select_link_setup):
     assignment.execute()
 
     for key in assignclass._selected_links.keys():
-        od_mask, link_loading = create_od_mask(
-            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 
 def test_single_demand(select_link_setup):
@@ -125,26 +101,17 @@ def test_single_demand(select_link_setup):
 
     custom_demand = np.zeros((24, 24, 1)).astype(float)
     custom_demand[0, 23, 0] = 1000
-    matrix.matrix_view = custom_demand
+    core = next(iter(matrix))
+    matrix[core] = custom_demand[:, :, 0]
     assignclass.matrix = matrix
 
     assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
     assignment.execute()
 
     for key in assignclass._selected_links.keys():
-        od_mask, link_loading = create_od_mask(
-            assignclass.matrix.matrix_view, assignclass.graph, assignclass._selected_links[key]
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_od.matrix[key][:, :, 0],
-            od_mask,
-            err_msg=f"OD SL matrix for: {key} does not match",
-        )
-        np.testing.assert_allclose(
-            assignclass.results.select_link_loading[key],
-            link_loading,
-            err_msg=f"Link loading SL matrix for: {key} does not match",
-        )
+        od_mask, link_loading = create_od_mask(assignclass.matrix, assignclass.graph, assignclass._selected_links[key])
+        np.testing.assert_allclose(assignclass.results.select_link_od.matrices[key][:, :, 0], od_mask)
+        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
 
 
 def test_select_link_network_loading(select_link_setup):
@@ -164,11 +131,9 @@ def test_select_link_network_loading(select_link_setup):
     new_assignment = TrafficAssignment()
     new_assignclass = TrafficClass("car", car_graph, matrix)
     new_assignment.set_classes([new_assignclass])
-    new_assignment.set_vdf("BPR")
-    new_assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    new_assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    new_assignment.set_capacity_field("capacity")
+    new_assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     new_assignment.set_time_field("free_flow_time")
+    new_assignment.set_capacity_field("capacity")
     new_assignment.max_iter = 1
     new_assignment.set_algorithm("msa")
 
@@ -224,9 +189,8 @@ def test_kaitang(test_data_path, tmp_path):
     g.set_blocked_centroid_flows(False)
     g.set_graph("fft")
 
-    aem_mat = AequilibraeMatrix()
-    aem_mat.load(os.path.join(tmp_path, "demand_a.aem"))
-    aem_mat.computational_view(["a"])
+    aem_mat = AequilibraeMatrix(index=centroids_array)
+    aem_mat["a"] = np.ones((len(centroids_array), len(centroids_array)))
 
     assign_class = TrafficClass("class_a", g, aem_mat)
     assign_class.set_fixed_cost("a_toll")
@@ -235,10 +199,9 @@ def test_kaitang(test_data_path, tmp_path):
 
     assign = TrafficAssignment()
     assign.set_classes([assign_class])
-    assign.set_vdf("BPR")
-    assign.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
-    assign.set_capacity_field("capacity")
+    assign.set_vdf(bpr, {"alpha": "alpha", "beta": "beta"})
     assign.set_time_field("fft")
+    assign.set_capacity_field("capacity")
     assign.set_algorithm("bfw")
     assign.max_iter = 100
     assign.rgap_target = 0.0001
@@ -266,11 +229,9 @@ def test_multi_iteration(select_link_setup, algorithm):
     assignment = TrafficAssignment()
     assignclass = TrafficClass("car", car_graph, matrix)
     assignment.set_classes([assignclass])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     assignment.set_algorithm(algorithm)
 
@@ -289,7 +250,8 @@ def test_multi_iteration(select_link_setup, algorithm):
     )
 
 
-def create_od_mask(demand: np.array, graph: Graph, sl):
+def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
+    demand = np.stack([demand[name] for name in demand], axis=2)
     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
     graph.set_graph("free_flow_time")
 

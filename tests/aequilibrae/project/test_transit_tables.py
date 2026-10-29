@@ -6,6 +6,7 @@ from aequilibrae.transit import Transit
 
 @pytest.fixture(scope="function")
 def create_project(empty_project: Project):
+    empty_project.scenario.create_transit_database()
     yield Transit(empty_project)
 
 

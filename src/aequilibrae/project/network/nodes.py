@@ -1,122 +1,120 @@
-from copy import deepcopy
+import logging
 
-import geopandas as gpd
 import pandas as pd
+from shapely.geometry import Point
 
-from aequilibrae.project.basic_table import BasicTable
-from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.network.node import Node
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.network.connector_creation import connector_creation
+from aequilibrae.project.network.links import Links
+from aequilibrae.project.project_table import SpatialProjectTable
+
+logger = logging.getLogger(__name__)
 
 
-class Nodes(BasicTable):
+class Nodes(SpatialProjectTable):
     """
-    Access to the API resources to manipulate the nodes table in the network
+    Object to manipulate the nodes table in the database.
 
     .. code-block:: python
 
+        >>> from shapely.geometry import Point
+
         >>> project = create_example(project_path)
 
-        >>> all_nodes = project.network.nodes
+        >>> nodes = project.network.nodes
 
-        # We can just get one link in specific
-        >>> node = all_nodes.get(21)
+        # We can get a single node as an immutable record
+        >>> node = nodes.get(21)
 
-        # We can save changes for all nodes we have edited so far
-        >>> all_nodes.save()
+        # and write changes explicitly
+        >>> nodes.update(21, geometry=Point(1, 2))
+
+        # Centroids are created with their id and position
+        >>> nodes.insert(node_id=998877, is_centroid=1, geometry=Point(1, 3))
+        998877
 
         >>> project.close()
     """
 
-    #: Query sql for retrieving nodes
-    sql = ""
+    name = "nodes"
+    key = "node_id"
+    record_name = "NodeRecord"
+    has_numeric_key = True
 
-    def __init__(self, net):
-        super().__init__(net.project)
-        self.__table_type__ = "nodes"
-        self.__items = {}
-        self.__fields = []
-
-        if self.sql == "":
-            self.refresh_fields()
-
-    def get(self, node_id: int) -> Node:
-        """Get a node from the network by its ``node_id``
-
-        It raises an error if ``node_id`` does not exist
-
-        :Arguments:
-            **node_id** (:obj:`int`): ID of a node to retrieve
-
-        :Returns:
-            **node** (:obj:`Node`): Node object for requested ``node_id``
-        """
-
-        if node_id in self.__items:
-            node = self.__items[node_id]
-
-            # If this element has not been renumbered, we return it. Otherwise we
-            # store the object under its new number and carry on
-            if node.node_id == node_id:
-                return node
-            else:
-                self.__items[node.node_id] = self.__items.pop(node_id)
-
-        with self.project.db_connection as conn:
-            data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
-        if data:
-            data = dict(zip(self.__fields, data, strict=True))
-            node = Node(data, self.project)
-            self.__items[node.node_id] = node
-            return node
-
-        raise ValueError(f"Node {node_id} does not exist in the model")
-
-    def refresh_fields(self) -> None:
-        """After adding a field one needs to refresh all the fields recognized by the software"""
-        tl = TableLoader()
-        with self.project.db_connection as conn:
-            tl.load_structure(conn, "nodes")
-        self.sql = tl.sql
-        self.__fields = deepcopy(tl.fields)
-
-    def refresh(self):
-        """Refreshes all the nodes in memory"""
-        lst = list(self.__items.keys())
-        for k in lst:
-            del self.__items[k]
-
-    def new_centroid(self, node_id: int) -> Node:
-        """Creates a new centroid with a given ID
+    def new_centroid(self, node_id: int, geometry: Point) -> int:
+        """Creates a new centroid with a given ID at the given position
 
         :Arguments:
             **node_id** (:obj:`int`): ID of the centroid to be created
+
+            **geometry** (:obj:`Point`): Position of the centroid
         """
-        with self.project.db_connection as conn:
-            ct = conn.execute("select count(*) from nodes where node_id=?", [node_id]).fetchone()[0]
-        if ct > 0:
-            raise Exception("Node_id already exists. Failed to create it")
+        return self.insert(node_id=node_id, is_centroid=1, geometry=geometry)
 
-        data = dict.fromkeys(self.__fields)
-        data["node_id"] = node_id
-        data["is_centroid"] = 1
-        node = Node(data, self.project)
-        self.__items[node_id] = node
-        return node
+    def renumber(self, node_id: int, new_id: int) -> None:
+        """Renumbers a node in the network
 
-    def save(self):
-        for item in self.__items.values():
-            item.save()
+        :Arguments:
+            **node_id** (:obj:`int`): Current node_id
 
-    @property
-    def data(self) -> gpd.GeoDataFrame:
-        """Returns all nodes data as a Pandas DataFrame
-
-        :Returns:
-            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
+            **new_id** (:obj:`int`): New node_id
         """
-        dl = DataLoader(self.project.path_to_file, "nodes")
-        return dl.load_table()
+        new_id = int(new_id)
+        if new_id == node_id:
+            logger.warning("This is already the node number")
+            return
+        self._change_key(node_id, new_id)
+        logger.info(f"Node {node_id} was renumbered to {new_id}")
+
+    def connect_mode(
+        self,
+        node_id: int,
+        mode_id: str,
+        link_types: str = "",
+        connectors: int = 1,
+        area: Point | None = None,
+    ) -> None:
+        """Adds centroid connectors for the desired mode to the network file
+
+        Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
+        all those that satisfy the mode and link_types criteria and are inside the provided area.
+
+        The selection of the nodes that will be connected is done simply by computing running the
+        `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
+        clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
+
+        When there are no node candidates inside the provided area, is it progressively expanded until
+        at least one candidate is found.
+
+        If fewer candidates than required connectors are found, all candidates are connected.
+
+        :Arguments:
+            **node_id** (:obj:`int`): Id of the centroid to connect
+
+            **mode_id** (:obj:`str`): Mode ID we are trying to connect
+
+            **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can
+            be considered. eg: yCdR. Defaults to ALL link types
+
+            **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
+
+            **area** (:obj:`Polygon`, *Optional*): Area limiting the search for connectors
+        """
+        if self.get(node_id).is_centroid != 1:
+            logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
+            return
+
+        links = Links(self._connection)
+        connector_creation(
+            zone_id=node_id,
+            mode_id=mode_id,
+            link_types=link_types,
+            connectors=connectors,
+            project_connection=self._connection,
+            links=links,
+            delimiting_area=area,
+            proj_nodes=self.data,
+            proj_links=links.data,
+        )
 
     @property
     def lonlat(self) -> pd.DataFrame:
@@ -125,9 +123,7 @@ class Nodes(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
-        with self.project.db_connection as conn:
-            df = pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", conn)
-        return df
-
-    def __del__(self):
-        self.__items.clear()
+        return pd.read_sql(
+            "SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes",
+            self._connection._connection,
+        )

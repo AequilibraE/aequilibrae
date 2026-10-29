@@ -11,6 +11,7 @@ from aequilibrae.utils.cython.bridge import Bridge
 from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.transit import Transit
 
 logger = logging.getLogger(__name__)
@@ -27,21 +28,18 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     graph.set_blocked_centroid_flows(False)
 
     try:
-        mat = scenario_example.matrices.get_matrix("demand_omx")
+        mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
     except Exception:
         # Expected to fail for non-sioux_falls scenarios as theres no demand_omx
         assert scenario != "root"
         return
 
-    mat.computational_view()
-
     assigclass = TrafficClass("car", graph, mat)
     assignment = TrafficAssignment(scenario_example)
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
     assignment.set_time_field("distance")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 5
     assignment.set_algorithm("msa")
 
@@ -49,13 +47,13 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
 
     assert assigclass.results.total_link_loads is not None
     assert len(assigclass.results.total_link_loads) > 0
-    mat.close()
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
 def test_transit_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
+    scenario_example.scenario.create_transit_database()
     data = Transit(scenario_example)
     try:
         graph = data.create_graph(
@@ -72,13 +70,8 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     graph.create_line_geometry(method="connector project match", graph="c")
     transit_graph = graph.to_transit_graph()
     zones_in_the_model = len(transit_graph.centroids)
-    names_list = ["pt"]
-
-    mat = AequilibraeMatrix()
-    mat.create_empty(zones=zones_in_the_model, matrix_names=names_list, memory_only=True)
-    mat.index = transit_graph.centroids[:]
-    mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
-    mat.computational_view()
+    mat = AequilibraeMatrix(index=transit_graph.centroids)
+    mat["pt"] = np.ones((zones_in_the_model, zones_in_the_model))
 
     assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
     assig = TransitAssignment()
@@ -110,7 +103,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 
     if len(df) > 0:
         first_matrix = df.iloc[0]["name"]
-        rec = matrices.get_record(first_matrix)
+        rec = matrices.get(first_matrix)
         assert rec.name is not None
         assert rec.name == first_matrix
     else:
@@ -151,9 +144,14 @@ def test_results_scenarios(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"test_result_{scenario}"
 
+    # Test data to save as the result
+    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
+
     # Create a new result record
-    record = results.new_record(
+    record = results.create(
         table_name,
+        data=test_data,
+        index=False,
         procedure="test_procedure",
         procedure_id=f"test_id_{scenario}",
         procedure_report=json.dumps({"status": "success", "scenario": scenario}),
@@ -164,21 +162,16 @@ def test_results_scenarios(scenario_example, scenario):
     # Verify the record was created
     assert record.table_name == table_name
     assert record.procedure == "test_procedure"
-    assert results.check_exists(table_name)
-
-    # Test saving data to the result
-    test_data = pd.DataFrame({"id": [1, 2, 3], "scenario": [scenario] * 3, "value": [10, 20, 30]})
-
-    record.set_data(test_data, index=False)
+    assert results.table_exists(table_name)
 
     # Verify data retrieval
-    retrieved_data = record.get_data()
+    retrieved_data = results.get_results(record.table_name)
     assert len(retrieved_data) == 3
     assert list(retrieved_data.columns) == ["id", "scenario", "value"]
 
     # Clean up
-    results.delete_record(table_name)
-    assert not results.check_exists(table_name)
+    results.delete_result(table_name)
+    assert not results.table_exists(table_name)
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])
@@ -196,6 +189,7 @@ def test_network_scenarios(scenario_example, scenario):
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
+        network = scenario_example.network
 
         links2 = network.links.data
         nodes2 = network.nodes.data
@@ -234,28 +228,28 @@ def test_scenario_result_isolation(scenario_example, scenario):
     table_name = f"isolation_test_{scenario}"
 
     # Create scenario-specific result
-    _ = results.new_record(
-        table_name,
+    _ = results.insert(
+        table_name=table_name,
         procedure="isolation_test",
         procedure_id=f"isolation_{scenario}",
         description=f"Testing isolation for {scenario}",
     )
-    assert results.check_exists(table_name)
+    assert results.get(table_name)
 
     # Switch to different scenario and verify isolation
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
-        results.reload()
+        results = scenario_example.results
 
-        assert not results.check_exists(table_name)
+        assert not results.table_exists(table_name)
 
         scenario_example.use_scenario(scenario)
-        results.reload()
+        results = scenario_example.results
 
-        results.delete_record(table_name)
-        assert not results.check_exists(table_name)
+        results.delete_result(table_name)
+        assert not results.table_exists(table_name)
 
 
 @pytest.mark.parametrize("from_scenario", ["root", "nauru", "coquimbo"])
@@ -378,7 +372,7 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Add some data to root
     results = scenario_example.results
-    results.new_record("root_specific", "test", "test_id", description="Root only data")
+    results.insert(table_name="root_specific", procedure="test", procedure_id="test_id", description="Root only data")
 
     # Create empty scenario
     scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
@@ -401,7 +395,7 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
-    results.new_record("clone_specific", "test", "test_id", description="Clone only data")
+    results.insert(table_name="clone_specific", procedure="test", procedure_id="test_id", description="Clone only data")
 
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()
@@ -424,3 +418,21 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 def test_scenario_use_scenario_must_exists(scenario_example):
     with pytest.raises(ValueError, match="scenario 'a scenario that doesn't exist' does not exist"):
         scenario_example.use_scenario("a scenario that doesn't exist")
+
+
+@pytest.mark.parametrize("child", ["nauru", "coquimbo"])
+def test_use_scenario_invalidates_project_parameters(scenario_example, child):
+    """Test that project_parameters tracks the active scenario through root -> child -> root."""
+    scenario_example.use_scenario("root")
+    root_path = scenario_example.project_parameters.file
+
+    scenario_example.use_scenario(child)
+    child_path = scenario_example.project_parameters.file
+
+    assert child_path != root_path
+    assert child in str(child_path)
+
+    scenario_example.use_scenario("root")
+    back_to_root_path = scenario_example.project_parameters.file
+
+    assert back_to_root_path == root_path

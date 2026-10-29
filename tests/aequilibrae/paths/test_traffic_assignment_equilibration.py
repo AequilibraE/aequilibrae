@@ -7,16 +7,17 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 from aequilibrae.utils.logging_utils import basic_config
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def project(sioux_falls_test):
     sioux_falls_test.network.build_graphs()
     return sioux_falls_test
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def car_graph(project):
     graph = project.network.graphs["c"]
     graph.set_blocked_centroid_flows(False)
@@ -24,24 +25,23 @@ def car_graph(project):
     return graph
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def matrix(project):
-    mat = project.matrices.get_matrix("omx2")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("omx2", subset=["matrix"])
     return mat
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assigclass(car_graph, matrix):
     return TrafficClass("car", car_graph, matrix)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def assignment(project):
     return TrafficAssignment(project)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def file_logging():
     logger = logging.getLogger("aequilibrae")
     handler = basic_config(level=logging.INFO)
@@ -52,19 +52,40 @@ def file_logging():
     logger.propagate = True
 
 
-@pytest.mark.parametrize("matrix_type", ["memmap", "memonly"])
-def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, matrix_type, file_logging):
-    if matrix_type == "memonly":
-        matrix = matrix.copy(memory_only=True)
+@pytest.mark.parametrize("pce", [1.0, 2.5])
+def test_max_iterations_returns_the_iterate_with_reported_gap(assignment, assigclass, pce):
+    assigclass.set_pce(pce)
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr)
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+    assignment.max_iter = 2
+    assignment.set_algorithm("bfw")
 
+    assignment.execute()
+
+    algorithm = assignment.assignment
+    report = algorithm.convergence_report
+    # Both result groups remain in demand units. The optimizer applies PCE to both.
+    unit_cost = algorithm.congested_time + assigclass.fixed_cost
+    expected_current_cost = np.sum(unit_cost * assigclass.results.total_link_loads * pce)
+    expected_aon_cost = np.sum(unit_cost * assigclass._aon_results.total_link_loads * pce)
+    expected_rgap = abs(expected_current_cost - expected_aon_cost) / expected_current_cost
+
+    assert np.isclose(algorithm.rgap, expected_rgap)
+    assert np.isclose(report["rgap"][-1], expected_rgap)
+    assert np.isnan(report["alpha"][-1])
+    assert all(np.isnan(report[key][-1]) for key in ("beta0", "beta1", "beta2"))
+    assert len({len(values) for values in report.values()}) == 1
+
+
+def test_execute_and_save_results(project, assignment, assigclass, car_graph, matrix, file_logging):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
 
     proj = assignment.project
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
     assignment.max_iter = 10
@@ -135,14 +156,14 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 
     assert file_text.count(tc_graph) > 1
 
-    tc_matrix = "'Number of centroids': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
+    tc_matrix = "'Number of centroids': 24, 'Matrix cores': ('matrix',), 'Matrix totals': {'matrix': 360600.0}}\"}}"
     assert file_text.count(tc_matrix) > 1
 
     assig_1 = (
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, "
-        "'Target RGAP': 0.0001}}"
+        "'Target RGAP': 0.0001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_1 in file_text
 
@@ -150,7 +171,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_2 in file_text
 
@@ -158,7 +179,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', "
-        "'Maximum iterations': 500, 'Target RGAP': 0.001}}"
+        "'Maximum iterations': 500, 'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_3 in file_text
 
@@ -166,7 +187,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_4 in file_text
 
@@ -174,7 +195,7 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
         "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, "
         "'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', "
         "'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, "
-        "'Target RGAP': 0.001}}"
+        "'Target RGAP': 0.001, 'BFW conjugacy': 'approximate'}}"
     ).format(num_cores)
     assert assig_5 in file_text
 
@@ -182,14 +203,14 @@ def test_execute_and_save_results(project, assignment, assigclass, car_graph, ma
 def test_execute_no_project(project, assignment, assigclass):
     with project.db_connection as conn:
         results = pd.read_sql("select volume from links order by link_id", conn)
+
     project.close()
+
     assignment = type(assignment)()
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     assignment.set_algorithm("msa")
     assignment.execute()
@@ -199,3 +220,96 @@ def test_execute_no_project(project, assignment, assigclass):
 
     with pytest.raises(FileNotFoundError):
         assignment.save_results("anything")
+
+
+def _configure(assignment, assigclass, algorithm="bfw", max_iter=30, rgap=1e-8):
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr)
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+    assignment.max_iter = max_iter
+    assignment.rgap_target = rgap
+    assignment.set_algorithm(algorithm)
+    return assignment
+
+
+@pytest.mark.parametrize("algorithm", ["cfw", "bfw"])
+def test_line_search_is_exact_and_uncapped(assignment, assigclass, algorithm):
+    """Test that CFW and BFW take exact line-search steps in [0, 1] that are free to exceed the old 1/sqrt(iter) cap."""
+    _configure(assignment, assigclass, algorithm=algorithm)
+    assignment.execute()
+
+    alphas = np.array(assignment.assignment.convergence_report["alpha"], dtype=float)
+
+    assert np.all(np.isfinite(alphas[:-1]))
+    assert np.all(alphas[:-1] >= 0.0) and np.all(alphas[:-1] <= 1.0)
+    if algorithm == "bfw":
+        cap = np.array([1.0 / np.sqrt(i) for i in assignment.assignment.convergence_report["iteration"]])
+        assert np.any(alphas[:-1] > cap[:-1]), "the exact line search must be able to exceed the old BFW cap"
+    assert np.isfinite(assignment.assignment.rgap)
+
+
+def test_bfw_conjugacy_defaults_to_approximate(assignment, assigclass):
+    _configure(assignment, assigclass)
+
+    assert assignment.bfw_conjugacy == "approximate"
+    assert assignment.assignment.bfw_conjugacy == "approximate"
+    assert assignment._config["BFW conjugacy"] == "approximate"
+
+
+@pytest.mark.parametrize("conjugacy", ["exact", "approximate", "EXACT"])
+def test_set_bfw_conjugacy_propagates_to_the_running_algorithm(assignment, assigclass, conjugacy):
+    _configure(assignment, assigclass)
+
+    assignment.set_bfw_conjugacy(conjugacy)
+
+    assert assignment.assignment.bfw_conjugacy == conjugacy.lower()
+    assert assignment._config["BFW conjugacy"] == conjugacy.lower()
+
+
+def test_set_bfw_conjugacy_before_set_algorithm_is_honoured(assignment, assigclass):
+    assignment.set_bfw_conjugacy("exact")
+    _configure(assignment, assigclass)
+
+    assert assignment.assignment.bfw_conjugacy == "exact"
+
+
+@pytest.mark.parametrize("bad", ["biconjugate", "", 2, None])
+def test_set_bfw_conjugacy_rejects_unknown_methods(assignment, bad):
+    with pytest.raises(ValueError, match="BFW conjugacy must be one of"):
+        assignment.set_bfw_conjugacy(bad)
+
+
+@pytest.mark.parametrize("conjugacy", ["approximate", "exact"])
+def test_bfw_reports_conjugacy_diagnostics(assignment, assigclass, conjugacy):
+    _configure(assignment, assigclass, algorithm="bfw", max_iter=25)
+    assignment.set_bfw_conjugacy(conjugacy)
+    assignment.execute()
+
+    report = assignment.assignment.convergence_report
+    columns = ("conjugacy_prev", "conjugacy_prev2", "hessian_drift", "bfw_clamped")
+    assert all(column in report for column in columns)
+    assert len({len(values) for values in report.values()}) == 1
+
+    drift = np.array([v for v in report["hessian_drift"] if v is not None], dtype=float)
+    measured = drift[np.isfinite(drift)]
+    assert measured.size > 0, "at least one iteration should have taken a BFW step"
+    # The dropped term is a cosine, so it is bounded even though it need not be small.
+    assert np.all(np.abs(measured) <= 1.0 + 1e-9)
+
+    residual = np.array([v for v in report["conjugacy_prev2"] if v is not None], dtype=float)
+    residual = np.abs(residual[np.isfinite(residual)])
+    assert residual.size > 0
+    if conjugacy == "exact":
+        # Only iterations where the clamp did not fire are required to be biconjugate.
+        clamped = np.array([v for v in report["bfw_clamped"] if v is not None], dtype=float)
+        interior = np.isfinite(clamped) & (clamped == 0.0)
+        if interior.any():
+            all_residual = np.array(report["conjugacy_prev2"], dtype=float)
+            assert np.all(np.abs(all_residual[interior]) < 1e-8)
+
+
+def test_cfw_does_not_get_conjugacy_columns(assignment, assigclass):
+    _configure(assignment, assigclass, algorithm="cfw")
+
+    assert "conjugacy_prev" not in assignment.assignment.convergence_report

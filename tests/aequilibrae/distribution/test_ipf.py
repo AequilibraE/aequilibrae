@@ -10,11 +10,10 @@ from aequilibrae.distribution import Ipf
 def test_fit(sioux_falls_test):
     mats = sioux_falls_test.matrices
     mats.update_database()
-    seed = mats.get_matrix("SiouxFalls_omx")
-    seed.computational_view("matrix")
+    seed = mats.get_matrix("SiouxFalls_omx", subset=["matrix"])
 
-    rows = np.random.rand(seed.zones)[:] * 1000
-    cols = np.random.rand(seed.zones)[:] * 1000
+    rows = np.random.rand(len(seed.index))[:] * 1000
+    cols = np.random.rand(len(seed.index))[:] * 1000
     vectors = pd.DataFrame({"rows": rows, "columns": cols}, index=seed.index)
 
     vectors["columns"] *= vectors["rows"].sum() / vectors["columns"].sum()
@@ -42,10 +41,9 @@ def test_fit(sioux_falls_test):
 
     result = fratar.output
 
-    assert np.isclose(np.nansum(result.matrix_view), np.nansum(vectors["rows"]), rtol=0.0001), "Ipf did not converge"
+    assert np.isclose(np.nansum(result["matrix"]), np.nansum(vectors["rows"]), rtol=0.0001), "Ipf did not converge"
     assert fratar.parameters["convergence level"] > fratar.gap, "Ipf did not converge"
 
-    mr = fratar.save_to_project("my_matrix_ipf", "my_matrix_ipf.aem")
+    mats.create("my_matrix_ipf", "my_matrix_ipf.omx", fratar.output)
 
-    assert os.path.isfile(os.path.join(mats.fldr, "my_matrix_ipf.aem")), "Did not save file to the appropriate place"
-    assert mr.procedure_id == fratar.procedure_id, "procedure ID saved wrong"
+    assert os.path.isfile(os.path.join(mats.folder, "my_matrix_ipf.omx")), "Did not save file to the appropriate place"

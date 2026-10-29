@@ -43,18 +43,13 @@ all_nodes = project.network.nodes
 links = project.network.links
 node = all_nodes.get(1)
 new_geo = Point(node.geometry.x + 0.02, node.geometry.y - 0.02)
-node.geometry = new_geo
-
-# We can save changes for all nodes we have edited so far.
-node.save()
+all_nodes.update(node.node_id, geometry=new_geo)
+node = all_nodes.get(node.node_id)
 
 # %%
 # If you want to show the path in Python.
 # 
 # We do NOT recommend this, though.... It is very slow for real networks.
-
-# Let's refresh the links in memory for usage
-links.refresh()
 
 # %%
 # Let's access our links data using a context manager instead of directly accessing the DataFrame.

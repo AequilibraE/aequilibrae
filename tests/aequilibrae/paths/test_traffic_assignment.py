@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from aequilibrae import Graph, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import all_vdf_functions
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture(scope="function")
@@ -25,8 +25,7 @@ def car_graph(project):
 
 @pytest.fixture(scope="function")
 def matrix(project):
-    mat = project.matrices.get_matrix("demand_omx")
-    mat.computational_view()
+    mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
     return mat
 
 
@@ -44,12 +43,11 @@ def test_skim_after(project, assigclass):
     assig = TrafficAssignment(project)
 
     assig.add_class(assigclass)
-    assig.set_vdf("BPR")
-    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
-    assig.set_capacity_field("capacity")
+    assig.set_vdf(bpr, name_mapping={"alpha": "b", "beta": "power"})
+
     assig.set_time_field("free_flow_time")
+    assig.set_capacity_field("capacity")
 
     assig.max_iter = 10
     assig.set_algorithm("msa")
@@ -57,11 +55,11 @@ def test_skim_after(project, assigclass):
 
     b = assig.skim_congested(["distance"], return_matrices=True)
 
-    assert b["car"].names == ["distance", "__assignment_cost__", "__congested_time__"]
+    assert b["car"].field_names == ("distance", "__congested_time__", "__assignment_cost__")
 
     b = assig.skim_congested(return_matrices=True)
 
-    assert b["car"].names == ["__assignment_cost__", "__congested_time__"]
+    assert b["car"].field_names == ("__congested_time__", "__assignment_cost__")
 
 
 # tests/aequilibrae/paths/test_traffic_assignment.py
@@ -70,15 +68,17 @@ ALGORITHMS = ["msa", "cfw", "bfw", "frank-wolfe"]
 
 
 def test_matrix_with_wrong_type(matrix, car_graph):
-    matrix.matrix_view = np.array(matrix.matrix_view, np.int32)
+    core = next(iter(matrix))
+    matrix[core] = np.array(matrix[core], np.int32)
     with pytest.raises(TypeError):
         TrafficClass("car", car_graph, matrix)
 
 
-def test_set_vdf(assignment):
+def test_set_vdf(assignment, assigclass):
     with pytest.raises(ValueError):
-        assignment.set_vdf("CQS")
-    assignment.set_vdf("BPR")
+        assignment.set_vdf(object())
+    assignment.add_class(assigclass)
+    assignment.set_vdf(bpr, {})
 
 
 def test_set_classes(assignment, assigclass):
@@ -112,10 +112,10 @@ def test_set_algorithm(assignment, assigclass):
     assignment.add_class(assigclass)
     with pytest.raises(Exception):
         assignment.set_algorithm("msa")
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = 10
     for _algo in ALGORITHMS:
         for _ in range(10):
@@ -124,22 +124,15 @@ def test_set_algorithm(assignment, assigclass):
         assignment.set_algorithm("not a valid algorithm")
 
 
-@pytest.mark.parametrize(
-    "vdf,parameters",
-    [
-        *[(k, {"alpha": "b", "beta": "power"}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": "b", "tau": "power", "length": "distance"}),
-        *[(k, {"alpha": 0.15, "beta": 4.0}) for k in all_vdf_functions if k != "akcelik"],
-        ("akcelik", {"alpha": 0.25, "tau": 0.1 * 8.0, "length": "distance"}),
-        ("akcelik", {"tau": 0.1 * 8.0, "length": "distance"}),
-    ],
-)
-def test_set_vdf_parameters(assignment, assigclass, vdf, parameters):
-    with pytest.raises(RuntimeError):
-        assignment.set_vdf_parameters(parameters)
-    assignment.set_vdf(vdf)
+def test_steps_below_needed_to_terminate_reaches_algorithm(assignment, assigclass):
     assignment.add_class(assigclass)
-    assignment.set_vdf_parameters(parameters)
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
+    assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
+    assignment.set_algorithm("bfw")
+
+    assignment.steps_below_needed_to_terminate = 3
+    assert assignment.assignment.steps_below_needed_to_terminate == 3
 
 
 def test_set_time_field(assignment, assigclass):
@@ -154,28 +147,14 @@ def test_set_time_field(assignment, assigclass):
     assert assignment.time_field == "free_flow_time"
 
 
-def test_set_capacity_field(assignment, assigclass):
-    with pytest.raises(ValueError):
-        assignment.set_capacity_field("capacity")
-    assignment.add_class(assigclass)
-    N = random.randint(1, 50)
-    val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-    with pytest.raises(ValueError):
-        assignment.set_capacity_field(val)
-    assignment.set_capacity_field("capacity")
-    assert assignment.capacity_field == "capacity"
-
-
 def test_info(assignment, assigclass):
     iterations = random.randint(1, 10000)
     rgap = random.random() / 10000
     algo = choice(ALGORITHMS)
     assignment.add_class(assigclass)
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    assignment.set_capacity_field("capacity")
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
     assignment.max_iter = iterations
     assignment.rgap_target = rgap
     assignment.set_algorithm(algo)

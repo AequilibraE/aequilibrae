@@ -1,13 +1,16 @@
 import logging
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from datetime import datetime
 from uuid import uuid4
 
-from aequilibrae.context import get_active_project
-from aequilibrae.paths.cython.skimming_core import skimming_parallel
+import numpy as np
+
+from aequilibrae.paths.cython.context import SkimmingContext
+from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
 from aequilibrae.paths.results.skim_results import SkimResults
+from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.core_setter import clamp_cores
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 logger = logging.getLogger(__name__)
@@ -34,11 +37,11 @@ class NetworkSkimming(WorkerThread):
         >>> skm.report
         []
 
-        # To access the skim matrix directly from its temporary file
+        # To access the in-memory skim matrix
         >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        >>> skm.save_to_project('skimming_result_omx', 'omx')
+        >>> matrix.save_as_omx(project_path / 'skimming_result.omx')
 
         >>> project.close()
     """
@@ -61,20 +64,63 @@ class NetworkSkimming(WorkerThread):
         self.execute()
 
     def execute(self):
-        """Runs the skimming process as specified in the graph.
-
-        Dispatches all origins to a single OpenMP-parallel Cython kernel
-        (``skimming_parallel``). This avoids the per-origin Python pool
-        dispatch overhead the previous ThreadPool-based path paid.
+        """
+        Runs the skimming process as specified in the graph.
         """
         self.signal.emit(["start", self.graph.num_zones, ""])
 
         self.results.cores = self.cores
-        self.results.prepare(self.graph)
 
-        skipped = skimming_parallel(self.graph, self.results, self.results.cores)
-        for _orig, msg in skipped:
-            self.report.append(msg)
+        if self.graph.num_zones == 0:
+            self.results.prepare(self.graph)
+            self.signal.emit(["update", 0, "0/0"])
+            self.procedure_id = uuid4().hex
+            self.procedure_date = str(datetime.today())
+            self.signal.emit(["set_text", "Saving Outputs"])
+            self.signal.emit(["finished"])
+            return
+
+        graph = self.graph
+        routing = make_routing_context(graph, compact=True)
+
+        # The routing objective includes turn penalties. Other fields are plain
+        # compact link sums, as in PathResults.
+        fields = {}
+        for i, name in enumerate(graph.skim_fields):
+            if name != graph.cost_field:
+                fields[name] = np.ascontiguousarray(graph.compact_skims[: routing.link_count, i])
+        inputs = SkimmingContext(
+            routing.link_count,
+            link_fields=fields,
+            cost_name=graph.cost_field if graph.cost_field in graph.skim_fields else None,
+        )
+        output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
+        # Keep the requested field order and centroid index while sharing the
+        # origin-major output buffer with the public AequilibraeMatrix.
+        self.results.prepare(graph, output=output)
+
+        origins = []
+        for row, orig in enumerate(graph.centroids):
+            if orig >= len(graph.compact_nodes_to_indices):
+                self.report.append(f"Centroid {orig} is outside the compact graph")
+                continue
+
+            node = int(graph.compact_nodes_to_indices[orig])
+            if node < 0 or node >= routing.node_count:
+                self.report.append(f"Centroid {orig} is outside the compact graph")
+            elif graph.compact_fs[node] == graph.compact_fs[node + 1]:
+                self.report.append(f"Centroid {orig} has no outgoing edges")
+            else:
+                origins.append((row, node))
+
+        skimming_parallel(
+            routing,
+            inputs,
+            output,
+            np.asarray(origins, dtype=np.uintp).reshape(-1, 2),
+            self.results.cores,
+            self.results._heap,
+        )
 
         self.signal.emit(["update", self.graph.num_zones, f"{self.graph.num_zones}/{self.graph.num_zones}"])
 
@@ -98,25 +144,3 @@ class NetworkSkimming(WorkerThread):
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
         self.cores = clamp_cores(cores)
-
-    def save_to_project(self, name: str, format="omx", project=None) -> None:
-        """Saves skim results to the project folder and creates record in the database
-
-        :Arguments:
-            **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
-
-            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
-        """
-
-        file_name = f"{name}.{format.lower()}"
-        if not project:
-            project = self.project or get_active_project()
-        mats = project.matrices
-        record = mats.new_record(name, file_name, self.results.skims)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Network skimming"
-        record.save()

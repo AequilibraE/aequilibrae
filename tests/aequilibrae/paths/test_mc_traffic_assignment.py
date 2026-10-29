@@ -1,6 +1,7 @@
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae.paths.vdf import bpr
 
 
 @pytest.fixture(scope="function")
@@ -15,14 +16,11 @@ def assignment_setup(sioux_falls_example):
         graph.set_graph("free_flow_time")
         graph.set_blocked_centroid_flows(False)
 
-    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    car_matrix.computational_view(["car"])
+    car_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["car"])
 
-    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    truck_matrix.computational_view(["trucks"])
+    truck_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["trucks"])
 
-    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc")
-    moto_matrix.computational_view(["motorcycle"])
+    moto_matrix = sioux_falls_example.matrices.get_matrix("demand_mc", subset=["motorcycle"])
 
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", car_graph, car_matrix)
@@ -45,11 +43,6 @@ def assignment_setup(sioux_falls_example):
         "truckclass": truckclass,
         "algorithms": algorithms,
     }
-
-    # Teardown
-    for mat in [car_matrix, truck_matrix, moto_matrix]:
-        mat.close()
-    sioux_falls_example.close()
 
 
 def test_set_classes(assignment_setup):
@@ -77,12 +70,10 @@ def test_execute_and_save_results(assignment_setup):
 
     for cls in assignment.classes:
         cls.graph.set_skimming(["free_flow_time", "distance"])
-    assignment.set_vdf("BPR")
-    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    assignment.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
-    assignment.set_capacity_field("capacity")
     assignment.set_time_field("free_flow_time")
+    assignment.set_capacity_field("capacity")
 
     assignment.max_iter = 20
     assignment.set_algorithm("bfw")

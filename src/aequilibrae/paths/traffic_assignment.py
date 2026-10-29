@@ -4,20 +4,20 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-from numpy import nan_to_num
+from numpy import dtype, nan_to_num, ndarray
 
-from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
-from aequilibrae.paths.vdf import VDF, all_vdf_functions
+from aequilibrae.paths.vdf import VDF
 from aequilibrae.utils.core_setter import clamp_cores
 
 
@@ -134,6 +134,9 @@ class AssignmentBase(ABC):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TransportClassBase]
+        if "Skimming Fields" in self._config:
+            for transport_class in self.classes:
+                transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def add_class(self, transport_class: TransportClassBase) -> None:
         """
@@ -148,6 +151,8 @@ class AssignmentBase(ABC):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
+        if "Skimming Fields" in self._config:
+            transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
@@ -158,16 +163,22 @@ class AssignmentBase(ABC):
             if field not in c.graph.graph.columns:
                 raise ValueError(f"'{field}' not in graph for '{c._id}'")
 
-            if np.any(np.isnan(c.graph.graph[field].values)):
+            try:
+                c.graph.graph[field] = pd.to_numeric(c.graph.graph[field], errors="raise").astype(np.float64)
+                values = c.graph.graph[field].to_numpy(dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Field {field} must contain numeric values for '{c._id}'") from exc
+
+            if np.any(pd.isna(values)):
                 raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
 
-            if c.graph.graph[field].values.min() <= 0 and not allow_zeros:
+            if values.min() <= 0 and not allow_zeros:
                 raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
 
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
         c = self.classes[0]
-        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], "float64")
         self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
@@ -189,21 +200,20 @@ class TrafficAssignment(AssignmentBase):
     .. code-block:: python
 
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
-
+        >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
         >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
         >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> # This applies automatic centroid-connector turn bans where needed
         >>> graph.set_blocked_centroid_flows(True)
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx")
-
         # We will only assign one user class stored as 'matrix' inside the OMX file
-        >>> demand.computational_view(['matrix'])
+        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
 
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
@@ -213,15 +223,12 @@ class TrafficAssignment(AssignmentBase):
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
 
-        # Then we set the volume delay function
-        >>> assig.set_vdf("BPR")  # This is not case-sensitive
+        # Then we set the volume delay function and its parameters
+        >>> assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
 
-        # And its parameters
-        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
-        # The capacity and free flow travel times as they exist in the graph
-        >>> assig.set_capacity_field("capacity")
+        # The free flow travel times and capacities as they exist in the graph
         >>> assig.set_time_field("free_flow_time")
+        >>> assig.set_capacity_field("capacity")
 
         # And the algorithm we want to use to assign
         >>> assig.set_algorithm('bfw')
@@ -252,8 +259,23 @@ class TrafficAssignment(AssignmentBase):
 
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
+    all_bfw_conjugacies = ["approximate", "exact"]
 
-    def __init__(self, project=None) -> None:
+    # Attributes restricted to a fixed set of strings, as {name: (allowed values, description for the error)}.
+    __choice_attributes = {
+        "bfw_conjugacy": (all_bfw_conjugacies, "BFW conjugacy"),
+    }
+
+    # Attributes that only need a type check, as {name: (expected type, description used in the error)}.
+    __plain_type_attributes = {
+        "time_field": (str, "string"),
+        "capacity_field": (str, "string"),
+        "cores": (int, "integer"),
+        "elementwise_cores": (int, "integer"),
+        "save_path_files": (bool, "boolean"),
+    }
+
+    def __init__(self, project=None) -> None:  # should have classes, vdfs in arguments avoiding 2 stage initialisation
         """"""
         self.__dict__["_TrafficAssignment__initalised"] = False
         super().__init__(project=project)
@@ -265,7 +287,7 @@ class TrafficAssignment(AssignmentBase):
 
         self.rgap_target = parameters["rgap"]
         self.max_iter = parameters["maximum_iterations"]
-        self.vdf = VDF()
+        self.vdf = None  # type: VDF
         self.vdf_parameters = None  # type: list
         self.capacity_field = None  # type: str
         self.capacity = None  # type: np.ndarray
@@ -275,6 +297,9 @@ class TrafficAssignment(AssignmentBase):
 
         self.steps_below_needed_to_terminate = 1
 
+        # How BFW solves for its direction coefficients. "approximate" preserves the historical behaviour.
+        self.bfw_conjugacy = "approximate"  # type: str
+
         self._config = {}
 
         self.__initalised = True
@@ -283,6 +308,11 @@ class TrafficAssignment(AssignmentBase):
         # Special methods (__method__) cannot be override at runtime, instead we'll
         # just set a variable to indicate if the checking of attributes should be performed
         if self.__initalised:
+            if name == "steps_below_needed_to_terminate":
+                if not value >= 1:
+                    raise ValueError("Steps below the target needed to terminate must be a positive integer")
+                if isinstance(self.assignment, LinearApproximation):
+                    self.assignment.steps_below_needed_to_terminate = value
             check, value, message = self.__check_attributes(name, value)
             if not check:
                 raise ValueError(message)
@@ -300,11 +330,8 @@ class TrafficAssignment(AssignmentBase):
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
-            v = value.lower()
-            if v not in all_vdf_functions:
-                return False, value, f"Volume-delay function {value} is not available"
-            value = VDF()
-            value.function = v
+            if not isinstance(value, VDF):
+                raise ValueError
         elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
@@ -317,24 +344,41 @@ class TrafficAssignment(AssignmentBase):
         elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
                 return False, value, f"Parameter set is not valid: {value} "
-        elif instance in ["time_field", "capacity_field"] and not isinstance(value, str):
-            return False, value, f"Value for {instance} is not string"
-        elif instance in ("cores", "elementwise_cores") and not isinstance(value, int):
-            return False, value, f"Value for {instance} is not integer"
-        elif instance == "save_path_files" and not isinstance(value, bool):
-            return False, value, f"Value for {instance} is not boolean"
+        elif instance in self.__choice_attributes:
+            allowed, description = self.__choice_attributes[instance]
+            return self.__check_choice(instance, value, allowed, description)
+        elif instance in self.__plain_type_attributes:
+            expected, description = self.__plain_type_attributes[instance]
+            if not isinstance(value, expected):
+                return False, value, f"Value for {instance} is not {description}"
         if instance not in self.__dict__:
             return False, value, f"TrafficAssignment class does not have property {instance}"
         return True, value, ""
 
-    def set_vdf(self, vdf_function: str) -> None:
+    def __check_choice(self, instance, value, allowed, description):
+        """Validates a string-valued choice and pushes it onto an algorithm that may already be instantiated."""
+        if not isinstance(value, str) or value.lower() not in allowed:
+            return False, value, f"{description} must be one of: {', '.join(allowed)}"
+        value = value.lower()
+        if isinstance(self.assignment, LinearApproximation):
+            setattr(self.assignment, instance, value)
+        return True, value, ""
+
+    def set_vdf(self, vdf: VDF, name_mapping: dict | None = None) -> None:
         """
-        Sets the Volume-delay function to be used
+        Sets the Volume-delay function to be used, along with the name mapping between the VDF's inputs
+        and columns in the dataframe.
 
         :Arguments:
-            **vdf_function** (:obj:`str`): Name of the VDF to be used
+            **vdf** (:obj:`VDF`): VDF to be used
+            **name_mapping** (:obj:`dict`, *optional*): Mapping between the VDF's argument names (e.g. "alpha",
+            "beta") and the corresponding column names in the dataframe/graph holding their values. Defaults to
+            ``None``, in which case the VDF's argument names are assumed to match the dataframe's columns directly.
         """
-        self.vdf = vdf_function
+
+        self.vdf = vdf
+
+        self._set_vdf_link_attributes(name_mapping if name_mapping is not None else {})
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
@@ -390,68 +434,95 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+        self.assignment.bfw_conjugacy = self.bfw_conjugacy
         self._config["Algorithm"] = algo
         self._config["Maximum iterations"] = self.assignment.max_iter
         self._config["Target RGAP"] = self.assignment.rgap_target
+        self._config["BFW conjugacy"] = self.bfw_conjugacy
 
-    def set_vdf_parameters(self, par: dict) -> None:
+    def set_bfw_conjugacy(self, bfw_conjugacy: str) -> None:
         """
-        Sets the parameters for the Volume-delay function.
+        Chooses how BFW solves for its direction coefficients. Ignored by every other algorithm.
 
-        Parameter values can be scalars (same values for the entire network) or network field names
-        (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
+        * ``"approximate"`` (default) - appendix A of Mitradjieva & Lindberg, which assumes the two previous
+          directions are already conjugate with respect to the *current* Hessian. They were made conjugate with
+          respect to the previous one, so the assumption holds only in the limit; the paper notes BFW is
+          therefore "correct only in the limit".
 
-        The Akcelik VDF parameter 'tau' value has typical ``8`` factor absorbed into it.
-        Users should supply ``8 * tau`` to match other common usages. Additionally the standard
-        ``0.25`` factor can be overridden by supplying the 'alpha' parameter.
+        * ``"exact"`` - solve both conjugacy conditions jointly as a 2x2 system, keeping the cross term the
+          appendix drops. Costs two extra Hessian contractions per iteration, which is negligible next to the
+          shortest-path build. The system is singular when the two previous directions are H-parallel, in which
+          case the iteration restarts from Frank-Wolfe.
+
+        Either way, negative coefficients are clamped to zero to keep the weights on the simplex, and that
+        clamping breaks strict biconjugacy whenever it triggers.
+
+        When the algorithm is BFW the convergence report gains ``conjugacy_prev``, ``conjugacy_prev2`` and
+        ``hessian_drift`` columns to compare the two variants; see ``LinearApproximation``.
 
         :Arguments:
-            **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
+            **bfw_conjugacy** (:obj:`str`): One of ``"approximate"`` or ``"exact"``
         """
-        if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise RuntimeError(
-                "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
-            )
+        self.bfw_conjugacy = bfw_conjugacy
+        self._config["BFW conjugacy"] = self.bfw_conjugacy
 
-        # In literature 0.25 is not provided as a parameter. We allow it but default to 0.25 if it wasn't provided.
-        if self.vdf.function == "AKCELIK":
-            par["alpha"] = par.get("alpha", 0.25)
+    def _set_vdf_link_attributes(self, par: dict[str, str | float]):
+        """
+        Sets vdf_link_attributes as a dict of {name: value}
+        Input parameter par:
+        {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
-        self.__dict__["vdf_parameters"] = par
-        self._config["VDF parameters"] = par
-        pars = []
+        """
+        assert self.vdf is not None
+        vdf_link_attributes: dict[str, np.ndarray] = {}
+        for attribute_name, settings in self.vdf.spec.items():
+            if attribute_name in par:
+                value = par[attribute_name]
+            elif "fill_NA" in settings:
+                value = settings["fill_NA"]
+                print(f"Using default value for {attribute_name} of {value}")
+            else:
+                raise ValueError(f"{attribute_name} should exist in the set of parameters provided")
 
-        if self.vdf.function in ["BPR", "BPR2", "CONICAL"]:
-            parameter_bounds = {"alpha": (0.0, float("inf")), "beta": (1.0, float("inf"))}
-        elif self.vdf.function == "INRETS":
-            parameter_bounds = {"alpha": (0.0, 1.0)}
-        elif self.vdf.function == "AKCELIK":
-            parameter_bounds = {"alpha": (0.0, float("inf")), "tau": (0.0, float("inf")), "length": (0.0, float("inf"))}
-        else:
-            raise ValueError(f"unknown vdf function {self.vdf.function}")
-
-        for p1, (minimum, maximum) in parameter_bounds.items():
-            if p1 not in par:
-                raise ValueError(f"{p1} should exist in the set of parameters provided")
-            p = par[p1]
-            if isinstance(self.vdf_parameters[p1], str):
+            if isinstance(value, str):
+                # value is the name of a column
                 c = self.classes[0]
                 array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-                array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
+                array[c.graph.graph.__supernet_id__] = c.graph.graph[value]
             else:
-                array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                array.fill(self.vdf_parameters[p1])
-            pars.append(array)
+                array: np.ndarray = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                array.fill(value)
+            vdf_link_attributes[attribute_name] = array
+
+        self.vdf_parameters: dict[str, ndarray[tuple[Any, ...], dtype[Any]]] = vdf_link_attributes
+        # vdf parameters
+        self._config["VDF parameters"] = par
+        self._config["VDF function"] = self.vdf.name
+
+        # check bounds
+        for parameter_name, parameter_data in self.vdf.spec.items():
+            if "bounds" not in parameter_data:
+                continue
+
+            minimum, maximum = parameter_data["bounds"]
+            array = vdf_link_attributes[parameter_name]
 
             if np.any(np.isnan(array)):
-                raise ValueError(f"At least one {p1} is NaN")
-            elif array.min() < minimum:
-                raise ValueError(f"At least one {p1} is less than {minimum}")
-            elif array.max() > maximum:
-                raise ValueError(f"At least one {p1} is greater than {maximum}")
+                raise ValueError(f"At least one {parameter_name} is NaN")
 
-        self.__dict__["vdf_parameters"] = pars
-        self._config["VDF function"] = self.vdf.function.lower()
+            if parameter_data.get("inclusive_lower", True):
+                if array.min() < minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than {minimum}")
+            else:
+                if array.min() <= minimum:
+                    raise ValueError(f"At least one {parameter_name} is less than or equal to {minimum}")
+
+            if parameter_data.get("inclusive_upper", True):
+                if array.max() > maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than {maximum}")
+            else:
+                if array.max() >= maximum:
+                    raise ValueError(f"At least one {parameter_name} is greater than or equal to {maximum}")
 
     def set_cores(
         self, cores: int, threading_threshold: int | None = None, elementwise_cores: int | None = None
@@ -491,7 +562,9 @@ class TrafficAssignment(AssignmentBase):
         if self.classes is None:
             raise RuntimeError("You need to set traffic classes before turning path saving on or off")
 
-        # self.save_path_files = save_it
+        # FIXME: Add path saving for state-based routing results.
+        if save_it:
+            raise NotImplementedError("Path file saving is not supported by the prepared assignment driver")
         for c in self.classes:
             c._aon_results.save_path_file = save_it
 
@@ -504,14 +577,8 @@ class TrafficAssignment(AssignmentBase):
         if self.classes is None:
             raise RuntimeError("You need to set traffic classes before specifying path saving options")
 
-        if file_format == "feather":
-            for c in self.classes:
-                c._aon_results.write_feather = True
-        elif file_format == "parquet":
-            for c in self.classes:
-                c._aon_results.write_feather = False
-        else:
-            raise TypeError(f"Unsupported path file format {file_format} - only feather or parquet available.")
+        # FIXME: Choose a file format that can represent turn-state paths.
+        raise NotImplementedError("Assignment path file formats are not supported yet")
 
     def set_time_field(self, time_field: str) -> None:
         """
@@ -529,21 +596,21 @@ class TrafficAssignment(AssignmentBase):
     def set_capacity_field(self, capacity_field: str) -> None:
         """
         Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
-
         :Arguments:
             **capacity_field** (:obj:`str`): Field name
         """
         super()._check_field(capacity_field)
         c = self.classes[0]
-
         self.cores = c.results.cores
-        self.elementwise_cores = c.results.elementwise_cores
-        self.threading_threshold = c.results.threading_threshold
         self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
+
+        # also set threading cores
+        self.elementwise_cores = c.results.elementwise_cores
+        self.threading_threshold = c.results.threading_threshold
 
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
@@ -615,9 +682,7 @@ class TrafficAssignment(AssignmentBase):
         """
         data = {}
         for assig_class in self.classes:
-            skimmer = assig_class.skim_congested(skim_fields)
-            assig_class._aon_results.skims = skimmer.results.skims
-            data[assig_class._id] = skimmer.results.skims
+            data[assig_class._id] = assig_class.skim_congested(skim_fields)
         if return_matrices:
             return data
 
@@ -625,10 +690,6 @@ class TrafficAssignment(AssignmentBase):
         if self.vdf == "":
             raise ValueError("First you need to set the Volume-Delay Function to use")
 
-        par = list(kwargs.keys())
-        q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
-        if len(q) > 0:
-            raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
     def log_specification(self):
@@ -661,15 +722,16 @@ class TrafficAssignment(AssignmentBase):
             project = self.project or get_active_project()
 
         report = {"convergence": self.assignment.convergence_report, "setup": self.info()}
-        record = project.results.new_record(
+        record = project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
+        return record
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -684,11 +746,15 @@ class TrafficAssignment(AssignmentBase):
         class1 = self.classes[0]
         res1 = assig_results[0]
 
-        tot_flow = self.assignment.fw_total_flow[idx]
-        voc = tot_flow / self.capacity[idx]
+        tot_flow = self.assignment.total_flow[idx]
+        capacity = self.capacity
+        voc = tot_flow / capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
-        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
+        if self.assignment.preload is None:
+            preload = np.full(len(tot_flow), np.nan)
+        else:
+            preload = self.assignment.preload
 
         fields = [
             "Preload_AB",
@@ -793,12 +859,7 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            if len(cls.matrix.view_names) == 1:
-                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
-            else:
-                uclass["matrix_totals"] = {
-                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
-                }
+            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
             uclass["network mode"] = cls.graph.mode
             uclass["Value-of-time"] = cls.vot
             uclass["PCE"] = cls.pce
@@ -820,7 +881,7 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[Any]:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         :Arguments:
@@ -830,15 +891,20 @@ class TrafficAssignment(AssignmentBase):
                 'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
                 blended ones. Default is 'final'
 
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
+            **format** (:obj:`str`, *Optional*): File format ('omx'). Default is 'omx'
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
                 Defaults to the active project
+
+        :Returns:
+            **records** (:obj:`list`): Matrix records created for classes with skims to save.
         """
+        if which_ones not in ("final", "blended", "all"):
+            raise ValueError("which_ones must be final, blended or all")
+        records = []
         mat_format = format.lower()
-        if mat_format not in ["omx", "aem"]:
-            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-            raise ImportError("OpenMatrix is not available on your system")
+        if mat_format != "omx":
+            raise ValueError("Only OMX matrix files are supported")
 
         if not project:
             project = self.project or get_active_project()
@@ -848,71 +914,54 @@ class TrafficAssignment(AssignmentBase):
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls._id}.{mat_format}"
 
-            export_name = path.join(mats.fldr, file_name)
+            export_name = mats.folder / file_name
 
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-            if mats.check_exists(matrix_name):
+            if mats.get(matrix_name, default=None) is not None:
                 raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
-            avg_skims = cls.results.skims  # type: AequilibraeMatrix
-
-            # The ones for the last iteration are here
-            last_skims = cls._aon_results.skims  # type: AequilibraeMatrix
+            avg_skims = {} if cls.results.skims is None else cls.results.skims.matrices
+            final = cls.congested_skims if cls.congested_skims is not None else cls._aon_results.skims
+            last_skims = {} if final is None else final.matrices
 
             names = []
             if which_ones in ["final", "all"]:
-                for core in last_skims.names:
+                for core in last_skims:
                     names.append(f"{core}_final")
 
             if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
+                for core in avg_skims:
                     names.append(f"{core}_blended")
 
             if not names:
                 continue
             # Assembling a single final skim file can be done like this
             # We will want only the time for the last iteration and the distance averaged out for all iterations
-            working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
-
-            kwargs = {
-                "file_name": working_name,
-                "zones": self.classes[0].graph.centroids.shape[0],
-                "matrix_names": names,
-                "memory_only": False,
-            }
-
-            # Create the matrix to manipulate
-            out_skims = AequilibraeMatrix()
-            out_skims.create_empty(**kwargs)
-
-            out_skims.index[:] = self.classes[0].graph.centroids[:]
-            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls._id}"
-
+            output_matrices = {}
             if which_ones in ["final", "all"]:
-                for core in last_skims.names:
-                    out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
-
+                output_matrices.update({f"{core}_final": values for core, values in last_skims.items()})
             if which_ones in ["blended", "all"]:
-                for core in avg_skims.names:
-                    out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
+                output_matrices.update({f"{core}_blended": values for core, values in avg_skims.items()})
 
-            out_skims.matrices.flush()  # Make sure that all data went to the disk
+            out_skims = AequilibraeMatrix(index=self.classes[0].graph.centroids)
+            out_skims.update(output_matrices)
+            description = f"Skimming for assignment procedure. Class {cls._id}"
+            out_skims.metadata["description"] = description
 
-            # If it were supposed to be an OMX, we export to one
-            if mat_format == "omx":
-                out_skims.export(export_name)
+            record = mats.create(
+                name=f"{matrix_name}_{cls._id}",
+                file_name=file_name,
+                matrix=out_skims,
+                procedure_id=self.procedure_id,
+                timestamp=self.procedure_date,
+                procedure="Traffic Assignment",
+                description=description,
+            )
+            records.append(record)
 
-            out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
-            # Now we create the appropriate record
-
-            record = mats.new_record(f"{matrix_name}_{cls._id}", file_name)
-            record.procedure_id = self.procedure_id
-            record.timestamp = self.procedure_date
-            record.procedure = "Traffic Assignment"
-            record.description = out_skims.description
-            record.save()
+        return records
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -948,15 +997,15 @@ class TrafficAssignment(AssignmentBase):
 
         report = {}
         description = f"Select link analysis from {self.procedure_id}"
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="traffic select link",
             procedure_id=f"{self.procedure_id}_sl",
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=description,
         )
-        record.set_data(df)
 
     def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
         """
@@ -976,42 +1025,31 @@ class TrafficAssignment(AssignmentBase):
 
         file_name = f"{matrix_name}.omx"
 
-        export_name = path.join(mats.fldr, file_name)
+        export_name = mats.folder / file_name
 
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.check_exists(matrix_name):
+        if mats.get(matrix_name, default=False):
             raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
-        names = [f"{key}_{cls._id}" for cls in self.classes for key in cls._selected_links.keys()]
-
-        kwargs = {
-            "file_name": AequilibraeMatrix().random_name(),
-            "zones": self.classes[0].graph.centroids.shape[0],
-            "matrix_names": names,
-            "memory_only": False,
-        }
-
-        # Create the matrix to manipulate
-        out_skims = AequilibraeMatrix()
-        out_skims.create_empty(**kwargs)
-
-        out_skims.index[:] = self.classes[0].graph.centroids[:]
-
+        matrices = {}
         for cls in self.classes:
-            if cls._selected_links is None:
+            selected = cls.results.select_link_od
+            if selected is None:
                 continue
-
-            res = cls.results.select_link_od
-
-            for mat in res.names:
-                out_skims.matrix[f"{mat}_{cls._id}"][:, :] = res.get_matrix(mat)[:, :, 0]
-
-        out_skims.matrices.flush()  # Make sure that all data went to the disk
-        out_skims.description = f"Select link matrix from procedure ID {self.procedure_id}_sl."
-
-        out_skims.export(export_name)
+            for name, values in selected.matrices.items():
+                for column, class_name in enumerate(cls.results.classes["names"]):
+                    key = f"{name}_{cls._id}_{class_name}"
+                    if key in matrices:
+                        raise ValueError(f"Duplicate selected OD export name: {key}")
+                    matrices[key] = values[:, :, column]
+        if not matrices:
+            return
+        out_skims = AequilibraeMatrix(index=self.classes[0].graph.centroids)
+        out_skims.update(matrices)
+        out_skims.metadata["description"] = f"Select link matrix from procedure ID {self.procedure_id}_sl."
+        out_skims.save_as_omx(export_name)
 
     def save_select_link_results(self, name: str) -> None:
         """
@@ -1095,12 +1133,7 @@ class TransitAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            if len(cls.matrix.view_names) == 1:
-                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
-            else:
-                uclass["matrix_totals"] = {
-                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
-                }
+            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
             uclass["network mode"] = cls.graph.mode
 
             classes[cls._id] = uclass
@@ -1143,15 +1176,15 @@ class TransitAssignment(AssignmentBase):
             project = project or get_active_project()
 
         report = {"setup": self.info()}
-        record = project.results.new_record(
+        project.results.create(
             table_name=table_name,
+            data=df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
             procedure_report=json.dumps(report),
             timestamp=self.procedure_date,
             description=self.description,
         )
-        record.set_data(df)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -1208,4 +1241,7 @@ class TransitAssignment(AssignmentBase):
             if not isinstance(skimming_fields, list):
                 raise TypeError("Skimming Fields should be defined on a list, tuple or set")
 
-        self._config["Skimming Fields"] = skimming_fields
+        fields = list(skimming_fields or [])
+        self._config["Skimming Fields"] = fields
+        for transport_class in self.classes:
+            transport_class.graph.set_skimming_fields(fields)
