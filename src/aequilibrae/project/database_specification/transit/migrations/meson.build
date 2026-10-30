@@ -8,6 +8,7 @@ pyfiles = [
   '004_move_results_to_project.py',
   '005_repair_foreign_keys.py',
   '006_normalise_route_link_stop_ids.py',
+  '008_fare_rule_zones_as_text.py',
   'migrations.py',
 ]
 
