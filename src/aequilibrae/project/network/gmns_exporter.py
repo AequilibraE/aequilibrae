@@ -30,9 +30,9 @@ class GMNSExporter:
 
     def doWork(self) -> None:
         if "ogc_fid" in list(self.links_df.columns):
-            self.links_df.drop("ogc_fid", axis=1, inplace=True)
+            self.links_df = self.links_df.drop("ogc_fid", axis=1)
         if "ogc_fid" in list(self.nodes_df.columns):
-            self.nodes_df.drop("ogc_fid", axis=1, inplace=True)
+            self.nodes_df = self.nodes_df.drop("ogc_fid", axis=1)
 
         self.update_direction_field()
 
@@ -88,11 +88,11 @@ class GMNSExporter:
         for col in list(self.links_df.columns):
             if col in links_equiv:
                 if links_equiv[col] not in list(self.links_df.columns):
-                    self.links_df.rename(columns={f"{col}": f"{links_equiv[col]}"}, inplace=True)
+                    self.links_df = self.links_df.rename(columns={f"{col}": f"{links_equiv[col]}"})
                 elif col not in ["lanes", "capacity", "link_id", "name", "geometry"]:
-                    self.links_df.drop(col, axis=1, inplace=True)
+                    self.links_df = self.links_df.drop(col, axis=1)
             elif col[-3:] in ["_ab", "_ba"]:
-                self.links_df.drop(col, axis=1, inplace=True)
+                self.links_df = self.links_df.drop(col, axis=1)
 
         for idx, row in self.nodes_df.iterrows():
             self.nodes_df.loc[idx, "node_type"] = "centroid" if row.is_centroid == 1 else None
@@ -100,9 +100,9 @@ class GMNSExporter:
         for col in list(self.nodes_df.columns):
             if col in nodes_equiv:
                 if nodes_equiv[col] not in list(self.nodes_df.columns):
-                    self.nodes_df.rename(columns={f"{col}": f"{nodes_equiv[col]}"}, inplace=True)
+                    self.nodes_df = self.nodes_df.rename(columns={f"{col}": f"{nodes_equiv[col]}"})
                 elif col != "node_id":
-                    self.links_df.drop(col, axis=1, inplace=True)
+                    self.links_df = self.links_df.drop(col, axis=1)
             elif col == "geometry":
                 self.nodes_df = self.nodes_df.assign(
                     x_coord=[self.nodes_df.geometry[idx].coords[0][0] for idx in list(self.nodes_df.index)]
@@ -110,7 +110,7 @@ class GMNSExporter:
                 self.nodes_df = self.nodes_df.assign(
                     y_coord=[self.nodes_df.geometry[idx].coords[0][1] for idx in list(self.nodes_df.index)]
                 )
-                self.nodes_df.drop("geometry", axis=1, inplace=True)
+                self.nodes_df = self.nodes_df.drop("geometry", axis=1)
 
     def reorder_fields(self) -> None:
         link_cols = list(self.links_df.columns)

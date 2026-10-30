@@ -183,7 +183,7 @@ class Pattern(BasicPTElement):
         df_net = df.assign(seq=np.arange(df.shape[0]), pattern_id=self.pattern_id, srid=4326)
 
         df_net = df_net.merge(self.__geolinks[["link_id", "geometry"]], on="link_id", how="inner")
-        df_net.sort_values("seq", inplace=True)
+        df_net = df_net.sort_values("seq")
         df_net = gpd.GeoDataFrame(df_net, geometry="geometry", crs=self.__geolinks.crs)
         df_net = df_net.assign(wkb=df_net.geometry.to_wkb()).drop(columns=["geometry"])
         self.pattern_mapping = df_net[["pattern_id", "seq", "link_id", "wkb", "dir", "srid"]]

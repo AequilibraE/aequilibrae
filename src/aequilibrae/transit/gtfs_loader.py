@@ -303,7 +303,7 @@ class GTFSReader(WorkerThread):
                     continue
 
                 cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1) + "#####" + stop_times.stop)
-                cleaner.drop_duplicates(["seqkey"], inplace=True, keep="first")
+                cleaner = cleaner.drop_duplicates(["seqkey"], keep="first")
                 stop_times = cleaner.drop(columns=["seqkey"])
                 stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
                 stop_times["departure_time"] = stop_times.departure_time.astype(int)
@@ -400,14 +400,14 @@ class GTFSReader(WorkerThread):
         df = df.assign(other_stop=df.stop_id.shift(-1), other_trip=df.trip_id.shift(-1))
         df = df.loc[~((df.other_stop == df.stop_id) & (df.trip_id == df.other_trip)), :]
         counter -= df.shape[0]
-        df.drop(columns=["other_stop", "other_trip"], inplace=True)
+        df = df.drop(columns=["other_stop", "other_trip"])
         df.columns = ["stop" if x == "stop_id" else x for x in df.columns]
 
         stops = [s.stop for s in self.stops.values()]
         stop_ids = [s.stop_id for s in self.stops.values()]
         stop_list = pd.DataFrame({"stop": stops, "stop_id": stop_ids})
         df = df.merge(stop_list, on="stop")
-        df.sort_values(["trip_id", "stop_sequence"], inplace=True)
+        df = df.sort_values(["trip_id", "stop_sequence"])
         df = df.assign(source_time=0)
 
         msg = "Loading stop times (Step: 3/12)"

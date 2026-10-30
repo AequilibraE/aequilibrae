@@ -352,18 +352,18 @@ class TransitGraphBuilder:
             tt = pd.read_sql(sql=sql, con=conn)
 
         # compute the travel time on the segments
-        tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
+        tt = tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True)
         tt["last_departure"] = tt["departure"].shift(+1)
         tt["last_trip_id"] = tt["trip_id"].shift(+1)
         tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
         tt["trav_time"] = tt["arrival"] - tt["last_departure"]
-        tt.dropna(how="any", inplace=True)
+        tt = tt.dropna(how="any")
         tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
             ["last_departure", "last_trip_id", "last_pattern_id"]
         ].astype(np.uint64)
 
         tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
-        tt.dropna(subset="trav_time", inplace=True)
+        tt = tt.dropna(subset="trav_time")
         tt = tt.copy(deep=True)
 
         # tt.seq refers to the stop sequence index.
@@ -386,14 +386,14 @@ class TransitGraphBuilder:
         """
         tt = self._compute_segment_travel_time(time_filter=True)
         tt_full = self._compute_segment_travel_time(time_filter=False)
-        tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
+        tt_full = tt_full.rename(columns={"trav_time": "trav_time_full"})
 
         # Compute the mean travel time from the different trips corresponding to
         assert self.__line_segments is not None
         self.__line_segments = pd.merge(self.__line_segments, tt, on=["pattern_id", "seq"], how="left")
         self.__line_segments = pd.merge(self.__line_segments, tt_full, on=["pattern_id", "seq"], how="left")
         self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.__line_segments.trav_time_full)
-        self.__line_segments.drop("trav_time_full", axis=1, inplace=True)
+        self.__line_segments = self.__line_segments.drop("trav_time_full", axis=1)
         self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.end - self.start)
 
     def _add_mean_headway_to_segments(self):
@@ -412,7 +412,7 @@ class TransitGraphBuilder:
 
         # merge the trips schedules with pattern ids
         mh = pd.merge(mh, trips, on="trip_id", how="left")
-        mh.sort_values(by=["pattern_id", "seq", "trip_id", "arrival"], inplace=True)
+        mh = mh.sort_values(by=["pattern_id", "seq", "trip_id", "arrival"])
         mh["headway"] = mh["arrival"].diff()
 
         # count the number of trips per stop
@@ -486,7 +486,7 @@ class TransitGraphBuilder:
         """Create boarding vertices."""
         assert self.__line_segments is not None
         boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
-        boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        boarding_vertices = boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"})
         assert self.__stop_vertices is not None
         boarding_vertices = pd.merge(
             boarding_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
@@ -503,7 +503,7 @@ class TransitGraphBuilder:
         assert self.__line_segments is not None
         assert self.__stop_vertices is not None
         alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        alighting_vertices = alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"})
         alighting_vertices = pd.merge(
             alighting_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
@@ -566,12 +566,12 @@ class TransitGraphBuilder:
                 self.vertices.node_type == "origin",
                 ["node_id", "taz_id"],
             ]
-            origin_nodes.rename(columns={"node_id": "o_node_id"}, inplace=True)
+            origin_nodes = origin_nodes.rename(columns={"node_id": "o_node_id"})
             destination_nodes = self.vertices.loc[
                 self.vertices.node_type == "destination",
                 ["node_id", "taz_id"],
             ]
-            destination_nodes.rename(columns={"node_id": "d_node_id"}, inplace=True)
+            destination_nodes = destination_nodes.rename(columns={"node_id": "d_node_id"})
             od_node_mapping = pd.merge(origin_nodes, destination_nodes, on="taz_id", how="left")[
                 ["o_node_id", "d_node_id", "taz_id"]
             ]
@@ -619,7 +619,7 @@ class TransitGraphBuilder:
         )
 
         # reset index and copy it to column
-        self.vertices.reset_index(drop=True, inplace=True)
+        self.vertices = self.vertices.reset_index(drop=True)
 
         o_vertices = self.__od_vertices[self.__od_vertices.node_type.isin(["origin", "od"])]
         node_id_min = o_vertices.taz_id.max() + 1
@@ -635,8 +635,8 @@ class TransitGraphBuilder:
 
         # data types
         self.vertices.node_id = self.vertices.node_id.astype("int64")
-        self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
-        self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
+        self.vertices.stop_id = self.vertices.stop_id.astype("string").fillna("").astype(str)
+        self.vertices.line_id = self.vertices.line_id.astype("string").fillna("").astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
         self.vertices.taz_id = self.vertices.taz_id.astype("int64")
 
@@ -644,7 +644,7 @@ class TransitGraphBuilder:
         """Create on board edges."""
         assert self.__line_segments is not None
         on_board_edges = self.__line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
-        on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
+        on_board_edges = on_board_edges.rename(columns={"seq": "line_seg_idx"})
 
         # get tail vertex index
         assert self.vertices is not None
@@ -654,7 +654,7 @@ class TransitGraphBuilder:
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        on_board_edges.rename(columns={"node_id": "b_node"}, inplace=True)
+        on_board_edges = on_board_edges.rename(columns={"node_id": "b_node"})
 
         # get head vertex index
         on_board_edges = pd.merge(
@@ -663,7 +663,7 @@ class TransitGraphBuilder:
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        on_board_edges.rename(columns={"node_id": "a_node"}, inplace=True)
+        on_board_edges = on_board_edges.rename(columns={"node_id": "a_node"})
 
         # uniform attributes
         on_board_edges["link_type"] = "on-board"
@@ -676,7 +676,7 @@ class TransitGraphBuilder:
         """Create boarding edges."""
         assert self.__line_segments is not None
         boarding_edges = self.__line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
-        boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        boarding_edges = boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"})
 
         # get tail vertex index (stop vertex)
         assert self.vertices is not None
@@ -686,7 +686,7 @@ class TransitGraphBuilder:
             on="stop_id",
             how="left",
         )
-        boarding_edges.rename(columns={"node_id": "b_node"}, inplace=True)
+        boarding_edges = boarding_edges.rename(columns={"node_id": "b_node"})
 
         # get head vertex index (boarding vertex)
         boarding_edges = pd.merge(
@@ -695,7 +695,7 @@ class TransitGraphBuilder:
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        boarding_edges.rename(columns={"node_id": "a_node"}, inplace=True)
+        boarding_edges = boarding_edges.rename(columns={"node_id": "a_node"})
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
@@ -712,7 +712,7 @@ class TransitGraphBuilder:
         """Create alighting edges."""
         assert self.__line_segments is not None
         alighting_edges = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        alighting_edges = alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"})
 
         # get tail vertex index (alighting vertex)
         assert self.vertices is not None
@@ -722,7 +722,7 @@ class TransitGraphBuilder:
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        alighting_edges.rename(columns={"node_id": "b_node"}, inplace=True)
+        alighting_edges = alighting_edges.rename(columns={"node_id": "b_node"})
 
         # get head vertex index (stop vertex)
         alighting_edges = pd.merge(
@@ -731,7 +731,7 @@ class TransitGraphBuilder:
             on="stop_id",
             how="left",
         )
-        alighting_edges.rename(columns={"node_id": "a_node"}, inplace=True)
+        alighting_edges = alighting_edges.rename(columns={"node_id": "a_node"})
 
         # uniform attributes
         alighting_edges["link_type"] = "alighting"
@@ -748,7 +748,7 @@ class TransitGraphBuilder:
         # we start by removing the first segment of each line
         assert self.__line_segments is not None
         dwell_edges = self.__line_segments.loc[self.__line_segments.seq != 0][["line_id", "from_stop", "seq"]]
-        dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
+        dwell_edges = dwell_edges.rename(columns={"seq": "line_seg_idx"})
 
         # we take the first stop of the segment
         dwell_edges["stop_id"] = dwell_edges.from_stop
@@ -762,7 +762,7 @@ class TransitGraphBuilder:
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        dwell_edges.rename(columns={"node_id": "a_node"}, inplace=True)
+        dwell_edges = dwell_edges.rename(columns={"node_id": "a_node"})
 
         # tail vertex index (alighting vertex)
         # aligthing vertices of line segments [0:segment_count]
@@ -773,10 +773,10 @@ class TransitGraphBuilder:
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        dwell_edges.rename(columns={"node_id": "b_node"}, inplace=True)
+        dwell_edges = dwell_edges.rename(columns={"node_id": "b_node"})
 
         # clean-up
-        dwell_edges.drop("from_stop", axis=1, inplace=True)
+        dwell_edges = dwell_edges.drop("from_stop", axis=1)
 
         # uniform values
         dwell_edges["line_seg_idx"] = -1
@@ -824,7 +824,7 @@ class TransitGraphBuilder:
             deep=True
         )
 
-        od_vertices.reset_index(drop=True, inplace=True)
+        od_vertices = od_vertices.reset_index(drop=True)
         od_geometries = od_vertices["geometry"].apply(
             lambda geometry: shapely.transform(
                 shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
@@ -836,7 +836,7 @@ class TransitGraphBuilder:
         stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(
             deep=True
         )
-        stop_vertices.reset_index(drop=True, inplace=True)
+        stop_vertices = stop_vertices.reset_index(drop=True)
         stop_geometries = stop_vertices["geometry"].apply(
             lambda geometry: shapely.transform(
                 shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
@@ -933,7 +933,7 @@ class TransitGraphBuilder:
         # Create egress connectors
         # ========================
         egress_connector_edges = access_connector_edges.copy(deep=True)
-        egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True)
+        egress_connector_edges = egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"})
 
         assert self.od_node_mapping is not None
         if self.blocking_centroid_flows:
@@ -945,8 +945,8 @@ class TransitGraphBuilder:
                 right_on="o_node_id",
                 how="left",
             )
-            egress_connector_edges.drop(["a_node", "o_node_id"], axis=1, inplace=True)
-            egress_connector_edges.rename(columns={"d_node_id": "a_node"}, inplace=True)
+            egress_connector_edges = egress_connector_edges.drop(["a_node", "o_node_id"], axis=1)
+            egress_connector_edges = egress_connector_edges.rename(columns={"d_node_id": "a_node"})
 
         # uniform values
         egress_connector_edges["link_type"] = "egress_connector"
@@ -985,7 +985,7 @@ class TransitGraphBuilder:
             right_on=["from_stop", "line_id"],
             how="left",
         )
-        inner_stop_transfer_edges.drop(["from_stop", "line_id"], axis=1, inplace=True)
+        inner_stop_transfer_edges = inner_stop_transfer_edges.drop(["from_stop", "line_id"], axis=1)
 
         # uniform attributes
         inner_stop_transfer_edges["line_seg_idx"] = -1
@@ -1000,7 +1000,7 @@ class TransitGraphBuilder:
         inner_stop_transfer_edges["trav_time"] = self.uniform_dwell_time + self.alighting_penalty
 
         # remove duplicates
-        inner_stop_transfer_edges.drop_duplicates(inplace=True)
+        inner_stop_transfer_edges = inner_stop_transfer_edges.drop_duplicates()
 
         self.__inner_stop_transfer_edges = inner_stop_transfer_edges
 
@@ -1028,7 +1028,7 @@ class TransitGraphBuilder:
         ].rename(columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"})
         # add the station id
         alighting = pd.merge(alighting, stops, on="stop_id", how="inner")
-        alighting.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+        alighting = alighting.rename(columns={"stop_id": "o_stop_id"})
 
         # load the boarding vertices (head of transfer edges)
         boarding = self.vertices[self.vertices.node_type == "boarding"][
@@ -1036,12 +1036,12 @@ class TransitGraphBuilder:
         ].rename(columns={"line_id": "d_line_id", "geometry": "d_geometry", "node_id": "a_node"})
         # add the station id
         boarding = pd.merge(boarding, stops, on="stop_id", how="inner")
-        boarding.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+        boarding = boarding.rename(columns={"stop_id": "d_stop_id"})
 
         outer_stop_transfer_edges = pd.merge(alighting, boarding, on="parent_station", how="inner")
-        outer_stop_transfer_edges.drop("parent_station", axis=1, inplace=True)
+        outer_stop_transfer_edges = outer_stop_transfer_edges.drop("parent_station", axis=1)
 
-        outer_stop_transfer_edges.dropna(how="any", inplace=True)
+        outer_stop_transfer_edges = outer_stop_transfer_edges.dropna(how="any")
 
         # remove entries that share the same stop
         outer_stop_transfer_edges = outer_stop_transfer_edges.loc[
@@ -1062,7 +1062,9 @@ class TransitGraphBuilder:
             right_on=["from_stop", "line_id"],
             how="left",
         )
-        outer_stop_transfer_edges.drop(["o_stop_id", "d_stop_id", "from_stop", "line_id"], axis=1, inplace=True)
+        outer_stop_transfer_edges = outer_stop_transfer_edges.drop(
+            ["o_stop_id", "d_stop_id", "from_stop", "line_id"], axis=1
+        )
 
         # uniform attributes
         outer_stop_transfer_edges["line_seg_idx"] = -1
@@ -1086,14 +1088,10 @@ class TransitGraphBuilder:
         outer_stop_transfer_edges["direction"] = 1
 
         # cleanup
-        outer_stop_transfer_edges.drop(
-            ["o_geometry", "d_geometry"],
-            axis=1,
-            inplace=True,
-        )
+        outer_stop_transfer_edges = outer_stop_transfer_edges.drop(["o_geometry", "d_geometry"], axis=1)
 
         # remove duplicates
-        outer_stop_transfer_edges.drop_duplicates(inplace=True)
+        outer_stop_transfer_edges = outer_stop_transfer_edges.drop_duplicates()
 
         self.__outer_stop_transfer_edges = outer_stop_transfer_edges
 
@@ -1114,7 +1112,7 @@ class TransitGraphBuilder:
 
             stops = pd.read_sql(sql=stops_sql, con=conn)
 
-        stops.drop_duplicates(inplace=True)
+        stops = stops.drop_duplicates()
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
         # we only keep the stations which contain at least 2 stops
@@ -1128,20 +1126,20 @@ class TransitGraphBuilder:
             columns={"geometry": "o_geometry", "node_id": "b_node"}
         )
         o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
-        o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+        o_walking = o_walking.rename(columns={"stop_id": "o_stop_id"})
 
         # head vertex
         d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
             columns={"geometry": "d_geometry", "node_id": "a_node"}
         )
         d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
-        d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+        d_walking = d_walking.rename(columns={"stop_id": "d_stop_id"})
 
         walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
 
         # remove entries that share the same stop
         walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
-        walking_edges.drop("parent_station", axis=1, inplace=True)
+        walking_edges = walking_edges.drop("parent_station", axis=1)
 
         # uniform attributes
         walking_edges["line_seg_idx"] = -1
@@ -1164,11 +1162,7 @@ class TransitGraphBuilder:
         )
 
         # cleanup
-        walking_edges.drop(
-            ["o_geometry", "d_geometry"],
-            axis=1,
-            inplace=True,
-        )
+        walking_edges = walking_edges.drop(["o_geometry", "d_geometry"], axis=1)
 
         self.__walking_edges = walking_edges
 
@@ -1231,7 +1225,7 @@ class TransitGraphBuilder:
         self.edges = pd.concat(edges, axis=0)
 
         # reset index and copy it to column
-        self.edges.reset_index(drop=True, inplace=True)
+        self.edges = self.edges.reset_index(drop=True)
         self.edges["link_id"] = self.edges.index + 1
         for col in SF_EDGE_COLS:
             if col not in self.edges:
@@ -1239,15 +1233,15 @@ class TransitGraphBuilder:
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
-        self.edges.line_id = self.edges.line_id.fillna("").astype(str)
-        self.edges.stop_id = self.edges.stop_id.fillna("").astype(str)
+        self.edges.line_id = self.edges.line_id.astype("string").fillna("").astype(str)
+        self.edges.stop_id = self.edges.stop_id.astype("string").fillna("").astype(str)
         self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int64")
         self.edges.b_node = self.edges.b_node.astype("int64")
         self.edges.a_node = self.edges.a_node.astype("int64")
         self.edges.trav_time = self.edges.trav_time.astype(float)
         self.edges.freq = self.edges.freq.astype(float)
-        self.edges.o_line_id = self.edges.o_line_id.fillna("").astype(str)
-        self.edges.d_line_id = self.edges.d_line_id.fillna("").astype(str)
+        self.edges.o_line_id = self.edges.o_line_id.astype("string").fillna("").astype(str)
+        self.edges.d_line_id = self.edges.d_line_id.astype("string").fillna("").astype(str)
         self.edges.direction = self.edges.direction.astype("int8")
 
     def create_graph(self):
@@ -1752,14 +1746,14 @@ class TransitGraphBuilder:
                 left_on=o_zone_col,
                 right_on="taz_id",
             )[["node_id", d_zone_col, "demand"]]
-            od_matrix.rename(columns={"node_id": "o_node_id"}, inplace=True)
+            od_matrix = od_matrix.rename(columns={"node_id": "o_node_id"})
             od_matrix = pd.merge(
                 od_matrix,
                 self.od_node_mapping[["node_id", "taz_id"]],
                 left_on=d_zone_col,
                 right_on="taz_id",
             )[["o_node_id", "node_id", "demand"]]
-            od_matrix.rename(columns={"node_id": "d_node_id"}, inplace=True)
+            od_matrix = od_matrix.rename(columns={"node_id": "d_node_id"})
         return od_matrix
 
     @property

@@ -646,7 +646,7 @@ class TrafficAssignment(AssignmentBase):
         )  # -1 -> remove keys to get 1 indexed preload columns
         if name in self.preloads.columns:
             raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
-        preload.rename(columns={"preload": name}, inplace=True)
+        preload = preload.rename(columns={"preload": name})
 
         # Merge onto current preload dataframe
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
@@ -976,7 +976,7 @@ class TrafficAssignment(AssignmentBase):
             df = cls.results.get_sl_results()
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
-            df.rename(columns=cls_cols, inplace=True)
+            df = df.rename(columns=cls_cols)
             class_flows.append(df)
         return pd.concat(class_flows, axis=1).rename_axis("link_id")
 

@@ -61,7 +61,7 @@ class DelaunayAnalysis:
                     edges.append([points.at[f, "node_id"], points.at[t, "node_id"]])
 
             edges = pd.DataFrame(edges)
-            edges.drop_duplicates(inplace=True)
+            edges = edges.drop_duplicates()
             edges.columns = ["a_node", "b_node"]
             edges = edges.assign(direction=0, distance=0, link_id=np.arange(edges.shape[0]) + 1)
             edges = edges[["link_id", "direction", "a_node", "b_node", "distance"]]

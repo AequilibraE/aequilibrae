@@ -449,16 +449,16 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     crosswalk = pd.concat([crosswalk, cw2])
     crosswalk = crosswalk.assign(key=crosswalk.compressed_link * crosswalk.compressed_direction)
-    crosswalk.drop(["compressed_link", "compressed_direction"], axis=1, inplace=True)
+    crosswalk = crosswalk.drop(["compressed_link", "compressed_direction"], axis=1)
 
     final_ids = pd.DataFrame(graph.compact_graph[["id", "link_id", "direction"]], copy=True)
     final_ids = final_ids.assign(key=final_ids.link_id * final_ids.direction)
-    final_ids.drop(["link_id", "direction"], axis=1, inplace=True)
+    final_ids = final_ids.drop(["link_id", "direction"], axis=1)
 
     # Cython's references can make pandas mistake this merge result for a chained assignment target.
     agg_crosswalk = crosswalk.merge(final_ids, on="key").copy(deep=False)
     agg_crosswalk.loc[:, "key"] = agg_crosswalk.link_id * agg_crosswalk.link_direction
-    agg_crosswalk.drop(["link_id", "link_direction"], axis=1, inplace=True)
+    agg_crosswalk = agg_crosswalk.drop(["link_id", "link_direction"], axis=1)
 
     direct_crosswalk = final_ids[final_ids.key.abs() < max_link_id]
 
@@ -467,7 +467,7 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     graph.graph = graph.graph.assign(__graph_correlation_key__=graph.graph.link_id * graph.graph.direction)
     graph.graph = graph.graph.merge(crosswalk, on="__graph_correlation_key__", how="left")
-    graph.graph.drop(["__graph_correlation_key__"], axis=1, inplace=True)
+    graph.graph = graph.graph.drop(["__graph_correlation_key__"], axis=1)
 
     # If will refer all the links that have no correlation to an element beyond the last link
     # This element will always be zero during assignment
