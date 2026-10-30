@@ -42,7 +42,7 @@ dependencies = [
   "requests",
   "rtree",
   "scipy>=1.4",
-  "shapely>=2.0",
+  "shapely>=2.1",
   "tqdm",
   "numexpr",
 ]

@@ -6,9 +6,8 @@ from typing import List
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import shapely.ops
+import shapely
 from shapely.geometry import LineString
-from shapely.ops import transform
 
 from aequilibrae.transit.functions.get_srid import get_srid
 
@@ -158,14 +157,24 @@ class Pattern(BasicPTElement):
 
         route_shape = self.raw_shape
         if route_shape is not None:
-            route_shape = transform(self.__feed.mm_transformer.transform, route_shape)
+            route_shape = shapely.transform(
+                route_shape,
+                self.__feed.mm_transformer.transform,
+                include_z=None,
+                interleaved=False,
+            )
         df = map_matcher.map_match_route(stops, route_shape, self.pattern_id)
 
         if df.shape[0] == 0:
             logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
 
-        self.shape = shapely.ops.transform(self.__feed.mm_transform_rev.transform, map_matcher.assemble_shape(df))
+        self.shape = shapely.transform(
+            map_matcher.assemble_shape(df),
+            self.__feed.mm_transform_rev.transform,
+            include_z=None,
+            interleaved=False,
+        )
         self.__build_pattern_mapping(df)
         logger.debug(f"Map-matched pattern {self.pattern_id}")
 

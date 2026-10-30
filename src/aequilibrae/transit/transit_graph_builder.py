@@ -243,14 +243,21 @@ class TransitGraphBuilder:
             ).transform
         else:
             transformer = self.transformer_g_to_p
-        geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        geometry = [shapely.transform(p, transformer, include_z=None, interleaved=False) for p in geometry]
         centroids = shapely.centroid(geometry)
 
         self.zones = pd.DataFrame(
             {
                 "zone_id": zones.zone_id.copy(deep=True).astype(int),
-                "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
-                "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids]),
+                "geometry": shapely.to_wkb(
+                    [shapely.transform(p, self.transformer_p_to_g, include_z=None, interleaved=False) for p in geometry]
+                ),
+                "centroids": shapely.to_wkb(
+                    [
+                        shapely.transform(p, self.transformer_p_to_g, include_z=None, interleaved=False)
+                        for p in centroids
+                    ]
+                ),
             }
         )
 
@@ -819,7 +826,9 @@ class TransitGraphBuilder:
 
         od_vertices.reset_index(drop=True, inplace=True)
         od_geometries = od_vertices["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
+            lambda geometry: shapely.transform(
+                shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
+            )
         )
         od_geometries = np.array(list(od_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
@@ -829,7 +838,9 @@ class TransitGraphBuilder:
         )
         stop_vertices.reset_index(drop=True, inplace=True)
         stop_geometries = stop_vertices["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
+            lambda geometry: shapely.transform(
+                shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
+            )
         )
         stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
@@ -1350,10 +1361,10 @@ class TransitGraphBuilder:
         """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
         nodes["geometry"] = nodes["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+            lambda geometry: shapely.transform(geometry, self.transformer_g_to_p, include_z=None, interleaved=False)
         )
         links["geometry"] = links["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+            lambda geometry: shapely.transform(geometry, self.transformer_g_to_p, include_z=None, interleaved=False)
         )
         nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
         kdtree = KDTree(nodes_geometries)
@@ -1368,13 +1379,17 @@ class TransitGraphBuilder:
         assert self.vertices is not None
         for row in self.edges[connector_rows].itertuples():
             # row.a_node - 1 because the node_ids are the index + 1
-            start = shapely.ops.transform(
-                self.transformer_g_to_p,
+            start = shapely.transform(
                 shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-            )
-            end = shapely.ops.transform(
                 self.transformer_g_to_p,
+                include_z=None,
+                interleaved=False,
+            )
+            end = shapely.transform(
                 shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+                self.transformer_g_to_p,
+                include_z=None,
+                interleaved=False,
             )
 
             _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
@@ -1405,7 +1420,8 @@ class TransitGraphBuilder:
             else:  # row.link_type == "egress_connector"
                 trav_time *= self.egress_time_factor
 
-            lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
+            geometry = shapely.transform(line, self.transformer_p_to_g, include_z=None, interleaved=False)
+            lines.append((trav_time, geometry.wkb))
         return lines
 
     def create_additional_db_fields(self, conn: sqlite3.Connection | None = None):

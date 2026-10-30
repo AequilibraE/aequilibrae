@@ -1,8 +1,8 @@
 import sqlite3
 
+import shapely
 import shapely.wkb
 import shapely.wkt
-from shapely.ops import transform
 from aequilibrae.utils.get_table import get_table
 
 from aequilibrae.transit.transit_elements import Pattern
@@ -23,7 +23,7 @@ def read_patterns(conn: sqlite3.Connection, transformer):
         pat.shape_length = pat.best_shape().length
 
         if transformer:
-            pat.shape = transform(transformer.transform, pat.shape)
+            pat.shape = shapely.transform(pat.shape, transformer.transform, include_z=None, interleaved=False)
 
         patterns.append(pat)
     return patterns
