@@ -22,8 +22,11 @@ Software Design and requirements
 
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
-Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. We use `Cython <https://cython.org/>`_ to integrate compiled code written in Cython and C/C++.
+Whenever vectorization is not possible through the use of NumPy functions,
+compiled code is developed in order to accelerate computation. We use `Cython
+<https://cython.org/>`_ to integrate compiled code written in Cython and
+C/C++. You can find documentation of AequilibraE's internal model here
+:doc:`Internals <internals>`.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
@@ -276,8 +279,6 @@ identified and that we intend to dedicate some time to in the future.
 
 * Traffic assignment
 
-  * Re-development of the path-finding algorithm to allow for turn
-    penalties/bans
   * New origin-based traffic assignment to achieve ultra-converged
     assignment
   * New path-finding algorithm based on contraction-hierarchies
