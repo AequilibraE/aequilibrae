@@ -29,36 +29,23 @@ def _schema(conn):
         """
         SELECT type, name, sql
         FROM sqlite_master
-        WHERE type IN ('index', 'trigger')
-          AND tbl_name IN ('links', 'nodes', 'modes', 'link_types', 'turn_restrictions', 'periods', 'scenarios')
         ORDER BY type, name
         """
     ).fetchall()
 
 
-def _indexed_columns(conn, table):
-    return sorted(
-        tuple(row[2] for row in conn.execute(f"PRAGMA index_info('{index[1]}')"))
-        for index in conn.execute(f"PRAGMA index_list({table})")
-    )
+def _structure(conn):
+    return [row for row in _schema(conn) if row[0] != "trigger" or not row[1].startswith("aequilibrae_")]
 
 
-def _insert_link_without_nodes(conn, link_id, coordinates):
+def _insert_link(conn, link_id, coordinates, a_node=0, b_node=0):
     conn.execute(
-        "INSERT INTO links (link_id, modes, link_type, geometry) VALUES (?, 'c', 'default', GeomFromWKB(?, 4326))",
-        (link_id, LineString(coordinates).wkb),
+        """
+        INSERT INTO links (link_id, a_node, b_node, modes, link_type, geometry)
+        VALUES (?, ?, ?, 'c', 'default', GeomFromWKB(?, 4326))
+        """,
+        (link_id, a_node, b_node, LineString(coordinates).wkb),
     )
-
-
-def _restore_strict_endpoint_checks(conn):
-    sql = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'links'").fetchone()[0]
-    for field in ("a_node", "b_node"):
-        sql = sql.replace(f"CHECK(TYPEOF({field}) IN ('integer', 'null'))", f"CHECK(TYPEOF({field}) == 'integer')")
-    version = conn.execute("PRAGMA schema_version").fetchone()[0]
-    conn.execute("PRAGMA writable_schema = ON")
-    conn.execute("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'links'", (sql,))
-    conn.execute(f"PRAGMA schema_version = {version + 1}")
-    conn.execute("PRAGMA writable_schema = RESET")
 
 
 def test_migration_replaces_outdated_triggers(empty_project, migrate):
@@ -76,8 +63,8 @@ def test_migration_replaces_outdated_triggers(empty_project, migrate):
         assert _schema(conn) == expected
 
 
-def test_migration_drops_redundant_indexes(empty_project, migrate):
-    """Test that migration 010 keeps a single index per column where earlier specifications created duplicates."""
+def test_migration_preserves_project_structure(empty_project, migrate):
+    """Test that migration 010 preserves existing tables, constraints, indexes and user triggers."""
     with empty_project.db_connection as conn:
         conn.execute("DROP INDEX idx_link_anode")
         for name, table, column in [
@@ -89,31 +76,20 @@ def test_migration_drops_redundant_indexes(empty_project, migrate):
             ("links_link_type", "links", "link_type"),
             ("aequilibrae_nodes_node_id", "nodes", "node_id"),
             ("nodes_node_id", "nodes", "node_id"),
-            ("idx_node", "nodes", "node_id"),
         ]:
             conn.execute(f"CREATE INDEX {name} ON {table} ({column})")
-        conn.execute("CREATE UNIQUE INDEX idx_link ON links (link_id)")
+        conn.execute("CREATE TRIGGER user_link_insert AFTER INSERT ON links BEGIN SELECT 1; END")
+        expected = _structure(conn)
 
         migrate(project_conn=conn)
 
-        assert _indexed_columns(conn, "links") == [
-            ("a_node",),
-            ("a_node", "b_node"),
-            ("b_node",),
-            ("link_id",),
-            ("link_type",),
-            ("modes",),
-        ]
-        assert _indexed_columns(conn, "nodes") == [("is_centroid",), ("node_id",)]
-        link_indexes = {row[1]: row[2] for row in conn.execute("PRAGMA index_list(links)")}
-        assert "idx_link_anode" in link_indexes
-        assert [unique for name, unique in link_indexes.items() if name.startswith("sqlite_autoindex")] == [1]
+        assert _structure(conn) == expected
 
 
 def test_migration_refreshes_stale_node_attributes(empty_project, migrate):
     """Test that migration 010 recomputes node modes and link types that earlier triggers left stale."""
     with empty_project.db_connection as conn:
-        _insert_link_without_nodes(conn, 1001, [(0, 0), (1, 0)])
+        _insert_link(conn, 1001, [(0, 0), (1, 0)])
         expected = conn.execute("SELECT node_id, modes, link_types FROM nodes ORDER BY node_id").fetchall()
         remove_triggers(conn, "network")
         conn.execute("UPDATE nodes SET modes = 'cw', link_types = NULL")
@@ -123,32 +99,37 @@ def test_migration_refreshes_stale_node_attributes(empty_project, migrate):
         assert conn.execute("SELECT node_id, modes, link_types FROM nodes ORDER BY node_id").fetchall() == expected
 
 
-def test_migration_allows_links_without_endpoint_nodes(empty_project, migrate):
-    """Test that migration 010 relaxes the a_node/b_node type checks so links can be added without them."""
+@pytest.mark.parametrize("field", ["a_node", "b_node"])
+@pytest.mark.parametrize("endpoint", [None, "invalid"])
+def test_migration_preserves_endpoint_checks(empty_project, migrate, field, endpoint):
+    """Test that migration 010 leaves the existing integer endpoint constraints in force."""
     with empty_project.db_connection as conn:
-        _restore_strict_endpoint_checks(conn)
-        with pytest.raises(sqlite3.IntegrityError, match="CHECK constraint failed"):
-            _insert_link_without_nodes(conn, 1001, [(0, 0), (1, 0)])
+        for upgraded in (False, True):
+            if upgraded:
+                migrate(project_conn=conn)
+            with pytest.raises(sqlite3.IntegrityError, match="CHECK constraint failed"):
+                _insert_link(conn, 1001, [(0, 0), (1, 0)], **{field: endpoint})
 
-        migrate(project_conn=conn)
-
-        _insert_link_without_nodes(conn, 1001, [(0, 0), (1, 0)])
+        _insert_link(conn, 1001, [(0, 0), (1, 0)])
         assert conn.execute("SELECT count(*) FROM links WHERE a_node IS NULL OR b_node IS NULL").fetchone()[0] == 0
         assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
 
 
-def test_upgrade_allows_links_without_endpoint_nodes(empty_project):
-    """Test that upgrading a project with the strict a_node/b_node checks lets links be added without them."""
+def test_upgrade_preserves_project_structure(empty_project):
+    """Test that upgrading a populated project preserves its tables, constraints and indexes."""
     with empty_project.db_connection as conn:
-        _restore_strict_endpoint_checks(conn)
+        _insert_link(conn, 1001, [(0, 0), (1, 0)])
+        expected = _structure(conn)
+        links = conn.execute("SELECT * FROM links ORDER BY link_id").fetchall()
         conn.execute("UPDATE migrations SET status = 'MISSING' WHERE id = 10")
 
     empty_project.upgrade()
 
     with empty_project.db_connection as conn:
-        _insert_link_without_nodes(conn, 1001, [(0, 0), (1, 0)])
+        assert _structure(conn) == expected
+        assert conn.execute("SELECT * FROM links ORDER BY link_id").fetchall() == links
         assert conn.execute("SELECT status FROM migrations WHERE id = 10").fetchone()[0] == "APPLIED"
-        assert conn.execute("SELECT count(*) FROM links WHERE a_node IS NULL OR b_node IS NULL").fetchone()[0] == 0
+        assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
 
 
 def test_upgraded_example_matches_new_project_triggers(sioux_falls_example, empty_project):

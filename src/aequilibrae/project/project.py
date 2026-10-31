@@ -263,13 +263,6 @@ class Project:
         )
         _upgrade(project_path=project_path, results_path=results_path, transit_path=transit_path)
 
-        # Connections this project already holds keep the pre-upgrade schema. With SpatiaLite loaded, the first write
-        # such a connection makes to a geometry table then fails with "no such table", while a read reloads it cleanly
-        closure = self.scenario.connections
-        for name in ("db_connection", "results_connection", "transit_connection"):
-            if getattr(closure, f"has_{name}") and getattr(closure, name).is_open():
-                getattr(closure, name)._connection.execute("SELECT count(*) FROM sqlite_master").fetchone()
-
     @functools.cached_property
     def project_parameters(self) -> Parameters:
         return Parameters(path=self.project_base_path)

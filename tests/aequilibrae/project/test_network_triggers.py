@@ -446,18 +446,11 @@ def _add_turn_restriction(conn, from_node, via_node, to_node):
     )
 
 
-def test_link_insert_without_endpoint_nodes(empty_project):
-    """Test that a link inserted without a_node/b_node takes them from the nodes at its geometry endpoints."""
+def test_link_insert_with_placeholder_endpoint_nodes(empty_project):
+    """Test that integer placeholders are replaced with the nodes at the geometry endpoints."""
     with empty_project.db_connection as conn:
         a_node, b_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
-        conn.execute(
-            """
-            INSERT INTO links (link_id, modes, link_type, geometry)
-            VALUES (1002, 'c', 'default', GeomFromWKB(?, 4326))
-            """,
-            (LineString([(1, 0), (2, 0)]).wkb,),
-        )
-        new_a_node, new_b_node = conn.execute("SELECT a_node, b_node FROM links WHERE link_id = 1002").fetchone()
+        new_a_node, new_b_node = _insert_link(conn, 1002, [(1, 0), (2, 0)])
 
         assert new_a_node == b_node
         assert new_b_node is not None
