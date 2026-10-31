@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List
 
-from aequilibrae.project.project import Project
+from aequilibrae.project.project import Project, _upgrade
 
 
 def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project:

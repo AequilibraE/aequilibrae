@@ -13,8 +13,7 @@ def migrate(
     results_conn: Optional[sqlite3.Connection] = None,
 ):
     """Refresh network triggers, preserving existing data, tables and indexes."""
-    if project_conn is None:
-        raise RuntimeError("Network migration 010 requires a project_conn connection")
+    assert  project_conn is not None, "Network migration 010 requires a project_conn connection"
 
     logger.info("Beginning migration to refresh the network triggers")
 
