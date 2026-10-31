@@ -437,3 +437,93 @@ def test_linked_centroid_can_be_renumbered_and_demoted(empty_project):
         assert conn.execute("SELECT count(*) FROM nodes WHERE node_id = ?", (moving_node,)).fetchone()[0] == 0
         assert conn.execute("SELECT is_centroid FROM nodes WHERE node_id = 9001").fetchone() == (0,)
         _assert_network_consistent(conn)
+
+
+def _add_turn_restriction(conn, from_node, via_node, to_node):
+    conn.execute(
+        "INSERT INTO turn_restrictions (from_node, via_node, to_node, penalty, modes) VALUES (?, ?, ?, NULL, 'c')",
+        (from_node, via_node, to_node),
+    )
+
+
+def test_link_insert_with_placeholder_endpoint_nodes(empty_project):
+    """Test that integer placeholders are replaced with the nodes at the geometry endpoints."""
+    with empty_project.db_connection as conn:
+        a_node, b_node = _insert_link(conn, 1001, [(0, 0), (1, 0)])
+        new_a_node, new_b_node = _insert_link(conn, 1002, [(1, 0), (2, 0)])
+
+        assert new_a_node == b_node
+        assert new_b_node is not None
+        assert new_b_node not in (a_node, b_node)
+        _assert_network_consistent(conn)
+
+
+def test_link_delete_refreshes_node_link_types(empty_project):
+    """Test that deleting a link drops its mode and link type from the node it leaves behind."""
+    _, shared_node, _ = _build_adjacent_network(empty_project)
+
+    with empty_project.db_connection as conn:
+        conn.execute("DELETE FROM links WHERE link_id = 1002")
+        default_type = conn.execute("SELECT link_type_id FROM link_types WHERE link_type = 'default'").fetchone()[0]
+
+        assert conn.execute("SELECT modes, link_types FROM nodes WHERE node_id = ?", (shared_node,)).fetchone() == (
+            "c",
+            default_type,
+        )
+        _assert_network_consistent(conn)
+
+
+def test_link_reshape_keeps_centroid_it_leaves(empty_project):
+    """Test that reshaping a centroid's only connector away from it keeps the centroid, as deleting the link does."""
+    with empty_project.db_connection as conn:
+        centroid, _ = _insert_link(conn, 1001, [(0, 0), (1, 0)])
+        conn.execute("UPDATE nodes SET is_centroid = 1 WHERE node_id = ?", (centroid,))
+        conn.execute(
+            "UPDATE links SET geometry = GeomFromWKB(?, 4326) WHERE link_id = 1001",
+            (LineString([(0, 1), (1, 0)]).wkb,),
+        )
+
+        assert conn.execute("SELECT is_centroid, modes FROM nodes WHERE node_id = ?", (centroid,)).fetchone() == (
+            1,
+            None,
+        )
+        assert conn.execute("SELECT a_node FROM links WHERE link_id = 1001").fetchone()[0] != centroid
+        _assert_network_consistent(conn)
+
+
+def test_node_merge_is_rejected_when_turn_restrictions_use_the_replaced_node(empty_project):
+    """Test that merging away a node used by a turn restriction fails with a clear message and changes nothing."""
+    first_node, replaced_node, moving_node = _build_adjacent_network(empty_project)
+
+    with empty_project.db_connection as conn:
+        _add_turn_restriction(conn, first_node, replaced_node, moving_node)
+        before = _network_snapshot(conn)
+
+        with pytest.raises(sqlite3.IntegrityError, match="Node is referenced by turn restrictions"):
+            conn.execute(
+                """
+                UPDATE nodes
+                SET geometry = (SELECT geometry FROM nodes WHERE node_id = ?)
+                WHERE node_id = ?
+                """,
+                (replaced_node, moving_node),
+            )
+
+        assert _network_snapshot(conn) == before
+        assert conn.execute("SELECT count(*) FROM turn_restrictions").fetchone()[0] == 1
+        _assert_network_consistent(conn)
+
+
+def test_link_delete_is_rejected_when_it_orphans_a_turn_restriction_node(empty_project):
+    """Test that deleting a link fails with a clear message when its orphaned end node is used by a turn restriction."""
+    first_node, via_node, last_node = _build_adjacent_network(empty_project)
+
+    with empty_project.db_connection as conn:
+        _add_turn_restriction(conn, first_node, via_node, last_node)
+        before = _network_snapshot(conn)
+
+        with pytest.raises(sqlite3.IntegrityError, match="Node is referenced by turn restrictions"):
+            conn.execute("DELETE FROM links WHERE link_id = 1001")
+
+        assert _network_snapshot(conn) == before
+        _assert_network_consistent(conn)
