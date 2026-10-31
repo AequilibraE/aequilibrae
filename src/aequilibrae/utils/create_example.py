@@ -1,9 +1,9 @@
-import zipfile
 import os
+import zipfile
 from pathlib import Path
 from typing import List
 
-from aequilibrae.project.project import Project, _upgrade
+from aequilibrae.project.project import Project
 
 
 def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project:
