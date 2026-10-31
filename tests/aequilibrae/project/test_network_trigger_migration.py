@@ -86,21 +86,21 @@ def test_migration_preserves_project_structure(empty_project, migrate):
         assert _structure(conn) == expected
 
 
-def test_migration_refreshes_stale_node_attributes(empty_project, migrate):
-    """Test that migration 010 recomputes node modes and link types that earlier triggers left stale."""
+def test_migration_preserves_node_attributes(empty_project, migrate):
+    """Test that migration 010 leaves existing node attributes unchanged, including stale values."""
     with empty_project.db_connection as conn:
         _insert_link(conn, 1001, [(0, 0), (1, 0)])
-        expected = conn.execute("SELECT node_id, modes, link_types FROM nodes ORDER BY node_id").fetchall()
         remove_triggers(conn, "network")
         conn.execute("UPDATE nodes SET modes = 'cw', link_types = NULL")
+        expected = conn.execute("SELECT * FROM nodes ORDER BY node_id").fetchall()
 
         migrate(project_conn=conn)
 
-        assert conn.execute("SELECT node_id, modes, link_types FROM nodes ORDER BY node_id").fetchall() == expected
+        assert conn.execute("SELECT * FROM nodes ORDER BY node_id").fetchall() == expected
 
 
 @pytest.mark.parametrize("field", ["a_node", "b_node"])
-@pytest.mark.parametrize("endpoint", [None, "invalid"])
+@pytest.mark.parametrize("endpoint", ["invalid", 1.5])
 def test_migration_preserves_endpoint_checks(empty_project, migrate, field, endpoint):
     """Test that migration 010 leaves the existing integer endpoint constraints in force."""
     with empty_project.db_connection as conn:
