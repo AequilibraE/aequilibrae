@@ -255,13 +255,9 @@ class Project:
             warnings.warn("Take care when ignoring a database during an upgrade.", stacklevel=2)
 
         project_path = self._project_database_path if not ignore_project else None
-        transit_path = (
-            self._transit_database_path if self._transit_database_path.exists() and not ignore_transit else None
-        )
-        results_path = (
-            self._results_database_path if self._results_database_path.exists() and not ignore_results else None
-        )
-        _upgrade(project_path=project_path, results_path=results_path, transit_path=transit_path)
+        tph = self._transit_database_path if self._transit_database_path.exists() and not ignore_transit else None
+        rph = self._results_database_path if self._results_database_path.exists() and not ignore_results else None
+        _upgrade(project_path=project_path, results_path=rph, transit_path=tph)
 
     @functools.cached_property
     def project_parameters(self) -> Parameters:

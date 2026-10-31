@@ -31,6 +31,11 @@ def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project
     zipfile.ZipFile(source).extractall(pth)
     project = Project.from_path(str(pth))
     project.upgrade()
+
+    # This refreshes the metadata of the project, so that the project is ready to be used.
+    # It is a workaround for a bug in sqlite3 that does not refresh the metadata after an upgrade.
+    with project.db_connection as conn:
+        _ = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
     return project
 
 
