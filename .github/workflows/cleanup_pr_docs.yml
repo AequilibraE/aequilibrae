@@ -1,0 +1,29 @@
+name: Clean up PR documentation on S3
+
+# pull_request_target so that secrets are available for closed PRs from forks too.
+# This workflow never checks out or executes PR code, so that is safe.
+on:
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+    steps:
+    - name: Delete the PR's documentation from S3
+      if: ${{ env.HAS_SECRETS == 'true' }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: 'us-east-1'
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        PR_NUMBER: ${{ github.event.number }}
+      run: |
+        # Guard against an empty/non-numeric value ever turning this into a delete of the whole dev/ folder
+        if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+          echo "Invalid PR number: '$PR_NUMBER'"
+          exit 1
+        fi
+        aws s3 rm "s3://${AWS_S3_BUCKET}/dev/${PR_NUMBER}/" --recursive
