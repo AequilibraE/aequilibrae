@@ -18,6 +18,13 @@ Gravity model calibration
 The calibrated model reproduces the observed average trip cost (``EXPO``), the observed average logarithm of the trip
 cost (``POWER``), or both (``GAMMA``). See :doc:`distribution_procedures/classes` for details.
 
+K-factors
+~~~~~~~~~
+
+``GravityCalibration`` can calibrate k-factors for pairs of districts together with the deterrence function, so the
+calibrated model reproduces both the trip length statistics and the observed trips between districts. K-factors can
+be bounded, are saved with the model and are applied by ``GravityApplication``.
+
 Performance improvements
 ------------------------
 

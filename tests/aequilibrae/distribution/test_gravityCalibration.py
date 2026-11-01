@@ -6,6 +6,7 @@ from aequilibrae.distribution import GravityApplication, GravityCalibration, Syn
 from aequilibrae.matrix import AequilibraeMatrix
 
 ZONES = 80
+DISTRICTS = pd.Series(np.arange(ZONES) % 4, index=np.arange(1, ZONES + 1))
 
 
 @pytest.fixture(scope="module")
@@ -78,6 +79,44 @@ def test_calibration_leaves_out_unusable_cells(zones):
     assert calibration.gap < 1e-4
     assert not calibration.result_matrix["gravity"][(cost == 0) | (cost >= max_cost)].any()
     assert "were not used" in "\n".join(calibration.report)
+
+
+def test_calibration_with_k_factors_recovers_the_model(zones, tmp_path):
+    """Test that joint calibration recovers a gamma model with k-factors, which reproduces its trips once saved."""
+    model = gravity_model("GAMMA", -0.6, 0.05)
+    model.districts = DISTRICTS
+    model.k_factors = pd.DataFrame(np.exp(np.random.default_rng(9).normal(0, 0.3, (4, 4))))
+    trips = model_trips(zones, model)
+
+    calibration = GravityCalibration(
+        matrix=matrix(trips, "trips"), impedance=matrix(zones[0], "cost"), function="GAMMA", districts=DISTRICTS
+    )
+    calibration.calibrate()
+    assert (calibration.model.alpha, calibration.model.beta) == pytest.approx((-0.6, 0.05), rel=1e-4)
+    np.testing.assert_allclose(calibration.result_matrix["gravity"], trips, rtol=1e-4, atol=1e-8)
+
+    calibration.model.save(tmp_path / "model.mod")
+    saved = SyntheticGravityModel()
+    saved.load(tmp_path / "model.mod")
+    np.testing.assert_allclose(model_trips(zones, saved), trips, rtol=1e-4, atol=1e-8)
+
+
+@pytest.mark.parametrize("bounds, k_factor", [(None, 0), ((0.2, 5), 0.2)])
+def test_k_factors_of_district_pairs_without_trips(zones, bounds, k_factor):
+    """Test that district pairs without observed trips get a k-factor of zero, or the lower bound if there is one."""
+    trips = model_trips(zones, gravity_model("EXPO", beta=0.08))
+    trips[np.ix_(DISTRICTS == 0, DISTRICTS == 3)] = 0
+    calibration = GravityCalibration(
+        matrix=matrix(trips, "trips"),
+        impedance=matrix(zones[0], "cost"),
+        function="EXPO",
+        districts=DISTRICTS,
+        k_factor_bounds=bounds,
+    )
+    calibration.calibrate()
+
+    assert calibration.model.k_factors.loc[0, 3] == pytest.approx(k_factor)
+    assert ("k-factor of zero" in "\n".join(calibration.report)) == (bounds is None)
 
 
 def test_save_and_load(tmp_path):

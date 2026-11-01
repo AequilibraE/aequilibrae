@@ -1,11 +1,12 @@
-"""Algorithms to **calibrate** synthetic gravity models by maximum likelihood"""
+"""Algorithms to **calibrate** synthetic gravity models by maximum likelihood, with optional k-factors"""
 
 from time import perf_counter
 
 import numpy as np
+import pandas as pd
 
 from aequilibrae.distribution.cython.gravity_core import deterrence_matrix, weighted_cost_sums
-from aequilibrae.distribution.cython.ipf_core import ipf_factors
+from aequilibrae.distribution.cython.ipf_core import ipf_block_factors, ipf_factors
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
@@ -49,6 +50,13 @@ class GravityCalibration:
         >>> gravity.calibrate()
         >>> gravity.model.save(project_path / 'dist_gamma_model.mod')
 
+        # K-factors for pairs of districts can be calibrated together with the deterrence function
+        >>> districts = pd.Series((demand.index - 1) // 6, index=demand.index)
+        >>> gravity = GravityCalibration(**args, districts=districts)
+        >>> gravity.calibrate()
+        >>> gravity.model.k_factors.shape
+        (4, 4)
+
         >>> project.close()
     """
 
@@ -70,6 +78,13 @@ class GravityCalibration:
 
             **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``False``
 
+            **districts** (:obj:`pd.Series`, *Optional*): District of each zone, indexed by zone ID. When provided,
+            a k-factor for each pair of districts is calibrated together with the deterrence function, so the model
+            also reproduces the observed trips between districts
+
+            **k_factor_bounds** (:obj:`tuple`, *Optional*): Smallest and largest k-factor allowed. By default
+            k-factors are not bounded, so pairs of districts without observed trips get a k-factor of zero
+
         :Results:
             **model** (:obj:`SyntheticGravityModel`): Calibrated model
 
@@ -87,6 +102,8 @@ class GravityCalibration:
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.matrix = kwargs.get("matrix")  # type: AequilibraeMatrix
         self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
+        self.districts = kwargs.get("districts")  # type: pd.Series
+        self.k_factor_bounds = kwargs.get("k_factor_bounds") or (0, np.inf)
         deterrence_function = str(kwargs.get("function", "")).upper()
 
         self.result_matrix = None
@@ -148,14 +165,20 @@ class GravityCalibration:
         for name, value in zip(names, theta, strict=True):
             setattr(self.model, name, float(value))
         # The deterrence buffer may hold a rejected trial, so we evaluate the solution again
-        _, _, (rows, columns) = self.__evaluate(theta)
-        trips = self.__deterrence
-        trips *= rows[:, np.newaxis]
-        trips *= columns[np.newaxis, :]
+        _, _, (rows, columns, k_factors) = self.__evaluate(theta)
+        trips, factors = self.__deterrence, columns * k_factors[:, self.__groups]
+        for row, row_factor, group in zip(trips, rows, self.__groups, strict=True):
+            row *= row_factor * factors[group]
         self.result_matrix = AequilibraeMatrix._from_shared_arrays(
             {"gravity": trips}, index=self.matrix.index, index_name=self.matrix.index_name
         )
 
+        if self.districts is not None:
+            self.model.districts = self.districts
+            self.model.k_factors = pd.DataFrame(k_factors, index=self.__labels, columns=self.__labels)
+            empty = int(((self.__district_trips == 0) & (k_factors == 0)).sum())
+            if empty:
+                self.report.append(f"{empty} pairs of districts without observed trips got a k-factor of zero")
         if self.gap > self.max_error:
             self.report.append(
                 f"DID NOT CONVERGE. Stopped in {self.itera} iterations with a global error of {self.gap}"
@@ -178,24 +201,30 @@ class GravityCalibration:
             self.__deterrence,
             self.cores,
         )
-        rows, columns, _, _ = ipf_factors(
-            self.__deterrence,
-            self.__productions,
-            self.__attractions,
-            self.__ipf_iterations,
-            IPF_TOLERANCE,
-            self.cores,
-            False,
+        seed = (self.__deterrence, self.__productions, self.__attractions)
+        settings = {"max_iterations": self.__ipf_iterations, "tolerance": IPF_TOLERANCE, "cores": self.cores}
+        if self.districts is None:
+            rows, columns, _, _ = ipf_factors(*seed, warn=False, **settings)
+            k_factors = np.ones((1, 1))
+        else:
+            # K-factors are balanced together with rows and columns, so each candidate is the best model for its
+            # deterrence parameters
+            rows, columns, k_factors, _, _ = ipf_block_factors(
+                *seed, self.__groups, self.__district_trips, block_bounds=self.k_factor_bounds, warn=False, **settings
+            )
+        _, cost_sum, log_sum = weighted_cost_sums(
+            self.__deterrence, rows, columns, self.__cost, self.__groups, k_factors, self.cores
         )
-        _, cost_sum, log_sum = weighted_cost_sums(self.__deterrence, rows, columns, self.__cost, self.cores)
         with np.errstate(divide="ignore"):
             likelihood = (
                 self.__productions @ np.log(np.where(self.__productions > 0, rows, 1))
                 + self.__attractions @ np.log(np.where(self.__attractions > 0, columns, 1))
+                + self.__district_trips.ravel() @ np.log(np.where(self.__district_trips > 0, k_factors, 1).ravel())
                 + theta @ self.__observed
                 - shift * self.__total
             )
-        return self.__weights @ (cost_sum, log_sum), likelihood if np.isfinite(likelihood) else -np.inf, (rows, columns)
+        statistics = self.__weights @ (cost_sum, log_sum)
+        return statistics, likelihood if np.isfinite(likelihood) else -np.inf, (rows, columns, k_factors)
 
     def __newton_step(self, theta, statistics, gradient):
         # The Jacobian of the modelled statistics, from forward differences, is the negative Hessian of the profile
@@ -257,9 +286,18 @@ class GravityCalibration:
                 f"{all_trips - self.__total:,.2f} observed trips are in cells with a missing, zero or excessive cost "
                 "and were not used"
             )
-
         self.__productions, self.__attractions = observed.sum(axis=1), observed.sum(axis=0)
-        _, cost_sum, log_sum = weighted_cost_sums(observed, np.ones(len(cost)), np.ones(len(cost)), cost, self.cores)
+
+        # Without districts, the model has a single district with a k-factor of one
+        if self.districts is None:
+            self.__groups, self.__district_trips = np.zeros(len(cost), np.int64), np.array([[self.__total]])
+        else:
+            self.__groups, self.__labels = pd.factorize(self.districts.loc[self.matrix.index], sort=True)
+            membership = np.eye(self.__labels.size)[self.__groups]
+            self.__district_trips = membership.T @ observed @ membership
+
+        ones, no_k_factors = np.ones(len(cost)), np.ones(self.__district_trips.shape)
+        _, cost_sum, log_sum = weighted_cost_sums(observed, ones, ones, cost, self.__groups, no_k_factors, self.cores)
         self.__average_cost = cost_sum / self.__total
         self.__weights = np.array(list(STATISTICS[self.model.function].values()), dtype=np.float64)
         self.__observed = self.__weights @ (cost_sum, log_sum)
