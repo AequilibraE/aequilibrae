@@ -111,26 +111,16 @@ cdef inline double _factor(double target, double total, double old, double *err)
     return target / total
 
 
-@cython.wraparound(False)
-@cython.boundscheck(False)
 cdef inline double _scale_row(const cython.floating *row, const double *weights, Py_ssize_t n, double target,
                               double old, double *totals, double *err) noexcept nogil:
-    # Factor that scales the weighted row to its target, adding the scaled row to the totals. Independent
-    # accumulators keep the floating-point pipeline busy without fast-math reassociation
-    cdef double s0 = 0, s1 = 0, s2 = 0, s3 = 0, factor
-    cdef Py_ssize_t j = 0
+    # Factor that scales the weighted row to its target, adding the scaled row to the totals
+    cdef double row_total = 0, factor
+    cdef Py_ssize_t j
     if target <= 0:
         return 0
-    while j + 4 <= n:
-        s0 += row[j] * weights[j]
-        s1 += row[j + 1] * weights[j + 1]
-        s2 += row[j + 2] * weights[j + 2]
-        s3 += row[j + 3] * weights[j + 3]
-        j += 4
-    while j < n:
-        s0 += row[j] * weights[j]
-        j += 1
-    factor = _factor(target, (s0 + s1) + (s2 + s3), old, err)
+    for j in range(n):
+        row_total += row[j] * weights[j]
+    factor = _factor(target, row_total, old, err)
     for j in range(n):
         totals[j] += factor * row[j]
     return factor

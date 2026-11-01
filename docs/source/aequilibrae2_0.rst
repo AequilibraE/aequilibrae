@@ -56,7 +56,7 @@ Iterative proportional fitting
 
 The IPF no longer rescales the whole matrix twice per iteration. It updates one factor per row and one per column
 in a single read-only pass over the seed matrix, and applies them once at the end. For matrices of 2,500 zones or
-more, this is between 6 and 9 times faster than in AequilibraE 1.X, both on a single thread and on all threads of
+more, this is between 4 and 7 times faster than in AequilibraE 1.X, both on a single thread and on all threads of
 a 24-core workstation. See :doc:`distribution_procedures/IPF_benchmark` for details.
 
 The balancing factors are also available through ``ipf_factors``, which does not modify the seed matrix.
