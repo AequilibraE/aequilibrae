@@ -55,7 +55,8 @@ def test_calibration_reproduces_observed_statistics(zones, function, alpha, beta
     modelled = calibration.result_matrix["gravity"]
 
     assert calibration.gap < calibration.parameters["max error"]
-    assert (calibration.model.alpha, calibration.model.beta) == pytest.approx((alpha, beta), rel=0.05)
+    assert calibration.model.alpha == (None if alpha is None else pytest.approx(alpha, rel=0.05))
+    assert calibration.model.beta == (None if beta is None else pytest.approx(beta, rel=0.05))
     np.testing.assert_allclose(modelled.sum(axis=1), observed.sum(axis=1), rtol=1e-6)
     np.testing.assert_allclose(modelled.sum(axis=0), observed.sum(axis=0), rtol=1e-6)
     for statistic in {"EXPO": [cost], "POWER": [np.log(cost)], "GAMMA": [cost, np.log(cost)]}[function]:
