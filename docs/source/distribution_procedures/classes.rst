@@ -58,13 +58,17 @@ documentation.
 ``Ipf``
 -------
 
-IPF is an acronym for Iterative Proportional Fitting, also known as Fratar or Furness. The IPF 
-procedure is used to "distribute" future trips based on a growth factor. The procedure can be 
-run with or without an AequilibraE model, with the latter using one of AequilibraE matrices 
+IPF is an acronym for Iterative Proportional Fitting, also known as Fratar or Furness. The IPF
+procedure is used to "distribute" future trips based on a growth factor. The procedure can be
+run with or without an AequilibraE model, with the latter using one of AequilibraE matrices
 or NumPy arrays as data input.
 
-In the following section, we present the validation of the results produced with AequilibraE's
-IPF.
+Under the hood, ``Ipf`` calls ``ipf_core``, which balances a NumPy array in place. It never rescales
+the matrix during the iterations: it only updates one factor per row and one per column, and applies
+them in a single pass at the end. If you only need the factors, ``ipf_factors`` returns them without
+modifying the seed matrix.
+
+In the following section, we compare the performance of AequilibraE's IPF with reference implementations.
 
 .. seealso::
 
