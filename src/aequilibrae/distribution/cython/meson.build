@@ -1,6 +1,7 @@
 thisdir = 'aequilibrae/distribution/cython'
 
 exts = [
+  'gravity_core',
   'ipf_core',
 ]
 

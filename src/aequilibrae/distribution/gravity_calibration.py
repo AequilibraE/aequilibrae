@@ -1,24 +1,31 @@
-"""
-Algorithms to **calibrate** synthetic gravity models with power and exponential functions
-
-The procedures implemented in this code are some of those suggested in
-Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
-"""
+"""Algorithms to **calibrate** synthetic gravity models by maximum likelihood"""
 
 from time import perf_counter
 
 import numpy as np
-import pandas as pd
 
-from aequilibrae.distribution.gravity_application import GravityApplication, SyntheticGravityModel
+from aequilibrae.distribution.cython.gravity_core import deterrence_matrix, weighted_cost_sums
+from aequilibrae.distribution.cython.ipf_core import ipf_factors
+from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
+from aequilibrae.utils.core_setter import resolve_cores
+
+# Balancing must be much tighter than the calibration, as the Jacobian comes from finite differences
+IPF_TOLERANCE = 1e-10
+FINITE_DIFFERENCE_STEP = 1e-5
+
+# Sufficient statistic of each parameter, as weights of trip cost and log-cost, so that log(f) = theta . statistics
+STATISTICS = {"EXPO": {"beta": (-1, 0)}, "POWER": {"alpha": (0, -1)}, "GAMMA": {"alpha": (0, 1), "beta": (-1, 0)}}
 
 
 class GravityCalibration:
     """Calibrate a traditional gravity model
 
     Available deterrence function forms are: 'EXPO', 'POWER' or 'GAMMA'.
+
+    Parameters are estimated by maximum likelihood, so the calibrated model reproduces the observed average
+    trip cost (``EXPO``), the observed average logarithm of trip cost (``POWER``), or both (``GAMMA``).
 
     .. code-block:: python
 
@@ -34,14 +41,13 @@ class GravityCalibration:
 
         >>> args = {"matrix": demand,
         ...         "impedance": skim,
-        ...         "row_field": "productions",
-        ...         "function": 'expo',
+        ...         "function": 'gamma',
         ...         "nan_as_zero": True}
         >>> gravity = GravityCalibration(**args)
 
         # Solve and save outputs
         >>> gravity.calibrate()
-        >>> gravity.model.save(project_path / 'dist_expo_model.mod')
+        >>> gravity.model.save(project_path / 'dist_gamma_model.mod')
 
         >>> project.close()
     """
@@ -55,22 +61,23 @@ class GravityCalibration:
 
             **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
 
-            **function** (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
+            **function** (:obj:`str`): Function name to be calibrated. "EXPO", "POWER" or "GAMMA"
 
             **project** (:obj:`Project`, *Optional*): The Project to connect to.
             By default, uses the currently active project
 
             **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
-            **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``True``
+            **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``False``
 
         :Results:
             **model** (:obj:`SyntheticGravityModel`): Calibrated model
 
+            **result_matrix** (:obj:`AequilibraeMatrix`): Trips modelled with the calibrated model
+
             **report** (:obj:`list`): Iteration and convergence report
 
-            **error** (:obj:`str`): Error description
-
+            **gap** (:obj:`float`): Largest relative change in a parameter in the last iteration
         """
 
         self.project = project
@@ -83,12 +90,7 @@ class GravityCalibration:
         deterrence_function = str(kwargs.get("function", "")).upper()
 
         self.result_matrix = None
-        self.vectors: pd.DataFrame = pd.DataFrame([])
-        self.gap = np.inf
-
         self.error = None
-        self.gravity = None
-
         self.comput_core = None
         self.impedance_core = None
 
@@ -96,6 +98,7 @@ class GravityCalibration:
         self.max_iter = None
         self.max_error = None
         self.gap = np.inf
+        self.cores = resolve_cores((project.parameters if project else Parameters().parameters)["system"])
 
         self.report = ["  #####    GRAVITY CALIBRATION    #####  ", ""]
         self.report.append("Functional form: " + deterrence_function)
@@ -105,95 +108,108 @@ class GravityCalibration:
         else:
             self.model.function = deterrence_function
 
-    def __assemble_model(self, b1):
-        # NEED TO SET PARAMETERS #
-        if self.model.function == "EXPO":
-            self.model.beta = float(b1)
-        elif self.model.function == "POWER":
-            self.model.alpha = float(b1)
-
     def calibrate(self):
         """Calibrate the model
 
-        Resulting model is in *output* class member
+        Resulting model is in the *model* class member, and the trips it produces in *result_matrix*
         """
         t = perf_counter()
-        # initialize auxiliary variables
-        max_cost = self.parameters["max trip length"]
+        self.__check_inputs()
         self.max_iter = self.parameters["max iterations"]
         self.max_error = self.parameters["max error"]
 
-        # Check the inputs
-        self.__check_inputs()
-        if self.model.function in ["EXPO", "POWER"]:
-            # filtering for all costs over limit
-
-            a = 1
-            if max_cost > 0:
-                a = (self.impedance[self.impedance_core] < max_cost).astype(int)
-
-            # weighted average cost
-            self.report.append("Iteration: 1")
-            gravity = self.result_matrix["gravity"]
-            impedance = self.impedance[self.impedance_core]
-            cstar = np.nansum(impedance * gravity * a) / np.nansum(gravity * a)
-
-            b0 = 1 / cstar
-
-            self.__assemble_model(b0)
-            c0 = self.__apply_gravity()
-            for i in self.gravity.report:
-                self.report.append("       " + i)
-            self.report.append("")
-            self.report.append("")
-
-            bm1 = b0
-            bm = b0 * c0 / cstar
-
-            self.report.append("Iteration: 2")
-            self.__assemble_model(bm)
-
-            cm = self.__apply_gravity()
-            for i in self.gravity.report:
-                self.report.append("       " + i)
-            self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
-            self.report.append("")
-            cm1 = c0
-
-        # While the max iterations has not been reached and the error is still too large
-        self.itera = 2
+        names = list(STATISTICS[self.model.function])
+        initial = {"alpha": float(self.model.function == "POWER"), "beta": 1 / self.__average_cost}
+        theta = np.array([initial[name] for name in names])
+        statistics, likelihood, _ = self.__evaluate(theta)
+        self.itera, self.gap = 0, np.inf
         while self.itera < self.max_iter and self.gap > self.max_error:
-            self.report.append("Iteration: " + str(self.itera + 1))
-            aux = bm
-            bm = ((cstar - cm1) * bm - (cstar - cm) * bm) / (cm - cm1)
-            bm1 = aux
-            cm1 = cm
-
-            self.__assemble_model(bm1)
-            cm = self.__apply_gravity()
-
-            for i in self.gravity.report:
-                self.report.append("       " + i)
-            self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
-            self.report.append("")
-
-            # compute convergence criteria
-            self.gap = abs((bm / bm1) - 1)
             self.itera += 1
+            gradient = self.__observed - statistics
+            step = self.__newton_step(theta, statistics, gradient)
 
-        if self.itera == self.max_iter:
+            # The profile log-likelihood is concave, so backtracking along the Newton direction improves it unless we
+            # are at the optimum. Steps below the tolerance are within the precision of the balancing, so we take them
+            converging = np.max(np.abs(step) / np.maximum(np.abs(theta), 1e-12)) < self.max_error
+            for size in 0.5 ** np.arange(20):
+                trial = self.__evaluate(theta + size * step)
+                if converging or trial[1] >= likelihood + 1e-4 * size * (gradient @ step):
+                    break
+            else:
+                self.report.append("Could not improve the likelihood any further")
+                break
+
+            self.gap = float(np.max(np.abs(size * step) / np.maximum(np.abs(theta + size * step), 1e-12)))
+            theta = theta + size * step
+            statistics, likelihood, _ = trial
+            values = ", ".join(f"{name}={value:.6g}" for name, value in zip(names, theta, strict=True))
+            self.report.append(f"Iteration {self.itera}: {values}, error {self.gap:.2E}")
+
+        for name, value in zip(names, theta, strict=True):
+            setattr(self.model, name, float(value))
+        # The deterrence buffer may hold a rejected trial, so we evaluate the solution again
+        _, _, (rows, columns) = self.__evaluate(theta)
+        trips = self.__deterrence
+        trips *= rows[:, np.newaxis]
+        trips *= columns[np.newaxis, :]
+        self.result_matrix = AequilibraeMatrix._from_shared_arrays(
+            {"gravity": trips}, index=self.matrix.index, index_name=self.matrix.index_name
+        )
+
+        if self.gap > self.max_error:
             self.report.append(
-                "DID NOT CONVERGE. Stopped in  " + str(self.itera) + "  with a global error of " + str(self.gap)
+                f"DID NOT CONVERGE. Stopped in {self.itera} iterations with a global error of {self.gap}"
             )
         else:
-            self.report.append("Converged in " + str(self.itera) + "  iterations to a global error of " + str(self.gap))
-        s = perf_counter() - t
-        m, s1 = divmod(s, 60)
-        s -= m * 60
-        h, m = divmod(m, 60)
-        t = "%d:%02d:%2.4f" % (h, m, s)
+            self.report.append(f"Converged in {self.itera} iterations to a global error of {self.gap}")
+        self.report.append(f"Running time: {round(perf_counter() - t, 3)}s")
 
-        self.report.append("Running time: " + t)
+    def __evaluate(self, theta):
+        # Balances the model for these parameters, returning its statistics, profile log-likelihood and factors
+        parameters = dict(zip(STATISTICS[self.model.function], theta, strict=True))
+        shift = theta @ self.__weights @ self.__cheapest  # The deterrence of the cheapest cell is one
+        deterrence_matrix(
+            self.__cost,
+            self.model.function,
+            parameters.get("alpha"),
+            parameters.get("beta"),
+            self.__max_cost,
+            shift,
+            self.__deterrence,
+            self.cores,
+        )
+        rows, columns, _, _ = ipf_factors(
+            self.__deterrence,
+            self.__productions,
+            self.__attractions,
+            self.__ipf_iterations,
+            IPF_TOLERANCE,
+            self.cores,
+            False,
+        )
+        _, cost_sum, log_sum = weighted_cost_sums(self.__deterrence, rows, columns, self.__cost, self.cores)
+        with np.errstate(divide="ignore"):
+            likelihood = (
+                self.__productions @ np.log(np.where(self.__productions > 0, rows, 1))
+                + self.__attractions @ np.log(np.where(self.__attractions > 0, columns, 1))
+                + theta @ self.__observed
+                - shift * self.__total
+            )
+        return self.__weights @ (cost_sum, log_sum), likelihood if np.isfinite(likelihood) else -np.inf, (rows, columns)
+
+    def __newton_step(self, theta, statistics, gradient):
+        # The Jacobian of the modelled statistics, from forward differences, is the negative Hessian of the profile
+        # log-likelihood, symmetric positive definite in exact arithmetic
+        typical = {"alpha": 1.0, "beta": 1 / self.__average_cost}
+        jacobian = np.empty((theta.size, theta.size))
+        for k, name in enumerate(STATISTICS[self.model.function]):
+            step = FINITE_DIFFERENCE_STEP * max(abs(theta[k]), typical[name])
+            jacobian[:, k] = (self.__evaluate(theta + step * np.eye(theta.size)[k])[0] - statistics) / step
+
+        # Flooring the eigenvalues guarantees an ascent direction even if differencing noise breaks definiteness
+        values, vectors = np.linalg.eigh((jacobian + jacobian.T) / 2)
+        values = np.maximum(values, max(values.max(), 0) * 1e-12 + np.finfo(float).tiny)
+        return vectors @ ((vectors.T @ gradient) / values)
 
     def __check_inputs(self):
         if not isinstance(self.impedance, AequilibraeMatrix):
@@ -210,21 +226,17 @@ class GravityCalibration:
         self.comput_core = next(iter(self.matrix))
         self.impedance_core = next(iter(self.impedance))
 
+        observed = np.array(self.matrix[self.comput_core], dtype=np.float64)
+        cost = np.array(self.impedance[self.impedance_core], dtype=np.float64)
         if self.nan_as_zero:
-            self.matrix = self.matrix.subset([self.comput_core])
-            self.impedance = self.impedance.subset([self.impedance_core])
-            self.matrix[self.comput_core] = np.nan_to_num(self.matrix[self.comput_core])
-            self.impedance[self.impedance_core] = np.nan_to_num(self.impedance[self.impedance_core])
+            np.nan_to_num(observed, copy=False)
+            np.nan_to_num(cost, copy=False)
 
-        for matrix, core, title in (
-            (self.matrix, self.comput_core, "Observed matrix"),
-            (self.impedance, self.impedance_core, "Impedance matrix"),
-        ):
-            values = matrix[core]
-            if np.nansum(values) == 0:
-                raise ValueError(f"{title} has only zero values")
+        for values, title in ((observed, "Observed matrix"), (cost, "Impedance matrix")):
             if np.nanmin(values) < 0:
                 raise ValueError(f"{title} has negative values")
+            if not np.nanmax(values) > 0:
+                raise ValueError(f"{title} has only zero values")
 
         # Augment parameters if we happen to have only passed one
         default_parameters = self.__get_parameters()
@@ -232,33 +244,29 @@ class GravityCalibration:
             if para not in self.parameters:
                 self.parameters[para] = default_parameters[para]
 
-        # Prepare the data for computation
-        observed = self.matrix[self.comput_core]
-        self.result_matrix = AequilibraeMatrix(index=self.matrix.index, index_name=self.matrix.index_name)
-        self.result_matrix["gravity"] = observed
+        # Observed trips the deterrence function cannot reproduce are left out
+        self.__max_cost = self.parameters["max trip length"]
+        valid = np.isfinite(cost) & ((cost < self.__max_cost) | (self.__max_cost <= 0))
+        valid &= (cost > 0) | (self.model.function == "EXPO")
+        observed[np.isnan(observed)] = 0
+        all_trips = observed.sum()
+        observed[~valid] = 0
+        self.__total = observed.sum()
+        if self.__total < all_trips:
+            self.report.append(
+                f"{all_trips - self.__total:,.2f} observed trips are in cells with a missing, zero or excessive cost "
+                "and were not used"
+            )
 
-        self.vectors = pd.DataFrame(
-            {"rows": np.nansum(observed, axis=1), "columns": np.nansum(observed, axis=0)}, index=self.matrix.index
-        )
-
-    def __apply_gravity(self):
-        args = {
-            "impedance": self.impedance,
-            "vectors": self.vectors,
-            "row_field": "rows",
-            "column_field": "columns",
-            "model": self.model,
-            "parameters": self.parameters,
-            "nan_as_zero": self.nan_as_zero,
-        }
-
-        self.gravity = GravityApplication(self.project, **args)
-        self.gravity.apply()
-        self.result_matrix = self.gravity.output
-
-        impedance = self.impedance[self.impedance_core]
-        gravity = self.result_matrix["gravity"]
-        return np.nansum(impedance * gravity) / np.nansum(gravity)
+        self.__productions, self.__attractions = observed.sum(axis=1), observed.sum(axis=0)
+        _, cost_sum, log_sum = weighted_cost_sums(observed, np.ones(len(cost)), np.ones(len(cost)), cost, self.cores)
+        self.__average_cost = cost_sum / self.__total
+        self.__weights = np.array(list(STATISTICS[self.model.function].values()), dtype=np.float64)
+        self.__observed = self.__weights @ (cost_sum, log_sum)
+        min_cost = cost.min(where=valid, initial=np.inf)
+        self.__cheapest = np.array([min_cost, np.log(min_cost) if min_cost > 0 else 0])
+        self.__cost, self.__deterrence = cost, np.empty_like(cost)
+        self.__ipf_iterations = Parameters().parameters["distribution"]["ipf"]["max iterations"]
 
     def __get_parameters(self):
         par = Parameters().parameters

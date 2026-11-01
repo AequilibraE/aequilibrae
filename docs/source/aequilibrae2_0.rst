@@ -11,6 +11,12 @@ in the API and changes in software behaviour, in addition to a series of new fea
 New Algorithms and features
 ---------------------------
 
+Gravity model calibration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``GravityCalibration`` now calibrates all three deterrence functions, including ``GAMMA``, by maximum likelihood.
+The calibrated model reproduces the observed average trip cost (``EXPO``), the observed average logarithm of the trip
+cost (``POWER``), or both (``GAMMA``). See :doc:`distribution_procedures/classes` for details.
 
 Performance improvements
 ------------------------
@@ -74,6 +80,19 @@ Iterative proportional fitting
 * Rows with a zero target total are now emptied. They used to keep their seed values, so the balanced matrix did
   not add up to the targets.
 * The number of iterations returned by ``ipf_core`` is the number of iterations performed. It used to be one less.
+
+Gravity models
+~~~~~~~~~~~~~~
+
+* The previous calibration's secant update used the latest parameter twice, so it stopped after two iterations,
+  reporting convergence, with an approximate result. Results of ``EXPO`` and ``POWER`` calibrations change.
+* Calibration of the ``POWER`` function now reproduces the observed average logarithm of the trip cost, its maximum
+  likelihood estimate, instead of the observed average trip cost.
+* Observed trips in cells the deterrence function cannot reproduce (missing cost, zero cost for ``POWER`` and
+  ``GAMMA``, or at or above the maximum trip length) are left out of the calibration.
+* ``GravityApplication`` applied the maximum trip length to the deterrence values instead of the cost. It now
+  removes trips with a cost at or above the limit.
+* ``GravityApplication`` no longer rescales the attractions column of the vectors it receives.
 
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~

@@ -197,8 +197,9 @@ proj_matrices.create(
 )
 
 # %%
-# Let's calibrate our Gravity Model
-for function in ["power", "expo"]:
+# Let's calibrate our Gravity Model. Parameters are estimated by maximum likelihood, so each model reproduces the
+# observed average trip time (expo), average logarithm of the trip time (power), or both (gamma)
+for function in ["power", "expo", "gamma"]:
     gc = GravityCalibration(matrix=demand, impedance=imped, function=function, nan_as_zero=True)
     gc.calibrate()
     model = gc.model
@@ -282,7 +283,7 @@ imped = proj_matrices.get_matrix(
 
 # %%
 # Now we apply the Synthetic Gravity model
-for function in ["power", "expo"]:
+for function in ["power", "expo", "gamma"]:
     model = SyntheticGravityModel()
     model.load(join(fldr, f"{function}_model.mod"))
 
