@@ -65,6 +65,30 @@ missing cost, cells at or above the maximum trip length (when one is set) and, f
 functions, cells with zero cost, such as intrazonal trips without an intrazonal impedance. The calibration
 report states how many trips were left out.
 
+K-factors
+~~~~~~~~~
+
+K-factors multiply the trips between pairs of districts, capturing interactions the deterrence function
+cannot, such as trips across a river or a state line. Passing a ``pd.Series`` with the district of each zone as
+``districts`` calibrates a k-factor for every pair of districts together with the deterrence function, so the
+calibrated model reproduces the observed trips between each pair of districts as well as the trip length
+statistics above. Fitting both at once matters: k-factors fitted after the deterrence function change the trip
+length distribution it was calibrated to reproduce.
+
+Each balancing of the model adjusts the row, column and district pair totals together, with k-factors starting
+at one and multiplied by the ratio between observed and modelled trips of their district pair, so they measure how
+far each pair departs from the gravity model without k-factors. In a doubly constrained model, multiplying all
+k-factors of one origin district, or of one destination district, by the same amount does not change any trip,
+as the zone balancing factors absorb it. What k-factors express is therefore how the pairs of an origin district
+compare to each other, and likewise for a destination district.
+
+Pairs of districts without observed trips get a k-factor of zero, so the model never sends trips between them.
+``k_factor_bounds`` sets a minimum and a maximum k-factor, for example ``(0.5, 2)``, which keeps every pair of
+districts connected at the cost of not reproducing the observed trips of pairs at a bound.
+
+The k-factors are saved with the model, and ``GravityApplication`` applies them to every zone with a district in
+the model.
+
 Please check other arguments and parameters that are passed to ``GravityCalibration`` in its
 documentation.
 

@@ -22,22 +22,28 @@ def deterrence_matrix(cost, function, alpha, beta, max_cost=-1.0, shift=0.0, out
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def weighted_cost_sums(const double[:, ::1] weights, const double[::1] row_factors, const double[::1] column_factors,
-                       const double[:, ::1] cost, int cores=0):
+                       const double[:, ::1] cost, const long long[::1] groups, const double[:, :] block_factors,
+                       int cores=0):
     """Sums of trips, trips times cost and trips times log-cost (of positive costs), for
-    ``trips = row_factors[:, None] * weights * column_factors[None, :]``"""
+    ``trips = row_factors[i] * block_factors[groups[i], groups[j]] * weights[i, j] * column_factors[j]``"""
     cdef int i, tid, cpus = clamp_cores(cores)
-    cdef Py_ssize_t j
+    cdef Py_ssize_t j, g
     cdef double trips, c, row_trips, row_cost, row_log
     cdef double[:, ::1] partial = np.zeros((cpus, 3))
+    # The column factors seen by the rows of each group
+    cdef double[:, ::1] columns = np.ascontiguousarray(
+        np.asarray(column_factors) * np.asarray(block_factors)[:, np.asarray(groups)]
+    )
 
     with nogil, parallel(num_threads=cpus):
         tid = threadid()
         for i in prange(weights.shape[0], schedule="dynamic", chunksize=16):
+            g = groups[i]
             row_trips = 0
             row_cost = 0
             row_log = 0
             for j in range(weights.shape[1]):
-                trips = weights[i, j] * column_factors[j]
+                trips = weights[i, j] * columns[g, j]
                 if trips > 0:
                     c = cost[i, j]
                     row_trips = row_trips + trips

@@ -94,6 +94,94 @@ def ipf_factors(
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
+@cython.cdivision(True)
+def ipf_block_factors(
+        const cython.floating[:, ::1] seed_matrix,
+        const double[:] target_productions,
+        const double[:] target_attractions,
+        const long long[:] groups,
+        const double[:, :] block_targets,
+        int max_iterations=200,
+        double tolerance=0.001,
+        int cores=0,
+        block_bounds=(0, np.inf),
+        bint warn=True,
+):
+    """Computes the factors that balance the rows, columns and blocks of a square seed matrix, without modifying it.
+
+    Blocks are the pairs of row and column groups, such as districts, and ``block_targets`` holds their totals. Block
+    factors start at one, within ``block_bounds``. Returns the row, column and block factors, the number of iterations
+    and the gap. The balanced matrix is
+    ``row_factors[i] * block_factors[groups[i], groups[j]] * seed_matrix[i, j] * column_factors[j]``.
+    """
+    # The pass of ipf_factors, with each row seeing the column factors times the block factors of its group. Rows go
+    # in chunks of a single group, each with its own buffer, and the buffers are then summed by group
+    cdef int k, tid, iteration = 0, cpus = clamp_cores(cores)
+    order = np.argsort(groups, kind="stable")
+    sorted_groups = np.asarray(groups)[order]
+    within = np.arange(order.size) - np.searchsorted(sorted_groups, sorted_groups)
+    starts = np.flatnonzero(within % max(ROW_CHUNK, -(-order.size // (8 * cpus))) == 0)
+
+    cdef Py_ssize_t p, i, j, g, h, n_cols = seed_matrix.shape[1], n_groups = block_targets.shape[0]
+    cdef double lower = block_bounds[0], upper = block_bounds[1], total, factor, err = INFINITY
+    cdef long long[::1] rows_in_order = order, chunk_start = starts, chunk_end = np.r_[starts[1:], order.size]
+    cdef long long[::1] chunk_group = sorted_groups[starts]
+    cdef double[:, ::1] chunk_buf = np.zeros((starts.size, n_cols)), weights = np.zeros((n_groups, n_cols))
+    cdef double[:, ::1] group_cols = np.zeros((n_groups, n_cols)), blk_tot = np.zeros((n_groups, n_groups))
+    cdef double[:, ::1] blk_fac = np.clip(np.ones((n_groups, n_groups)), lower, upper)
+    cdef double[::1] row_fac = np.ones(order.size), col_fac = np.ones(n_cols), thread_err = np.zeros(cpus)
+
+    with nogil:
+        while iteration < max_iterations and err >= tolerance:
+            iteration += 1
+            for g in range(n_groups):
+                for j in range(n_cols):
+                    weights[g, j] = col_fac[j] * blk_fac[g, groups[j]]
+
+            with parallel(num_threads=cpus):
+                tid = threadid()
+                thread_err[tid] = 0
+                for k in prange(chunk_start.shape[0], schedule="dynamic", chunksize=1):
+                    memset(&chunk_buf[k, 0], 0, n_cols * sizeof(double))
+                    for p in range(chunk_start[k], chunk_end[k]):
+                        i = rows_in_order[p]
+                        row_fac[i] = _scale_row(&seed_matrix[i, 0], &weights[chunk_group[k], 0], n_cols,
+                                                target_productions[i], row_fac[i], &chunk_buf[k, 0], &thread_err[tid])
+
+            for k in prange(n_cols, num_threads=cpus, schedule="static"):
+                for g in range(n_groups):
+                    group_cols[g, k] = 0
+                for p in range(chunk_start.shape[0]):
+                    group_cols[chunk_group[p], k] += chunk_buf[p, k]
+
+            err = 0
+            for k in range(cpus):
+                err = max(err, thread_err[k])
+            for j in range(n_cols):
+                total = 0
+                for g in range(n_groups):
+                    total += blk_fac[g, groups[j]] * group_cols[g, j]
+                col_fac[j] = _factor(target_attractions[j], total, col_fac[j], &err)
+                for g in range(n_groups):
+                    blk_tot[g, groups[j]] += col_fac[j] * group_cols[g, j]
+
+            # Blocks without anything to scale keep their factor
+            for g in range(n_groups):
+                for h in range(n_groups):
+                    if blk_tot[g, h] > 0:
+                        factor = min(max(block_targets[g, h] / blk_tot[g, h], lower), upper)
+                        if factor > 0:
+                            err = max(err, max(factor / blk_fac[g, h], blk_fac[g, h] / factor) - 1)
+                        blk_fac[g, h] = factor
+                    blk_tot[g, h] = 0
+
+    if err > tolerance and warn:
+        warnings.warn(f"Could not reach convergence in {iteration} iterations: {err}", stacklevel=2)
+    return np.asarray(row_fac), np.asarray(col_fac), np.asarray(blk_fac), iteration, err
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
 def _apply_factors(cython.floating[:, ::1] seed, const double[::1] row_fac, const double[::1] col_fac, int cpus):
     cdef int i
     cdef Py_ssize_t j

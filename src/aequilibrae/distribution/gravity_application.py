@@ -152,6 +152,11 @@ class GravityApplication:
             self.parameters["max trip length"],
             cores=self.cores,
         )
+        if self.model.k_factors is not None:
+            groups = self.model.k_factors.index.get_indexer(self.model.districts.loc[self.impedance.index])
+            factors = self.model.k_factors.to_numpy()[:, groups]
+            for row, group in zip(trips, groups, strict=True):
+                row *= factors[group]
         rows = np.nan_to_num(self.vectors[self.rows_].to_numpy(dtype=np.float64))
         columns = np.nan_to_num(self.vectors[self.cols_].to_numpy(dtype=np.float64))
         iterations, self.gap = ipf_core(
