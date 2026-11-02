@@ -33,12 +33,13 @@ private:
     if (length > kScanned ||
         length > std::numeric_limits<std::size_t>::max() / sizeof(Node) -
                      kLeadingSlots) {
-      throw std::invalid_argument("FourAryHeap capacity exceeds its position range");
+      throw std::invalid_argument(
+          "FourAryHeap capacity exceeds its position range");
     }
 
     const std::size_t slots = length + kLeadingSlots;
-    void *allocation =
-        ::operator new[](slots * sizeof(Node), std::align_val_t{kCacheLineBytes});
+    void *allocation = ::operator new[](slots * sizeof(Node),
+                                        std::align_val_t{kCacheLineBytes});
     Element *elements = nullptr;
     try {
       elements = new Element[length];
@@ -213,9 +214,8 @@ private:
       // Strict comparisons choose the right child on ties, preserving the
       // descending child scan's extraction order. The replacement wins ties.
       const std::size_t left =
-          heap_[first_child].key < heap_[first_child + 1].key
-              ? first_child
-              : first_child + 1;
+          heap_[first_child].key < heap_[first_child + 1].key ? first_child
+                                                              : first_child + 1;
       const std::size_t right =
           heap_[first_child + 2].key < heap_[first_child + 3].key
               ? first_child + 2

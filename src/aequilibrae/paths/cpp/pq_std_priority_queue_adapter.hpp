@@ -26,8 +26,8 @@ private:
 
   using Entry = std::pair<T, std::size_t>;
 
-  class Queue
-      : public std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> {
+  class Queue : public std::priority_queue<Entry, std::vector<Entry>,
+                                           std::greater<Entry>> {
   public:
     const std::vector<Entry> &entries() const noexcept { return this->c; }
   };

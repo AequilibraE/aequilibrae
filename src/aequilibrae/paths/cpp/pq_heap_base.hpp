@@ -41,9 +41,7 @@ public:
     derived().init_heap_impl(length);
   }
 
-  void alloc_heap(std::size_t length) {
-    derived().alloc_heap_impl(length);
-  }
+  void alloc_heap(std::size_t length) { derived().alloc_heap_impl(length); }
 
   void reset_heap() noexcept {
     AEQ_LOG(log_closure_, AEQ_LOG_DEBUG,

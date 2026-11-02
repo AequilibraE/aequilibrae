@@ -59,8 +59,8 @@ template <typename T> struct AStarEstimateCache {
 // A* also needs tentative costs and per-node heuristic estimates.
 template <typename T> struct AStarWorkspace {
   SearchWorkspace<T> search;
-  T *costs = nullptr;     // [states]
-  T *estimates = nullptr; // [nodes]
+  T *costs = nullptr;                       // [states]
+  T *estimates = nullptr;                   // [nodes]
   std::uint32_t *estimate_epochs = nullptr; // [nodes]
   AStarEstimateCache<T> *estimate_cache = nullptr;
 };
