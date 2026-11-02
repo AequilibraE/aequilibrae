@@ -2,8 +2,8 @@
 
 import numpy as np
 import pandas as pd
-
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.routing_context import make_routing_context
 
@@ -22,11 +22,11 @@ def zero_cost_road_turn(graph):
     tails = graph.all_nodes[arcs["a_node"].to_numpy(np.int64, copy=False)]
     heads = graph.all_nodes[arcs["b_node"].to_numpy(np.int64, copy=False)]
     outgoing = {}
-    for tail, head in zip(tails, heads):
+    for tail, head in zip(tails, heads, strict=True):
         outgoing.setdefault(int(tail), []).append(int(head))
 
     centroids = set(map(int, graph.centroids))
-    for tail, via in zip(tails, heads):
+    for tail, via in zip(tails, heads, strict=True):
         tail, via = int(tail), int(via)
         if tail in centroids or via in centroids:
             continue
