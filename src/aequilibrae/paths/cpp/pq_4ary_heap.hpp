@@ -6,23 +6,27 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 
 #include "pq_heap_base.hpp"
 
 namespace aequilibrae::paths::cpp {
 
-class FourAryHeap final : public PriorityQueueBase<FourAryHeap> {
+template <typename T>
+class FourAryHeap final : public PriorityQueueBase<FourAryHeap<T>, T> {
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>);
+
 public:
   static constexpr const char *kName = "FourAryHeap";
 
   FourAryHeap() noexcept = default;
 
-  ~FourAryHeap() { free_heap(); }
+  ~FourAryHeap() { this->free_heap(); }
 
 private:
-  friend class PriorityQueueBase<FourAryHeap>;
+  friend class PriorityQueueBase<FourAryHeap<T>, T>;
 
-  void init_heap_impl(std::size_t length) { alloc_heap(length); }
+  void init_heap_impl(std::size_t length) { this->alloc_heap(length); }
 
   void alloc_heap_impl(std::size_t length) {
     // UINT32_MAX is reserved for SCANNED; valid positions are [0, length).
@@ -46,7 +50,7 @@ private:
     // Placement array-new starts the trivial nodes' lifetimes without writing
     // their contents. The raw allocation is retained for matching deallocation.
     Node *nodes = ::new (allocation) Node[slots];
-    free_heap();
+    this->free_heap();
 
     length_ = length;
     size_ = 0;
@@ -87,19 +91,20 @@ private:
     current_epoch_ = 0;
   }
 
-  void insert_impl(std::size_t element_idx, double key) noexcept {
+  void insert_impl(std::size_t element_idx, T key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
     // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
-    assert(effective_state(element_idx) != IN_HEAP);
-    assert(key < kInfinity);
+    assert(this->effective_state(element_idx) != IN_HEAP);
+    assert(key < kInfinity<T>);
 
     elements_[element_idx].epoch = current_epoch_;
+    // Overwrite a potentially stale key from a previous epoch.
     elements_[element_idx].key = key;
     sift_up(size_++, {key, element_idx});
   }
 
-  void decrease_key_impl(std::size_t element_idx, double key_new) noexcept {
+  void decrease_key_impl(std::size_t element_idx, T key_new) noexcept {
     assert(element_idx < length_);
     assert(element_is_in_heap(element_idx));
     assert(key_new <= elements_[element_idx].key);
@@ -108,7 +113,7 @@ private:
     sift_up(elements_[element_idx].node_idx, {key_new, element_idx});
   }
 
-  double peek_impl() const noexcept {
+  T peek_impl() const noexcept {
     assert(size_ > 0);
     return heap_[0].key;
   }
@@ -134,7 +139,7 @@ private:
     return element.node_idx == kScanned ? SCANNED : IN_HEAP;
   }
 
-  double element_key_impl(std::size_t element_idx) const noexcept {
+  T element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
   }
 
@@ -145,7 +150,7 @@ private:
   }
 
   struct alignas(16) Element {
-    double key;
+    T key;
     std::uint32_t epoch;
     std::uint32_t node_idx;
   };
@@ -154,7 +159,7 @@ private:
   // The allocation is line-aligned and the logical root is offset by 3 slots,
   // so every full group of four 16-byte children occupies one cache line.
   struct alignas(16) Node {
-    double key;
+    T key;
     std::size_t element_idx;
   };
 
@@ -173,7 +178,7 @@ private:
   std::uint32_t current_epoch_ = 0;
 
   void initialize_element(std::size_t element_idx) noexcept {
-    elements_[element_idx].key = kInfinity;
+    elements_[element_idx].key = kInfinity<T>;
     elements_[element_idx].epoch = 0;
     elements_[element_idx].node_idx = kScanned;
   }
@@ -227,7 +232,7 @@ private:
 
     const std::size_t first_child = kArity * current + 1;
     std::size_t smallest = current;
-    double min_key = node.key;
+    T min_key = node.key;
     for (std::size_t child = size_; child-- > first_child;) {
       if (heap_[child].key < min_key) {
         smallest = child;

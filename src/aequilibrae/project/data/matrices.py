@@ -151,8 +151,8 @@ class Matrices(NonSpatialProjectTable):
     def get_matrix(
         self,
         name: str,
-        index_name: str | None = None,
         subset: Sequence[str | dict[str, Any]] | None = None,
+        **kwargs,
     ) -> AequilibraeMatrix | MatrixStore:
         """
         Load a registered matrix, optionally selecting an in-memory subset.
@@ -173,12 +173,12 @@ class Matrices(NonSpatialProjectTable):
         :Arguments:
             **name** (:obj:`str`): Registered matrix name.
 
-            **index_name** (:obj:`str`, *Optional*): Name of the OMX zone
-                index.  Inferred when omitted, as described above.
-
             **subset** (:obj:`Sequence`, *Optional*): Matrix names or metadata
                 queries to copy into an in-memory matrix. If omitted, returns a
                 :class:`MatrixStore` instead.
+
+            **kwargs** (:obj:`dict[str, Any]`): Other keyword arguments, passed
+                to ``from_file``.
 
         :Returns:
             **matrix** (:class:`~aequilibrae.matrix.AequilibraeMatrix` or
@@ -194,9 +194,9 @@ class Matrices(NonSpatialProjectTable):
             raise ValueError("Only OMX (.omx) matrices are supported")
 
         if subset is not None:
-            return from_file(path, index_name=index_name, subset=subset, store=False)
+            return from_file(path, subset=subset, store=False, **kwargs)
         else:
-            return from_file(path, index_name=index_name, subset=None, store=True)
+            return from_file(path, subset=None, store=True, **kwargs)
 
     def clear_database(self) -> None:
         """Remove metadata records whose files are absent."""

@@ -13,7 +13,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routin
         size_t reached_target_count
         cpp_bool exhausted
 
-    cdef cppclass CppSearchResults "aequilibrae::paths::cpp::routing::SearchResults":
+    cdef cppclass CppSearchResults "aequilibrae::paths::cpp::routing::SearchResults"[T]:
         CppSearchResults() noexcept
         size_t node_count
         size_t state_count
@@ -22,11 +22,11 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routin
         const size_t *connectors
         const size_t *settlement_order
         const size_t *terminal_states
-        const double *distances
-        const double *turn_costs
+        const T *distances
+        const T *turn_costs
         const CppSearchMetadata *metadata
 
-    cdef cppclass CppMutableSearchResults "aequilibrae::paths::cpp::routing::MutableSearchResults":
+    cdef cppclass CppMutableSearchResults "aequilibrae::paths::cpp::routing::MutableSearchResults"[T]:
         CppMutableSearchResults() noexcept
         size_t node_count
         size_t state_count
@@ -36,12 +36,12 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routin
         size_t *settlement_order
         size_t *terminal_states
         size_t *terminal_nodes
-        double *distances
-        double *turn_costs
+        T *distances
+        T *turn_costs
         CppSearchMetadata *metadata
         void reset() noexcept
         void set_terminal(size_t node, size_t state) noexcept
-        CppSearchResults read_view() noexcept
+        CppSearchResults[T] read_view() noexcept
 
 
 cdef class SearchResults:
@@ -51,6 +51,6 @@ cdef class SearchResults:
     cdef size_t[::1] settlement_order_buffer, terminal_states_buffer
     cdef size_t[::1] terminal_nodes_buffer
     cdef double[::1] distances_buffer, turn_costs_buffer
-    cdef CppMutableSearchResults view(self) noexcept nogil
-    cdef CppSearchResults read_view(self) noexcept nogil
+    cdef CppMutableSearchResults[double] view(self) noexcept nogil
+    cdef CppSearchResults[double] read_view(self) noexcept nogil
     cdef size_t validate_destination(self, object destination) except *

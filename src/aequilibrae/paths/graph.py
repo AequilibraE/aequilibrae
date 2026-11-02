@@ -240,9 +240,9 @@ class GraphBase(ABC):  # noqa: B024
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        self.graph.sort_values(by=["link_id", "direction"], inplace=True)
+        self.graph = self.graph.sort_values(by=["link_id", "direction"])
         self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__int_type)
-        self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
+        self.graph = self.graph.sort_values(by=["a_node", "b_node"])
 
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
