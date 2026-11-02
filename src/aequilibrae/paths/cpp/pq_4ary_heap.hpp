@@ -8,21 +8,22 @@
 
 namespace aequilibrae::paths::cpp {
 
-class FourAryHeap final : public PriorityQueueBase<FourAryHeap> {
+template <typename T>
+class FourAryHeap final : public PriorityQueueBase<FourAryHeap<T>, T> {
 public:
   static constexpr const char *kName = "FourAryHeap";
 
   FourAryHeap() noexcept = default;
 
-  ~FourAryHeap() { free_heap(); }
+  ~FourAryHeap() { this->free_heap(); }
 
 private:
-  friend class PriorityQueueBase<FourAryHeap>;
+  friend class PriorityQueueBase<FourAryHeap<T>, T>;
 
-  void init_heap_impl(std::size_t length) noexcept { alloc_heap(length); }
+  void init_heap_impl(std::size_t length) noexcept { this->alloc_heap(length); }
 
   void alloc_heap_impl(std::size_t length) noexcept {
-    free_heap();
+    this->free_heap();
 
     length_ = length;
     size_ = 0;
@@ -61,20 +62,21 @@ private:
     current_epoch_ = 0;
   }
 
-  void insert_impl(std::size_t element_idx, double key) noexcept {
+  void insert_impl(std::size_t element_idx, T key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
     // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
-    assert(effective_state(element_idx) != IN_HEAP);
-    assert(key < kInfinity);
+    assert(this->effective_state(element_idx) != IN_HEAP);
+    assert(key < kInfinity<T>);
 
     elements_[element_idx].state = IN_HEAP;
     elements_[element_idx].epoch = current_epoch_;
+    // Overwrite a potentially stale key from a previous epoch.
     elements_[element_idx].key = key;
     sift_up(size_++, {key, element_idx});
   }
 
-  void decrease_key_impl(std::size_t element_idx, double key_new) noexcept {
+  void decrease_key_impl(std::size_t element_idx, T key_new) noexcept {
     assert(element_idx < length_);
     assert(element_is_in_heap(element_idx));
     assert(key_new <= elements_[element_idx].key);
@@ -83,7 +85,7 @@ private:
     sift_up(elements_[element_idx].node_idx, {key_new, element_idx});
   }
 
-  double peek_impl() const noexcept {
+  T peek_impl() const noexcept {
     assert(size_ > 0);
     return heap_[0].key;
   }
@@ -109,12 +111,12 @@ private:
     return element.state;
   }
 
-  double element_key_impl(std::size_t element_idx) const noexcept {
+  T element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
   }
 
   struct Element {
-    double key;
+    T key;
     std::uint32_t epoch;
     ElementState state;
     std::size_t node_idx;
@@ -122,7 +124,7 @@ private:
 
   // Keys live in the heap so a node's children share a cache line.
   struct Node {
-    double key;
+    T key;
     std::size_t element_idx;
   };
 
@@ -135,7 +137,7 @@ private:
   std::uint32_t current_epoch_ = 0;
 
   void initialize_element(std::size_t element_idx) noexcept {
-    elements_[element_idx].key = kInfinity;
+    elements_[element_idx].key = kInfinity<T>;
     elements_[element_idx].epoch = 0;
     elements_[element_idx].state = NOT_IN_HEAP;
     elements_[element_idx].node_idx = length_;
@@ -168,7 +170,7 @@ private:
     std::size_t current = 0;
     while (true) {
       std::size_t smallest = current;
-      double min_key = node.key;
+      T min_key = node.key;
 
       const std::size_t first_child = kArity * current + 1;
       const std::size_t end_child =

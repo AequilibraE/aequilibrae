@@ -9,7 +9,7 @@ from aequilibrae.paths.cython.a_star import (
     a_star,
     estimate_context_scale,
 )
-from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.workspaces import AStarWorkspace, SearchWorkspace
 
 from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
