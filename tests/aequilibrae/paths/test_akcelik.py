@@ -50,3 +50,26 @@ def test_akcelik_function():
         # We check if the analytical solution matches the numerical differentiation
         dydx = (congested_times[1] - congested_times[0]) / dx
         np.testing.assert_allclose(dydx, delta, err_msg="Problems with derivative for the akcelik vdf")
+
+
+def test_akcelik_derivative_scales_with_link_length():
+    """Test that the Akcelik derivative matches a finite difference on links of different lengths and capacities"""
+    cores = omp_get_max_threads()
+
+    length = np.array([0.3, 1.0, 2.5, 4.0, 0.7, 12.0])
+    capacity = np.array([1.0, 1.5, 2.0, 800.0, 1800.0, 2200.0])
+    link_flows = capacity * np.array([0.0, 0.4, 1.0, 1.3, 0.9, 2.0])
+    fftime = np.full(length.shape, 2.0)
+    alpha = np.full(length.shape, 0.25)
+    tau = np.full(length.shape, 8.0)
+
+    def times(flows):
+        congested_times = np.zeros(length.shape)
+        akcelik(congested_times, flows, fftime, capacity, cores, alpha, tau, length)
+        return congested_times
+
+    # A forward difference, as the function is only defined for non-negative flows
+    dx = capacity * 1e-7
+    delta = np.zeros(length.shape)
+    delta_akcelik(delta, link_flows, fftime, capacity, cores, alpha, tau, length)
+    np.testing.assert_allclose(delta, (times(link_flows + dx) - times(link_flows)) / dx, rtol=1e-5)
