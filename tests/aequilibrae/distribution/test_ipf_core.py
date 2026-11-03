@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from aequilibrae.distribution.cython.ipf_core import ipf_core
 
 
@@ -29,6 +28,20 @@ def test_ipf_core_matches_classic_ipf(problem, cores):
     result = seed.copy()
     assert ipf_core(result, productions, attractions, 5, -1, cores, warn=False)[0] == 5
     np.testing.assert_allclose(result, expected, rtol=1e-12, atol=1e-12)
+
+
+def test_ipf_core_warns_for_incompatible_disconnected_targets():
+    """Globally balanced targets cannot balance components with incompatible marginals."""
+    result = np.eye(2)
+    productions = np.array([100.0, 1.0])
+    attractions = np.array([1.0, 100.0])
+
+    with pytest.warns(UserWarning, match="Could not reach convergence"):
+        iterations, gap = ipf_core(result, productions, attractions, cores=1)
+
+    assert iterations < 200
+    assert np.isinf(gap)
+    np.testing.assert_array_equal(result, np.eye(2))
 
 
 @pytest.mark.parametrize("dtype", [np.float64, np.float32])

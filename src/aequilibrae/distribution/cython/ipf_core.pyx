@@ -4,7 +4,7 @@ from aequilibrae.utils.core_setter import clamp_cores
 cimport cython
 import numpy as np
 from cython.parallel import parallel, prange, threadid
-from libc.math cimport INFINITY
+from libc.math cimport INFINITY, isfinite
 from libc.string cimport memset
 
 # Rows given to a thread at a time: few enough to balance hybrid (P/E-core) CPUs, enough to amortise the scheduling
@@ -26,6 +26,7 @@ def ipf_core(
     Only one factor per row and column changes during the iterations, and the matrix is scaled once at the end, which
     gives the iterates of the classic row-then-column IPF. It converges when no factor changed by more than
     ``tolerance`` (relative) in an iteration. ``cores`` is the number of threads, 0 for all of them.
+    Anything that results in invalid arithmetic returns infinite gap and leaves the seed unchanged.
 
     :Returns:
         **iterations** (:obj:`int`): Number of iterations performed
@@ -36,9 +37,13 @@ def ipf_core(
     rows, columns, iterations, gap = ipf_factors(
         seed, target_productions, target_attractions, max_iterations, tolerance, cores, warn
     )
+    if not np.isfinite(gap):
+        return iterations, gap
+
     _apply_factors(seed, rows, columns, clamp_cores(int(cores)))
     if seed is not seed_matrix:
         seed_matrix[:] = seed
+
     return iterations, gap
 
 
@@ -87,6 +92,11 @@ def ipf_factors(
             for j in range(n_cols):
                 col_fac[j] = _factor(target_attractions[j], thread_buf[0, j], col_fac[j], &err)
 
+            # Stop before invalid arithmetic can be mistaken for convergence
+            if not isfinite(err):
+                err = INFINITY
+                break
+
     if err > tolerance and warn:
         warnings.warn(f"Could not reach convergence in {iteration} iterations: {err}", stacklevel=2)
     return np.asarray(row_fac), np.asarray(col_fac), iteration, err
@@ -105,10 +115,21 @@ def _apply_factors(cython.floating[:, ::1] seed, const double[::1] row_fac, cons
 @cython.cdivision(True)
 cdef inline double _factor(double target, double total, double old, double *err) noexcept nogil:
     # Factor that scales a total to its target, zero without either, keeping the largest relative change in err
+    cdef double factor
+    if not isfinite(target) or not isfinite(total) or not isfinite(old):
+        err[0] = INFINITY
+        return INFINITY
+
     if target <= 0 or total <= 0:
         return 0
-    err[0] = max(err[0], max(target / total / old, old * total / target) - 1)
-    return target / total
+
+    factor = target / total
+    if not isfinite(factor) or factor == 0:
+        err[0] = INFINITY
+        return INFINITY
+
+    err[0] = max(err[0], max(factor / old, old / factor) - 1)
+    return factor
 
 
 cdef inline double _scale_row(const cython.floating *row, const double *weights, Py_ssize_t n, double target,
