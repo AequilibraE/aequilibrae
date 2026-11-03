@@ -64,15 +64,15 @@ def ipf_factors(
     cdef Py_ssize_t j, t, n_cols = seed_matrix.shape[1]
     cdef double err = INFINITY
     cdef double[::1] row_fac = np.ones(seed_matrix.shape[0]), col_fac = np.ones(n_cols), thread_err = np.zeros(cpus)
-    cdef double[:, ::1] thread_buf = np.zeros((cpus, n_cols))
+    cdef double[:, ::1] thread_buf = np.empty((cpus, n_cols))
     assert target_productions.shape[0] == seed_matrix.shape[0] and target_attractions.shape[0] == n_cols
 
     with nogil:
         while iteration < max_iterations and err >= tolerance:
             iteration += 1
+            memset(&thread_buf[0, 0], 0, cpus * n_cols * sizeof(double))
             with parallel(num_threads=cpus):
                 tid = threadid()
-                memset(&thread_buf[tid, 0], 0, n_cols * sizeof(double))
                 thread_err[tid] = 0
                 for i in prange(seed_matrix.shape[0], schedule="dynamic", chunksize=ROW_CHUNK):
                     row_fac[i] = _scale_row(&seed_matrix[i, 0], &col_fac[0], n_cols, target_productions[i],
