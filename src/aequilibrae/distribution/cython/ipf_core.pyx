@@ -1,11 +1,15 @@
 import warnings
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
+from aequilibrae.utils.core_setter import clamp_cores
 
 cimport cython
 import numpy as np
-from cython.parallel import parallel, prange
-from libc.stdlib cimport calloc, free
+from cython.parallel import parallel, prange, threadid
+from libc.math cimport INFINITY, isfinite
 from libc.string cimport memset
+
+# Rows given to a thread at a time: few enough to balance hybrid (P/E-core) CPUs, enough to amortise the scheduling
+cdef enum:
+    ROW_CHUNK = 16
 
 
 def ipf_core(
@@ -17,219 +21,127 @@ def ipf_core(
         cores = 0,
         warn=True
 ):
-    assert target_attractions.shape[0] == seed_matrix.shape[1]
-    assert target_productions.shape[0] == seed_matrix.shape[0]
+    """Balances a float32 or float64 seed matrix in place so its row and column totals match the targets.
 
-    cdef int max_iter = max_iterations
-    cdef double toler = tolerance
-    cdef int cpus = 0
+    Only one factor per row and column changes during the iterations, and the matrix is scaled once at the end, which
+    gives the iterates of the classic row-then-column IPF. It converges when no factor changed by more than
+    ``tolerance`` (relative) in an iteration. ``cores`` is the number of threads, 0 for all of them.
+    Anything that results in invalid arithmetic returns infinite gap and leaves the seed unchanged.
 
-    if cores < 0:
-        cpus = max(1, omp_get_max_threads() + cores)
-    if cores == 0:
-        cpus = omp_get_max_threads()
-    elif cores > 0:
-        cpus = min(omp_get_max_threads(), cores)
+    :Returns:
+        **iterations** (:obj:`int`): Number of iterations performed
 
-    mat_prod_tot = np.zeros_like(target_productions, np.float64)
-    factor_prod = np.zeros_like(target_productions, np.float64)
+        **gap** (:obj:`float`): Convergence gap reached
+    """
+    seed = np.ascontiguousarray(seed_matrix)
+    rows, columns, iterations, gap = ipf_factors(
+        seed, target_productions, target_attractions, max_iterations, tolerance, cores, warn
+    )
+    if not np.isfinite(gap):
+        return iterations, gap
 
-    mat_attr_tot = np.zeros_like(target_attractions, np.float64)
-    factor_attr = np.zeros_like(target_attractions, np.float64)
+    _apply_factors(seed, rows, columns, clamp_cores(int(cores)))
+    if seed is not seed_matrix:
+        seed_matrix[:] = seed
 
-    cdef double [:] prod_tot = mat_prod_tot
-    cdef const double [:] prod_tgt = target_productions
-    cdef double [:] prod_factor = factor_prod
+    return iterations, gap
 
-    cdef double [::1] attr_tot = np.ascontiguousarray(mat_attr_tot)
-    cdef const double [:] attr_tgt = target_attractions
-    cdef double [:] attr_factor = factor_attr
 
-    # This uses a Cython fused type cython.floating to defer to the float or double method without duplicated code
-    if seed_matrix.dtype == np.float32:
-        iter, err = _fratar[float](
-            seed_matrix,
-            prod_tot,
-            prod_tgt,
-            prod_factor,
-            attr_tot,
-            attr_tgt,
-            attr_factor,
-            max_iter,
-            toler,
-            cpus
-        )
-    else:
-        iter, err = _fratar[double](
-            seed_matrix,
-            prod_tot,
-            prod_tgt,
-            prod_factor,
-            attr_tot,
-            attr_tgt,
-            attr_factor,
-            max_iter,
-            toler,
-            cpus
-        )
+@cython.wraparound(False)
+@cython.boundscheck(False)
+def ipf_factors(
+        const cython.floating[:, ::1] seed_matrix,
+        const double[:] target_productions,
+        const double[:] target_attractions,
+        int max_iterations=200,
+        double tolerance=0.001,
+        int cores=0,
+        bint warn=True,
+):
+    """Computes the factors that balance a seed matrix without modifying it. Arguments are those of ``ipf_core``.
+
+    Returns the row factors, the column factors, the number of iterations and the gap. The balanced matrix is
+    ``row_factors[:, None] * seed_matrix * column_factors[None, :]``.
+    """
+    # Each iteration is a single read-only pass over the seed: a row's factor comes from its dot product with the
+    # column factors and, while the row is in cache, its scaled values are added to the thread's column totals
+    cdef int i, tid, iteration = 0, cpus = clamp_cores(cores)  # OpenMP on Windows requires signed loop variables
+    cdef Py_ssize_t j, t, n_cols = seed_matrix.shape[1]
+    cdef double err = INFINITY
+    cdef double[::1] row_fac = np.ones(seed_matrix.shape[0]), col_fac = np.ones(n_cols), thread_err = np.zeros(cpus)
+    cdef double[:, ::1] thread_buf = np.empty((cpus, n_cols))
+    assert target_productions.shape[0] == seed_matrix.shape[0] and target_attractions.shape[0] == n_cols
+
+    with nogil:
+        while iteration < max_iterations and err >= tolerance:
+            iteration += 1
+            memset(&thread_buf[0, 0], 0, cpus * n_cols * sizeof(double))
+            with parallel(num_threads=cpus):
+                tid = threadid()
+                thread_err[tid] = 0
+                for i in prange(seed_matrix.shape[0], schedule="dynamic", chunksize=ROW_CHUNK):
+                    row_fac[i] = _scale_row(&seed_matrix[i, 0], &col_fac[0], n_cols, target_productions[i],
+                                            row_fac[i], &thread_buf[tid, 0], &thread_err[tid])
+
+            for i in prange(n_cols, num_threads=cpus, schedule="static"):
+                for t in range(1, cpus):
+                    thread_buf[0, i] += thread_buf[t, i]
+            err = 0
+            for t in range(cpus):
+                err = max(err, thread_err[t])
+            for j in range(n_cols):
+                col_fac[j] = _factor(target_attractions[j], thread_buf[0, j], col_fac[j], &err)
+
+            # Stop before invalid arithmetic can be mistaken for convergence
+            if not isfinite(err):
+                err = INFINITY
+                break
 
     if err > tolerance and warn:
-        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}", stacklevel=2)
-    return iter, err
+        warnings.warn(f"Could not reach convergence in {iteration} iterations: {err}", stacklevel=2)
+    return np.asarray(row_fac), np.asarray(col_fac), iteration, err
 
 
 @cython.wraparound(False)
-@cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef object _fratar(cython.floating[:, :] flows,
-                    double[:] prod_tot,
-                    const double[:] prod_tgt,
-                    double[:] prod_factor,
-                    double[::1] attr_tot,
-                    const double[:] attr_tgt,
-                    double[:] attr_factor,
-                    int max_iter,
-                    double toler,
-                    int cpus):
-
-    cdef double err = 1.0
-    cdef int _iter = 0
-    cdef long long i, j
-    cdef long long n_rows = flows.shape[0]
-    cdef long long J = flows.shape[1]
-
-    # we zero everyone that needs to be zero to be able to skip them in the future
-    for i in prange(n_rows, nogil=True):
-        for j in range(J):
-            if prod_tgt[i] + attr_tgt[j] == 0:
-                flows[i, j] = 0
-
-    for _iter in range(max_iter):
-        _total_prods(flows, prod_tgt, prod_tot, cpus)
-        err = _factors(prod_tgt, prod_tot, prod_factor, cpus)
-        for i in prange(n_rows, nogil=True, num_threads=cpus):
-            if prod_tgt[i] > 0:
-                for j in range(J):
-                    flows[i, j] = flows[i, j] * prod_factor[i]
-
-        _total_attra(flows, prod_tgt, attr_tot, cpus)
-        err = _factors(attr_tgt, attr_tot, attr_factor, cpus)
-        for i in prange(n_rows, nogil=True, num_threads=cpus):
-            if prod_tgt[i] > 0:
-                for j in range(J):
-                    flows[i, j] = flows[i, j] * attr_factor[j]
-
-        # FUNCTION TO COMPUTE THE ERROR
-        err = _calc_err(prod_factor, attr_factor)
-        if (err - 1) < toler:
-            break
-
-    return _iter, err - 1
+def _apply_factors(cython.floating[:, ::1] seed, const double[::1] row_fac, const double[::1] col_fac, int cpus):
+    cdef int i
+    cdef Py_ssize_t j
+    for i in prange(seed.shape[0], nogil=True, num_threads=cpus, schedule="static"):
+        for j in range(seed.shape[1]):
+            seed[i, j] = <cython.floating> (row_fac[i] * seed[i, j] * col_fac[j])
 
 
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cpdef void _total_attra(cython.floating[:, :] flows,
-                        const double[:] prod_tgt,
-                        double[::1] attr_tot,
-                        int cpus) noexcept:
-    cdef long i, j = 0, jk
-    cdef double *local_buf = NULL
-    cdef long n_rows = flows.shape[0]
-    cdef long J = flows.shape[1]
-
-    # Zero the provided total buffer, a IEEE 64bit floating point value represents its
-    # 0.0 with all 0 bytes.
-    memset(&(attr_tot[0]), 0, attr_tot.shape[0] * sizeof(double))
-
-    # Computes factors
-    with nogil, parallel(num_threads=cpus):
-        # A thread-local buffer is used to optimize access to cache.
-        # This makes the IPF roughly 2x faster, with this function being 8x faster
-        local_buf = <double *> calloc(J, sizeof(double))
-
-        for i in prange(n_rows):
-            if prod_tgt[i] == 0:
-                continue
-
-            for jk in range(J):
-                # for jk in array_of_indices_of_non_zeros:
-                local_buf[jk] += flows[i, jk]
-
-        with gil:
-            for j in range(J):
-                attr_tot[j] += local_buf[j]
-
-        free(local_buf)
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cpdef void _total_prods(cython.floating[:, :] flows,
-                        const double[:] prod_tgt,
-                        double[:] prod_tot,
-                        int cpus) noexcept nogil:
-
-    cdef long long i, j
-    cdef long long n_rows = flows.shape[0]
-    cdef long long J = flows.shape[1]
-
-    # Calculate the row totals (prods) from the flows
-    for i in prange(n_rows, num_threads=cpus):
-        prod_tot[i] = 0
-        if prod_tgt[i] == 0:
-            continue
-
-        for j in range(J):
-            prod_tot[i] += flows[i, j]
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
 @cython.cdivision(True)
-cpdef double _factors(const double[:] target,
-                      double[:] total,
-                      double[:] factor,
-                      int cpus) noexcept:
+cdef inline double _factor(double target, double total, double old, double *err) noexcept nogil:
+    # Factor that scales a total to its target, zero without either, keeping the largest relative change in err
+    cdef double factor
+    if not isfinite(target) or not isfinite(total) or not isfinite(old):
+        err[0] = INFINITY
+        return INFINITY
 
-    cdef long long i, n = target.shape[0]
-    cdef double err = 1.0
+    if target <= 0 or total <= 0:
+        return 0
 
-    # Computes factors
-    with nogil, parallel(num_threads=cpus):
-        for i in prange(n):
-            factor[i] = 0
-            if target[i] > 0:
-                if total[i] == 0:
-                    err = -1.0
-                else:
-                    factor[i] = target[i] / total[i]
-    return err
+    factor = target / total
+    if not isfinite(factor) or factor == 0:
+        err[0] = INFINITY
+        return INFINITY
+
+    err[0] = max(err[0], max(factor / old, old / factor) - 1)
+    return factor
 
 
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-@cython.cdivision(True)
-cpdef double _calc_err(double[:] p_factor,
-                       double[:] a_factor) noexcept:
-
-    cdef long long i, n = p_factor.shape[0]
-    cdef long long j, J = a_factor.shape[0]
-    cdef double err = 1.0
-
-    # Production
-    for i in range(n):
-        if p_factor[i] > 0:
-            err = err if err > 1 / p_factor[i] else 1 / p_factor[i]
-        err = err if err > p_factor[i] else p_factor[i]
-
-    # Attraction
-    for j in range(J):
-        if a_factor[j] > 0:
-            err = err if err > 1 / a_factor[j] else 1 / a_factor[j]
-        err = err if err > a_factor[j] else a_factor[j]
-    return err
+cdef inline double _scale_row(const cython.floating *row, const double *weights, Py_ssize_t n, double target,
+                              double old, double *totals, double *err) noexcept nogil:
+    # Factor that scales the weighted row to its target, adding the scaled row to the totals
+    cdef double row_total = 0, factor
+    cdef Py_ssize_t j
+    if target <= 0:
+        return 0
+    for j in range(n):
+        row_total += row[j] * weights[j]
+    factor = _factor(target, row_total, old, err)
+    for j in range(n):
+        totals[j] += factor * row[j]
+    return factor

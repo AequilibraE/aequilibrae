@@ -29,6 +29,7 @@ The data used in this example comes from Table 5.6 in
 #     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.distribution.cython.ipf_core`
+#     * :func:`aequilibrae.distribution.cython.ipf_core.ipf_factors`
 
 # %%
 
@@ -57,3 +58,12 @@ matrix
 # Notice that the matrix value was updated, and results are the same as in :ref:`plot_ipf_without_model`
 # - and this is no coincidence. Under the hood, when we call ``aequilibrae.distribution.Ipf``, we
 # are actually calling the ``ipf_core`` method.
+
+# %%
+# If we only need the factors that balance the matrix, ``ipf_factors`` computes them without modifying
+# the seed. The balanced matrix is the seed with each row and each column multiplied by its factor.
+from aequilibrae.distribution.cython.ipf_core import ipf_factors
+
+seed = np.array([[5, 50, 100, 200], [50, 5, 100, 300], [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
+row_factors, column_factors, num_iter, gap = ipf_factors(seed, future_prod, future_attr, tolerance=0.0001)
+np.allclose(row_factors[:, None] * seed * column_factors[None, :], matrix)

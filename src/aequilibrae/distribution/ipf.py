@@ -160,10 +160,11 @@ class Ipf:
 
             core = next(iter(self.matrix))
             self.output = self.matrix.subset([core])
+            seed = self.output[core]
             if self.nan_as_zero:
-                self.output[core] = np.nan_to_num(self.output[core])
+                np.nan_to_num(seed, copy=False)
 
-            tot_matrix = np.nansum(self.output[core])
+            tot_matrix = np.nansum(seed)
 
             # Reporting
             self.report.append("Target convergence criteria: " + str(conv_criteria))
@@ -177,7 +178,6 @@ class Ipf:
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
 
-            seed = np.array(self.output[core], copy=True)
             iterations, self.gap = ipf_core(
                 seed,
                 self.__row_vector,
@@ -186,7 +186,6 @@ class Ipf:
                 tolerance=conv_criteria,
                 cores=self.cpus,
             )
-            self.output[core] = seed
 
             self.report.append(str(iterations) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
@@ -216,17 +215,6 @@ class Ipf:
             timestamp=self.procedure_date,
         )
         return record
-
-    def __tot_rows(self, matrix):
-        return np.nansum(matrix, axis=1)
-
-    def __tot_columns(self, matrix):
-        return np.nansum(matrix, axis=0)
-
-    def __factor(self, marginals, targets):
-        f = np.divide(targets, marginals)  # We compute the factors
-        f[f == np.NINF] = 1  # And treat the errors
-        return f
 
     def __get_parameters(self, model):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

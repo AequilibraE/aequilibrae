@@ -80,6 +80,7 @@ tests = [
   "pytest-subtests",
   "pytest-random-order",
   "pytest-benchmark",
+  "threadpoolctl",
   "seaborn",
   "coveralls",
   "ruff==0.16.1",

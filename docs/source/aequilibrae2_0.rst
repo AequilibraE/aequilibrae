@@ -45,6 +45,16 @@ The following conditions apply to this benchmark:
 using 8 threads for the parallelization (this CPU's *performance cores*).
 - The speed-up procedure considers the ratio between the median time for 10 runs.
 
+Iterative proportional fitting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The IPF no longer rescales the whole matrix twice per iteration. It updates one factor per row and one per column
+in a single read-only pass over the seed matrix, and applies them once at the end. For matrices of 2,500 zones or
+more, this is between 4 and 7 times faster than in AequilibraE 1.X, both on a single thread and on all threads of
+a 24-core workstation. See :doc:`distribution_procedures/IPF_benchmark` for details.
+
+The balancing factors are also available through ``ipf_factors``, which does not modify the seed matrix.
+
 
 API Changes
 --------------------
@@ -57,6 +67,13 @@ API Changes
 
 Changes in Behaviour
 --------------------
+
+Iterative proportional fitting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Rows with a zero target total are now emptied. They used to keep their seed values, so the balanced matrix did
+  not add up to the targets.
+* The number of iterations returned by ``ipf_core`` is the number of iterations performed. It used to be one less.
 
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
