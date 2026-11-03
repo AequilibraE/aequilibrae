@@ -7,10 +7,12 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_active_project
-from aequilibrae.distribution.ipf import Ipf
+from aequilibrae.distribution.cython.gravity_core import deterrence_matrix
+from aequilibrae.distribution.cython.ipf_core import ipf_core
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
+from aequilibrae.utils.core_setter import resolve_cores
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +51,7 @@ class GravityApplication:
         >>> query = "SELECT zone_id, population, employment FROM zones;"
         >>> with project.db_connection as conn:
         ...     df = pd.read_sql(query, conn)
-        >>> df.sort_values(by="zone_id", inplace=True)
-        >>> df.set_index("zone_id", inplace=True)
+        >>> df = df.sort_values(by="zone_id").set_index("zone_id")
 
         # You create the vectors you would have
         >>> df = df.assign(productions=df.population * 3.0)
@@ -110,9 +111,6 @@ class GravityApplication:
         """
 
         self.project = project
-        self.__required_parameters = ["max trip length"]
-        self.__required_model = ["function", "parameters"]
-
         self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.vectors = kwargs.get("vectors")
@@ -128,7 +126,7 @@ class GravityApplication:
         self.gap = np.inf
         self.procedure_date = ""
         self.procedure_id = ""
-        self.__ipf = None  # type: Ipf
+        self.cores = resolve_cores((project.parameters if project else Parameters().parameters)["system"])
 
     def apply(self):
         """Runs the Gravity Application instance as instantiated
@@ -139,56 +137,38 @@ class GravityApplication:
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
         t = perf_counter()
-        max_cost = self.parameters["max trip length"]
 
-        # We create the output
         assert self.impedance is not None
-        self.output = AequilibraeMatrix(index=self.impedance.index, index_name=self.impedance.index_name)
-
-        value = self.impedance[self.impedance_core]
+        cost = self.impedance[self.impedance_core]
         if self.nan_as_zero:
-            value = np.nan_to_num(value)
+            cost = np.nan_to_num(cost)
 
-        self.output[self.core_name] = value
-
-        # We apply the function
-        self.__apply_function()
-
-        # We zero those cells that have a trip length above the limit
-        if max_cost > 0:
-            values = self.output[self.core_name]
-            self.output[self.core_name] = (values < max_cost) * values
-
-        # We adjust the total of the self.output
-        values = self.output[self.core_name]
-        total_factor = np.nansum(self.vectors[self.rows_]) / np.nansum(values)
-        self.output[self.core_name] = values * total_factor
-
-        # And adjust with a fratar
-        self.__ipf = Ipf(
-            matrix=self.output,
-            vectors=self.vectors,
-            column_field=self.cols_,
-            row_field=self.rows_,
-            nan_as_zero=self.nan_as_zero,
+        # The deterrence matrix, without trips at or above the max trip length, is the seed of the balancing
+        trips = deterrence_matrix(
+            cost,
+            self.model.function,
+            self.model.alpha,
+            self.model.beta,
+            self.parameters["max trip length"],
+            cores=self.cores,
+        )
+        rows = np.nan_to_num(self.vectors[self.rows_].to_numpy(dtype=np.float64))
+        columns = np.nan_to_num(self.vectors[self.cols_].to_numpy(dtype=np.float64))
+        iterations, self.gap = ipf_core(
+            trips,
+            rows,
+            columns * (rows.sum() / columns.sum()),
+            self.parameters["max iterations"],
+            self.parameters["convergence level"],
+            self.cores,
+        )
+        self.output = AequilibraeMatrix._from_shared_arrays(
+            {self.core_name: trips}, index=self.impedance.index, index_name=self.impedance.index_name
         )
 
-        # We use the model application parameters in case they were provided
-        # not the standard way of using this tool)
-        for p in self.__ipf.parameters:
-            if p in self.parameters:
-                self.__ipf.parameters[p] = self.parameters[p]
-
-        # apply Fratar
-        self.__ipf.fit()
-        self.output = self.__ipf.output
-        self.gap = self.__ipf.gap
-
-        self.report.extend(self.__ipf.report[1:] + ["", ""])
-        values = self.output[self.core_name]
-        self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(values))))
-        intrazonals = float(np.nansum(np.diagonal(values)))
-        self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
+        self.report.append(f"Iterations: {iterations}, convergence: {self.gap:.10f}")
+        self.report.append("Total of matrix: " + "{:15,.4f}".format(float(trips.sum())))
+        self.report.append("Intrazonal flow: " + "{:15,.4f}".format(float(np.diagonal(trips).sum())))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
@@ -257,46 +237,3 @@ class GravityApplication:
         sum_cols = np.nansum(self.vectors[self.cols_])
         if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
             raise ValueError("Vectors are not balanced")
-        else:
-            # guarantees that they are precisely balanced
-            self.vectors[self.cols_] = self.vectors[self.cols_] * (sum_rows / sum_cols)
-
-        self.__check_parameters()
-
-    def __check_parameters(self):
-        # Check if parameters are configured properly
-        for p in self.__required_parameters:
-            if p not in self.parameters:
-                self.error = "Parameters error. It needs to be a dictionary with the following keys: "
-                for t in self.__required_parameters:
-                    self.error = self.error + t + ", "
-                break
-
-    def __apply_function(self):
-        assert (
-            self.impedance is not None
-            and self.output is not None
-            and self.vectors is not None
-            and self.model is not None
-        )
-        impedance = self.impedance[self.impedance_core]
-        output = self.output[self.core_name]
-        for i in range(self.vectors.shape[0]):
-            p = self.vectors[self.rows_].values[i]
-            a = self.vectors[self.cols_].to_numpy()
-
-            if self.model.function == "EXPO":
-                output[i, :] = np.exp(-self.model.beta * impedance[i, :]) * p * a
-
-            elif self.model.function == "POWER":
-                output[i, :] = (np.power(impedance[i, :], -self.model.alpha) * p * a)[:]
-            elif self.model.function == "GAMMA":
-                output[i, :] = (
-                    np.power(impedance[i, :], self.model.alpha) * np.exp(-self.model.beta * impedance[i, :]) * p * a
-                )[:]
-
-        # Deals with infinite and NaNs
-        infinite = np.isinf(output).astype(int)
-        non_inf = np.ones_like(output) - infinite
-        output[:] = output * non_inf
-        output[:] = np.nan_to_num(output)
