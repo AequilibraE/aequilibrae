@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -211,18 +212,29 @@ private:
     std::size_t current = 0;
     while (kArity * current + kArity < size_) {
       const std::size_t first_child = kArity * current + 1;
-      // Strict comparisons choose the right child on ties, preserving the
-      // descending child scan's extraction order. The replacement wins ties.
+      // Branch-free tournament. Index arithmetic on the comparison results and
+      // std::min on the keys become setcc/cmov and minsd on GCC, Clang and
+      // MSVC; written as ternaries on heap loads, GCC emitted three
+      // unpredictable branches per level instead. Ties go to the later child,
+      // matching the descending child scan this replaces, so extraction order
+      // is unchanged.
+      const T key0 = heap_[first_child].key;
+      const T key1 = heap_[first_child + 1].key;
+      const T key2 = heap_[first_child + 2].key;
+      const T key3 = heap_[first_child + 3].key;
       const std::size_t left =
-          heap_[first_child].key < heap_[first_child + 1].key ? first_child
-                                                              : first_child + 1;
+          first_child + static_cast<std::size_t>(!(key0 < key1));
       const std::size_t right =
-          heap_[first_child + 2].key < heap_[first_child + 3].key
-              ? first_child + 2
-              : first_child + 3;
-      const std::size_t smallest =
-          heap_[left].key < heap_[right].key ? left : right;
-      if (!(heap_[smallest].key < node.key)) {
+          first_child + 2 + static_cast<std::size_t>(!(key2 < key3));
+      const T left_key = std::min(key0, key1);
+      const T right_key = std::min(key2, key3);
+      // A mask select keeps this a cmov/and/xor sequence; as a ternary, GCC
+      // computed `left` lazily behind a data-dependent branch.
+      const std::size_t mask =
+          std::size_t{0} - static_cast<std::size_t>(left_key < right_key);
+      const std::size_t smallest = right ^ ((left ^ right) & mask);
+      const T smallest_key = std::min(left_key, right_key);
+      if (!(smallest_key < node.key)) {
         place(current, node);
         return;
       }
