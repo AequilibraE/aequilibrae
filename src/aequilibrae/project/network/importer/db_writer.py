@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Iterable
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
+from aequilibrae.project.project_creation import without_triggers
 from aequilibrae.utils.db_utils import list_columns
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
@@ -39,12 +39,9 @@ class SpatialiteWriter:
             net = self._fold_excess_link_types(conn, net)
             self._ensure_link_types(conn, net.links["link_type"].dropna().astype(str).unique())
 
-            remove_triggers(conn, "network")
-            try:
+            with without_triggers(conn):
                 self._insert_nodes(conn, net.nodes, node_cols)
                 self._insert_links(conn, net.links, link_cols)
-            finally:
-                add_triggers(conn, "network")
 
     def _fold_excess_link_types(self, conn, net: StagedNetwork) -> StagedNetwork:
         """Bucket the least-frequent link types into ``other_link_types`` when the

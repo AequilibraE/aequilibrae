@@ -2,7 +2,7 @@ import logging
 import sqlite3
 from typing import Optional
 
-from aequilibrae.project.project_creation import add_triggers, remove_triggers
+from aequilibrae.project.project_creation import _add_triggers, _remove_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def migrate(
     logger.info("Beginning migration to refresh the network triggers")
 
     # Trigger names are unchanged, so dropping the current names removes every outdated definition
-    remove_triggers(project_conn, "network")
+    _remove_triggers(project_conn, "network")
 
-    add_triggers(project_conn, "network")
+    _add_triggers(project_conn, "network")
     logger.info("Migration to refresh the network triggers completed")
