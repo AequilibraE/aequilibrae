@@ -8,6 +8,7 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routin
         size_t origin
         size_t root
         size_t settled_count
+        size_t terminal_count
         size_t target_count
         size_t reached_target_count
         cpp_bool exhausted
@@ -34,10 +35,12 @@ cdef extern from "search_results.hpp" namespace "aequilibrae::paths::cpp::routin
         size_t *connectors
         size_t *settlement_order
         size_t *terminal_states
+        size_t *terminal_nodes
         T *distances
         T *turn_costs
         CppSearchMetadata *metadata
         void reset() noexcept
+        void set_terminal(size_t node, size_t state) noexcept
         CppSearchResults[T] read_view() noexcept
 
 
@@ -46,6 +49,7 @@ cdef class SearchResults:
     cdef CppSearchMetadata metadata
     cdef size_t[::1] predecessors_buffer, connectors_buffer
     cdef size_t[::1] settlement_order_buffer, terminal_states_buffer
+    cdef size_t[::1] terminal_nodes_buffer
     cdef double[::1] distances_buffer, turn_costs_buffer
     cdef CppMutableSearchResults[double] view(self) noexcept nogil
     cdef CppSearchResults[double] read_view(self) noexcept nogil

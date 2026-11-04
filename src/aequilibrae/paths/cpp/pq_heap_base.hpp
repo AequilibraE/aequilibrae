@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 #include "aeq_log.hpp"
 
@@ -33,16 +34,14 @@ public:
     log_closure_ = closure;
   }
 
-  void init_heap(std::size_t length) noexcept {
+  void init_heap(std::size_t length) {
     AEQ_LOG(log_closure_, AEQ_LOG_DEBUG,
             aeq_format_string(Derived::kName, ": init_heap(length = ", length,
                               ")"));
     derived().init_heap_impl(length);
   }
 
-  void alloc_heap(std::size_t length) noexcept {
-    derived().alloc_heap_impl(length);
-  }
+  void alloc_heap(std::size_t length) { derived().alloc_heap_impl(length); }
 
   void reset_heap() noexcept {
     AEQ_LOG(log_closure_, AEQ_LOG_DEBUG,
@@ -77,6 +76,12 @@ public:
 
   [[nodiscard]] T element_key(std::size_t element_idx) const noexcept {
     return derived().element_key_impl(element_idx);
+  }
+
+  // Visit pending element IDs without changing the queue. The callback must not
+  // mutate the queue and must tolerate duplicate IDs from lazy queue adapters.
+  template <class F> void for_each_pending(F &&fn) const {
+    derived().for_each_pending_impl(std::forward<F>(fn));
   }
 
 protected:
