@@ -160,6 +160,13 @@ def run(args, unparsed_args):
         project.close()
 
 
+def copy_project(parser, operation, args, unparsed_args):
+    """Copy project files without opening or activating a Project."""
+    if unparsed_args:
+        parser.error(f"unrecognised arguments: {' '.join(unparsed_args)}")
+    print(operation(args.project, args.destination))
+
+
 def cli(argv=None):
     """Entry point for the aeq command. argv defaults to sys.argv, it is a parameter for testing."""
     # Create a parser that just parses the project dir. This is global and used by every sub-command.
@@ -198,6 +205,18 @@ def cli(argv=None):
 
     list_functions_parser = subparsers.add_parser("list", help="List project commands")
     list_functions_parser.set_defaults(_aeq_internal_func=functools.partial(list_functions, list_functions_parser))
+
+    from aequilibrae.project.tools.backup import backup, copy_to_new
+
+    for name, operation, help_text in (
+        ("backup", backup, "Back up project databases and files"),
+        ("copy-to-new", copy_to_new, "Copy project data into the current database schema"),
+    ):
+        copy_parser = subparsers.add_parser(
+            name, help=help_text, description=inspect.getdoc(operation), allow_abbrev=False
+        )
+        copy_parser.add_argument("destination", help="New destination directory outside the source project")
+        copy_parser.set_defaults(_aeq_internal_func=functools.partial(copy_project, copy_parser, operation))
 
     args, unparsed_args = parser.parse_known_args(argv)
 
