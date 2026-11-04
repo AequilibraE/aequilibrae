@@ -10,12 +10,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
 import numpy as np
-import openmatrix as omx
 import pandas as pd
-import scipy
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.cython.route_choice_set_results import (
     RouteChoiceSetResults,
@@ -50,8 +48,6 @@ class RouteChoice:
         "bfsle": {"penalty": 1.0},
     }
 
-    demand_index_names = ["origin id", "destination id"]
-
     def __init__(self, graph: Graph, project=None, *, coordinates: pd.DataFrame | None = None):
         self.parameters = {}
         self.procedure_id = None
@@ -62,7 +58,8 @@ class RouteChoice:
 
         self.cores: int = 0
         self.__rc = RouteChoiceSet(graph, coordinates=coordinates)
-        self.demand = self.__init_demand()
+        self.demand: AequilibraeMatrix | AequilibraeSparseMatrix | None = None
+        self._nodes = None
 
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
@@ -74,9 +71,6 @@ class RouteChoice:
         self._config = {}
         self._selected_links = {}
         self.sl_link_loading = True
-
-    def __init_demand(self):
-        return self.__rc.make_demand(*self.demand_index_names)
 
     def set_choice_set_generation(self, /, algorithm: str = None, **kwargs) -> None:
         """
@@ -212,25 +206,23 @@ class RouteChoice:
         self.where = where
         self.to_parquet_kwargs = to_parquet_kwargs if to_parquet_kwargs is not None else {}
 
-    def add_demand(self, demand, fill: float = 0.0):
+    def set_demand(self, demand: AequilibraeMatrix | AequilibraeSparseMatrix | None) -> None:
         """
-        Add demand DataFrame or matrix for the assignment.
+        Set the demand matrix for the assignment.
 
         :Arguments:
-            **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to
-            assignment. If the supplied demand is a DataFrame, it should have a 2-level
-            MultiIndex of Origin and Destination node IDs. If an AequilibraE Matrix is
-            supplied node IDs will be inferred from the index. Demand values should be either
-            ``float32`` or ``float64``.
-
-            **fill** (:obj:`float`): Value to fill any ``NaN`` with.
+            **demand** (:obj:`AequilibraeMatrix` or
+                :obj:`AequilibraeSparseMatrix`, *Optional*): Demand for
+                assignment. Node IDs are inferred from the index and must be
+                graph centroids. Use :func:`aequilibrae.matrix.from_df` to
+                convert a DataFrame.
         """
-        if isinstance(demand, pd.DataFrame):
-            self.demand.add_df(demand, fill=fill)
-        elif isinstance(demand, AequilibraeMatrix):
-            self.demand.add_matrix(demand, fill=fill)
-        else:
-            raise TypeError(f"unknown argument type '{(type(demand).__name__)}'")
+        if not isinstance(demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
+
+        self.demand = demand
+        self._nodes = None
+        self.__rc.clear_results()
 
     def prepare(self, nodes: Union[List[int], List[Tuple[int, int]], None] = None) -> None:
         """
@@ -244,15 +236,13 @@ class RouteChoice:
             in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
             If ``None`` is provided, all OD pairs with non-zero flows will be used.
         """
-        if nodes is not None and not self.demand.no_demand():
+        if nodes is not None and self.demand is not None:
             raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
         elif nodes is None:
             return
         elif len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 
-        self.demand = self.__init_demand()
-        df = pd.DataFrame()
         if all(
             isinstance(pair, tuple)
             and len(pair) == 2
@@ -260,13 +250,14 @@ class RouteChoice:
             and isinstance(pair[1], (int, np.integer))
             for pair in nodes
         ):
-            df.index = pd.MultiIndex.from_tuples(nodes, name=self.demand_index_names)
+            pairs = list(nodes)
         elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
-            df.index = pd.MultiIndex.from_tuples(itertools.permutations(nodes, r=2), names=self.demand_index_names)
+            pairs = list(itertools.permutations(nodes, r=2))
         else:
             raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
 
-        self.demand.add_df(df)
+        self._nodes = pairs
+        self.__rc.clear_results()
 
     def execute_single(self, origin: int, destination: int, demand: float = 0.0) -> List[Tuple[int]]:
         """
@@ -283,7 +274,9 @@ class RouteChoice:
 
             **destination** (:obj:`int`): Destination node ID.
 
-            **demand** (:obj:`float`): If provided an assignment will be performed with this demand.
+            **demand** (:obj:`float`): If provided an assignment will be
+                performed with this demand.  Non-zero demand requires centroid
+                endpoints.
 
         :Returns:
             **route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
@@ -295,7 +288,6 @@ class RouteChoice:
             return self.__rc.run(
                 origin,
                 destination,
-                self.demand.shape,
                 demand=demand,
                 bfsle=self.algorithm == "bfsle",
                 path_size_logit=bool(demand),
@@ -318,7 +310,7 @@ class RouteChoice:
             **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment.
             Defaults to ``False``.
         """
-        if self.demand.df.index.empty:
+        if self.demand is None and self._nodes is None:
             logging.warning("There is no demand or pairs of OD pairs to compute Route choice for.", stacklevel=2)
             return
 
@@ -328,6 +320,7 @@ class RouteChoice:
             self.__rc.batched(
                 self.demand,
                 self._selected_links,
+                nodes=self._nodes,
                 bfsle=self.algorithm == "bfsle",
                 path_size_logit=perform_assignment,
                 cores=self.cores,
@@ -468,7 +461,7 @@ class RouteChoice:
             **info** (:obj:`dict`): Dictionary with summary information
         """
 
-        matrix_totals = self.demand.df.sum().to_dict()
+        matrix_totals = self.demand.totals() if self.demand is not None else {}
 
         info = {
             "Algorithm": self.algorithm,
@@ -529,9 +522,9 @@ class RouteChoice:
             direction.
         """
 
-        if self.demand.no_demand():
+        if self.demand is None:
             warnings.warn(
-                "No demand was provided. To perform link loading add a demand matrix or data frame",
+                "No demand was provided. To perform link loading set a demand matrix",
                 stacklevel=2,
             )
             return pd.DataFrame([])
@@ -648,8 +641,8 @@ class RouteChoice:
             and direction.
         """
 
-        if self.demand.no_demand():
-            raise ValueError("no demand was provided. To perform link loading add a demand matrix or data frame")
+        if self.demand is None:
+            raise ValueError("no demand was provided. To perform link loading set a demand matrix")
         elif not self.sl_link_loading:
             raise ValueError("select link loading was disabled via `set_select_links(..., link_loading=False)`")
 
@@ -663,18 +656,18 @@ class RouteChoice:
 
         return df
 
-    def get_select_link_od_matrix_results(self) -> Dict[str, Dict[str, scipy.sparse.coo_matrix]]:
+    def get_select_link_od_matrix_results(self) -> Dict[str, AequilibraeSparseMatrix]:
         """
         Get the select link OD matrix results as a sparse matrix.
 
         :Returns:
-            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`):
-            Returns a dict of select link set names to a dict of demand column names to a sparse OD
-            matrix
+            **select link OD matrix results** (:obj:`Dict[str,
+                AequilibraeSparseMatrix]`): Returns a dict of select link set
+                names to labelled sparse OD matrices.
         """
 
-        if self.demand.no_demand():
-            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+        if self.demand is None:
+            raise ValueError("No demand was provided. To perform link loading set a demand matrix")
 
         return self.__rc.get_sl_od_matrices()
 
@@ -717,12 +710,10 @@ class RouteChoice:
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
-        Saves the select link link flows for all classes into the results database. Additionally,
-        it exports the OD matrices into OMX format.
+        Saves the select link link flows into the results database.
 
         :Arguments:
-            **table_name** (:obj:`str`): Name of the table being inserted to and the name of the
-            OpenMatrix file used for OD matrices.
+            **table_name** (:obj:`str`): Name of the table being inserted to.
 
             **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
             Defaults to the active project
@@ -741,13 +732,37 @@ class RouteChoice:
             project=project,
         )
 
-        path = (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx")
-        for sl_name, v in self.get_select_link_od_matrix_results().items():
-            for demand_name, mat in v.items():
-                mat.to_disk(path, sl_name + "_" + demand_name)
+    def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
+        """Save the select link OD matrices to a new OMX file in the project matrices folder."""
+        if not project:
+            project = self.project or get_active_project()
 
-        file = omx.open_file(path, "a")
-        try:
-            file.create_mapping(self.index_name, self.__rc.centroids)
-        finally:
-            file.close()
+        results = self.get_select_link_od_matrix_results()
+        matrices = {
+            f"{sl_name}_{demand_name}": matrix
+            for sl_name, values in results.items()
+            for demand_name, matrix in values.items()
+        }
+        if not matrices:
+            return
+
+        assert self.demand is not None, "got sl od matrices without demand?"
+        out_matrix = AequilibraeSparseMatrix._from_shared_arrays(
+            data=matrices,
+            index=self.demand.index,
+            index_name=self.index_name,
+        )
+        project.matrices.create(
+            name=matrix_name,
+            file_name=f"{matrix_name}.omx",
+            matrix=out_matrix,
+            procedure="Route choice OD select link",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+            description=f"Select link matrices from procedure ID {self.procedure_id}.",
+        )
+
+    def save_select_link(self, name: str, project=None) -> None:
+        """Save both select link flows and OD matrices using the same name."""
+        self.save_select_link_flows(name, project=project)
+        self.save_select_link_matrices(name, project=project)

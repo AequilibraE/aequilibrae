@@ -87,12 +87,12 @@ class Matrices:
         :Arguments:
             **file_name** (:obj:`str`): The filename of the matrix.
 
-            **index_name** (:obj:`str`, *Optional*): Name of the OMX zone
-                index.  Inferred when omitted, as described above.
-
             **subset** (:obj:`Sequence`, *Optional*): Matrix names or metadata
                 queries to copy into an in-memory matrix. If omitted, returns a
                 :class:`MatrixStore` instead.
+
+            **kwargs** (:obj:`dict[str, Any]`): Other keyword arguments, passed
+                to ``from_file``.
 
         :Returns:
             **matrix** (:class:`~aequilibrae.matrix.AequilibraeMatrix` or

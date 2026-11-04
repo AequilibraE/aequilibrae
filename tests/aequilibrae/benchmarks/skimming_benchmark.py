@@ -2,8 +2,8 @@
 
 import numpy as np
 import pandas as pd
-
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.routing_context import make_routing_context
 
@@ -17,27 +17,26 @@ MIN_LEFT_TURNS = {"Anaheim": 400, "ChicagoRegional": 28_000}
 
 
 def zero_cost_road_turn(graph):
-    """Pick a compact-graph road turn to enable turn-based routing without changing its cost."""
-    arcs = graph.compact_graph
-    ids = arcs["id"].to_numpy(np.int64, copy=False)
-    tails = np.empty(graph.compact_num_links, dtype=np.int64)
-    heads = np.empty(graph.compact_num_links, dtype=np.int64)
-    tails[ids] = arcs["a_node"].to_numpy(np.int64, copy=False)
-    heads[ids] = arcs["b_node"].to_numpy(np.int64, copy=False)
+    """Pick a real full-graph road turn to enable turn-based routing without changing its cost."""
+    arcs = graph.graph
+    tails = graph.all_nodes[arcs["a_node"].to_numpy(np.int64, copy=False)]
+    heads = graph.all_nodes[arcs["b_node"].to_numpy(np.int64, copy=False)]
+    outgoing = {}
+    for tail, head in zip(tails, heads, strict=True):
+        outgoing.setdefault(int(tail), []).append(int(head))
 
-    for incoming in range(graph.compact_num_links):
-        tail, via = int(tails[incoming]), int(heads[incoming])
-        if tail < graph.num_zones or via < graph.num_zones:
+    centroids = set(map(int, graph.centroids))
+    for tail, via in zip(tails, heads, strict=True):
+        tail, via = int(tail), int(via)
+        if tail in centroids or via in centroids:
             continue
-        for outgoing in range(int(graph.compact_fs[via]), int(graph.compact_fs[via + 1])):
-            destination = int(heads[outgoing])
-            if destination >= graph.num_zones and destination != tail:
-                nodes = graph.compact_all_nodes
+        for destination in outgoing.get(via, ()):
+            if destination not in centroids and destination != tail:
                 return pd.DataFrame(
                     {
-                        "from_node": [int(nodes[tail])],
-                        "via_node": [int(nodes[via])],
-                        "to_node": [int(nodes[destination])],
+                        "from_node": [tail],
+                        "via_node": [via],
+                        "to_node": [destination],
                         "penalty": [0.0],
                     }
                 )

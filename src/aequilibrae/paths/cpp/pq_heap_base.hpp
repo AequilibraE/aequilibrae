@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <limits>
+#include <type_traits>
 
 #include "aeq_log.hpp"
 
@@ -13,10 +14,14 @@ enum ElementState {
   IN_HEAP,
 };
 
-inline constexpr double kInfinity = std::numeric_limits<double>::infinity();
+template <typename T>
+inline constexpr T kInfinity = std::numeric_limits<T>::infinity();
 
-template <class Derived> class PriorityQueueBase {
+template <class Derived, typename T> class PriorityQueueBase {
+  static_assert(std::is_floating_point_v<T>);
+
 public:
+  using value_type = T;
   PriorityQueueBase(const PriorityQueueBase &) = delete;
   PriorityQueueBase &operator=(const PriorityQueueBase &) = delete;
   PriorityQueueBase(PriorityQueueBase &&) = delete;
@@ -47,15 +52,15 @@ public:
 
   void free_heap() noexcept { derived().free_heap_impl(); }
 
-  void insert(std::size_t element_idx, double key) noexcept {
+  void insert(std::size_t element_idx, T key) noexcept {
     derived().insert_impl(element_idx, key);
   }
 
-  void decrease_key(std::size_t element_idx, double key_new) noexcept {
+  void decrease_key(std::size_t element_idx, T key_new) noexcept {
     derived().decrease_key_impl(element_idx, key_new);
   }
 
-  [[nodiscard]] double peek() const noexcept { return derived().peek_impl(); }
+  [[nodiscard]] T peek() const noexcept { return derived().peek_impl(); }
 
   [[nodiscard]] bool is_empty() const noexcept {
     return derived().is_empty_impl();
@@ -70,7 +75,7 @@ public:
     return derived().effective_state_impl(element_idx);
   }
 
-  [[nodiscard]] double element_key(std::size_t element_idx) const noexcept {
+  [[nodiscard]] T element_key(std::size_t element_idx) const noexcept {
     return derived().element_key_impl(element_idx);
   }
 

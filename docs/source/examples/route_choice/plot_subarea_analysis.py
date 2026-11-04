@@ -4,11 +4,11 @@
 Route Choice with sub-area analysis
 ===================================
 
-In this example, we show how to perform sub-area analysis using route choice assignment, 
+In this example, we show how to perform sub-area analysis using route choice assignment,
 for a city in La Serena Metropolitan Area in Chile.
 
 .. admonition:: References
- 
+
    * :doc:`../../route_choice`
 
 .. seealso::
@@ -23,14 +23,14 @@ for a city in La Serena Metropolitan Area in Chile.
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
-from os.path import join
 import itertools
+from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
-import pandas as pd
-import numpy as np
 import folium
+import numpy as np
+import pandas as pd
 
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.logging_utils import basic_config
@@ -156,10 +156,11 @@ demand_matrix = from_df(
     subset=list(demand.columns),
     index=new_centroids,
     index_name="zones",
+    sparse=True,
 )
 
 rc = RouteChoice(graph)
-rc.add_demand(demand_matrix)
+rc.set_demand(demand_matrix)
 rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False, seed=123)
 rc.execute(perform_assignment=True)
 
@@ -261,22 +262,22 @@ graph.set_graph("utility")
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# This object construction might take a minute depending on the size of the graph due to the
-# construction of the compressed link to network link mapping that's required. This is a one
-# time operation per graph and is cached. We need to supply a Graph and an AequilibraeMatrix
-# or DataFrame via the ``add_demand`` method, if demand is not provided link loading cannot
+# This object construction might take a minute depending on the size of the
+# graph due to the construction of the compressed link to network link mapping
+# that's required. This is a one time operation per graph and is cached. We
+# need to supply a Graph and an AequilibraeMatrix or AequilibraeSparseMatrix
+# via the ``set_demand`` method, if demand is not provided link loading cannot
 # be performed.
 rc = RouteChoice(graph)
-rc.add_demand(mat)
+rc.set_demand(mat)
 
 # %%
 # Here we add the union of edges as select link sets.
 rc.set_select_links(single_edges | edge_pairs)
 
 # %%
-# For the sake of demonstration we limit out demand matrix to a few OD pairs. This filter is also
-# possible with the automated approach, just edit the ``subarea.rc.demand.df`` DataFrame, however
-# make sure the index remains intact.
+# For the sake of demonstration we limit out demand matrix to a few OD
+# pairs.
 ods_pairs_of_interest = [
     (4, 39),
     (92, 37),
@@ -285,8 +286,18 @@ ods_pairs_of_interest = [
     (39, 34),
 ]
 ods_pairs_of_interest = ods_pairs_of_interest + [(x[1], x[0]) for x in ods_pairs_of_interest]
-rc.demand.df = rc.demand.df.loc[ods_pairs_of_interest].sort_index().astype(np.float32)
-rc.demand.df
+
+# Construct a sparse Aeq matrix for our sub-selection
+demand = pd.DataFrame(
+    {name: [mat.mat[name, o, d] for o, d in ods_pairs_of_interest] for name in mat},
+    index=pd.MultiIndex.from_tuples(ods_pairs_of_interest, names=["origin id", "destination id"]),
+).sort_index()
+demand_matrix = from_df(demand.reset_index(), "origin id", "destination id", index=mat.index, sparse=True)
+
+rc = RouteChoice(graph)
+rc.set_demand(demand_matrix)
+rc.set_select_links(single_edges | edge_pairs)
+rc.demand
 
 # %%
 # Perform the assignment
@@ -300,11 +311,12 @@ subarea_zone.add_to(map)
 map
 
 # %%
-# We'll pull out just OD matrix results as well we need it for the post-processing, we'll also
-# convert the sparse matrices to SciPy COO matrices.
+# We'll pull out just OD matrix results as well we need it for the
+# post-processing, we'll also use the returned SciPy CSR arrays directly.
 sl_od = rc.get_select_link_od_matrix_results()
-edge_totals = {k: sl_od[k]["demand"].to_scipy() for k in single_edges}
-edge_pair_values = {k: sl_od[k]["demand"].to_scipy() for k in edge_pairs}
+od_index = demand_matrix.index
+edge_totals = {k: sl_od[k]["demand"] for k in single_edges}
+edge_pair_values = {k: sl_od[k]["demand"] for k in edge_pairs}
 
 # %%
 # For the post processing, we are interested in the demand of OD pairs that enter or exit the
@@ -318,8 +330,8 @@ exited = defaultdict(float)
 for (link_id, dir), v in edge_totals.items():
     link = g.loc[link_id, dir]
     for (o, d), load in v.todok().items():
-        o = graph.all_nodes[o]
-        d = graph.all_nodes[d]
+        o = od_index[o]
+        d = od_index[d]
 
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
@@ -347,6 +359,8 @@ for (l1, l2), v in edge_pair_values.items():
     link2 = g.loc[l2]
 
     for (o, d), load in v.todok().items():
+        o = od_index[o]
+        d = od_index[d]
         o_inside = o in inside_nodes.index
         d_inside = d in inside_nodes.index
 
@@ -358,10 +372,12 @@ through
 # %%
 # With these results we can construct a new demand matrix. Usually this would be now transplanted
 # onto another network, however for demonstration purposes we'll reuse the same network.
+manual_od_pairs = list(entered.keys()) + list(exited.keys()) + list(through.keys())
+manual_od_pairs = np.asarray(manual_od_pairs, dtype=np.uint64)
 demand = pd.DataFrame(
     list(entered.values()) + list(exited.values()) + list(through.values()),
-    index=pd.MultiIndex.from_tuples(
-        list(entered.keys()) + list(exited.keys()) + list(through.keys()), names=["origin id", "destination id"]
+    index=pd.MultiIndex.from_arrays(
+        [manual_od_pairs[:, 0], manual_od_pairs[:, 1]], names=["origin id", "destination id"]
     ),
     columns=["demand"],
 ).sort_index()
@@ -377,7 +393,7 @@ new_centroids
 # %%
 # Re-perform our assignment
 rc = RouteChoice(graph)
-rc.add_demand(demand)
+rc.set_demand(from_df(demand.reset_index(), "origin id", "destination id", index=new_centroids, sparse=True))
 rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False, seed=123)
 rc.execute(perform_assignment=True)
 

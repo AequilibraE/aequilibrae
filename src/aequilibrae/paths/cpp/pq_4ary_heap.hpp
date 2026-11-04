@@ -8,30 +8,30 @@
 
 namespace aequilibrae::paths::cpp {
 
-class FourAryHeap final : public PriorityQueueBase<FourAryHeap> {
+template <typename T>
+class FourAryHeap final : public PriorityQueueBase<FourAryHeap<T>, T> {
 public:
   static constexpr const char *kName = "FourAryHeap";
 
   FourAryHeap() noexcept = default;
 
-  ~FourAryHeap() { free_heap(); }
+  ~FourAryHeap() { this->free_heap(); }
 
 private:
-  friend class PriorityQueueBase<FourAryHeap>;
+  friend class PriorityQueueBase<FourAryHeap<T>, T>;
 
-  void init_heap_impl(std::size_t length) noexcept { alloc_heap(length); }
+  void init_heap_impl(std::size_t length) noexcept { this->alloc_heap(length); }
 
   void alloc_heap_impl(std::size_t length) noexcept {
-    free_heap();
+    this->free_heap();
 
     length_ = length;
     size_ = 0;
-    heap_ = new std::size_t[length];
+    heap_ = new Node[length];
     elements_ = new Element[length];
     current_epoch_ = 1;
 
     for (std::size_t i = 0; i < length_; ++i) {
-      heap_[i] = length_;
       initialize_element(i);
     }
   }
@@ -62,35 +62,32 @@ private:
     current_epoch_ = 0;
   }
 
-  void insert_impl(std::size_t element_idx, double key) noexcept {
+  void insert_impl(std::size_t element_idx, T key) noexcept {
     assert(element_idx < length_);
     assert(size_ < length_);
     // SCANNED elements may be re-inserted (A* with an inconsistent heuristic).
-    assert(effective_state(element_idx) != IN_HEAP);
-    assert(key < kInfinity);
+    assert(this->effective_state(element_idx) != IN_HEAP);
+    assert(key < kInfinity<T>);
 
-    const std::size_t node_idx = size_;
-    ++size_;
     elements_[element_idx].state = IN_HEAP;
     elements_[element_idx].epoch = current_epoch_;
-    elements_[element_idx].node_idx = node_idx;
-    // The element may carry a stale key from a previous epoch; make the
-    // sift-up below a genuine decrease.
-    elements_[element_idx].key = kInfinity;
-    heap_[node_idx] = element_idx;
-    decrease_key_from_node_index(node_idx, key);
+    // Overwrite a potentially stale key from a previous epoch.
+    elements_[element_idx].key = key;
+    sift_up(size_++, {key, element_idx});
   }
 
-  void decrease_key_impl(std::size_t element_idx, double key_new) noexcept {
+  void decrease_key_impl(std::size_t element_idx, T key_new) noexcept {
     assert(element_idx < length_);
     assert(element_is_in_heap(element_idx));
+    assert(key_new <= elements_[element_idx].key);
 
-    decrease_key_from_node_index(elements_[element_idx].node_idx, key_new);
+    elements_[element_idx].key = key_new;
+    sift_up(elements_[element_idx].node_idx, {key_new, element_idx});
   }
 
-  double peek_impl() const noexcept {
+  T peek_impl() const noexcept {
     assert(size_ > 0);
-    return elements_[heap_[0]].key;
+    return heap_[0].key;
   }
 
   bool is_empty_impl() const noexcept { return size_ == 0; }
@@ -98,20 +95,11 @@ private:
   std::size_t extract_min_impl() noexcept {
     assert(size_ > 0);
 
-    const std::size_t element_idx = heap_[0];
-    const std::size_t node_idx = size_ - 1;
-
-    exchange_nodes(0, node_idx);
-
+    const std::size_t element_idx = heap_[0].element_idx;
     elements_[element_idx].state = SCANNED;
-    elements_[element_idx].node_idx = length_;
-    heap_[node_idx] = length_;
-    --size_;
-
-    if (size_ > 0) {
-      min_heapify(0);
+    if (--size_ > 0) {
+      sift_down(heap_[size_]);
     }
-
     return element_idx;
   }
 
@@ -123,27 +111,33 @@ private:
     return element.state;
   }
 
-  double element_key_impl(std::size_t element_idx) const noexcept {
+  T element_key_impl(std::size_t element_idx) const noexcept {
     return elements_[element_idx].key;
   }
 
   struct Element {
-    double key;
+    T key;
     std::uint32_t epoch;
     ElementState state;
     std::size_t node_idx;
+  };
+
+  // Keys live in the heap so a node's children share a cache line.
+  struct Node {
+    T key;
+    std::size_t element_idx;
   };
 
   static constexpr std::size_t kArity = 4;
 
   std::size_t length_ = 0;
   std::size_t size_ = 0;
-  std::size_t *heap_ = nullptr;
+  Node *heap_ = nullptr;
   Element *elements_ = nullptr;
   std::uint32_t current_epoch_ = 0;
 
   void initialize_element(std::size_t element_idx) noexcept {
-    elements_[element_idx].key = kInfinity;
+    elements_[element_idx].key = kInfinity<T>;
     elements_[element_idx].epoch = 0;
     elements_[element_idx].state = NOT_IN_HEAP;
     elements_[element_idx].node_idx = length_;
@@ -154,79 +148,48 @@ private:
     return element.epoch == current_epoch_ && element.state == IN_HEAP;
   }
 
-  void exchange_nodes(std::size_t node_i, std::size_t node_j) noexcept {
-    assert(node_i < size_);
-    assert(node_j < size_);
-
-    const std::size_t element_i = heap_[node_i];
-    const std::size_t element_j = heap_[node_j];
-
-    assert(element_i < length_);
-    assert(element_j < length_);
-
-    heap_[node_i] = element_j;
-    heap_[node_j] = element_i;
-    elements_[element_j].node_idx = node_i;
-    elements_[element_i].node_idx = node_j;
+  void place(std::size_t node_idx, Node node) noexcept {
+    heap_[node_idx] = node;
+    elements_[node.element_idx].node_idx = node_idx;
   }
 
-  void decrease_key_from_node_index(std::size_t node_idx,
-                                    double key_new) noexcept {
-    assert(node_idx < size_);
-
-    std::size_t current = node_idx;
-    const std::size_t element_idx = heap_[current];
-    assert(element_idx < length_);
-    assert(elements_[element_idx].state == IN_HEAP);
-    assert(key_new <= elements_[element_idx].key);
-
-    elements_[element_idx].key = key_new;
+  // Sifts move a hole instead of swapping, so each level writes once.
+  void sift_up(std::size_t current, Node node) noexcept {
     while (current > 0) {
       const std::size_t parent = (current - 1) / kArity;
-      const std::size_t parent_element = heap_[parent];
-      assert(parent_element < length_);
-      if (elements_[parent_element].key > key_new) {
-        exchange_nodes(current, parent);
-        current = parent;
-      } else {
+      if (heap_[parent].key <= node.key) {
         break;
       }
+      place(current, heap_[parent]);
+      current = parent;
     }
+    place(current, node);
   }
 
-  void min_heapify(std::size_t node_idx) noexcept {
-    if (size_ == 0) {
-      return;
-    }
-
-    assert(node_idx < size_);
-
-    std::size_t current = node_idx;
+  void sift_down(Node node) noexcept {
+    std::size_t current = 0;
     while (true) {
       std::size_t smallest = current;
-      double min_key = elements_[heap_[smallest]].key;
+      T min_key = node.key;
 
       const std::size_t first_child = kArity * current + 1;
       const std::size_t end_child =
           first_child + kArity < size_ ? first_child + kArity : size_;
 
-      for (std::size_t candidate = end_child; candidate > first_child;
-           --candidate) {
-        const std::size_t child = candidate - 1;
-        const double child_key = elements_[heap_[child]].key;
-        if (child_key < min_key) {
+      for (std::size_t child = end_child; child-- > first_child;) {
+        if (heap_[child].key < min_key) {
           smallest = child;
-          min_key = child_key;
+          min_key = heap_[child].key;
         }
       }
 
       if (smallest == current) {
-        return;
+        break;
       }
-
-      exchange_nodes(current, smallest);
+      place(current, heap_[smallest]);
       current = smallest;
     }
+    place(current, node);
   }
 };
 

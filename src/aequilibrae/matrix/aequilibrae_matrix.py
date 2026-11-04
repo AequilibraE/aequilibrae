@@ -1,8 +1,9 @@
 import os
 from abc import abstractmethod
+from collections import ChainMap
 from collections.abc import Iterator, MutableMapping
 from copy import deepcopy
-from typing import Any, Callable, Literal, Mapping, Self, Sequence, TypeAlias, overload
+from typing import Any, Callable, Generic, Literal, Mapping, Self, Sequence, TypeAlias, TypeVar, overload
 from uuid import uuid4
 
 import h5py
@@ -11,12 +12,21 @@ import openmatrix as omx
 import pandas as pd
 import scipy.sparse
 from numpy.typing import ArrayLike, DTypeLike
+from openmatrix import File as OMXFile
+from scipy.sparse import bsr_array, coo_array, csc_array, csr_array, dok_array, lil_array, sparray
 
 OMX_SPECIAL_ATTRS = {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"}
+SPARSE_SPECIAL_ATTRS = {"FORMAT"}
+
+SparseArray: TypeAlias = bsr_array | coo_array | csc_array | csr_array | dok_array | lil_array
 
 
 def _copy_file_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy({key: value for key, value in metadata.items() if key not in OMX_SPECIAL_ATTRS})
+
+
+def _filter_matrix_metadata(metadata: Mapping[str, Any], *, sparse: bool) -> dict[str, Any]:
+    return {key: value for key, value in metadata.items() if not sparse or key not in SPARSE_SPECIAL_ATTRS}
 
 
 def _cast_index(value: np.ndarray, dataset: h5py.Dataset) -> np.ndarray:
@@ -25,7 +35,7 @@ def _cast_index(value: np.ndarray, dataset: h5py.Dataset) -> np.ndarray:
     return value.astype(dataset.dtype, casting="same_value")
 
 
-def _write_index(file: omx.File, name: str, value: np.ndarray) -> None:
+def _write_index(file: OMXFile, name: str, value: np.ndarray) -> None:
     dataset = file.lookup.get(name)
     if dataset is None:
         file.lookup.create_dataset(name, data=value)
@@ -49,6 +59,25 @@ def _metadata_equal(left: Any, right: Any) -> bool:
     return np.array_equal(left, right, equal_nan=equal_nan)
 
 
+def _matrix_values_equal(left: np.ndarray | SparseArray, right: np.ndarray | SparseArray) -> bool:
+    if not isinstance(left, sparray) and not isinstance(right, sparray):
+        return np.array_equal(left, right, equal_nan=True)
+    if left.shape != right.shape:
+        return False
+
+    # Compare stored values without making dense copies. Ignore explicit zeros and duplicates.
+    left, right = scipy.sparse.csr_array(left, copy=True), scipy.sparse.csr_array(right, copy=True)
+    for value in (left, right):
+        value.sum_duplicates()
+        value.eliminate_zeros()
+        value.sort_indices()
+    return (
+        np.array_equal(left.indptr, right.indptr)
+        and np.array_equal(left.indices, right.indices)
+        and np.array_equal(left.data, right.data, equal_nan=True)
+    )
+
+
 def _lookup_to_key_error(mapping, key):
     try:
         return mapping[key]
@@ -58,16 +87,38 @@ def _lookup_to_key_error(mapping, key):
         raise KeyError(key) from e
 
 
+def _validate_name_available(file: OMXFile, name: str, group: str) -> None:
+    other_group = "sparse" if group == "data" else "data"
+    matrices = file["/"].get(other_group, {})
+    if name in matrices:
+        raise ValueError(
+            f"matrix {name!r} already exists in the {other_group} group, delete it before changing its storage type"
+        )
+
+
 def _query_matrices(
     matrices: Mapping[str, Any],
     subset: Sequence[str | dict[str, Any]],
     matrix_metadata: Callable[[str], Mapping[str, Any]],
+    *,
+    other_matrices: Mapping[str, Any] | None = None,
+    other_store: str | None = None,
 ) -> dict[str, Any]:
     mats = {}
     for key in subset:
         if isinstance(key, str):
             _validate_matrix_key(key)
-            mats[key] = _lookup_to_key_error(matrices, key)
+
+            try:
+                mats[key] = _lookup_to_key_error(matrices, key)
+            except KeyError:
+                if other_matrices is not None and key in other_matrices:
+                    assert other_store is not None
+                    raise KeyError(
+                        f"{key!r} is missing from this collection, but exists in the other storage group. "
+                        f"Use {other_store} to read it."
+                    ) from None
+                raise
 
         elif isinstance(key, dict):
             for name in matrices.keys():
@@ -83,6 +134,7 @@ def _query_matrices(
 
 
 _IndexKey: TypeAlias = str | tuple[str] | tuple[str, Any] | tuple[str, Any, Any]
+_ArrayT = TypeVar("_ArrayT", bound=np.ndarray | SparseArray)
 
 
 def _validate_name(name: object, kind: str) -> None:
@@ -129,7 +181,7 @@ def _matrix_values(value: ArrayLike, shape: tuple[int, int]) -> np.ndarray:
     return value
 
 
-def _write_matrix(file: omx.File, name: str, value: np.ndarray, attributes: Mapping[str, Any]) -> None:
+def _write_matrix(file: OMXFile, name: str, value: np.ndarray, attributes: Mapping[str, Any]) -> None:
     dataset = file.data.get(name)
     if dataset is not None and dataset.dtype == value.dtype:
         # Keep the dataset, including its dtype and compression, when replacing values.
@@ -153,8 +205,62 @@ def _write_matrix(file: omx.File, name: str, value: np.ndarray, attributes: Mapp
             del file.data[temporary_name]
 
 
-class _MatrixIndexer:
-    def __init__(self, matrix: "_Matrix", *, zones: bool) -> None:
+def _sparse_values(value: object, shape: tuple[int, int]) -> SparseArray:
+    if not isinstance(value, SparseArray):
+        raise TypeError("matrix values must be SciPy sparse arrays")
+
+    _validate_matrix_dtype(value.dtype)
+    if value.shape != shape:
+        raise ValueError(f"got bad shape, expected {shape}, got {value.shape}")
+
+    return value
+
+
+def _read_sparse_matrix(group: h5py.Group, expected_shape: tuple[int, int]) -> scipy.sparse.csr_array:
+    if group.attrs.get("FORMAT") != "csr":
+        raise ValueError(f"unsupported sparse format for matrix {group.name!r}, expected 'csr'")
+
+    _validate_matrix_dtype(group["data"].dtype)
+
+    value = scipy.sparse.csr_array(
+        (group["data"][...], group["col_index"][...], group["row_index"][...]), shape=expected_shape
+    )
+    value.check_format(full_check=True)
+    return value
+
+
+def _write_sparse_matrix(file: OMXFile, name: str, value: SparseArray, attributes: Mapping[str, Any]) -> None:
+    csr = value.tocsr()
+    csr.check_format(full_check=True)
+    # Work from the root group because OMX redirects file lookups to /data.
+    sparse = file["/"].require_group("sparse")
+    group = sparse.get(name)
+
+    attrs = (
+        {key: value for key, value in group.attrs.items() if key not in SPARSE_SPECIAL_ATTRS}
+        if group is not None
+        else {}
+    )
+    attrs.update({key: value for key, value in attributes.items() if key not in SPARSE_SPECIAL_ATTRS})
+    attrs["FORMAT"] = "csr"
+    temporary_name = f"__aequilibrae_{uuid4().hex}"
+
+    try:
+        replacement = sparse.create_group(temporary_name)
+        replacement.attrs.update(attrs)
+        replacement.create_dataset("row_index", data=csr.indptr)
+        replacement.create_dataset("col_index", data=csr.indices)
+        replacement.create_dataset("data", data=csr.data)
+        if group is not None:
+            del sparse[name]
+        sparse.move(temporary_name, name)
+    finally:
+        if temporary_name in sparse:
+            del sparse[temporary_name]
+
+
+class _MatrixIndexer(Generic[_ArrayT]):
+    def __init__(self, matrix: "_Matrix[_ArrayT]", *, zones: bool) -> None:
         self._matrix = matrix
         self._zones = zones
 
@@ -206,33 +312,30 @@ class _MatrixIndexer:
 
     # Normal lookup
     @overload
-    def __getitem__(self, key: str | tuple[str]) -> np.ndarray: ...
+    def __getitem__(self, key: str | tuple[str]) -> _ArrayT: ...
 
     # Dataset slice (partial read)
     @overload
-    def __getitem__(self, key: tuple[str, Any] | tuple[str, Any, Any]) -> np.ndarray | np.generic: ...
+    def __getitem__(self, key: tuple[str, Any] | tuple[str, Any, Any]) -> _ArrayT | np.ndarray | np.generic: ...
 
-    def __getitem__(self, key: _IndexKey) -> np.ndarray | np.generic:
+    def __getitem__(self, key: _IndexKey) -> _ArrayT | np.ndarray | np.generic:
         name, selection = self._parse_key(key)
         if not selection:
             return self._matrix[name]
 
-        dataset = _lookup_to_key_error(self._matrix._backend, name)
-        return dataset[selection]
+        return self._matrix._read_selection(name, selection)
 
     # Dataset slice (partial write), allows in-place modification without writing the whole matrix
-    def __setitem__(self, key: _IndexKey, value: ArrayLike) -> None:
+    def __setitem__(self, key: _IndexKey, value: ArrayLike | SparseArray) -> None:
         name, selection = self._parse_key(key)
         if not selection:
             self._matrix[name] = value
         else:
-            dataset = _lookup_to_key_error(self._matrix._backend, name)
-            dataset[selection] = value
+            self._matrix._write_selection(name, selection, value)
 
 
-class _Matrix(MutableMapping[str, Any]):
+class _Matrix(MutableMapping[str, _ArrayT]):
     def __init__(self, index: ArrayLike, index_name: str) -> None:
-        self._backend: MutableMapping[str, Any]
         self._metadata: MutableMapping[str, Any]
         self._index: np.ndarray
         assert hasattr(self, "_backend") and hasattr(self, "_metadata")
@@ -241,6 +344,26 @@ class _Matrix(MutableMapping[str, Any]):
         self.__index_name = index_name
         self._index = self._validate_index(index)  # Validate without writing a store's index
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
+
+    @property
+    @abstractmethod
+    def _backend(self) -> MutableMapping[str, Any]:
+        pass
+
+    def _read_selection(self, name: str, selection: tuple[Any, ...]) -> Any:
+        dataset = _lookup_to_key_error(self._backend, name)
+        return dataset[selection]
+
+    def _write_selection(self, name: str, selection: tuple[Any, ...], value: Any) -> None:
+        dataset = _lookup_to_key_error(self._backend, name)
+        dataset[selection] = value
+
+    def _query_subset(self, subset: Sequence[str | dict[str, Any]]) -> dict[str, Any]:
+        return _query_matrices(self._backend, subset, self.matrix_metadata)
+
+    def totals(self) -> dict[str, Any]:
+        """Return each named matrix's total."""
+        return {name: values.sum().item() for name, values in self.items()}
 
     def save_as_omx(
         self,
@@ -297,7 +420,7 @@ class _Matrix(MutableMapping[str, Any]):
 
         if subset is not None:
             # Query backend arrays or dataset handles without loading store values.
-            keys = set(_query_matrices(self._backend, subset, self.matrix_metadata))
+            keys = set(self._query_subset(subset))
         else:
             keys = set(self)
 
@@ -315,13 +438,21 @@ class _Matrix(MutableMapping[str, Any]):
                 if dataset is not None:
                     _cast_index(self.index, dataset)
 
+                for name in keys:
+                    group = "sparse" if isinstance(self._backend[name], (sparray, h5py.Group)) else "data"
+                    _validate_name_available(file, name, group)
+
+        # Sparse matrices do not pass through OMX's create_matrix, which normally sets the file shape.
+        kwargs["shape"] = self.shape
         with omx.open_file(path, mode=mode, **kwargs) as file:
             # Save the index without replacing its existing dtype or attributes.
             _write_index(file, self.index_name, self.index)
 
             for name in keys:
+                group = "sparse" if isinstance(self._backend[name], (sparray, h5py.Group)) else "data"
+                _validate_name_available(file, name, group)
                 # Keep destination attributes and apply source attributes when writing the matrix.
-                _write_matrix(file, name, self[name], self.matrix_metadata(name))
+                self._write_omx_matrix(file, name)
 
             for key, value in self.metadata.items():
                 # These attributes are managed by OMX so we shouldn't try to write them
@@ -331,10 +462,18 @@ class _Matrix(MutableMapping[str, Any]):
                 file.attrs[key] = value
 
     @abstractmethod
+    def _write_omx_matrix(self, file: OMXFile, name: str) -> None:
+        pass
+
+    @abstractmethod
+    def __setitem__(self, key: str, value: Any) -> None:
+        pass
+
+    @abstractmethod
     def subset(
         self,
         subset: Sequence[str | dict[str, Any]],
-    ) -> "_Matrix":
+    ) -> "AequilibraeMatrix | AequilibraeSparseMatrix":
         """
         Copy selected matrices into a new in-memory matrix object.
 
@@ -399,7 +538,7 @@ class _Matrix(MutableMapping[str, Any]):
         self._zone_positions = {int(zone): position for position, zone in enumerate(self._index)}
 
     @property
-    def mat(self) -> _MatrixIndexer:
+    def mat(self) -> _MatrixIndexer[_ArrayT]:
         """
         Read or change matrix values using zone IDs.
 
@@ -408,9 +547,12 @@ class _Matrix(MutableMapping[str, Any]):
         follow the stored zone order and include the stop ID. An unknown zone
         ID raises ``KeyError``.
 
-        Zone IDs are converted to positions before indexing. In-memory matrices
-        support NumPy selections. Stores support the selections allowed by
-        h5py.
+        Zone IDs are converted to positions before indexing. In-memory, dense
+        matrices use NumPy selections while sparse matrices use SciPy
+        selections. Stored dense matrices support the selections allowed by
+        h5py. Stored sparse matrices only support whole-matrix access. Writing
+        to a selection keeps the matrix's dtype. Values are broadcast and
+        converted according to the array or dataset's rules.
 
         >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
         >>> demand.mat["car", 101:205].tolist()
@@ -422,7 +564,7 @@ class _Matrix(MutableMapping[str, Any]):
         return _MatrixIndexer(self, zones=True)
 
     @property
-    def imat(self) -> _MatrixIndexer:
+    def imat(self) -> _MatrixIndexer[_ArrayT]:
         """
         Read or change matrix values using zero-based positions.
 
@@ -430,9 +572,12 @@ class _Matrix(MutableMapping[str, Any]):
         ``imat[name, row, column]`` to select both rows and columns. Slices
         exclude the stop position.
 
-        Selections follow NumPy rules in memory and h5py rules on disk. Writing
+        Zone IDs are converted to positions before indexing. In-memory, dense
+        matrices use NumPy selections while sparse matrices use SciPy
+        selections. Stored dense matrices support the selections allowed by
+        h5py. Stored sparse matrices only support whole-matrix access. Writing
         to a selection keeps the matrix's dtype. Values are broadcast and
-        converted according to NumPy or h5py rules.
+        converted according to the array or dataset's rules.
 
         >>> demand = from_dict({"car": [[0, 12], [10, 0]]}, index=[101, 205])
         >>> demand.imat["car", :, 1].tolist()
@@ -517,7 +662,8 @@ class _Matrix(MutableMapping[str, Any]):
 
         NaNs in the same positions are considered equal. Matrix insertion order
         and numeric dtypes do not affect the result. File attributes managed by
-        OMX are ignored. Comparing a store reads its matrix values from disk.
+        OMX and sparse storage attributes are ignored. Comparing a store
+        reads its matrices values from disk.
 
         :Arguments:
             **other** (:obj:`object`): Object to compare with this matrix collection.
@@ -548,8 +694,15 @@ class _Matrix(MutableMapping[str, Any]):
             return False
 
         return all(
-            _metadata_equal(self.matrix_metadata(name), other.matrix_metadata(name))
-            and np.array_equal(self[name], other[name], equal_nan=True)
+            _metadata_equal(
+                _filter_matrix_metadata(
+                    self.matrix_metadata(name), sparse=isinstance(self._backend[name], (sparray, h5py.Group))
+                ),
+                _filter_matrix_metadata(
+                    other.matrix_metadata(name), sparse=isinstance(other._backend[name], (sparray, h5py.Group))
+                ),
+            )
+            and _matrix_values_equal(self[name], other[name])
             for name in self
         )
 
@@ -559,7 +712,8 @@ class _Matrix(MutableMapping[str, Any]):
 
         The zone index and file-level metadata are kept.
 
-        >>> demand = from_dict({"car": [[0]]}, index=[101], metadata={"year": 2030})
+        >>> demand = from_dict({"car": [[0]]}, index=[101])
+        >>> demand.metadata["year"] = 2030
         >>> demand.clear()
         >>> list(demand), demand.index.tolist(), demand.metadata["year"]
         ([], [101], 2030)
@@ -567,7 +721,7 @@ class _Matrix(MutableMapping[str, Any]):
         for key in list(self):
             del self[key]
 
-    def setdefault(self, key: str, default: ArrayLike | None = None) -> np.ndarray:
+    def setdefault(self, key: str, default: ArrayLike | SparseArray | None = None) -> _ArrayT:
         """
         Return a named matrix, adding it from ``default`` if it is missing.
 
@@ -575,8 +729,8 @@ class _Matrix(MutableMapping[str, Any]):
         ``default`` must contain a full square matrix. ``None`` cannot be used
         to create a matrix.
 
-        As with a normal lookup, the result is a view for an in-memory matrix
-        and a copy for a store.
+        As with a normal lookup, the result is a view for a dense in-memory
+        matrix, the stored array for a sparse matrix and a copy for a store.
 
         :Arguments:
             **key** (:obj:`str`): Matrix name to look up or insert.
@@ -596,7 +750,7 @@ class _Matrix(MutableMapping[str, Any]):
         return self[key]
 
 
-class AequilibraeMatrix(_Matrix):
+class AequilibraeMatrix(_Matrix[np.ndarray]):
     """
     A dictionary-like collection of square matrices held in memory.
 
@@ -639,10 +793,14 @@ class AequilibraeMatrix(_Matrix):
             **index_name** (:obj:`str`, *Optional*): Name of the zone
                 mapping. Defaults to ``"main_index"``.
         """
-        self._backend: dict[str, np.ndarray] = {}
+        self._matrices: dict[str, np.ndarray] = {}
         self._metadata: dict[str, Any] = {}
         self._matrix_metadata: dict[str, dict[str, Any]] = {}
         super().__init__(index=index, index_name=index_name)
+
+    @property
+    def _backend(self) -> dict[str, np.ndarray]:
+        return self._matrices
 
     @classmethod
     def _from_shared_arrays(
@@ -738,7 +896,13 @@ class AequilibraeMatrix(_Matrix):
             if subset is None:
                 subset = file.list_matrices()
 
-            datasets = _query_matrices(file.data, subset, lambda name: file.data[name].attrs)
+            datasets = _query_matrices(
+                file.data,
+                subset,
+                lambda name: file.data[name].attrs,
+                other_matrices=file["/"].get("sparse", {}),
+                other_store="MatrixStore or AequilibraeSparseMatrix.from_omx()",
+            )
 
             self = cls(index=index, index_name=index_name, **kwargs)
 
@@ -799,6 +963,9 @@ class AequilibraeMatrix(_Matrix):
         self._backend[key] = np.asarray(value, copy=True, order="C")
         self._matrix_metadata.setdefault(key, {})
 
+    def _write_omx_matrix(self, file: OMXFile, name: str) -> None:
+        _write_matrix(file, name, self[name], self.matrix_metadata(name))
+
     # Normal lookup
     def __getitem__(self, key: str) -> np.ndarray:
         """
@@ -856,7 +1023,191 @@ class AequilibraeMatrix(_Matrix):
         return other
 
 
-class MatrixStore(_Matrix):
+class AequilibraeSparseMatrix(_Matrix[SparseArray]):
+    """
+    A dictionary-like collection of square SciPy sparse arrays held in memory.
+
+    All matrices use the same zone index for rows and columns. Assigning a
+    matrix copies the array and keeps its sparse format and dtype. Reading a
+    whole matrix returns the stored array, so changes to it change the matrix.
+    Use ``.copy()`` when you need an independent array. Selections through
+    ``mat`` and ``imat`` follow the sparse format's own SciPy indexing rules.
+
+    Saving writes each array in the CSR format.  This extends the OMX format
+    with a ``/sparse/<name>`` group for each matrix. The group has a
+    ``row_index`` (CSR row pointers), ``col_index`` (column positions) and
+    ``data`` datasets. The group attribute ``FORMAT`` is set to ``"csr"``. Zone
+    mappings, file metadata, and shape use the standard OMX attributes.
+
+    When reading, only ``/sparse`` is read from, dense matrices in ``/data``
+    are ignored. Use :class:`MatrixStore` or
+    :method:`AequilibraeMatrix.from_omx()` instead.
+
+    Matrix and index names follow the same rules as :class:`AequilibraeMatrix`.
+
+    >>> from scipy.sparse import coo_array
+    >>> demand = AequilibraeSparseMatrix(index=[101, 205])
+    >>> demand["car"] = coo_array([[0, 12], [10, 0]])
+    >>> demand["car"].format
+    'coo'
+    >>> demand["car"].toarray().tolist()
+    [[0, 12], [10, 0]]
+    """
+
+    def __init__(self, index: ArrayLike, index_name: str = "main_index") -> None:
+        """
+        Create an empty sparse collection with a shared zone index.
+
+        :Arguments:
+            **index** (array-like): Unique integer zone IDs from ``0`` to
+                ``2**64 - 1`` in row and column order.
+
+            **index_name** (:obj:`str`, *Optional*): Name of the zone mapping.
+                Defaults to ``"main_index"``.
+        """
+        self._matrices: dict[str, SparseArray] = {}
+        self._metadata: dict[str, Any] = {}
+        self._matrix_metadata: dict[str, dict[str, Any]] = {}
+
+        super().__init__(index=index, index_name=index_name)
+
+    @property
+    def _backend(self) -> dict[str, SparseArray]:
+        return self._matrices
+
+    @classmethod
+    def _from_shared_arrays(
+        cls,
+        data: Mapping[str, SparseArray],
+        index: ArrayLike,
+        index_name: str = "main_index",
+    ) -> Self:
+        """
+        Use supplied sparse arrays without copying.
+
+        :Arguments:
+            **data** (mapping of :obj:`str` to :obj:`scipy.sparse.sparray`):
+                Named square sparse arrays to share. Each array must match
+                the index length and have a supported numeric or boolean dtype.
+
+            **index** (array-like): Ordered zone IDs shared by rows and columns.
+
+            **index_name** (:obj:`str`, *Optional*): Name of the zone mapping.
+                Defaults to ``"main_index"``.
+        """
+        self = cls(index=index, index_name=index_name)
+
+        for name, value in data.items():
+            _validate_matrix_key(name)
+            if not isinstance(value, sparray):
+                raise TypeError("shared matrix values must be SciPy sparse arrays")
+
+            _validate_matrix_dtype(value.dtype)
+            if value.shape != self.shape:
+                raise ValueError(f"got bad shape, expected {self.shape}, got {value.shape}")
+
+            self._backend[name] = value
+            self._matrix_metadata[name] = {}
+        return self
+
+    def __setitem__(self, key: str, value: SparseArray) -> None:
+        """Copy a square sparse array, keeping its format, dtype and metadata."""
+        _validate_matrix_key(key)
+        self._backend[key] = _sparse_values(value, self.shape).copy()
+        self._matrix_metadata.setdefault(key, {})
+
+    def __getitem__(self, key: str) -> SparseArray:
+        """Return the stored sparse array. Changing it also changes the matrix."""
+        _validate_matrix_key(key)
+        return self._backend[key]
+
+    def __delitem__(self, key: str) -> None:
+        super().__delitem__(key)
+        del self._matrix_metadata[key]
+
+    def matrix_metadata(self, name: str) -> MutableMapping[str, Any]:
+        """Return mutable attributes for an existing named sparse matrix."""
+        _validate_matrix_key(name)
+        return self._matrix_metadata[name]
+
+    def subset(self, subset: Sequence[str | dict[str, Any]]) -> Self:
+        """
+        Copy selected sparse matrices, their zone index and metadata.
+
+        Select by matrix name or attribute query. Each matching matrix is
+        included once. Changes to the result do not change the original.
+        Sparse formats and dtypes are kept.
+        """
+        mats = _query_matrices(self, subset, self.matrix_metadata)
+        other = self.__class__(index=self.index, index_name=self.index_name)
+
+        other.update(mats)
+        for key in mats:
+            other.matrix_metadata(key).update(deepcopy(dict(self.matrix_metadata(key))))
+        other.metadata.update(_copy_file_metadata(self.metadata))
+
+        return other
+
+    def _write_omx_matrix(self, file: OMXFile, name: str) -> None:
+        _write_sparse_matrix(file, name, self[name], self.matrix_metadata(name))
+
+    @classmethod
+    def from_omx(
+        cls,
+        path: str | os.PathLike,
+        index_name: str = "main_index",
+        subset: Sequence[str | dict[str, Any]] | None = None,
+        **kwargs,
+    ) -> Self:
+        """
+        Load CSR arrays from the OMX extension group ``/sparse`` into memory.
+
+        Dense matrices in ``/data`` are ignored. Values, the zone index and
+        metadata are copied. Changes to the result do not change the file.
+
+        :Arguments:
+            **path** (:obj:`str` or :obj:`os.PathLike`): Existing OMX file.
+
+            **index_name** (:obj:`str`, *Optional*): Existing zone mapping to
+                read. Defaults to ``"main_index"``.
+
+            **subset** (sequence of :obj:`str` or :obj:`dict`, *Optional*):
+                Matrix names or attribute queries. Defaults to all sparse
+                matrices. Each matching matrix is loaded once.
+
+            **kwargs**: Additional keyword arguments passed to the constructor.
+        """
+        _validate_name(index_name, "index")
+        with omx.open_file(path, mode="r") as file:
+            index = file.lookup.get(index_name)
+            if index is None:
+                raise ValueError(f"index not found, expected group at '/lookup/{index_name}'")
+
+            sparse = file["/"].get("sparse", {})
+
+            if subset is None:
+                subset = list(sparse)
+
+            groups = _query_matrices(
+                sparse,
+                subset,
+                lambda name: sparse[name].attrs,
+                other_matrices=file.data,
+                other_store="MatrixStore or AequilibraeMatrix.from_omx()",
+            )
+            self = cls(index=index, index_name=index_name, **kwargs)
+
+            for name, group in groups.items():
+                self[name] = _read_sparse_matrix(group, self.shape)
+                self.matrix_metadata(name).update(
+                    deepcopy({key: value for key, value in group.attrs.items() if key not in SPARSE_SPECIAL_ATTRS})
+                )
+
+            self.metadata.update(_copy_file_metadata(file.attrs))
+            return self
+
+
+class MatrixStore(_Matrix[np.ndarray | SparseArray]):
     """
     A dictionary-like collection of square matrices backed by an OMX file.
 
@@ -866,10 +1217,17 @@ class MatrixStore(_Matrix):
 
     Each read loads values from disk into a new array. Changing that array does
     not update the file. To write changes, assign a whole matrix by name or use
-    ``mat`` or ``imat`` to update part of a matrix.
+    ``mat`` or ``imat`` to update part of a dense matrix.
 
-    Use ``subset()`` to copy selected matrices into memory for calculations.
-    Keep the store open while using it. Using a ``with`` block is recommended.
+    Sparse matrices use the CSR extension in ``/sparse`` and share the selected
+    zone mapping with dense matrices in ``/data``. Each sparse read returns an
+    independent CSR array. Partial reads and writes through ``mat`` or ``imat``
+    are not supported, even for selections covering all values. Whole-matrix
+    access through ``mat[name]`` and ``imat[name]`` is supported.
+
+    Use ``subset()`` to copy selected matrices of one type into memory for
+    calculations. Keep the store open while using it. Using a ``with`` block
+    is recommended. Delete a matrix before changing its storage type.
 
     >>> from pathlib import Path
     >>> from tempfile import TemporaryDirectory
@@ -942,48 +1300,42 @@ class MatrixStore(_Matrix):
                         "or an index name of one that exists in the OMX file"
                     )
 
-            self._backend: omx.File = file
+            self._file = file
+
             self._metadata: h5py.AttributeManager = file.attrs
+
             super().__init__(index=index, index_name=index_name)
             if (shape := file.shape()) is not None and shape != self.shape:
                 raise ValueError(f"matrix shape does not match index, expected {self.shape}, got {shape}")
 
-            for dataset in file.data.values():
-                _validate_matrix_dtype(dataset.dtype)
+            if overlap := file["/"].get("data", {}).keys() & file["/"].get("sparse", {}).keys():
+                raise ValueError(
+                    f"matrix names {sorted(overlap)} exist in both the data and sparse groups. "
+                    "Use OMX h5py directly to resolve the conflict"
+                )
 
             if supplied_index:
                 self.index = index
+            # Sparse writes do not use OMX's create_matrix, which normally sets the shape.
+            if file.shape() is None and file.mode != "r":
+                file.attrs["SHAPE"] = self.shape
         except:
             file.close()
             raise
 
-    def matrix_metadata(self, name: str) -> h5py.AttributeManager:
-        """
-        Return h5py attributes for an existing matrix dataset.
-
-        Use a writable store to change attributes, and assign each new value as
-        a whole. Replacing a matrix with a different dtype creates a new
-        dataset. Call this method again afterwards to get its attributes.
-
-        :Arguments:
-            **name** (:obj:`str`): Name of an existing matrix dataset.
-
-        >>> from pathlib import Path
-        >>> from tempfile import TemporaryDirectory
-        >>> with TemporaryDirectory() as directory:
-        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
-        ...         store["car"] = [[12]]
-        ...         store.matrix_metadata("car")["mode"] = "car"
-        ...         print(store.matrix_metadata("car")["mode"])
-        car
-        """
-        _validate_matrix_key(name)
-        return self._backend.data[name].attrs
+    @property
+    def _backend(self) -> ChainMap[str, h5py.Dataset | h5py.Group]:
+        # The groups may not exist, or may have been replaced through the OMX handle.
+        root = self._file["/"]
+        return ChainMap(root.get("data", {}), root.get("sparse", {}))
 
     @property
-    def omx(self) -> omx.File:
+    def omx(self) -> OMXFile:
         """
         Underlying open OMX file for advanced operations.
+
+        Changes to matrix storage groups through this handle are visible to
+        the store without reopening it.
 
         >>> from pathlib import Path
         >>> from tempfile import TemporaryDirectory
@@ -993,7 +1345,7 @@ class MatrixStore(_Matrix):
         ...         print(store.omx.list_matrices())
         ['car']
         """
-        return self._backend
+        return self._file
 
     def __enter__(self) -> Self:
         return self
@@ -1017,29 +1369,59 @@ class MatrixStore(_Matrix):
         >>> working["car"].tolist()
         [[12]]
         """
-        if hasattr(self, "_backend"):
+        if hasattr(self, "_file"):
             self.omx.close()
 
     def __del__(self) -> None:
         self.close()
 
     def _set_index(self, value: ArrayLike) -> None:
-        if self._backend.mode == "r":
+        if self._file.mode == "r":
             raise PermissionError("cannot change the index of a read-only matrix store")
 
         value = self._validate_index(value)
-        _write_index(self._backend, self.index_name, value)
+        _write_index(self._file, self.index_name, value)
         self._index = value
 
-    def __setitem__(self, key: str, value: ArrayLike) -> None:
+    def matrix_metadata(self, name: str) -> h5py.AttributeManager:
+        """
+        Return h5py attributes for an existing matrix dataset or sparse group.
+
+        Use a writable store to change attributes, and assign each new value as
+        a whole. Replacing a matrix with a different dtype creates a new
+        dataset. Replacing a sparse matrix creates a new storage group. Call
+        this method again afterwards to get its attributes. The sparse storage
+        attribute ``FORMAT`` is ignored when writing.
+
+        :Arguments:
+            **name** (:obj:`str`): Name of an existing matrix dataset or sparse group.
+
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as directory:
+        ...     with MatrixStore(Path(directory) / "demand.omx", index=[101], mode="x") as store:
+        ...         store["car"] = [[12]]
+        ...         store.matrix_metadata("car")["mode"] = "car"
+        ...         print(store.matrix_metadata("car")["mode"])
+        car
+        """
+        _validate_matrix_key(name)
+        return self._backend[name].attrs
+
+    def __setitem__(self, key: str, value: ArrayLike | SparseArray) -> None:
         """
         Write a full square matrix using its supplied dtype, keeping attributes.
+
+        Sparse arrays are written as CSR. An existing matrix must be deleted
+        before assigning values of a different storage type.
+
         :Arguments:
 
             **key** (:obj:`str`): Matrix name to create or replace.
 
-            **value** (array-like): Values matching the collection's square
-                shape, with an integer, float, boolean or complex dtype.
+            **value** (array-like or SciPy sparse array): Values matching the
+                collection's square shape, with an integer, float, boolean or
+                complex dtype.
 
         >>> from pathlib import Path
         >>> from tempfile import TemporaryDirectory
@@ -1051,18 +1433,55 @@ class MatrixStore(_Matrix):
         [[12.5]]
         """
         _validate_matrix_key(key)
-        value = _matrix_values(value, self.shape)
+        sparse = isinstance(value, sparray)
+        _validate_name_available(self._file, key, "sparse" if sparse else "data")
 
         # Keep the dataset's existing attributes, even when its dtype changes.
-        _write_matrix(self._backend, key, value, {})
+        if isinstance(value, sparray):
+            value = _sparse_values(value, self.shape)
+            _write_sparse_matrix(self._file, key, value, {})
+        else:
+            value = _matrix_values(value, self.shape)
+            _write_matrix(self._file, key, value, {})
+
+    def __delitem__(self, key: str) -> None:
+        _validate_matrix_key(key)
+        node = _lookup_to_key_error(self._backend, key)
+        del node.parent[key]
+
+    def _write_omx_matrix(self, file: OMXFile, name: str) -> None:
+        value = self[name]
+        attrs = self.matrix_metadata(name)
+        if isinstance(value, sparray):
+            _write_sparse_matrix(file, name, value, attrs)
+        else:
+            _write_matrix(file, name, value, attrs)
+
+    def _read_selection(self, name: str, selection: tuple[Any, ...]) -> Any:
+        node = _lookup_to_key_error(self._backend, name)
+        if isinstance(node, h5py.Group):
+            raise NotImplementedError(
+                "Stored sparse matrices only support whole-matrix reads. Use 'store[name]' instead"
+            )
+        return node[selection]
+
+    def _write_selection(self, name: str, selection: tuple[Any, ...], value: Any) -> None:
+        node = _lookup_to_key_error(self._backend, name)
+        if isinstance(node, h5py.Group):
+            raise NotImplementedError(
+                "Stored sparse matrices only support whole-matrix writes. Use 'store[name] = value' instead"
+            )
+        node[selection] = value
 
     # Normal lookup
-    def __getitem__(self, key: str) -> np.ndarray:
+    def __getitem__(self, key: str) -> np.ndarray | scipy.sparse.csr_array:
         """
         Read a whole matrix into an independent array, without changing the file.
 
+        Sparse matrices are returned as CSR arrays.
+
         :Arguments:
-            **key** (:obj:`str`): Name of an existing matrix dataset.
+            **key** (:obj:`str`): Name of an existing matrix dataset or sparse group.
 
         >>> from pathlib import Path
         >>> from tempfile import TemporaryDirectory
@@ -1076,12 +1495,16 @@ class MatrixStore(_Matrix):
         """
         _validate_matrix_key(key)
         value = _lookup_to_key_error(self._backend, key)
+        if isinstance(value, h5py.Group):
+            return _read_sparse_matrix(value, self.shape)
         return np.asarray(value)
 
     def subset(
         self,
         subset: Sequence[str | dict[str, Any]],
-    ) -> AequilibraeMatrix:
+        *,
+        sparse: bool | None = None,
+    ) -> AequilibraeMatrix | AequilibraeSparseMatrix:
         """
         Copy selected matrices from the file into memory.
 
@@ -1091,11 +1514,15 @@ class MatrixStore(_Matrix):
 
         The zone index and metadata are also copied. You can keep using the
         result after the store closes, and changes to it do not affect the
-        file.
+        file. All selected matrices must have the same storage type.
 
         :Arguments:
             **subset** (sequence of :obj:`str` or :obj:`dict`): Matrix names or
               attribute queries to load.
+
+            **sparse** (:obj:`bool`, *Optional*): Expected storage
+                type. Defaults to ``None``, which infers the type from the
+                first selected matrix.
 
         >>> from pathlib import Path
         >>> from tempfile import TemporaryDirectory
@@ -1108,13 +1535,22 @@ class MatrixStore(_Matrix):
         >>> list(working), working["car"].tolist()
         (['car'], [[12]])
         """
-        datasets = _query_matrices(self._backend.data, subset, self.matrix_metadata)
+        datasets = self._query_subset(subset)
+        inferred = sparse is None
+        if inferred:
+            sparse = isinstance(next(iter(datasets.values()), None), h5py.Group)
 
-        other = AequilibraeMatrix(index=self.index, index_name=self.index_name)
-        other.update({key: np.asarray(dataset) for key, dataset in datasets.items()})
+        mismatches = [name for name, node in datasets.items() if isinstance(node, h5py.Group) != sparse]
+        if mismatches:
+            expected = "sparse" if sparse else "dense"
+            reason = "inferred from the first selected matrix" if inferred else f"required by sparse={sparse}"
+            raise ValueError(f"expected {expected} matrices ({reason}). Mismatched matrices: {mismatches}")
 
+        matrix_type = AequilibraeSparseMatrix if sparse and datasets else AequilibraeMatrix
+        other = matrix_type(index=self.index, index_name=self.index_name)
         for key, dataset in datasets.items():
-            other.matrix_metadata(key).update(deepcopy(dict(dataset.attrs)))
+            other[key] = _read_sparse_matrix(dataset, self.shape) if sparse else np.asarray(dataset)
+            other.matrix_metadata(key).update(deepcopy(_filter_matrix_metadata(dataset.attrs, sparse=bool(sparse))))
         other.metadata.update(_copy_file_metadata(self.metadata))
 
         return other
@@ -1128,6 +1564,7 @@ def from_file(
     index_name: str | None = None,
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: Literal[False] = False,
+    sparse: Literal[False],
 ) -> AequilibraeMatrix: ...
 
 
@@ -1139,7 +1576,20 @@ def from_file(
     index_name: str | None = None,
     subset: None = None,
     store: Literal[True],
+    sparse: bool | None = None,
 ) -> MatrixStore: ...
+
+
+@overload
+def from_file(
+    path: str | os.PathLike,
+    mode: None = None,
+    *,
+    index_name: str | None = None,
+    subset: Sequence[str | dict[str, Any]] | None = None,
+    store: Literal[False] = False,
+    sparse: bool | None = None,
+) -> AequilibraeMatrix | AequilibraeSparseMatrix: ...
 
 
 def from_file(
@@ -1149,18 +1599,25 @@ def from_file(
     index_name: str | None = None,
     subset: Sequence[str | dict[str, Any]] | None = None,
     store: bool = False,
-) -> AequilibraeMatrix | MatrixStore:
+    sparse: bool | None = None,
+) -> AequilibraeMatrix | MatrixStore | AequilibraeSparseMatrix:
     """
     Load an OMX file as an in-memory matrix or an on-disk store.
 
     By default, this copies all matrices and metadata into an in-memory
-    :class:`AequilibraeMatrix`. Pass ``subset`` to load only the matrices you
-    need.
+    :class:`AequilibraeMatrix` or :class:`AequilibraeSparseMatrix`, inferred
+    from the first selected matrix. Pass ``subset`` to load only the matrices
+    you need. Mixed storage types raise ``ValueError``.
 
     Use ``store=True`` to work with the file through a :class:`MatrixStore`
     instead. The store opens read-only unless you pass ``mode="r+"``.  Stores
     do not accept ``subset``. Use their ``subset()`` method to copy selected
     matrices into memory.
+
+    Pass ``sparse=True`` or ``False`` to require sparse or dense matrices,
+    respectively. This validates the selection without filtering or converting
+    matrices. An empty selection returns an AequilibraeMatrix. The option is
+    ignored when ``store=True``; stores expose both storage types.
 
     If the file has only one zone mapping, it is selected automatically. If
     there are several, ``main_index`` is used when available. Otherwise, choose
@@ -1184,6 +1641,10 @@ def from_file(
         **store** (:obj:`bool`, *Optional*): Return an open
             :class:`MatrixStore` instead of an in-memory
             :class:`AequilibraeMatrix`. Defaults to ``False``.
+
+        **sparse** (:obj:`bool`, *Optional*): Expected in-memory storage type.
+            Defaults to ``None``, which infers it from the first selected
+            matrix. Ignored when ``store=True``.
 
     >>> from pathlib import Path
     >>> from tempfile import TemporaryDirectory
@@ -1223,7 +1684,8 @@ def from_file(
 
     if store:
         return MatrixStore(path=path, index_name=index_name, mode=mode if mode is not None else "r")
-    return AequilibraeMatrix.from_omx(path=path, index_name=index_name, subset=subset)
+    with MatrixStore(path=path, index_name=index_name) as matrices:
+        return matrices.subset(list(matrices) if subset is None else subset, sparse=sparse)
 
 
 @overload
@@ -1231,134 +1693,112 @@ def from_dict(
     data: Mapping[str, ArrayLike],
     index: ArrayLike,
     *,
-    path: None = None,
-    mode: None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[False] = False,
 ) -> AequilibraeMatrix: ...
 
 
 @overload
 def from_dict(
-    data: Mapping[str, ArrayLike],
+    data: Mapping[str, SparseArray],
     index: ArrayLike,
     *,
-    path: str | os.PathLike,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: Literal[True],
-) -> MatrixStore: ...
+) -> AequilibraeSparseMatrix: ...
 
 
 def from_dict(
-    data: Mapping[str, ArrayLike],
+    data: Mapping[str, ArrayLike] | Mapping[str, SparseArray],
     index: ArrayLike,
     *,
-    path: str | os.PathLike | None = None,
-    mode: Literal["w", "a", "r+", "w-", "x"] | None = None,
     index_name: str = "main_index",
-    metadata: Mapping[str, Any] | None = None,
-    store: bool = False,
-) -> AequilibraeMatrix | MatrixStore:
+) -> AequilibraeMatrix | AequilibraeSparseMatrix:
     """
     Create named square matrices from a mapping of names to array-like values.
 
-    The result is an in-memory :class:`AequilibraeMatrix` unless you pass
-    ``store=True``. Arrays are copied with their original dtypes. File metadata
-    is also copied, apart from attributes managed by OMX.
+    The result is an in-memory :class:`AequilibraeMatrix` or
+    :class:`AequilibraeSparseMatrix`, inferred from the first value. All values
+    must have the same storage type. Mixed dense and sparse inputs will raise a
+    ``ValueError``. The mapping must contain at least one matrix.
 
-    To create a :class:`MatrixStore`, pass ``store=True`` and a file path.  The
-    default mode is ``"x"``, which raises an error if the file already
-    exists. Close the store when finished, or use a ``with`` block. In-memory
-    matrices do not accept ``path`` or ``mode``.
+    Arrays are copied with their original dtypes. Each sparse array keeps its
+    format. Its shape must match the number of zones in ``index``, which sets
+    the row and column order.
 
     :Arguments:
 
-        **data** (mapping of :obj:`str` to array-like): Named square matrices
-            matching the index length.  Values must have integer, float,
-            boolean or complex dtypes.
+        **data** (mapping of :obj:`str` to array-like or SciPy sparse arrays):
+            Non-empty collection of named square matrices matching the index
+            length. Values must all be dense or all be sparse, with integer,
+            float, boolean or complex dtypes.
 
         **index** (array-like): One-dimensional sequence of unique integer zone
             IDs from ``0`` to ``2**64 - 1`` in row and column order.
 
-        **path** (:obj:`str` or :obj:`os.PathLike`, *Optional*): Destination
-            OMX file. Required when ``store=True`` and not accepted
-            otherwise. Defaults to ``None``.
-
-        **mode** (:obj:`str`, *Optional*): Writable store mode: ``"x"``,
-            ``"w-"``, ``"w"``, ``"r+"`` or ``"a"``. Defaults to ``None``, which
-            uses ``"x"`` for stores. Must be omitted for in-memory matrices.
-
         **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
           ``"main_index"``.
 
-        **metadata** (:obj:`Mapping`, *Optional*): File-level attributes to
-            copy, excluding OMX-managed attributes. Defaults to ``None``.
-
-        **store** (:obj:`bool`, *Optional*): Write to an OMX file and return an
-            open :class:`MatrixStore` instead of an in-memory
-            :class:`AequilibraeMatrix`. Defaults to ``False``.
-
     >>> demand = from_dict(
     ...     {"car": [[0, 12], [10, 0]], "bus": [[0, 2], [2, 0]]},
-    ...     index=[101, 205], index_name="zones", metadata={"year": 2030},
+    ...     index=[101, 205], index_name="zones",
     ... )
-    >>> demand["car"].tolist(), demand.metadata["year"]
-    ([[0, 12], [10, 0]], 2030)
-    >>> from pathlib import Path
-    >>> from tempfile import TemporaryDirectory
-    >>> with TemporaryDirectory() as directory:
-    ...     with from_dict(
-    ...         {"car": demand["car"]}, index=demand.index,
-    ...         path=Path(directory) / "demand.omx", store=True,
-    ...     ) as store:
-    ...         print(store["car"].tolist())
+    >>> demand["car"].tolist()
     [[0, 12], [10, 0]]
+    >>> from scipy.sparse import csr_array
+    >>> demand = from_dict(
+    ...     {"car": csr_array([[0, 12], [10, 0]])},
+    ...     index=[101, 205], index_name="zones",
+    ... )
+    >>> demand["car"].toarray().tolist()
+    [[0, 12], [10, 0]]
+    >>> demand.index.tolist()
+    [101, 205]
     """
-    mat: AequilibraeMatrix | MatrixStore
-    if store:
-        if path is None:
-            raise ValueError("a matrix store must have a path")
+    if not data:
+        raise ValueError("data must contain at least one matrix")
 
-        if mode is not None and mode not in ("w", "a", "r+", "w-", "x"):
-            raise ValueError("from_dict stores only support modes 'w', 'a', 'r+', 'w-' and 'x'")
-
-        # Check names, shapes and dtypes before opening a file or changing its index.
-        validated_index = AequilibraeMatrix(index=index, index_name=index_name).index
-        prepared = {}
-        for name, value in data.items():
-            _validate_matrix_key(name)
-            prepared[name] = _matrix_values(value, (len(validated_index), len(validated_index)))
-
-        data = prepared
-
-        mat = MatrixStore(
-            path=path,
-            index=validated_index,
-            index_name=index_name,
-            mode=mode if mode is not None else "x",
+    sparse = isinstance(next(iter(data.values())), sparray)
+    mismatches = [name for name, value in data.items() if isinstance(value, sparray) != sparse]
+    if mismatches:
+        expected = "sparse" if sparse else "dense"
+        raise ValueError(
+            f"expected {expected} matrices (inferred from the first value). The mismatched matrices are: {mismatches}"
         )
-    else:
-        if path is not None:
-            raise ValueError("an in-memory matrix cannot have a path")
 
-        if mode is not None:
-            raise ValueError("an in-memory matrix cannot have a mode")
-        mat = AequilibraeMatrix(index=index, index_name=index_name)
-
-    try:
-        mat.update(data)
-        if metadata is not None:
-            mat.metadata.update(_copy_file_metadata(metadata))
-
-    except Exception:
-        if isinstance(mat, MatrixStore):
-            mat.close()
-        raise
-
+    matrix_type = AequilibraeSparseMatrix if sparse else AequilibraeMatrix
+    mat = matrix_type(index=index, index_name=index_name)
+    for name, value in data.items():
+        mat[name] = value
     return mat
+
+
+@overload
+def from_df(
+    df: pd.DataFrame,
+    row: str,
+    col: str,
+    subset: Sequence[str] | None = None,
+    *,
+    index: ArrayLike | None = None,
+    index_name: str = "main_index",
+    fill_value: float = 0,
+    dtype: DTypeLike = float,
+    sparse: Literal[False] = False,
+) -> AequilibraeMatrix: ...
+
+
+@overload
+def from_df(
+    df: pd.DataFrame,
+    row: str,
+    col: str,
+    subset: Sequence[str] | None = None,
+    *,
+    index: ArrayLike | None = None,
+    index_name: str = "main_index",
+    fill_value: float = 0,
+    dtype: DTypeLike = float,
+    sparse: Literal[True],
+) -> AequilibraeSparseMatrix: ...
 
 
 def from_df(
@@ -1371,22 +1811,25 @@ def from_df(
     index_name: str = "main_index",
     fill_value: float = 0,
     dtype: DTypeLike = float,
-) -> AequilibraeMatrix:
+    sparse: bool = False,
+) -> AequilibraeMatrix | AequilibraeSparseMatrix:
     """
-    Create dense in-memory matrices from an origin-destination DataFrame.
+    Create dense or sparse in-memory matrices from an origin-destination DataFrame.
 
-    Choose the origin and destination columns with ``row`` and ``col``.  Each
-    remaining column becomes a named matrix, or you can choose columns with
-    ``subset``. Values for repeated origin-destination pairs are added
-    together. Missing pairs are filled with ``fill_value``.
+    Choose the origin and destination columns with ``row`` and ``col``. All
+    other columns become a named matrix, or you can choose columns with
+    ``subset``. Values for repeated origin-destination pairs are
+    summed. Missing pairs are filled with ``fill_value``.
 
     Pass ``index`` to set the zone order and include zones with no trips.  If
     omitted, the index contains the sorted unique origin and destination
-    IDs. All IDs must be valid integer zone IDs and appear in the index.
+    IDs. All IDs must be valid integer zone IDs and appear in the index.  Pass
+    ``sparse=True`` to construct CSR arrays directly from the records without
+    allocating dense matrices. Sparse matrices require ``fill_value=0``.
 
     :Arguments:
         **df** (:obj:`pandas.DataFrame`): Origin-destination records with zone
-          IDs and matrix value columns.
+            IDs and matrix value columns.
 
         **row** (:obj:`str`): Column containing origin zone IDs.
 
@@ -1401,13 +1844,18 @@ def from_df(
             IDs. Defaults to their sorted union.
 
         **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
-          ``"main_index"``.
+            ``"main_index"``.
 
         **fill_value** (:obj:`float`, *Optional*): Value for pairs without
-          records. Defaults to ``0``.
+            records. Defaults to ``0``.
 
         **dtype** (NumPy dtype-like, *Optional*): Dtype used for all output
-          matrices. Defaults to :obj:`float`.
+            matrices. Defaults to :obj:`float`.
+
+        **sparse** (:obj:`bool`, *Optional*): Return an
+            :class:`AequilibraeSparseMatrix` instead of an
+            :class:`AequilibraeMatrix`.  Defaults to ``False``. Requires
+            ``fill_value=0``.
 
     >>> trips = pd.DataFrame({"origin": [101, 101, 309], "destination": [205, 205, 101], "car": [2, 3, 7]})
     >>> demand = from_df(
@@ -1419,6 +1867,9 @@ def from_df(
     >>> from_df(trips, row="origin", col="destination").index.tolist()
     [101, 205, 309]
     """
+    if sparse and fill_value != 0:
+        raise ValueError("sparse matrices require fill_value=0")
+
     dtype = np.dtype(dtype)
     if subset is None:
         subset = [name for name in df.columns if name not in (row, col)]
@@ -1428,7 +1879,8 @@ def from_df(
     if index is None:
         index = np.union1d(row_ids, col_ids)
 
-    mat = AequilibraeMatrix(index=index, index_name=index_name)
+    matrix_type = AequilibraeSparseMatrix if sparse else AequilibraeMatrix
+    mat = matrix_type(index=index, index_name=index_name)
     matrix_index = pd.Index(mat.index)
     rows = matrix_index.get_indexer(row_ids)
     cols = matrix_index.get_indexer(col_ids)
@@ -1437,57 +1889,14 @@ def from_df(
 
     for name in subset:
         values = df[name].to_numpy(dtype=dtype, copy=False)
-        values_matrix: np.ndarray = np.full(mat.shape, fill_value, dtype=dtype)
-        values_matrix[rows, cols] = 0
-        np.add.at(values_matrix, (rows, cols), values)
+        if sparse:
+            values_matrix = scipy.sparse.coo_array((values, (rows, cols)), shape=mat.shape).tocsr()
+            values_matrix.eliminate_zeros()
+        else:
+            values_matrix = np.full(mat.shape, fill_value, dtype=dtype)
+            values_matrix[rows, cols] = 0
+            np.add.at(values_matrix, (rows, cols), values)
+
         mat[name] = values_matrix
-
-    return mat
-
-
-def from_scipy(
-    data: Mapping[str, scipy.sparse.sparray],
-    index: ArrayLike,
-    *,
-    index_name: str = "main_index",
-) -> AequilibraeMatrix:
-    """
-    Convert named SciPy sparse arrays to dense in-memory matrices.
-
-    Each sparse array becomes a named dense matrix with the same dtype.  Its
-    shape must match the number of zones in ``index``, which sets the row and
-    column order. The result stores full square arrays, so make sure they will
-    fit in memory.
-
-    :Arguments:
-
-        **data** (mapping of :obj:`str` to :obj:`scipy.sparse.sparray`): Named
-            square sparse arrays.  Each array's shape must match the index
-            length.
-
-        **index** (array-like): One-dimensional sequence of unique integer zone
-            IDs from ``0`` to ``2**64 - 1`` in row and column order.
-
-        **index_name** (:obj:`str`, *Optional*): Zone mapping name. Defaults to
-          ``"main_index"``.
-
-    >>> from scipy.sparse import csr_array
-    >>> demand = from_scipy(
-    ...     {"car": csr_array([[0, 12], [10, 0]])},
-    ...     index=[101, 205], index_name="zones",
-    ... )
-    >>> demand["car"].tolist()
-    [[0, 12], [10, 0]]
-    >>> demand.index.tolist()
-    [101, 205]
-    """
-    for value in data.values():
-        if not isinstance(value, scipy.sparse.sparray):
-            raise TypeError("data values must be SciPy sparse arrays")
-        if value.ndim != 2 or value.shape[0] != value.shape[1]:  # type: ignore
-            raise ValueError("sparse arrays must be square")
-
-    mat = AequilibraeMatrix(index=index, index_name=index_name)
-    mat.update({name: value.toarray() for name, value in data.items()})  # type: ignore
 
     return mat
