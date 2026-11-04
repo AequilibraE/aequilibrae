@@ -266,7 +266,7 @@ In the meantime, you can find the documentation for all versions since 0.5.3.
 
 .. grid::
 
-   .. grid-item-card:: 1.6.2
+    .. grid-item-card:: 1.6.2
         :link:  https://www.aequilibrae.com/docs/python/v1.6.2/
         :link-type: url
         :text-align: center

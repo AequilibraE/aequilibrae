@@ -1,5 +1,5 @@
 """
-.. _example_usage_forecasting:
+.. _example_usage_forecasting_custom_vdfs:
 
 Forecasting
 ===========
