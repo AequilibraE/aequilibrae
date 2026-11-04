@@ -44,21 +44,28 @@ class Matrices:
         fnames = [f.name for f in self.folder.iterdir() if f.is_file() and f.suffix == ".omx"]
         name_to_metadata = {}
         for file_name in fnames:
-            with omx.open_file(self.folder / file_name, mode="r") as matrix:
-                name_to_metadata[file_name] = {
-                    "procedure": matrix.attrs.get("procedure"),
-                    "procedure_id": matrix.attrs.get("procedure_id"),
-                    "timestamp": matrix.attrs.get("timestamp"),
-                    "description": matrix.attrs.get("description"),
-                }
+            path = self.folder / file_name
+            try:
+                with omx.open_file(path, mode="r") as matrix:
+                    name_to_metadata[file_name] = {
+                        "procedure": matrix.attrs.get("procedure"),
+                        "procedure_id": matrix.attrs.get("procedure_id"),
+                        "timestamp": matrix.attrs.get("timestamp"),
+                        "description": matrix.attrs.get("description"),
+                    }
+            except OSError as error:
+                message = f"Could not read metadata from OMX matrix file {str(path)!r}: {error}"
+                logger.error(message)
+                raise OSError(message) from error
 
         return name_to_metadata
 
     def file_exists(self, file_name: str) -> bool:
-        return file_name in self.get_available_matrices_and_metadata()
+        return (self.folder / file_name).is_file()
 
     def cores_on_disk(self, file_name: str) -> int:
-        with omx.open_file(self.folder / file_name, mode="r") as matrix:
+        path = self.folder / file_name
+        with omx.open_file(path, mode="r") as matrix:
             return len(matrix.list_matrices())
 
     def get_matrix(
@@ -69,7 +76,7 @@ class Matrices:
         **kwargs,
     ) -> AequilibraeMatrix | MatrixStore:
         """
-        Load a registered matrix, optionally selecting an in-memory subset.
+        Load a matrix file, optionally selecting an in-memory subset.
 
         Without ``subset``, the matrix is opened as a
         :class:`~aequilibrae.matrix.MatrixStore` for generic OMX access.  When
@@ -99,22 +106,20 @@ class Matrices:
                 :class:`~aequilibrae.matrix.MatrixStore`): An in-memory matrix
                 when ``subset`` is supplied, otherwise an OMX matrix store.
 
-        :raises ValueError: If the file is not OMX, no usable index exists, or
-            multiple indices are ambiguous.
+        :raises ValueError: If the file is missing, no usable index exists,
+            or multiple indices are ambiguous.
+        :raises OSError: If the requested OMX file cannot be opened or read.
         """
         path = self.folder / file_name
-        if file_name not in self.get_available_matrices_and_metadata():
-            raise ValueError(
-                f"matrices folder does not have a matrix file named '{file_name}', "
-                f"available are {self.get_available_matrices_and_metadata().keys()}"
-            )
-        if path.suffix.lower() != ".omx":
-            raise ValueError("Only OMX (.omx) matrices are supported")
+        if not path.is_file():
+            raise ValueError(f"matrices folder does not have a matrix file named '{file_name}'")
 
-        if subset is not None:
-            return from_file(path, index_name=index_name, subset=subset, store=False, **kwargs)
-        else:
-            return from_file(path, index_name=index_name, subset=None, store=True, **kwargs)
+        try:
+            return from_file(path, index_name=index_name, subset=subset, store=subset is None, **kwargs)
+        except OSError as error:
+            message = f"Could not load OMX matrix file {str(path)!r}: {error}"
+            logger.error(message)
+            raise OSError(message) from error
 
     def save_matrix(
         self,
@@ -148,12 +153,11 @@ class Matrices:
         Omitted metadata retains the source matrix's corresponding attributes.
         """
         path = self.folder / file_name
-        if file_name in [f.name for f in self.folder.iterdir() if f.is_file() and f.suffix == ".omx"]:
-            raise FileExistsError(f"There is already a matrix of name ({file_name}). It must be unique.")
-
-        suffix = path.suffix.lower()
+        suffix = path.suffix
         if suffix != ".omx":
             raise ValueError("Only OMX (.omx) matrices are supported")
+        if path.exists():
+            raise FileExistsError(f"There is already a matrix of name ({file_name}). It must be unique.")
 
         temporary = path.with_name(f".{path.stem}.{uuid.uuid4().hex}.tmp{suffix}")
         try:

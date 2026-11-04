@@ -8,7 +8,7 @@ import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae import TrafficAssignment, TrafficClass, MatrixStore
+from aequilibrae import MatrixStore, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.paths.vdf import bpr
@@ -101,11 +101,10 @@ def test_matrices_scenarios(scenario_example, scenario):
     df = matrices.list()
 
     if len(df) > 0:
-        first_matrix = df.iloc[0]["name"]
-        rec = matrices.get_matrix(first_matrix)
-        assert isinstance(rec, MatrixStore)
-        # assert rec.name is not None
-        # assert rec.name == first_matrix
+        first_matrix = df.index[0]
+        with matrices.get_matrix(first_matrix) as matrix:
+            assert isinstance(matrix, MatrixStore)
+            assert len(matrix) > 0
     else:
         assert scenario != "root"
 

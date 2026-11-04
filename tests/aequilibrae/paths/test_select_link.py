@@ -59,11 +59,10 @@ def test_multiple_link_sets(select_link_setup):
     assignment.save_select_link_results("select_link_analysis")
 
     matrices = project.matrices
-    # matrices.update_database()
-    assert "select_link_analysis.omx" in matrices.get_available_matrices_and_metadata()["file_name"].tolist()
+    assert "select_link_analysis.omx" in matrices.get_available_matrices_and_metadata()
 
     # Test if matrices are with the correct shape and are not empty
-    sla = matrices.get_matrix("select_link_analysis_omx")
+    sla = matrices.get_matrix("select_link_analysis.omx")
     num_zones = assignment.classes[0].graph.num_zones
     for mat in sla:
         m = sla[mat]

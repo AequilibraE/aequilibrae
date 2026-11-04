@@ -70,7 +70,7 @@ def test_gravity_application(model_expo, model_gamma, model_power, tmp_path):
 
         project = SimpleNamespace(matrices=Matrices(tmp_path))
         file_name = f"gravity_{model_name}.omx"
-        distributed_matrix.save_to_project(f"gravity_{model_name}", file_name, project=project)
+        distributed_matrix.save_to_project(file_name, project=project)
         metadata = project.matrices.get_available_matrices_and_metadata()[file_name]
         assert metadata["procedure"] == "Synthetic gravity trip distribution"
         assert metadata["procedure_id"] == distributed_matrix.procedure_id

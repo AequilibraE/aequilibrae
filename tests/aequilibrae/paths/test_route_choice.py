@@ -190,6 +190,9 @@ def test_saving(route_choice_setup):
 
     rc.save_link_flows("ll")
     rc.save_select_link("sl")
+    metadata = project.matrices.get_available_matrices_and_metadata()["sl.omx"]
+    assert metadata["procedure"] == "Route choice OD select link"
+    assert metadata["procedure_id"] == rc.procedure_id
 
     with project.results_connection as conn:
         for table, df in [

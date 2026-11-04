@@ -81,7 +81,7 @@ def arkansas(path: str):
     period = "am"
     logger.info(f"\n\n Assigning {period.upper()}")
     proj_matrices = proj.matrices
-    car_demand = proj_matrices.get_matrix(f"{period.upper()}_omx")
+    car_demand = proj_matrices.get_matrix(f"{period.upper()}.omx")
     car_demand.computational_view()  # 'AUTO')
     assig = TrafficAssignment()
     assig.procedure_id = f"{period}_baseline"

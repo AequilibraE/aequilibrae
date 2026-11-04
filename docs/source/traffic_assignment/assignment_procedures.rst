@@ -44,9 +44,9 @@ assigned. There are three pieces of information that are required in the instant
     >>> graph_truck = project.network.graphs['T']
 
     # And also get the matrices for cars and trucks
-    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
+    >>> matrix_car = project.matrices.get_matrix("demand_mc.omx", subset=["car"])
 
-    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
+    >>> matrix_truck = project.matrices.get_matrix("demand_mc.omx", subset=["trucks"])
 
     # We create the Traffic Classes
     >>> tc_car = TrafficClass("car", graph_car, matrix_car)

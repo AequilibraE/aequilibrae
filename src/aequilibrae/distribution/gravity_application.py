@@ -43,7 +43,7 @@ class GravityApplication:
         >>> model.beta = 0.0001
 
         # We load the impedance matrix
-        >>> matrix = project.matrices.get_matrix("skims", subset=["distance_blended"])
+        >>> matrix = project.matrices.get_matrix("skims.omx", subset=["distance_blended"])
 
         # We create the vectors we will use
         >>> query = "SELECT zone_id, population, employment FROM zones;"

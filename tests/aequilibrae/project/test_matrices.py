@@ -200,7 +200,7 @@ def test_get_matrix_requires_index_when_multiple_nondefault_indices_exist(matrix
     )
 
 
-@pytest.mark.parametrize("extension", [".aem", ".csv"])
+@pytest.mark.parametrize("extension", ["", ".aem", ".csv", ".OMX", ".Omx"])
 def test_create_rejects_other_formats(matrix_table, source_matrix, extension):
     with pytest.raises(ValueError, match="Only OMX"):
         matrix_table.save_matrix(f"demand{extension}", source_matrix)
@@ -226,3 +226,57 @@ def test_create_removes_partial_export(matrix_table, source_matrix, monkeypatch)
     assert not (matrix_table.folder / "demand.omx").exists()
     assert not list(matrix_table.folder.glob(".demand.*.tmp.omx"))
     assert "demand" not in matrix_table.get_available_matrices_and_metadata()
+
+
+@pytest.mark.parametrize("subset", [None, ["demand"]])
+def test_get_matrix_only_opens_requested_file(matrix_table, source_matrix, monkeypatch, subset):
+    matrix_table.save_matrix("valid.omx", source_matrix)
+    (matrix_table.folder / "damaged.omx").write_bytes(b"not an OMX file")
+
+    def unexpected_catalogue_scan():
+        pytest.fail("Loading one matrix must not scan other OMX files")
+
+    monkeypatch.setattr(matrix_table, "get_available_matrices_and_metadata", unexpected_catalogue_scan)
+    assert matrix_table.file_exists("valid.omx")
+    assert not matrix_table.file_exists("missing.omx")
+    loaded = matrix_table.get_matrix("valid.omx", subset=subset)
+    try:
+        np.testing.assert_array_equal(loaded["demand"], source_matrix["demand"])
+    finally:
+        if isinstance(loaded, MatrixStore):
+            loaded.close()
+
+
+@pytest.mark.parametrize("extension", [".omx", ".data", ""])
+@pytest.mark.parametrize("subset", [None, ["demand"]])
+def test_get_matrix_logs_unreadable_file_with_context(matrix_table, caplog, subset, extension):
+    path = matrix_table.folder / f"damaged{extension}"
+    path.write_bytes(b"not an OMX file")
+
+    with pytest.raises(OSError, match=f"Could not load OMX matrix file .*{path.name}") as caught:
+        matrix_table.get_matrix(path.name, subset=subset)
+
+    assert isinstance(caught.value.__cause__, OSError)
+    assert str(path) in caplog.text
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
+def test_matrix_metadata_logs_unreadable_file_with_context(matrix_table, caplog):
+    path = matrix_table.folder / "damaged.omx"
+    path.write_bytes(b"not an OMX file")
+    with pytest.raises(OSError, match="Could not read metadata from OMX matrix file .*damaged.omx"):
+        matrix_table.get_available_matrices_and_metadata()
+    assert str(path) in caplog.text
+
+
+@pytest.mark.parametrize("extension", [".OMX", ".Omx"])
+def test_saving_and_discovery_require_exact_omx_suffix(matrix_table, source_matrix, extension):
+    path = matrix_table.folder / f"demand{extension}"
+    path.write_bytes(b"existing")
+
+    with pytest.raises(ValueError, match="Only OMX"):
+        matrix_table.save_matrix(path.name, source_matrix)
+
+    assert matrix_table.file_exists(path.name)
+    assert path.name not in matrix_table.get_available_matrices_and_metadata()
+    assert path.read_bytes() == b"existing"

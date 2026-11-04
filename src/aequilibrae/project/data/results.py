@@ -26,11 +26,8 @@ class Results(NonSpatialProjectTable):
         """Create the result table.
 
         :Arguments:
-            **project_connection** (:obj:`NestedTransactionManager`): Manager for
-            result metadata in the project database.
-
             **results_connection** (:obj:`NestedTransactionManager`): Manager for
-            result tables.
+            result metadata and data tables in the results database.
         """
         super().__init__(results_connection)
 
@@ -190,7 +187,7 @@ class Results(NonSpatialProjectTable):
         result_tables = {
             row[0]
             for row in self._connection._connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'results'"
             ).fetchall()
         }
         records = {row[0] for row in self._connection._connection.execute("SELECT table_name FROM results").fetchall()}
