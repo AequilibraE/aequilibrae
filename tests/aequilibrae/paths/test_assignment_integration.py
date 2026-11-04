@@ -383,12 +383,16 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
     project = sioux_falls_single_class
     assignment, traffic = assignment_for(diamond(True))
     assignment.execute()
-    assignment.save_skims("new_skims", which_ones="all", project=project)
+    file_names = assignment.save_skims("new_skims", which_ones="all", project=project)
+    assert file_names == ["new_skims_cars.omx"]
     assignment.save_select_link_matrices("new_selected", project=project)
-    project.matrices.update_database()
 
-    skims = project.matrices.get_matrix("new_skims_cars")
-    selected = project.matrices.get_matrix("new_selected_omx")
+    metadata = project.matrices.get_available_matrices_and_metadata()[file_names[0]]
+    assert metadata["procedure"] == "Traffic Assignment"
+    assert metadata["procedure_id"] == assignment.procedure_id
+    assert metadata["timestamp"] == assignment.procedure_date
+    skims = project.matrices.get_matrix(file_names[0])
+    selected = project.matrices.get_matrix("new_selected.omx")
     try:
         for name, values in traffic.results.skims.matrices.items():
             np.testing.assert_array_equal(skims[f"{name}_blended"], values)

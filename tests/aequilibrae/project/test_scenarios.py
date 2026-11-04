@@ -228,9 +228,9 @@ def test_scenario_result_isolation(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"isolation_test_{scenario}"
 
-    # Create scenario-specific result
-    _ = results.insert(
-        table_name=table_name,
+    results.create(
+        table_name,
+        pd.DataFrame({"value": [1]}),
         procedure="isolation_test",
         procedure_id=f"isolation_{scenario}",
         description=f"Testing isolation for {scenario}",
@@ -373,7 +373,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Add some data to root
     results = scenario_example.results
-    results.insert(table_name="root_specific", procedure="test", procedure_id="test_id", description="Root only data")
+    results.create(
+        "root_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Root only data",
+    )
 
     # Create empty scenario
     scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
@@ -396,7 +402,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
-    results.insert(table_name="clone_specific", procedure="test", procedure_id="test_id", description="Clone only data")
+    results.create(
+        "clone_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Clone only data",
+    )
 
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()

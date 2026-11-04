@@ -1,9 +1,10 @@
 import string
 from math import floor
 from random import choice
-import numpy as np
 
+import numpy as np
 import openmatrix as omx
+import pandas as pd
 import pytest
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
@@ -19,7 +20,15 @@ def test_list_available_matrices(sioux_falls_example):
         "demand.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
     }
 
-    demand_matrix = MatrixStore(mat.folder / "demand.omx", index=list(range(24)), mode="r+")
+    df = pd.DataFrame(columns=["procedure", "procedure_id", "timestamp", "description"])
+    df.index.name = "file_name"
+    df.loc["demand.omx", :] = [None] * 4
+    df.loc["demand_mc.omx", :] = [None] * 4
+    df.loc["skims.omx", :] = [None] * 4
+
+    pd.testing.assert_frame_equal(mat.list(), df)
+
+    demand_matrix = mat.get_matrix("demand.omx", mode="r+")
 
     demand_matrix.metadata.update(
         {
@@ -111,6 +120,55 @@ def source_matrix(request, tmp_path):
     yield matrix
     if isinstance(matrix, MatrixStore):
         matrix.close()
+
+
+def test_save_matrix_persists_metadata_without_changing_source(matrix_table, source_matrix):
+    original_metadata = dict(source_matrix.metadata)
+    metadata = {
+        "procedure": "Test export",
+        "procedure_id": "export-id",
+        "timestamp": "2026-01-01 12:00:00",
+        "description": "Exported demand",
+    }
+
+    matrix_table.save_matrix("exported.omx", source_matrix, **metadata)
+
+    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"] == metadata
+    assert set(source_matrix.metadata) == set(original_metadata)
+    for key, value in original_metadata.items():
+        np.testing.assert_equal(source_matrix.metadata[key], value)
+    with matrix_table.get_matrix("exported.omx") as exported:
+        np.testing.assert_array_equal(exported["demand"], source_matrix["demand"])
+        assert exported.matrix_metadata("demand")["purpose"] == "work"
+
+
+def test_save_matrix_retains_omitted_metadata(matrix_table, source_matrix):
+    original_metadata = dict(source_matrix.metadata)
+
+    matrix_table.save_matrix("exported.omx", source_matrix, procedure="Test export")
+
+    metadata = matrix_table.get_available_matrices_and_metadata()["exported.omx"]
+    assert metadata == {
+        "procedure": "Test export",
+        "procedure_id": None,
+        "timestamp": None,
+        "description": "Future demand",
+    }
+    assert set(source_matrix.metadata) == set(original_metadata)
+    for key, value in original_metadata.items():
+        np.testing.assert_equal(source_matrix.metadata[key], value)
+
+
+def test_save_matrix_accepts_read_only_store(matrix_table, tmp_path):
+    source = AequilibraeMatrix(index=[10, 20])
+    source["demand"] = [[0, 1], [2, 0]]
+    source.save_as_omx(tmp_path / "read_only.omx")
+
+    with MatrixStore(tmp_path / "read_only.omx", mode="r") as store:
+        matrix_table.save_matrix("exported.omx", store, description="Exported demand")
+        assert "description" not in store.metadata
+
+    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"]["description"] == "Exported demand"
 
 
 def test_get_matrix_uses_requested_index(matrix_table):

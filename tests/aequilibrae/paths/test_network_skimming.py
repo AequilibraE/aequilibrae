@@ -29,17 +29,18 @@ def test_network_skimming(sioux_falls_example):
     assert not skm.report, f"Skimming returned an error: {skm.report}"
 
     matrices = sioux_falls_example.matrices
-    record = matrices.save_matrix(
-        "test_Skimming.omx",
+    file_name = "test_Skimming.omx"
+    matrices.save_matrix(
+        file_name,
         skm.results.skims,
         procedure="Network skimming",
         procedure_id=skm.procedure_id,
         timestamp=skm.procedure_date,
     )
-    assert record.cores == 1
-    assert record.procedure_id == skm.procedure_id
-    loaded = matrices.get_matrix(record.name)
-    np.testing.assert_array_equal(loaded["distance"], skm.results.skims["distance"])
+    assert matrices.cores_on_disk(file_name) == 1
+    assert matrices.get_available_matrices_and_metadata()[file_name]["procedure_id"] == skm.procedure_id
+    with matrices.get_matrix(file_name) as loaded:
+        np.testing.assert_array_equal(loaded["distance"], skm.results.skims["distance"])
 
 
 def test_prepare_shares_existing_output():

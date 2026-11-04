@@ -193,12 +193,10 @@ class Ipf:
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
-    def save_to_project(self, name: str, file_name: str, project=None):
+    def save_to_project(self, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
 
         :Arguments:
-            **name** (:obj:`str`): Name of the desired matrix record
-
             **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
@@ -207,26 +205,13 @@ class Ipf:
 
         project = project or get_active_project()
         mats = project.matrices
-        record = mats.create(
-            name,
+        mats.save_matrix(
             file_name,
             self.output,
             procedure="Iterative Proportional fitting",
             procedure_id=self.procedure_id,
             timestamp=self.procedure_date,
         )
-        return record
-
-    def __tot_rows(self, matrix):
-        return np.nansum(matrix, axis=1)
-
-    def __tot_columns(self, matrix):
-        return np.nansum(matrix, axis=0)
-
-    def __factor(self, marginals, targets):
-        f = np.divide(targets, marginals)  # We compute the factors
-        f[f == np.NINF] = 1  # And treat the errors
-        return f
 
     def __get_parameters(self, model):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
