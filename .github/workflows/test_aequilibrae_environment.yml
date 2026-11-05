@@ -29,12 +29,23 @@ jobs:
       run: |
         uv pip install -r pyproject.toml --extra create --group dev
         uv pip install numpy==2.4.6 --force-reinstall
-        echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+    - name: Activate virtualenv
+      if: matrix.os != 'windows-latest'
+      run: |
+        . .venv/bin/activate
+        echo PATH=$PATH >> $GITHUB_ENV
+
+    - name: Activate virtualenv (windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        .\.venv\Scripts\Activate.ps1
+        "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
-      run: python -m spin python tests/setup_windows_spatialite.py
+      run: spin python tests/setup_windows_spatialite.py
 
     - name: Runs test
-      run: |
-        python -m spin test -j 4 -v -- tests/ --durations=50 --dist=loadscope --random-order-bucket=global --random-order
+      run: spin test -j 4 -v -- tests/ --durations=50 --dist=loadscope --random-order-bucket=global --random-order
