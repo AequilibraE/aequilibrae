@@ -16,15 +16,20 @@ jobs:
         python-version: [3.12]
     steps:
     - uses: actions/checkout@v7
+
     - name: Set Python environment
-      uses: actions/setup-python@v7.0.0
+      uses: astral-sh/setup-uv@v10.0.1
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install Python and create virtual environment
+      run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
+
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip uv
-        python -m uv pip install .[dev]
+        uv pip install -r pyproject.toml --extra create --group dev
+        uv pip install numpy==2.4.6 --force-reinstall
+        echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
@@ -32,5 +37,4 @@ jobs:
 
     - name: Runs test
       run: |
-        python -m uv pip install numpy==2.4.6 --force-reinstall
-        pytest tests/ --durations=50 --dist=loadscope -n 4 --random-order --verbose
+        spin test -j 4 -v -- tests/ --durations=50 --dist=loadscope --random-order-bucket=global --random-order
