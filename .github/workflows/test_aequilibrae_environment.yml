@@ -31,11 +31,9 @@ jobs:
         uv pip install numpy==2.4.6 --force-reinstall
 
     - name: Activate virtualenv (windows)
-      if: matrix.os == 'windows-latest'
       run: |
         .\.venv\Scripts\Activate.ps1
         "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
-
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
