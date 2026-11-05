@@ -5,8 +5,10 @@ import shutil
 import sqlite3
 from contextlib import closing
 from graphlib import TopologicalSorter
-from os import PathLike
+from os import PathLike, environ
 from pathlib import Path
+
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ def backup(source: str | PathLike, destination: str | PathLike) -> Path:
     The destination must not exist or be inside the source. On failure, stop and
     leave partial output in place. Each database is consistent independently;
     stop writers for a consistent snapshot across databases and other files.
+    A database-level progress bar honours the AEQ_SHOW_PROGRESS environment variable.
 
     :Arguments:
         **source** (:obj:`str` or :obj:`os.PathLike`): Source project directory.
@@ -44,9 +47,9 @@ def copy_from_old(source: str | PathLike, destination: str | PathLike) -> Path:
 
     Both project_database.sqlite files must already exist. The actual destination
     schema determines which tables and writable columns are copied, including
-    user-added schema. Missing source columns must have an explicit destination
-    default, even if nullable; otherwise the import aborts. Source-only tables
-    and columns are logged and omitted. Destination-only tables remain untouched.
+    user-added schema. Missing source columns use their destination defaults,
+    or NULL if no default exists, subject to destination constraints. Source-only
+    tables and columns are logged and omitted. Destination-only tables remain untouched.
     Generated columns are calculated by the destination, not copied.
 
     SQLite and SpatiaLite infrastructure and migration records are not copied.
@@ -61,6 +64,7 @@ def copy_from_old(source: str | PathLike, destination: str | PathLike) -> Path:
     files are created or copied. Transit, results and scenario databases are not
     imported, and references to their data are not checked. SpatiaLite is required
     when the destination is spatial. No migrations or renamed-field mappings run.
+    A table-level progress bar honours the AEQ_SHOW_PROGRESS environment variable.
 
     :Arguments:
         **source** (:obj:`str` or :obj:`os.PathLike`): Old project directory.
@@ -102,10 +106,7 @@ def _tables(conn: sqlite3.Connection, schema: str = "main") -> dict[str, str]:
 
 def _columns(conn: sqlite3.Connection, table: str, schema: str = "main") -> dict[str, tuple[str | None, int]]:
     """Map column names to their default SQL and hidden/generated flag (zero means writable)."""
-    return {
-        row[1]: (row[4], row[6])
-        for row in conn.execute(f"PRAGMA {_quote(schema)}.table_xinfo({_quote(table)})")
-    }
+    return {row[1]: (row[4], row[6]) for row in conn.execute(f"PRAGMA {_quote(schema)}.table_xinfo({_quote(table)})")}
 
 
 def _reject_symlink(path: Path) -> None:
@@ -139,16 +140,25 @@ def _copy_project(source: str | PathLike, destination: str | PathLike) -> Path:
     destination.mkdir(parents=True)
     try:
         # Complete all database copies before copying any accompanying files.
-        for folder in folders:
-            target = destination / folder.relative_to(source)
-            target.mkdir(parents=True, exist_ok=True)
-            for filename in _DATABASES:
-                database = folder / filename
-                _reject_symlink(database)
-                if not database.is_file():
-                    continue
-                logger.info("Copying database %s to %s", database, target / filename)
-                _backup_database(database, target / filename)
+        total = sum((folder / filename).is_file() for folder in folders for filename in _DATABASES)
+        with tqdm(
+            total=total,
+            desc="Backing up databases",
+            unit="db",
+            disable=environ.get("AEQ_SHOW_PROGRESS", "TRUE") != "TRUE",
+        ) as progress:
+            for folder in folders:
+                target = destination / folder.relative_to(source)
+                target.mkdir(parents=True, exist_ok=True)
+                for filename in _DATABASES:
+                    database = folder / filename
+                    _reject_symlink(database)
+                    if not database.is_file():
+                        continue
+                    logger.info("Copying database %s to %s", database, target / filename)
+                    progress.set_postfix_str(str(database.relative_to(source)))
+                    _backup_database(database, target / filename)
+                    progress.update(1)
         for folder in folders:
             _copy_files(folder, destination / folder.relative_to(source))
     except BaseException:
@@ -196,23 +206,18 @@ def _copy_statement(conn: sqlite3.Connection, table: str, database: Path) -> str
     for column, (_, hidden) in target_columns.items():
         if hidden != 0:
             logger.info("Not copying column %s.%s: generated or hidden in the destination", table, column)
-    invalid = sorted(column for column in missing if target_columns[column][0] is None)
     for column in sorted(missing):
         default = target_columns[column][0]
         if default is None:
-            logger.error(
-                "Cannot copy table %s: source column %s is missing and has no destination default", table, column
-            )
+            logger.info("Using NULL for %s.%s: source column is missing and destination has no default", table, column)
         else:
             logger.info("Using destination default for %s.%s: %s", table, column, default)
-    if invalid:
-        raise ValueError(f"Cannot copy table {table!r} from {database}: missing columns without defaults: {invalid}")
     columns = [column for column in target_columns if column in writable]
     if not columns:
         raise ValueError(f"Cannot copy table {table!r}: no writable destination columns")
     logger.info("Copying table %s from %s; matching columns: %s", table, database, sorted(matching))
     selection = ", ".join(
-        f"source_row.{_quote(column)}" if column in matching else f"({target_columns[column][0]})"
+        f"source_row.{_quote(column)}" if column in matching else f"({target_columns[column][0] or 'NULL'})"
         for column in columns
     )
     # Copy rows within SQLite rather than materialising potentially large network tables.
@@ -292,10 +297,18 @@ def _import_database(source: Path, destination: Path) -> None:
                     logger.info("Leaving destination table %s untouched: absent from %s", table, source)
             ordered = _table_copy_order(conn, sorted(target_tables.keys() - infrastructure))
             statements = {table: _copy_statement(conn, table, source) for table in ordered if table in source_tables}
-            for table, statement in statements.items():
-                try:
-                    conn.execute(statement)
-                except sqlite3.Error as error:
-                    error.add_note(f"While copying table {table!r} from {source}")
-                    raise
+            with tqdm(
+                total=len(statements),
+                desc="Copying tables",
+                unit="table",
+                disable=environ.get("AEQ_SHOW_PROGRESS", "TRUE") != "TRUE",
+            ) as progress:
+                for table, statement in statements.items():
+                    progress.set_postfix_str(table)
+                    try:
+                        conn.execute(statement)
+                    except sqlite3.Error as error:
+                        error.add_note(f"While copying table {table!r} from {source}")
+                        raise
+                    progress.update(1)
             _check_database(conn, destination)

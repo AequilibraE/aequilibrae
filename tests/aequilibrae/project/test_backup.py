@@ -65,6 +65,24 @@ def test_backup_preserves_databases_and_only_project_files(plain_project, tmp_pa
         assert not (copied / "unrelated.sqlite").exists()
 
 
+@pytest.mark.parametrize("show_progress", ["TRUE", "FALSE", "0"])
+def test_backup_progress_counts_only_existing_project_databases(
+    plain_project, tmp_path, monkeypatch, capsys, show_progress
+):
+    monkeypatch.setenv("AEQ_SHOW_PROGRESS", show_progress)
+    (plain_project / "public_transport.sqlite").unlink()
+    target = backup(plain_project, tmp_path / "backup")
+    output = capsys.readouterr().err
+    if show_progress == "TRUE":
+        assert "Backing up databases" in output
+        assert "5/5" in output
+        assert str((plain_project / "scenarios/future/project_database.sqlite").relative_to(plain_project)) in output
+    else:
+        assert "Backing up databases" not in output
+    assert not (target / "public_transport.sqlite").exists()
+    assert query(target / "scenarios/future/public_transport.sqlite", "SELECT id FROM payload") == [(1,)]
+
+
 def test_cli_backup(plain_project, tmp_path, capsys):
     target = tmp_path / "cli-backup"
     cli(["-p", str(plain_project), "backup", str(target)])
@@ -102,7 +120,8 @@ def test_path_safety(plain_project, tmp_path):
     assert not (tmp_path / "backup").exists()
 
 
-def test_failure_leaves_output_and_does_not_copy_files(plain_project, tmp_path, monkeypatch):
+def test_failure_leaves_output_and_does_not_copy_files(plain_project, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AEQ_SHOW_PROGRESS", "TRUE")
     original = backup_module._backup_database
 
     def fail_transit(source, destination):
@@ -117,6 +136,10 @@ def test_failure_leaves_output_and_does_not_copy_files(plain_project, tmp_path, 
     assert (target / "project_database.sqlite").is_file()
     assert not (target / "parameters.yml").exists()
     assert not (target / "matrices").exists()
+    output = capsys.readouterr().err
+    assert "public_transport.sqlite" in output
+    assert "1/6" in output
+    assert "6/6" not in output
 
 
 def test_cli_dispatch_without_opening_project(tmp_path, monkeypatch, capsys):

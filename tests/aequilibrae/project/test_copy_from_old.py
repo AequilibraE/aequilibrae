@@ -33,7 +33,7 @@ def source(tmp_path):
     return make_database(
         tmp_path / "old #project's",
         'CREATE TABLE payload (id INTEGER PRIMARY KEY, "odd""column" BLOB);'
-        'INSERT INTO payload VALUES (1, X\'00FF\'), (2, X\'12\');',
+        "INSERT INTO payload VALUES (1, X'00FF'), (2, X'12');",
     )
 
 
@@ -51,6 +51,39 @@ def test_import_uses_existing_schema_and_leaves_source_unchanged(source, destina
     assert query(destination, "SELECT * FROM payload") == [(1, b"\x00\xff"), (2, b"\x12")]
     assert query(destination, "SELECT * FROM sqlite_master") == schema
     assert (source / "project_database.sqlite").read_bytes() == original
+
+
+@pytest.mark.parametrize("show_progress", ["TRUE", "FALSE", "0"])
+def test_table_progress_respects_environment_and_counts_only_copied_tables(
+    source, destination, monkeypatch, capsys, show_progress
+):
+    monkeypatch.setenv("AEQ_SHOW_PROGRESS", show_progress)
+    with closing(sqlite3.connect(source / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE source_only (value); CREATE TABLE migrations (status);")
+    with closing(sqlite3.connect(destination / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE destination_only (value); CREATE TABLE migrations (status);")
+    copy_from_old(source, destination)
+    output = capsys.readouterr().err
+    if show_progress == "TRUE":
+        assert "Copying tables" in output
+        assert "payload" in output
+        assert "1/1" in output
+    else:
+        assert "Copying tables" not in output
+    assert query(destination, "SELECT id FROM payload ORDER BY id") == [(1,), (2,)]
+
+
+def test_table_progress_does_not_count_a_failed_table(source, destination, monkeypatch, capsys):
+    monkeypatch.setenv("AEQ_SHOW_PROGRESS", "TRUE")
+    with closing(sqlite3.connect(destination / "project_database.sqlite")) as conn:
+        conn.executescript('DROP TABLE payload; CREATE TABLE payload (id INTEGER CHECK(id < 2), "odd""column" BLOB);')
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        copy_from_old(source, destination)
+    output = capsys.readouterr().err
+    assert "payload" in output
+    assert "0/1" in output
+    assert "1/1" not in output
+    assert query(destination, "SELECT * FROM payload") == []
 
 
 def test_logs_custom_tables_columns_and_destination_only_tables(source, destination, caplog):
@@ -95,18 +128,40 @@ def test_all_destination_columns_can_use_defaults(tmp_path):
 
 
 @pytest.mark.parametrize("empty_source", [False, True])
-@pytest.mark.parametrize("declaration", ["TEXT", "TEXT NOT NULL", "INTEGER PRIMARY KEY"])
-def test_missing_column_without_default_aborts(source, destination, empty_source, declaration, caplog):
+@pytest.mark.parametrize("declaration, expected", [("TEXT", None), ("INTEGER PRIMARY KEY", 1)])
+def test_missing_column_without_default_uses_null(source, destination, empty_source, declaration, expected, caplog):
     with closing(sqlite3.connect(destination / "project_database.sqlite")) as conn:
         conn.executescript(f"CREATE TABLE custom (new_field {declaration});")
     with closing(sqlite3.connect(source / "project_database.sqlite")) as conn:
         conn.executescript(
             "CREATE TABLE custom (old_field);" + ("" if empty_source else "INSERT INTO custom VALUES (1);")
         )
-    with pytest.raises(ValueError, match="missing columns without defaults.*new_field"):
+    caplog.set_level(logging.INFO, logger=backup_module.__name__)
+    copy_from_old(source, destination)
+    assert query(destination, "SELECT * FROM custom") == ([] if empty_source else [(expected,)])
+    assert query(destination, "SELECT id FROM payload ORDER BY id") == [(1,), (2,)]
+    assert "Using NULL for custom.new_field: source column is missing and destination has no default" in caplog.text
+
+
+def test_missing_not_null_column_without_default_rolls_back(source, destination):
+    with closing(sqlite3.connect(source / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE z_custom (old_field); INSERT INTO z_custom VALUES (1);")
+    with closing(sqlite3.connect(destination / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE z_custom (new_field TEXT NOT NULL);")
+    with pytest.raises(sqlite3.IntegrityError, match="NOT NULL constraint failed: z_custom.new_field"):
         copy_from_old(source, destination)
     assert query(destination, "SELECT * FROM payload") == []
-    assert "source column new_field is missing and has no destination default" in caplog.text
+    assert query(destination, "SELECT * FROM z_custom") == []
+
+
+def test_empty_source_table_with_missing_not_null_column_inserts_no_rows(source, destination):
+    with closing(sqlite3.connect(source / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE custom (old_field);")
+    with closing(sqlite3.connect(destination / "project_database.sqlite")) as conn:
+        conn.executescript("CREATE TABLE custom (new_field TEXT NOT NULL);")
+    copy_from_old(source, destination)
+    assert query(destination, "SELECT * FROM custom") == []
+    assert query(destination, "SELECT id FROM payload ORDER BY id") == [(1,), (2,)]
 
 
 @pytest.mark.parametrize("kind", ["VIRTUAL", "STORED"])
@@ -123,12 +178,14 @@ def test_generated_columns_are_recalculated(tmp_path, kind, caplog):
 
 def test_constraint_failure_rolls_back_prior_tables(tmp_path):
     source = make_database(
-        tmp_path / "old", "CREATE TABLE a (id INTEGER PRIMARY KEY); INSERT INTO a VALUES (2);"
-        "CREATE TABLE z (value INTEGER); INSERT INTO z VALUES (-1);"
+        tmp_path / "old",
+        "CREATE TABLE a (id INTEGER PRIMARY KEY); INSERT INTO a VALUES (2);"
+        "CREATE TABLE z (value INTEGER); INSERT INTO z VALUES (-1);",
     )
     destination = make_database(
-        tmp_path / "new", "CREATE TABLE a (id INTEGER PRIMARY KEY); INSERT INTO a VALUES (1);"
-        "CREATE TABLE z (value INTEGER CHECK(value > 0));"
+        tmp_path / "new",
+        "CREATE TABLE a (id INTEGER PRIMARY KEY); INSERT INTO a VALUES (1);"
+        "CREATE TABLE z (value INTEGER CHECK(value > 0));",
     )
     with pytest.raises(sqlite3.IntegrityError, match="CHECK") as error:
         copy_from_old(source, destination)
@@ -170,8 +227,9 @@ def test_infrastructure_and_migrations_are_not_copied(tmp_path, caplog):
         "CREATE TABLE spatialite_history (value TEXT);"
     )
     source = make_database(
-        tmp_path / "old", sql + "INSERT INTO migrations VALUES ('old'); INSERT INTO spatialite_history VALUES ('old');"
-        "INSERT INTO payload VALUES (1000); DELETE FROM payload;"
+        tmp_path / "old",
+        sql + "INSERT INTO migrations VALUES ('old'); INSERT INTO spatialite_history VALUES ('old');"
+        "INSERT INTO payload VALUES (1000); DELETE FROM payload;",
     )
     destination = make_database(
         tmp_path / "new", sql + "INSERT INTO migrations VALUES ('new'); INSERT INTO spatialite_history VALUES ('new');"
@@ -194,7 +252,8 @@ def test_only_root_project_database_is_imported(source, destination):
             path.mkdir(parents=True)
             (path / "project_database.sqlite").write_text(str(folder))
     untouched = {
-        path: path.read_bytes() for path in destination.rglob("*")
+        path: path.read_bytes()
+        for path in destination.rglob("*")
         if path.is_file() and path != destination / "project_database.sqlite"
     }
     copy_from_old(source, destination)
@@ -208,9 +267,9 @@ def test_import_includes_only_committed_wal_data(source, destination):
     with closing(sqlite3.connect(source / "project_database.sqlite")) as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA wal_autocheckpoint=0")
-        conn.execute('INSERT INTO payload VALUES (3, X\'AB\')')
+        conn.execute("INSERT INTO payload VALUES (3, X'AB')")
         conn.commit()
-        conn.execute('INSERT INTO payload VALUES (4, X\'CD\')')
+        conn.execute("INSERT INTO payload VALUES (4, X'CD')")
         copy_from_old(source, destination)
         assert query(destination, "SELECT id FROM payload ORDER BY id") == [(1,), (2,), (3,)]
 
@@ -320,7 +379,11 @@ def test_initial_rows_without_source_conflicts_remain(spatial_source, spatial_de
         conn.execute("UPDATE modes SET pce=2 WHERE mode_id='c'")
     copy_from_old(spatial_source, spatial_destination)
     assert query(spatial_destination, "SELECT mode_id FROM modes ORDER BY mode_id") == [
-        ("b",), ("c",), ("q",), ("t",), ("w",)
+        ("b",),
+        ("c",),
+        ("q",),
+        ("t",),
+        ("w",),
     ]
     assert query(spatial_destination, "SELECT pce FROM modes WHERE mode_id='c'") == [(2,)]
 

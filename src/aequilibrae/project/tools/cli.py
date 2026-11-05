@@ -3,6 +3,7 @@ import functools
 import inspect
 import logging
 import os
+import textwrap
 
 # Dests used internally via the .set_defaults trick. The prefix keeps them from colliding with
 # real function parameters.
@@ -43,6 +44,14 @@ def _annotation_help(param):
     return f"type: {inspect.formatannotation(param.annotation)}"
 
 
+def _deindent_doc_string(func):
+    doc = inspect.getdoc(func)
+    if doc is None:
+        return
+    else:
+        return textwrap.dedent(doc)
+
+
 def _extract_target_call(args: dict):
     """
     Split a parsed argument dict into the target function and the keyword arguments to call it with.
@@ -57,8 +66,13 @@ def add_subcommand_from_function(subparsers, func, defaults: dict):
     """
     Create a sub-command from a function's signature.
     """
-    doc = inspect.getdoc(func)
-    parser = subparsers.add_parser(func.__name__, description=doc, help=doc.split("\n")[0] if doc else None)
+    doc = _deindent_doc_string(func)
+    parser = subparsers.add_parser(
+        func.__name__,
+        description=doc,
+        help=doc,
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.set_defaults(_aeq_internal_target_func=functools.partial(func, **defaults) if defaults else func)
 
     var_keyword = None
@@ -235,7 +249,11 @@ def cli(argv=None):
     create_parser.set_defaults(_aeq_internal_func=functools.partial(create_project, create_parser))
 
     copy_parser = subparsers.add_parser(
-        "backup", help="Back up project databases and files", description=inspect.getdoc(backup), allow_abbrev=False
+        "backup",
+        help="Back up project databases and files",
+        description=_deindent_doc_string(backup),
+        formatter_class=argparse.RawTextHelpFormatter,
+        allow_abbrev=False,
     )
     copy_parser.add_argument("destination", help="New destination directory outside the source project")
     copy_parser.set_defaults(_aeq_internal_func=functools.partial(copy_project, copy_parser, backup))
@@ -243,7 +261,8 @@ def cli(argv=None):
     import_parser = subparsers.add_parser(
         "copy-from-old",
         help="Import old project database rows into the existing project schema",
-        description=inspect.getdoc(copy_from_old),
+        description=_deindent_doc_string(copy_from_old),
+        formatter_class=argparse.RawTextHelpFormatter,
         allow_abbrev=False,
     )
     import_parser.add_argument("source", help="Old project directory to read from")
@@ -254,3 +273,7 @@ def cli(argv=None):
     # args now contains the project and the "_aeq_internal_func" to run from .set_defaults. unparsed_args should
     # contain everything else.
     args._aeq_internal_func(args, unparsed_args)
+
+
+if __name__ == "__main__":
+    cli()

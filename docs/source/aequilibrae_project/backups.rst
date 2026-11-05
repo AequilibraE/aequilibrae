@@ -29,6 +29,11 @@ open database files. Committed data in a write-ahead log is included. The result
 a consistent database copy, not necessarily a byte-for-byte identical file.
 SpatiaLite is not required for this operation.
 
+A ``tqdm`` progress bar counts completed databases across the root project and its
+scenarios, showing the current database's relative path. Missing databases and
+accompanying files do not count towards the total. Set ``AEQ_SHOW_PROGRESS=FALSE``
+to hide the progress bar.
+
 Import into an existing schema
 ------------------------------
 
@@ -55,12 +60,16 @@ Both project databases must already exist. The actual destination schema, includ
 user-added tables and columns, determines what is copied; the import does not
 create or alter table definitions. Source-only tables and columns are omitted.
 Tables absent from the source remain untouched. Python's logging system reports
-which tables and columns will be copied, omitted or supplied with defaults.
+which tables and columns will be copied, omitted or supplied with defaults or NULL.
+A ``tqdm`` progress bar shows completed tables and the current table's name. Only
+tables being copied count towards the total. Set ``AEQ_SHOW_PROGRESS=FALSE`` to
+hide the progress bar.
 
-For every writable destination column absent from a matching source table, an
-explicit destination default is required. Without one the import aborts, even for
-nullable columns or empty source tables. Generated columns are calculated by the
-destination. No migrations are run, and renamed or moved fields are not mapped
+For every writable destination column absent from a matching source table, its
+destination default is used, or NULL if no default exists. Destination constraints
+still apply: for example, inserting NULL into a NOT NULL column without a default
+aborts the import. Empty source tables insert no rows. Generated columns are
+calculated by the destination. No migrations are run, and renamed or moved fields are not mapped
 automatically. Keep a plain backup if you need to preserve everything.
 
 SQLite and SpatiaLite infrastructure and migration records remain those of the
