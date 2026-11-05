@@ -37,10 +37,9 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# As Coquimbo already has centroids and centroid connectors, we should remove
-# them for the sake of this example.
+# As Coquimbo already has centroids and centroid connectors, we should remove them for the sake of this example
 with project.db_connection as conn:
-    conn.execute("DELETE FROM links WHERE name LIKE 'centroid connector%'")
+    conn.execute("DELETE FROM links WHERE name LIKE 'centroid connector%';")
     conn.execute("DELETE FROM nodes WHERE is_centroid=1;")
     conn.commit()
 

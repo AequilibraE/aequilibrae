@@ -3,7 +3,7 @@ import pathlib
 import sqlite3
 from typing import Optional
 
-from aequilibrae.project.project_creation import add_triggers, recreate_columns, remove_triggers
+from aequilibrae.project.project_creation import _add_triggers, _remove_triggers, recreate_columns
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def migrate(
             *nodes_sql.read().split("--#"),
         ]
 
-    remove_triggers(transit_conn, "transit")
+    _remove_triggers(transit_conn, "transit")
     try:
         for sql in sqls:
             transit_conn.execute(sql)
@@ -80,6 +80,6 @@ def migrate(
             transit_conn.execute(f"SELECT DropTable(NULL, '__old_{table}')")
 
     finally:
-        add_triggers(transit_conn, "transit")
+        _add_triggers(transit_conn, "transit")
 
     logger.info("Migration successful")

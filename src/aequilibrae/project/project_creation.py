@@ -1,7 +1,10 @@
 import logging
 import re
+import warnings
+from contextlib import contextmanager
 from pathlib import Path
 from sqlite3 import Connection
+from typing import Iterator
 
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
 
@@ -15,7 +18,7 @@ logger = logging.getLogger(__name__)
 def initialize_tables(db_type: str, conn: Connection) -> None:
     with conn as conn:
         create_base_tables(conn, db_type)
-        add_triggers(conn, db_type)
+        _add_triggers(conn, db_type)
 
 
 def create_base_tables(conn: Connection, db_type: str) -> None:
@@ -39,6 +42,20 @@ def create_base_tables(conn: Connection, db_type: str) -> None:
 
 
 def add_triggers(conn: Connection, db_type: str, skip: set[str] | None = None) -> None:
+    """Adds consistency triggers to the project.
+
+    Deprecated: use ``without_triggers`` to temporarily suspend installed triggers instead.
+    """
+    warnings.warn(
+        "'add_triggers' is deprecated. Use the 'without_triggers' context manager "
+        "to temporarily suspend installed triggers instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    _add_triggers(conn, db_type, skip=skip)
+
+
+def _add_triggers(conn: Connection, db_type: str, skip: set[str] | None = None) -> None:
     """Adds consistency triggers to the project"""
     spec_folder = Path(__file__).resolve().parent / "database_specification" / db_type / "triggers"
     with open(spec_folder / "triggers_list.txt", "r") as file_list:
@@ -52,7 +69,49 @@ def add_triggers(conn: Connection, db_type: str, skip: set[str] | None = None) -
         run_queries_from_sql_file(conn, qry_file)
 
 
+@contextmanager
+def without_triggers(conn: Connection) -> Iterator[None]:
+    """Temporarily remove installed triggers, then restore their exact SQL definitions.
+
+    The caller is responsible for running this context within a managed transaction.
+    """
+    triggers = conn.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND sql IS NOT NULL ORDER BY name"
+    ).fetchall()
+    try:
+        for name, _ in triggers:
+            logger.debug("Temporarily removing trigger %s", name)
+            quoted_name = name.replace('"', '""')
+            conn.execute(f'DROP TRIGGER "{quoted_name}"')
+        yield
+    finally:
+        for name, sql in triggers:
+            exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?", (name,)).fetchone()
+            if exists is None:
+                logger.debug("Restoring trigger %s", name)
+                conn.execute(sql)
+
+
 def remove_triggers(
+    conn: Connection,
+    db_type: str,
+    use_aequilibrae_prefix: bool = True,
+    skip: set[str] | None = None,
+) -> None:
+    """Remove consistency triggers from the project.
+
+    Deprecated: use ``without_triggers`` to temporarily suspend installed triggers instead.
+    """
+    warnings.warn(
+        "'remove_triggers' is deprecated. Use the 'without_triggers' context manager "
+        "to temporarily suspend installed triggers instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    _remove_triggers(conn, db_type, use_aequilibrae_prefix=use_aequilibrae_prefix, skip=skip)
+
+
+def _remove_triggers(
     conn: Connection,
     db_type: str,
     use_aequilibrae_prefix: bool = True,
