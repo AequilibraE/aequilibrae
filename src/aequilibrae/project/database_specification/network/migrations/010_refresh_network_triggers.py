@@ -6,6 +6,7 @@ from aequilibrae.project.project_creation import _add_triggers, _remove_triggers
 
 logger = logging.getLogger(__name__)
 
+
 def migrate(
     *,
     project_conn: sqlite3.Connection,
