@@ -68,8 +68,8 @@ AequilibraE compiles its extensions with frame pointers enabled by default, to a
 should be installed using the following command (or similar) to make debug information and source code available to
 profilers::
 
-    uv pip install meson-python ninja cython cysignals
-    uv pip install --no-build-isolation --editable ".[dev]" \
+    uv pip install --group build
+    uv pip install --no-build-isolation --editable '.[create]' \
         -Cbuild-dir=build \
         -Ceditable-verbose=true \
         -Csetup-args="-Ddebug=true" \
