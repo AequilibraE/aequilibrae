@@ -3,9 +3,10 @@
 Project backups
 ===============
 
-Two standalone utilities copy a project without opening or activating a
-``Project``. Both include the root project and every directory immediately under
-``scenarios/`` containing a ``project_database.sqlite``.
+Two standalone utilities back up or import project data without opening or
+activating a ``Project``. Plain backups include the root project and every directory
+immediately under ``scenarios/`` containing a ``project_database.sqlite``. Imports
+currently handle only the root project's ``project_database.sqlite``.
 
 SQLite backup
 -------------
@@ -28,60 +29,72 @@ open database files. Committed data in a write-ahead log is included. The result
 a consistent database copy, not necessarily a byte-for-byte identical file.
 SpatiaLite is not required for this operation.
 
-Copy into the current schema
-----------------------------
+Import into an existing schema
+------------------------------
 
-Use this to initialise databases using the installed AequilibraE version's schema
-and attempt to copy the existing data into them:
+Create a blank project separately, optionally add your own tables and columns,
+and then import rows from an old project's network database:
 
 .. code-block:: console
 
-   aeq -p /models/source copy-to-new /models/rebuilt
+   aeq -p /models/rebuilt create
+   aeq -p /models/rebuilt copy-from-old /models/source
 
 .. code-block:: python
 
-   from aequilibrae.project.tools import copy_to_new
+   from aequilibrae import Project
+   from aequilibrae.project.tools import copy_from_old
 
-   destination = copy_to_new("/models/source", "/models/rebuilt")
+   project = Project()
+   project.new("/models/rebuilt")
+   project.close()
+   # Add any custom destination schema before importing.
+   destination = copy_from_old("/models/source", "/models/rebuilt")
 
-Only matching AequilibraE-managed tables and columns are copied. Source-only
-tables and columns are omitted with warnings through Python's logging system.
-This includes user-added network attributes. No migrations are run, and renamed
-or moved fields are not mapped automatically. Keep a plain backup if you need to
-preserve everything.
+Both project databases must already exist. The actual destination schema, including
+user-added tables and columns, determines what is copied; the import does not
+create or alter table definitions. Source-only tables and columns are omitted.
+Tables absent from the source remain untouched. Python's logging system reports
+which tables and columns will be copied, omitted or supplied with defaults.
 
-New columns use the current schema's defaults. Tables present in the source
-receive source rows instead of the freshly initialised rows; tables absent from
-the source retain their initial data. Migration records and SpatiaLite metadata
-are freshly initialised. Spatial indexes are rebuilt while copying geometry.
-AequilibraE's editing triggers are installed before any source rows are inserted,
-after clearing initial rows being replaced. Tables are copied in dependency order
-using both foreign keys and the dependencies of editing triggers: for example,
-network modes and nodes precede links, and links precede turn restrictions.
-Foreign keys remain enabled while copying the network and transit databases.
-Dependency cycles cause an error rather than disabling validation.
+For every writable destination column absent from a matching source table, an
+explicit destination default is required. Without one the import aborts, even for
+nullable columns or empty source tables. Generated columns are calculated by the
+destination. No migrations are run, and renamed or moved fields are not mapped
+automatically. Keep a plain backup if you need to preserve everything.
+
+SQLite and SpatiaLite infrastructure and migration records remain those of the
+destination. Spatial indexes are maintained while copying geometry. Rows are
+copied within SQLite using a read-only attached source database, not transferred
+through Python. Tables are copied in dependency order using both foreign keys and
+the dependencies of editing triggers: for example, network modes and nodes precede
+links, and links precede turn restrictions. Custom foreign-key dependencies are
+included. Dependency cycles cause an error rather than disabling validation.
+
+``INSERT OR REPLACE`` replaces conflicting initial rows. Initial rows without a
+source conflict remain. Use a freshly initialised destination, not a populated
+project; this restriction is not yet checked. Foreign keys and insertion triggers
+remain enabled. Recursive triggers are disabled so implicit replacement deletions
+do not run deletion-protection triggers. Replacement is a deletion followed by an
+insertion, not an update, and can affect dependent rows in a populated database.
 
 Trigger-generated changes are accepted, including recalculated distances,
 corrected link endpoints, additional nodes and regenerated turn geometry. This
-validates data through the current schema's insertion behaviour; it does not
+validates data through the destination schema's insertion behaviour; it does not
 prove the source data was already consistent or preserve every source value.
-Foreign-key and SQLite integrity checks also run before each database's data
-transaction is committed. SpatiaLite is required.
+Foreign-key and SQLite integrity checks run before the import transaction is
+committed. An error rolls back all imported rows. SpatiaLite is required for a
+spatial destination.
 
-Result tables are an exception to the fixed-schema rule: AequilibraE creates
-these dynamically. Tables registered in the project's ``results`` table are
-recreated in ``results_database.sqlite`` with their source definitions, columns,
-data and indexes. Unregistered tables are omitted with warnings. A registered
-table missing from an existing results database causes the operation to fail.
-An absent results database with registered results, or a registered scenario
-without its project database, also causes ``copy-to-new`` to fail before copying
-accompanying files. Plain ``backup`` preserves such incomplete projects without
-these additional checks.
+Only the root ``project_database.sqlite`` is imported. Transit, results and scenario
+databases and accompanying files are untouched, and references to those resources
+are not checked. In particular, copying their registration rows does not copy the
+registered databases, result tables or matrix files.
 
 Files and safety
 ----------------
 
-Both utilities copy these databases when present, at root and scenario level:
+Plain backups copy these databases when present, at root and scenario level:
 
 * ``project_database.sqlite``
 * ``public_transport.sqlite``
@@ -94,11 +107,14 @@ excluded. Other files and databases at root/scenario level are not copied.
 Accompanying files are not rewritten, including any paths in ``parameters.yml``.
 Symbolic links within the selected project files and folders are rejected.
 
-The destination must not exist and must be outside the source project. Neither
-utility opens a ``Project`` or writes to the source databases. Any copying error
-stops the operation immediately; **partial output is left in place**, not removed
-or treated as a successful backup. Choose another destination or remove the
-partial output yourself before retrying.
+For plain backups, the destination must not exist and must be outside the source
+project. Any backup error stops the operation immediately; **partial output is
+left in place**, not removed or treated as a successful backup. Choose another
+destination or remove the partial output yourself before retrying.
+
+For imports, the destination project database must already exist and must not be
+the source database. Neither utility opens a ``Project`` or writes to the source
+databases. Symbolic links to selected database files are rejected.
 
 SQLite provides consistency for each database separately, not a simultaneous
 snapshot of all databases and files. Stop project writers while either utility
