@@ -30,12 +30,6 @@ jobs:
         uv pip install -r pyproject.toml --extra create --group dev
         uv pip install numpy==2.4.6 --force-reinstall
 
-    - name: Activate virtualenv
-      if: matrix.os != 'windows-latest'
-      run: |
-        . .venv/bin/activate
-        echo PATH=$PATH >> $GITHUB_ENV
-
     - name: Activate virtualenv (windows)
       if: matrix.os == 'windows-latest'
       run: |
