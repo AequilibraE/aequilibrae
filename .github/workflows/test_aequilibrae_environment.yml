@@ -33,8 +33,8 @@ jobs:
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
-      run:  python tests/setup_windows_spatialite.py
+      run: python -m spin python tests/setup_windows_spatialite.py
 
     - name: Runs test
       run: |
-        spin test -j 4 -v -- tests/ --durations=50 --dist=loadscope --random-order-bucket=global --random-order
+        python -m spin test -j 4 -v -- tests/ --durations=50 --dist=loadscope --random-order-bucket=global --random-order
