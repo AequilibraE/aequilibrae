@@ -1,14 +1,16 @@
 import geopandas as gpd
 import numpy as np
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pandas as pd
 import pytest
 
 from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.a_star import EuclideanContext, a_star
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.results import path_results as path_results_module
-from aequilibrae.paths.cython.queries import SearchQuery
+from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 
@@ -53,6 +55,28 @@ def test_new_dijkstra_heap_dispatch(heap, turn):
         SearchWorkspace(context.node_count, context.state_count, heap="invalid")
 
 
+def test_four_ary_workspace_rejects_unrepresentable_capacity():
+    # Validate before allocating: UINT32_MAX is reserved for scanned elements.
+    with pytest.raises(ValueError, match="capacity exceeds"):
+        SearchWorkspace(1, 1 << 32, heap="4ary")
+
+
+def test_four_ary_equal_cost_predecessor_preserves_child_ties():
+    # Removing node 1 replaces the root with the expensive node 6. All four
+    # children tie; the existing reverse scan chooses node 5, so its route to
+    # node 7 must win over equally cheap arrivals through nodes 2, 3 and 4.
+    context = make_context(
+        [0, 6, 6, 7, 8, 9, 10, 10, 10],
+        [1, 2, 3, 4, 5, 6, 7, 7, 7, 7],
+        [0, 1, 1, 1, 1, 5, 1, 1, 1, 1],
+    )
+    results = SearchResults(context.node_count, context.state_count, context.link_count)
+    workspace = SearchWorkspace(context.node_count, context.state_count, heap="4ary")
+    dijkstra(context, SearchQuery(context.node_count, 0), results, workspace)
+    np.testing.assert_array_equal(results.path_links_to(7), [4, 9])
+    assert results.path_cost_to(7) == 2
+
+
 @pytest.mark.parametrize("heap", available_heaps())
 @pytest.mark.parametrize("turn", [False, True])
 def test_separate_workspaces_reuse_their_heaps(heap, turn):
@@ -85,8 +109,9 @@ def test_separate_workspaces_reuse_their_heaps(heap, turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_prepared_aon_heap_dispatch(heap, turn):
     context = make_context([0, 2, 3, 3], [1, 2, 2], [1, 5, 2], turn=turn)
-    demand = np.zeros((3, 3, 1))
-    demand[0, 2, 0] = 7
+    demand = {"class_0": np.zeros((3, 3))}
+    demand["class_0"][0, 2] = 7
+    demand = DenseMatrix.from_dict(demand)
     prepared = PreparedAoN(context, demand, heap=heap, cores=2)
     output = prepared.make_outputs()
     prepared.run(output)

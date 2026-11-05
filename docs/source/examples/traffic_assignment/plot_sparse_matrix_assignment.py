@@ -32,10 +32,13 @@ from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from scipy.sparse import csr_array
+
+from aequilibrae.matrix import from_dict
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
+from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
@@ -59,7 +62,7 @@ basic_config()
 # %%
 # We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs. 
+# We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # We grab the graph for cars
@@ -80,6 +83,14 @@ proj_matrices.list()
 # %%
 # We get the demand matrix, and prepare it for computation
 demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+
+# Copy the named matrices into sparse float64 storage. In practise these would
+# be stored in the sparse OMX extension rather than as a dense matrix, then
+# converted to a sparse format.
+demand = from_dict(
+    {name: csr_array(values, dtype="float64") for name, values in demand.items()},
+    index=demand.index,
+)
 
 # %%
 # Let's perform the traffic assignment

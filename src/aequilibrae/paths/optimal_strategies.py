@@ -1,8 +1,6 @@
 import logging
 
-import numpy as np
-from scipy import sparse
-
+from aequilibrae.paths.cython.demand import assignment_demand
 
 logger = logging.getLogger(__name__)
 
@@ -14,37 +12,28 @@ class OptimalStrategies:
     def execute(self):
         self.__classes = {}
         self.__results = {}
-        self.__demand_cols = {}
+        self.__demand = {}
 
         for cls in self.__assig_spec.classes:
+            if len(cls.matrix) != 1:
+                raise ValueError("Transit assignment requires exactly one demand matrix per class")
+
+            self.__demand[cls._id] = assignment_demand(cls.matrix, cls.graph.centroids, transpose=True)
             cls.results.prepare(cls.graph, cls.matrix)
 
             self.__results[cls._id] = cls.results
-            try:
-                # Converts the named matrix to a 0-based COO matrix; the custom zone IDs are mapped below.
-                demand = sparse.coo_matrix(cls.matrix[cls.matrix_core], dtype=np.float64)
-            except KeyError as e:
-                raise ValueError(f"matrix core {cls.matrix_core} is not present in the matrix") from e
-
-            hypergraph = cls.graph.context
-
-            # The HyperpathGenerating maps taz_id, taz_id -> O, D, we then take the COO matrix and index into that
-            self.__demand_cols[cls._id] = {
-                "origin_column": hypergraph._o_vert_ids[demand.row].astype(np.uint32),
-                "destination_column": hypergraph._d_vert_ids[demand.col].astype(np.uint32),
-                "demand_column": demand.data,
-            }
-
-            self.__classes[cls._id] = hypergraph
+            self.__classes[cls._id] = cls.graph.context
 
         for cls in self.__assig_spec.classes:
             hyperpath = self.__classes[cls._id]
 
             logger.info(f"Executing S&F assignment  for {cls._id}")
 
-            hyperpath.assign(**self.__demand_cols[cls._id], threads=self.__assig_spec.cores)
+            hyperpath.assign(self.__demand[cls._id], threads=self.__assig_spec.cores)
             self.__results[cls._id].link_loads = hyperpath._edges["volume"].values
-            if hyperpath._skimming:
-                skim = hyperpath.skim_matrix
-                # skim.index = cls.graph.centroids[:]
-                self.__results[cls._id].skims = skim
+            # Skims share the packed dense buffer and use the demand's zone IDs.
+            self.__results[cls._id].skims = (
+                hyperpath.skim_matrix.to_matrix(cls.matrix.index, cls.matrix.index_name)
+                if hyperpath._skimming
+                else None
+            )

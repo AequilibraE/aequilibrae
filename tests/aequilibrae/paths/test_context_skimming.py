@@ -7,11 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.paths.cython.aon import PreparedAoN
 from aequilibrae.paths.cython.context import SkimmingContext
-from aequilibrae.paths.cython.network_loading import sum_weighted_turn_costs
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
-from aequilibrae.paths.cython.queries import LoadingQuery
 from aequilibrae.paths.cython.skimming import skimming
 from aequilibrae.paths.cython.workspaces import SkimmingWorkspace
 
@@ -52,8 +50,13 @@ def test_skim_state_tree_against_path_sums_and_assignment(turn, penalty, width):
         cost_name="objective",
         turn_cost_name="penalty",
     )
-    demand = np.ones((4, 4, 2))
-    prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
+    demand = {f"class_{field}": np.ones((4, 4)) for field in range(2)}
+    prepared = PreparedAoN(
+        context,
+        DenseMatrix.from_dict(demand),
+        skimming=inputs,
+        cores=3,
+    )
     assigned = prepared.run(prepared.make_outputs())
     output = inputs.make_outputs(4, origin_count=4)
     scratch = workspace_for(context, inputs)
@@ -521,7 +524,7 @@ def test_shared_inputs_and_disjoint_output_rows(labels_only):
 def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn, label):
     context = history_context(0.5, turn=turn)
     inputs = SkimmingContext(4, **{label: "label"})
-    demand = np.zeros((4, 4, 1))
+    demand = DenseMatrix.from_dict({"class_0": np.zeros((4, 4))})
     prepared = PreparedAoN(context, demand, skimming=inputs, cores=3)
     np.testing.assert_array_equal(prepared.origins, np.arange(4))
     np.testing.assert_array_equal(prepared.destination_counts, [4])
@@ -544,7 +547,7 @@ def test_label_only_assignment_searches_zero_demand_and_resets_skipped_rows(turn
 
 def test_assignment_rejects_mismatched_names_before_reset():
     context = history_context()
-    demand = np.ones((4, 4, 1))
+    demand = DenseMatrix.from_dict({"class_0": np.ones((4, 4))})
     first = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="first"))
     second = PreparedAoN(context, demand, skimming=SkimmingContext(4, cost_name="second"))
     out = first.run(first.make_outputs())
@@ -555,27 +558,3 @@ def test_assignment_rejects_mismatched_names_before_reset():
     np.testing.assert_array_equal(out.loading.link_loads, saved_loads)
     with pytest.raises(ValueError, match="link_count"):
         PreparedAoN(context, demand, skimming=SkimmingContext(5, cost_name="bad"))
-
-
-@pytest.mark.parametrize("turn", [False, True])
-def test_weighted_turn_costs_are_independent_of_skimming(turn):
-    context = history_context(0.5, turn=turn)
-    demand = np.array([[np.nan, np.inf], [2.0, -1.0], [4.0, 3.0], [5.0, 6.0]])
-    query = LoadingQuery(demand)
-    results = allocate_results(context)
-    assert sum_weighted_turn_costs(results, query) == 0
-    search(context, 0, results=results)
-    expected = sum(demand[node, cls] * results.path_turn_cost_to(node) for node in range(1, 4) for cls in range(2))
-    labels = results.turn_costs.copy()
-    assert sum_weighted_turn_costs(results, query) == expected
-    np.testing.assert_array_equal(results.turn_costs, labels)
-    demand[1:] *= 2
-    assert sum_weighted_turn_costs(results, query) == 2 * expected
-    search(context, 0, targets=[1], results=results)
-    assert sum_weighted_turn_costs(results, query) == 0
-    assert sum_weighted_turn_costs(results, LoadingQuery(np.empty((0, 2)))) == 0
-    assert sum_weighted_turn_costs(results, LoadingQuery(np.empty((4, 0)))) == 0
-    demand[1] = np.inf
-    assert np.isnan(sum_weighted_turn_costs(results, query))
-    with pytest.raises(ValueError, match="destination_count"):
-        sum_weighted_turn_costs(results, LoadingQuery(np.ones((5, 2))))

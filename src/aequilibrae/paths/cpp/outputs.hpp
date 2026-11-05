@@ -4,6 +4,9 @@
 #include <cstddef>
 #include <limits>
 
+#include "dense_matrix.hpp"
+#include "sparse_matrix_builder.hpp"
+
 namespace aequilibrae::paths::cpp::routing {
 
 template <typename T> struct LoadingOutputs {
@@ -18,20 +21,7 @@ template <typename T> struct LoadingOutputs {
   }
 };
 
-// Borrow one origin's contiguous [destinations, fields] block.
-// Callers supply valid indices and ranges. Empty views do not offset pointers.
-template <typename T> struct SkimmingOriginView {
-  std::size_t field_count = 0;
-  std::size_t destination_count = 0;
-  T *data = nullptr;
-
-  T *destination_data(std::size_t index) const noexcept {
-    if (field_count == 0 || destination_count == 0) {
-      return nullptr;
-    }
-    return data + index * field_count;
-  }
-};
+using aequilibrae::matrix::cpp::DenseMatrixOriginView;
 
 // Borrow the complete contiguous output. Neither view owns its buffer.
 template <typename T> struct SkimmingOutputsView {
@@ -40,12 +30,15 @@ template <typename T> struct SkimmingOutputsView {
   std::size_t destination_count = 0;
   T *data = nullptr; // [origins, destinations, fields]
 
-  SkimmingOriginView<T> origin(std::size_t index) const noexcept {
+  // Borrow one origin's contiguous [destinations, fields] block.
+  // Callers supply valid indices and ranges. Empty views do not offset
+  // pointers.
+  DenseMatrixOriginView<T> origin(std::size_t index) const noexcept {
     T *values = nullptr;
     if (field_count && destination_count) {
       values = data + index * field_count * destination_count;
     }
-    return {field_count, destination_count, values};
+    return {destination_count, field_count, values};
   }
 
   void reset() const noexcept {
@@ -78,51 +71,41 @@ template <typename T> struct SelectLinkLoadingOutputsView {
   }
 };
 
-// An origin corresponds to a contiguous block.
+using aequilibrae::matrix::cpp::SparseMatrixBuilderView;
+
+// Borrow worker-local builders and bind the origin for one routing operation.
 template <typename T> struct SelectLinkODOriginView {
   std::size_t set_count = 0;
-  std::size_t destination_count = 0;
-  std::size_t class_count = 0;
-  T *data = nullptr;
+  std::size_t origin_index = 0;
+  SparseMatrixBuilderView<T> *builders = nullptr;
 
-  T *selection_data(std::size_t index) const noexcept {
-    return destination_count && class_count
-               ? data + index * destination_count * class_count
-               : nullptr;
+  void append(std::size_t set, std::size_t destination,
+              const T *values) const noexcept {
+    builders[set].append(origin_index, destination, values);
   }
 };
 
 template <typename T> struct SelectLinkODOutputsView {
-  std::size_t origin_count = 0;
   std::size_t set_count = 0;
-  std::size_t destination_count = 0;
-  std::size_t class_count = 0;
-  T *data = nullptr; // [origins, sets, destinations, classes]
+  SparseMatrixBuilderView<T> *builders = nullptr;
 
   SelectLinkODOriginView<T> origin(std::size_t index) const noexcept {
-    T *values = nullptr;
-    if (set_count && destination_count && class_count) {
-      values = data + index * set_count * destination_count * class_count;
-    }
-    return {set_count, destination_count, class_count, values};
+    return {set_count, index, builders};
   }
 
   void reset() const noexcept {
-    if (origin_count && set_count && destination_count && class_count) {
-      std::fill_n(data,
-                  origin_count * set_count * destination_count * class_count,
-                  T{0});
-    }
+    for (std::size_t set = 0; set < set_count; ++set)
+      builders[set].reset();
   }
 };
 
 // Borrow the assignment's components for one run. This is a driver view;
 // individual operation kernels receive only the component they write.
-struct AoNOutputsView {
-  LoadingOutputs<double> loading;
-  SkimmingOutputsView<double> skimming;
-  SelectLinkLoadingOutputsView<double> selected_loading;
-  SelectLinkODOutputsView<double> selected_od;
+template <typename T> struct AoNOutputsView {
+  LoadingOutputs<T> loading;
+  SkimmingOutputsView<T> skimming;
+  SelectLinkLoadingOutputsView<T> selected_loading;
+  SelectLinkODOutputsView<T> selected_od;
 
   void reset() const noexcept {
     loading.reset();

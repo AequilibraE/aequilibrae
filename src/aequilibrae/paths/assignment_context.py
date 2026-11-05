@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.cython.aon_context import PreparedAoN
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
+from aequilibrae.paths.cython.aon import PreparedAoN
+from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads, sum_axis1
@@ -21,31 +22,6 @@ if TYPE_CHECKING:
     from aequilibrae.matrix import AequilibraeMatrix
     from aequilibrae.paths.cython.outputs import AoNOutputs
     from aequilibrae.paths.graph import Graph
-
-
-def assignment_demand(matrix: AequilibraeMatrix, centroids: np.ndarray) -> np.ndarray:
-    """Copy named matrices into fixed, packed assignment demand."""
-    if not isinstance(matrix, AequilibraeMatrix):
-        raise TypeError("Demand must be an AequilibraeMatrix")
-    if not np.array_equal(matrix.index, centroids):
-        raise ValueError("Matrix and graph must have the same centroid order")
-
-    names = tuple(matrix)
-    demand = np.stack([matrix[name] for name in names], axis=2) if names else np.empty((0, 0, 0))
-    zones = len(centroids)
-    classes = len(names)
-    if demand.shape != (zones, zones, classes) or not zones or not classes:
-        raise ValueError("Demand must have shape (zones, zones, classes)")
-    if not np.issubdtype(demand.dtype, np.number) or np.iscomplexobj(demand):
-        raise TypeError("Demand must contain real numbers")
-    if not np.all(np.isfinite(demand)) or np.any(demand < 0):
-        raise ValueError("Demand must be finite and nonnegative")
-
-    demand = np.array(demand, dtype=np.float64, order="C", copy=True)
-    if not np.all(np.isfinite(demand)):
-        raise ValueError("Demand must be finite when stored as float64")
-    demand.flags.writeable = False
-    return demand
 
 
 class AssignmentMapping:
@@ -128,7 +104,7 @@ class AssignmentInputs:
     def __init__(
         self,
         graph: Graph,
-        matrix: AequilibraeMatrix,
+        matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
         cores: int,

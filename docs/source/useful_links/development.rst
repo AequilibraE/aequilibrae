@@ -22,8 +22,11 @@ Software Design and requirements
 
 The most important piece of AequilibraE's backend is, without a doubt, `NumPy <http://numpy.org>`__.
 
-Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. We use `Cython <https://cython.org/>`_ to integrate compiled code written in Cython and C/C++.
+Whenever vectorization is not possible through the use of NumPy functions,
+compiled code is developed in order to accelerate computation. We use `Cython
+<https://cython.org/>`_ to integrate compiled code written in Cython and
+C/C++. You can find documentation of AequilibraE's internal model here
+:doc:`Internals <internals>`.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article <https://doi.org/10.1371/journal.pbio.1001745>`_.
@@ -61,16 +64,66 @@ using `Chocolatey <https://chocolatey.org/>`_ as a package manager.
   cinst python
 
   set PATH=C:\Python312;%PATH%
-  python -m pip install pipenv
-  virtualenv .venv #Only if you want to save the virtual environment in the same folder
-  python -m pipenv install --dev
-  python -m pipenv run pre-commit-install
+  python -m venv .venv
+  .venv\Scripts\activate
+  python -m pip install --upgrade pip
+  python -m pip install --group dev -e ".[create]"
 
-Setup Pycharm with the virtual environment you just created.
+Set up PyCharm with the virtual environment you just created.
 
 ::
 
   Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
+
+Using Spin
+~~~~~~~~~~
+
+AequilibraE uses `Spin <https://scientific-python.org/spin/>`_ to share development commands with GitHub Actions.
+Install the build tools and development dependencies in your virtual environment, then create an editable install::
+
+  python -m pip install --upgrade pip
+  python -m pip install --group dev -e ".[create]"
+  spin install
+
+``spin install`` enables verbose editable rebuilds by default, so importing AequilibraE shows any recompilation.
+Keep the build dependencies installed in the same environment, as editable rebuilds need them.
+
+Run the development checks from the repository root::
+
+  spin build
+  spin test
+  spin lint
+  spin doctest
+
+``spin test`` and ``spin doctest`` build the package first. They also work with an editable install created by
+``spin install``. Use ``--no-build`` to skip an explicit build when it is not needed.
+
+``spin test`` uses Spin's built-in test command, configured in ``pyproject.toml`` to default to eight workers
+(``-j 8``) and pass ``--random-order-bucket=global --random-order --durations=50`` to pytest.
+Supplying pytest arguments replaces that entire argument list rather than appending to it. Use ``-j`` to change
+the worker count. These defaults do not affect direct pytest invocations. For example::
+
+  spin test tests/aequilibrae/paths
+  spin test -j 2 -- -k graph --durations=10
+
+``spin lint`` runs Ruff lint/format checks, cython-lint, clang-tidy and clang-format in check-only mode. Install the LLVM tools
+``clang-tidy`` and ``clang-format`` separately using your system package manager. Linting never configures or
+builds the package. If there is no compilation database, it warns and skips clang-tidy; the other checks still run.
+Use ``spin lint -C BUILD_DIR`` to select an existing build directory.
+
+``spin doctest`` checks the Python docstrings and reStructuredText examples covered by the documentation workflow.
+It runs serially by default; pytest arguments can be supplied after ``--``.
+
+The other standard Spin commands are also available:
+
+* ``spin sdist`` and ``spin wheel`` build distribution archives.
+* ``spin python``, ``spin ipython`` and ``spin shell`` open an environment using the built package.
+* ``spin run`` executes a command using the built package.
+* ``spin docs`` builds the Sphinx documentation.
+* ``spin gdb`` and ``spin lldb`` launch the corresponding system debugger, which must be installed separately.
+* ``spin introspect COMMAND`` shows a command's implementation.
+
+Use ``spin COMMAND --help`` for command-specific options.
 
 Development Guidelines
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -197,14 +250,11 @@ All the AequilibraE documentation is (unfortunately) written in
 Although reStructuredText is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-
 looking HTML pages, while also bringing the docstring documentation along for the ride.
 
-To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev
-environment above, then nothing else is needed. However, if you have incorrectly only run::
+To build the documentation, first make sure the required packages are installed. If you have set up the development
+environment above, then nothing else is needed. In a separate environment, install the development group and create
+extra::
 
-    python -m pipenv install
-
-Then you will have to run::
-
-    python -m pipenv install --dev
+    python -m pip install --group dev -e ".[create]"
 
 Next, build the documentation in html format with the following commands run from the ``root`` folder::
 
@@ -276,8 +326,6 @@ identified and that we intend to dedicate some time to in the future.
 
 * Traffic assignment
 
-  * Re-development of the path-finding algorithm to allow for turn
-    penalties/bans
   * New origin-based traffic assignment to achieve ultra-converged
     assignment
   * New path-finding algorithm based on contraction-hierarchies

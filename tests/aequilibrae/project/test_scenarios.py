@@ -79,7 +79,6 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     assig.set_time_field("trav_time")
     assig.set_frequency_field("freq")
     assig.set_algorithm("os")
-    assigclass.set_demand_matrix_core("pt")
 
     assig.execute()
 
@@ -122,10 +121,9 @@ def test_route_choice_scenarios(scenario_example, scenario):
     if len(graph.centroids) >= 2:
         rc = RouteChoiceSet(graph)
         a, b = graph.centroids[0], graph.centroids[-1]
-        shape = (graph.num_zones, graph.num_zones)
 
         with Bridge(logger) as bridge:
-            results = rc.run(int(a), int(b), shape, max_routes=3, max_depth=2, bridge=bridge)
+            results = rc.run(int(a), int(b), max_routes=3, max_depth=2, bridge=bridge)
 
         assert isinstance(results, list)
         assert len(results) <= 3
