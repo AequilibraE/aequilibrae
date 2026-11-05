@@ -1,4 +1,5 @@
 from libc.stddef cimport size_t
+from libc.stdint cimport uint32_t
 from libcpp cimport bool as cpp_bool
 from libcpp.vector cimport vector
 from aequilibrae.paths.cython.outputs cimport CppSelectLinkODOutputsView
@@ -18,11 +19,16 @@ cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" n
         CppSearchWorkspace() noexcept
         CppSearchHeapStorage[T] *heap
 
+    cdef cppclass CppAStarEstimateCache "aequilibrae::paths::cpp::routing::AStarEstimateCache"[T]:
+        CppAStarEstimateCache() noexcept
+
     cdef cppclass CppAStarWorkspace "aequilibrae::paths::cpp::routing::AStarWorkspace"[T]:
         CppAStarWorkspace() noexcept
         CppSearchWorkspace[T] search
         T *costs
         T *estimates
+        uint32_t *estimate_epochs
+        CppAStarEstimateCache[T] *estimate_cache
 
     cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::routing::LoadingWorkspace"[T]:
         CppLoadingWorkspace() noexcept
@@ -59,6 +65,8 @@ cdef class SearchWorkspace:
 
 cdef class AStarWorkspace(SearchWorkspace):
     cdef double[::1] costs_buffer, estimates_buffer
+    cdef uint32_t[::1] estimate_epochs_buffer
+    cdef CppAStarEstimateCache[double] estimate_cache
     cdef CppAStarWorkspace[double] a_star_view(self) noexcept nogil
 
 

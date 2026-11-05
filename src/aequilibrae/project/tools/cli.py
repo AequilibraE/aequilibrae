@@ -207,9 +207,7 @@ def cli(argv=None):
     )
 
     try:
-        from importlib.metadata import version
-
-        aeq_version = version("aequilibrae")
+        from aequilibrae import version as aeq_version
     except Exception:
         aeq_version = "unknown"
     parser.add_argument("--version", action="version", version=f"aeq (AequilibraE {aeq_version})")

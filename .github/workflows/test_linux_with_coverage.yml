@@ -28,21 +28,21 @@ jobs:
       - name: Install Python and create virtual environment
         run: uv venv .venv --python ${{ matrix.python-version }} --python-preference only-managed
 
+      - name: Install test dependencies
+        run: |
+          uv pip install -r pyproject.toml --extra create --group build --group tests
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
       - name: Generate coverage report
         run: |
-          uv run --extra tests --extra create \
-            pytest tests/ \
-            --cov=aequilibrae \
+          spin test --coverage -j 4 -v -- tests/ \
             --cov-branch \
             --cov-report=term-missing \
-            --cov-report=html:cov_html \
             --cov-report=markdown-append:$GITHUB_STEP_SUMMARY \
             --dist=loadscope \
-            --numprocesses=4 \
-            --random-order \
-            --verbose
+            --random-order
 
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: html-coverage-artifact
-          path: ./cov_html/
+          path: ./build/coverage/

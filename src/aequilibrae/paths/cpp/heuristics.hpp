@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
 namespace aequilibrae::paths::cpp::routing {
 
 // Coordinates use local node order. Views borrow their Cython owner's arrays.
 template <typename T> struct EuclideanContext {
-  using value_type = T;
-
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>);
+  std::uint64_t cache_identity = 0;
   std::size_t node_count = 0;
   const T *x = nullptr;
   const T *y = nullptr;
@@ -25,8 +27,8 @@ template <typename T> struct EuclideanContext {
 };
 
 template <typename T> struct HaversineContext {
-  using value_type = T;
-
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>);
+  std::uint64_t cache_identity = 0;
   std::size_t node_count = 0;
   const T *latitudes = nullptr;  // Radians.
   const T *longitudes = nullptr; // Radians.

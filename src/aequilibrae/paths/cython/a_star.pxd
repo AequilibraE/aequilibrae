@@ -1,4 +1,5 @@
 from libc.stddef cimport size_t
+from libc.stdint cimport uint64_t
 from aequilibrae.paths.cython.context cimport CppNodeBasedContext, CppTurnBasedContext
 from aequilibrae.paths.cython.search_query cimport CppSearchQuery
 from aequilibrae.paths.cython.search_results cimport CppMutableSearchResults
@@ -8,6 +9,7 @@ from aequilibrae.paths.cython.workspaces cimport CppAStarWorkspace
 cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     cdef cppclass CppEuclideanContext "aequilibrae::paths::cpp::routing::EuclideanContext"[T]:
         CppEuclideanContext() noexcept
+        uint64_t cache_identity
         size_t node_count
         const T *x
         const T *y
@@ -16,6 +18,7 @@ cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::routing" n
 
     cdef cppclass CppHaversineContext "aequilibrae::paths::cpp::routing::HaversineContext"[T]:
         CppHaversineContext() noexcept
+        uint64_t cache_identity
         size_t node_count
         const T *latitudes
         const T *longitudes
@@ -25,6 +28,7 @@ cdef extern from "heuristics.hpp" namespace "aequilibrae::paths::cpp::routing" n
 
 
 cdef class EuclideanContext:
+    cdef uint64_t cache_identity
     cdef const double[::1] x, y
     cdef readonly size_t node_count
     cdef readonly double scale
@@ -32,6 +36,7 @@ cdef class EuclideanContext:
 
 
 cdef class HaversineContext:
+    cdef uint64_t cache_identity
     cdef const double[::1] latitudes, longitudes, cos_latitudes
     cdef readonly size_t node_count
     cdef readonly double scale
