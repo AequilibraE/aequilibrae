@@ -48,6 +48,7 @@ def migrate(
     with TemporaryDirectory(dir=folder) as temporary:
         staged_files = stage_matrix_metadata(project_conn, folder, Path(temporary))
         move_results_table(project_conn, results_conn)
+        project_conn.execute("DROP TABLE IF EXISTS matrices")
 
         # SQLite rollback cannot undo file replacements, so finish all staged edits and SQL work first.
         for copy, original in staged_files:
@@ -70,6 +71,11 @@ def stage_matrix_metadata(project_conn: sqlite3.Connection, folder: Optional[Pat
     # Validate and edit copies before changing any original files.
     for file_name, *values in rows:
         path = folder / "matrices" / file_name
+        if path.suffix.lower() == ".aem":
+            raise RuntimeError(
+                f"legacy AEM matrix file {path!r} found, its metadata cannot not be migrated. "
+                "Re-encode as OMX manually",
+            )
         metadata = {key: value for key, value in zip(columns, values, strict=True) if value is not None}
         if not path.is_file():
             if not metadata:
