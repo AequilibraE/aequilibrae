@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from aequilibrae import Project
-from aequilibrae.project.project_creation import remove_triggers
+from aequilibrae.project.project_creation import _remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
@@ -118,7 +118,7 @@ def cached_empty_no_triggers_project(cache_path):
 @pytest.fixture
 def empty_no_triggers_project(empty_project, tmp_path) -> Project:
     with empty_project.db_connection as conn:
-        remove_triggers(conn, db_type="network")
+        _remove_triggers(conn, db_type="network")
         tables = ["nodes", "links"]
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")

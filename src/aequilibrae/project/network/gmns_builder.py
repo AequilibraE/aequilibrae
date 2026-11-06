@@ -48,6 +48,14 @@ def resolve_recusive_dict(base_dict):
 
 
 class GMNSBuilder:
+    @staticmethod
+    def _read_csv_with_empty_text(path: str) -> pd.DataFrame:
+        """Fill missing text fields without coercing numeric columns to strings."""
+        frame = pd.read_csv(path)
+        text_columns = frame.select_dtypes(include=["object", "string"]).columns
+        frame[text_columns] = frame[text_columns].fillna("")
+        return frame
+
     def __init__(
         self,
         net,
@@ -65,8 +73,8 @@ class GMNSBuilder:
         self.modes = net.modes
         self.__connections = connections
 
-        self.link_df = pd.read_csv(link_path).fillna("")
-        self.node_df = pd.read_csv(node_path).fillna("")
+        self.link_df = self._read_csv_with_empty_text(link_path)
+        self.node_df = self._read_csv_with_empty_text(node_path)
         self.uses_df = pd.read_csv(uses_path) if uses_path not in [""] else None
         self.geom_df = pd.read_csv(geom_path) if geom_path not in [""] else None
         self.srid = srid
@@ -287,9 +295,9 @@ class GMNSBuilder:
 
             to_drop_lst += list(same_dir_df.index) + list(opp_dir_df.index)
 
-        sorted_df.drop(to_drop_lst, axis=0, inplace=True)
+        sorted_df = sorted_df.drop(to_drop_lst, axis=0)
         self.link_df = self.link_df[self.link_df.link_id.isin(list(sorted_df.link_id))]
-        self.link_df.reset_index(drop=True, inplace=True)
+        self.link_df = self.link_df.reset_index(drop=True)
         direction = list(self.link_df[gmns_dir])
 
         return direction

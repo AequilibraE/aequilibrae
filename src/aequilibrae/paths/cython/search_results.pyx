@@ -37,12 +37,13 @@ cdef class SearchResults:
         self.connectors_buffer = array[size_t](state_count, True, INVALID)
         self.settlement_order_buffer = array[size_t](state_count, True, INVALID)
         self.terminal_states_buffer = array[size_t](node_count, True, INVALID)
+        self.terminal_nodes_buffer = array[size_t](node_count)
         self.distances_buffer = array[double](state_count, True, np.inf)
         self.turn_costs_buffer = array[double](state_count, True, np.inf)
 
-    cdef CppMutableSearchResults view(self) noexcept nogil:
+    cdef CppMutableSearchResults[double] view(self) noexcept nogil:
         """Borrow writable buffers and the owner's metadata for a search."""
-        cdef CppMutableSearchResults result
+        cdef CppMutableSearchResults[double] result
         result.node_count = self.node_count
         result.state_count = self.state_count
         result.link_count = self.link_count
@@ -50,12 +51,13 @@ cdef class SearchResults:
         result.connectors = array_pointer(self.connectors_buffer)
         result.settlement_order = array_pointer(self.settlement_order_buffer)
         result.terminal_states = array_pointer(self.terminal_states_buffer)
+        result.terminal_nodes = array_pointer(self.terminal_nodes_buffer)
         result.distances = array_pointer(self.distances_buffer)
         result.turn_costs = array_pointer(self.turn_costs_buffer)
         result.metadata = &self.metadata
         return result
 
-    cdef CppSearchResults read_view(self) noexcept nogil:
+    cdef CppSearchResults[double] read_view(self) noexcept nogil:
         """Downstream operations may read paths, but must not change them."""
         return self.view().read_view()
 

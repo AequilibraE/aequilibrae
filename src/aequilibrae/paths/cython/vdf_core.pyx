@@ -469,8 +469,9 @@ def delta_akcelik(d_akcelik, link_flows, fftime, capacity, cores, alpha, tau, le
     cdef double[:] fftime_view = fftime
     cdef double[:] alpha_view = alpha
     cdef double[:] tau_view = tau
+    cdef double[:] length_view = length
 
-    dakcelik_cython(d_akcelik_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, c)
+    dakcelik_cython(d_akcelik_view, link_flows_view, capacity_view, fftime_view, alpha_view, tau_view, length_view, c)
 
 
 @cython.wraparound(False)
@@ -524,6 +525,7 @@ cpdef void dakcelik_cython(
     const double[:] fftime,
     const double[:] alpha,
     const double[:] tau,
+    const double[:] length,
     const int cores
 ) noexcept:
     cdef long long i
@@ -531,7 +533,7 @@ cpdef void dakcelik_cython(
 
     for i in prange(n_links, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            deltaresult[i] = (
+            deltaresult[i] = length[i] * (
                 alpha[i]
                 * (0.5 * tau[i] - capacity[i] + link_flows[i])
                 / (
@@ -546,7 +548,8 @@ cpdef void dakcelik_cython(
 
         else:
             deltaresult[i] = (
-                alpha[i]
+                length[i]
+                * alpha[i]
                 / capacity[i]
                 * ((0.5 * tau[i] - capacity[i]) / capacity[i] + 1)
             )

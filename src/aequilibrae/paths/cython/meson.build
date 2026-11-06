@@ -6,7 +6,8 @@ pyfiles = [
 
 exts = [
     'a_star',
-    'aon_context',
+    'aon',
+    'demand',
     'graph_building',
     'parallel_numpy',
     'public_transport',
@@ -16,13 +17,11 @@ exts = [
     'vdf_core',
     'context',
     'search_results',
-    'queries',
+    'search_query',
     'workspaces',
     'outputs',
-    'network_loading',
     'network_skimming_core',
     'skimming',
-    'select_link_loading',
     'dijkstra',
 ]
 

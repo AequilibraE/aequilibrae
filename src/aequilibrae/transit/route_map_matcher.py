@@ -274,7 +274,7 @@ class RouteMapMatcher(WorkerThread):
 
         # Map internal link IDs to original network IDs
         df = result.merge(corresp, on="link_id", how="left")
-        df.sort_values(by=["sequence"], inplace=True)
+        df = df.sort_values(by=["sequence"])
 
         # Remove consecutive links with same original_id and direction
         # (these are internal graph subdivisions of the same physical link)
@@ -290,9 +290,9 @@ class RouteMapMatcher(WorkerThread):
         df = df[(crit_differs_prev & crit_differs_next) | (df.distance > DEAD_END_RUN)]
 
         # Prepare final output with direction based on link sign
-        df.sort_values(by=["sequence"], inplace=True)
+        df = df.sort_values(by=["sequence"])
         df = df[["original_id", "direction"]]
-        df.reset_index(drop=True, inplace=True)
+        df = df.reset_index(drop=True)
 
         # Eliminate back-and-forth patterns on the same link
         # e.g., [A, B, A] -> [A] when all three have the same absolute link_id
@@ -302,12 +302,12 @@ class RouteMapMatcher(WorkerThread):
             for i in range(0, df.shape[0] - 2):
                 # Check if three consecutive rows are all the same link
                 if df.loc[i : i + 2, "original_id"].unique().shape[0] == 1:
-                    df.drop(index=[i, i + 1], inplace=True)
+                    df = df.drop(index=[i, i + 1])
                     df.index = pd.RangeIndex(df.shape[0])
                     has_issues = True
                     break
 
-        df.dropna(subset=["original_id"], inplace=True)
+        df = df.dropna(subset=["original_id"])
         df["original_id"] = df["original_id"].astype(int)
 
         return df.rename(columns={"original_id": "link_id", "direction": "dir"})
@@ -350,7 +350,7 @@ class RouteMapMatcher(WorkerThread):
             .merge(df.assign(sequence=np.arange(df.shape[0])), on="link_id", how="inner")
             .sort_values("sequence")
         )
-        df_.reset_index(drop=True, inplace=True)
+        df_ = df_.reset_index(drop=True)
         # dir < 0 means BA direction (reverse), dir >= 0 means AB direction (forward)
         shapes = [rec.geometry.reverse() if rec["dir"] < 0 else rec.geometry for _, rec in df_.iterrows()]
 

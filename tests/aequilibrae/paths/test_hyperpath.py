@@ -10,6 +10,10 @@ https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import sparse
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 
@@ -413,8 +417,24 @@ def network_setup(request):
     return result
 
 
+@pytest.fixture(params=[DenseMatrix, SparseMatrix])
+def packed_demand(network_setup, request):
+    centroids = network_setup["centroids"]
+    positions = {node: zone for zone, node in enumerate(centroids)}
+    demand = network_setup["demand"]
+    origin, destination = demand.columns[:2]
+    values = np.zeros((len(centroids), len(centroids)))
+    np.add.at(
+        values,
+        ([positions[node] for node in demand[origin]], [positions[node] for node in demand[destination]]),
+        demand["demand"].to_numpy(),
+    )
+    source = sparse.csr_array(values) if request.param is SparseMatrix else values
+    return request.param.from_dict({"demand": source}, transpose=True)
+
+
 @pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
-def test_bell_assign_parallel_agreement(network_setup):
+def test_bell_assign_parallel_agreement(network_setup, packed_demand):
     hp = HyperpathGenerating(
         network_setup["edges"],
         o_vert_ids=network_setup["centroids"],
@@ -424,13 +444,7 @@ def test_bell_assign_parallel_agreement(network_setup):
 
     results = []
     for threads in [1, 2, 4]:
-        hp.assign(
-            network_setup["demand"]["orig_vert_idx"].values.astype(np.uint32),
-            network_setup["demand"]["dest_vert_idx"].values.astype(np.uint32),
-            network_setup["demand"]["demand"].values.astype(np.float64),
-            check_demand=True,
-            threads=threads,
-        )
+        hp.assign(packed_demand, threads=threads)
         results.append(hp._edges.copy(deep=True))
 
     for result in results[1:]:
@@ -438,14 +452,14 @@ def test_bell_assign_parallel_agreement(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_run_01(network_setup):
+def test_SF_single_destination(network_setup, packed_demand):
     hp = HyperpathGenerating(
         network_setup["edges"],
         o_vert_ids=network_setup["centroids"],
         d_vert_ids=network_setup["centroids"],
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
-    hp.run(origin=0, destination=12, volume=1.0)
+    hp.assign(packed_demand, threads=1)
 
     np.testing.assert_allclose(
         network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
@@ -476,7 +490,7 @@ def test_SF_run_01(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_assign_01(network_setup):
+def test_SF_assign_01(network_setup, packed_demand):
     hp = HyperpathGenerating(
         network_setup["edges"],
         o_vert_ids=network_setup["centroids"],
@@ -484,12 +498,7 @@ def test_SF_assign_01(network_setup):
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
 
-    hp.assign(
-        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["demand"].values.astype(np.float64),
-        check_demand=True,
-    )
+    hp.assign(packed_demand)
 
     np.testing.assert_allclose(
         network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
@@ -539,7 +548,7 @@ def test_waiting_time_skimming(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_skimming_01(network_setup):
+def test_SF_skimming_01(network_setup, packed_demand):
     hp = HyperpathGenerating(
         network_setup["edges"],
         skim_cols=["boardings", "transfers", "waiting_time"],
@@ -548,13 +557,9 @@ def test_SF_skimming_01(network_setup):
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
 
-    hp.assign(
-        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["demand"].values.astype(np.float64),
-        check_demand=True,
-    )
-    mats = hp.skim_matrix
+    hp.assign(packed_demand)
+    assert isinstance(hp.skim_matrix, DenseMatrix)
+    mats = hp.skim_matrix.to_matrix(network_setup["centroids"])
 
     np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
 
@@ -577,7 +582,7 @@ def test_SF_skimming_01(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_skimming_02(network_setup):
+def test_SF_skimming_02(network_setup, packed_demand):
     hp = HyperpathGenerating(
         network_setup["edges"],
         skim_cols=["boardings", "alightings"],
@@ -586,13 +591,8 @@ def test_SF_skimming_02(network_setup):
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
 
-    hp.assign(
-        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["demand"].values.astype(np.float64),
-        check_demand=True,
-    )
-    mats = hp.skim_matrix
+    hp.assign(packed_demand)
+    mats = hp.skim_matrix.to_matrix(network_setup["centroids"])
 
     # Only board once
     np.testing.assert_allclose(mats["boardings"], mats["alightings"])
