@@ -1,7 +1,9 @@
 import argparse
 import functools
 import inspect
+import logging
 import os
+import textwrap
 
 # Dests used internally via the .set_defaults trick. The prefix keeps them from colliding with
 # real function parameters.
@@ -42,6 +44,14 @@ def _annotation_help(param):
     return f"type: {inspect.formatannotation(param.annotation)}"
 
 
+def _deindent_doc_string(func):
+    doc = inspect.getdoc(func)
+    if doc is None:
+        return
+    else:
+        return textwrap.dedent(doc)
+
+
 def _extract_target_call(args: dict):
     """
     Split a parsed argument dict into the target function and the keyword arguments to call it with.
@@ -56,8 +66,13 @@ def add_subcommand_from_function(subparsers, func, defaults: dict):
     """
     Create a sub-command from a function's signature.
     """
-    doc = inspect.getdoc(func)
-    parser = subparsers.add_parser(func.__name__, description=doc, help=doc.split("\n")[0] if doc else None)
+    doc = _deindent_doc_string(func)
+    parser = subparsers.add_parser(
+        func.__name__,
+        description=doc,
+        help=doc,
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.set_defaults(_aeq_internal_target_func=functools.partial(func, **defaults) if defaults else func)
 
     var_keyword = None
@@ -160,6 +175,37 @@ def run(args, unparsed_args):
         project.close()
 
 
+def copy_project(parser, operation, args, unparsed_args):
+    """Copy project files without opening or activating a Project."""
+    if unparsed_args:
+        parser.error(f"unrecognised arguments: {' '.join(unparsed_args)}")
+    print(operation(args.project, args.destination))
+
+
+def create_project(parser, args, unparsed_args):
+    """Create a project separately from importing old database rows."""
+    if unparsed_args:
+        parser.error(f"unrecognised arguments: {' '.join(unparsed_args)}")
+    from pathlib import Path
+
+    from aequilibrae.project import Project
+
+    project = Project()
+    project.new(args.project)
+    try:
+        print(Path(args.project).resolve())
+    finally:
+        project.close()
+
+
+def import_project(parser, operation, args, unparsed_args):
+    """Import into an existing schema without opening or activating a Project."""
+    if unparsed_args:
+        parser.error(f"unrecognised arguments: {' '.join(unparsed_args)}")
+    logging.basicConfig(level=logging.INFO)
+    print(operation(args.source, args.project))
+
+
 def cli(argv=None):
     """Entry point for the aeq command. argv defaults to sys.argv, it is a parameter for testing."""
     # Create a parser that just parses the project dir. This is global and used by every sub-command.
@@ -197,8 +243,37 @@ def cli(argv=None):
     list_functions_parser = subparsers.add_parser("list", help="List project commands")
     list_functions_parser.set_defaults(_aeq_internal_func=functools.partial(list_functions, list_functions_parser))
 
+    from aequilibrae.project.tools.backup import backup, copy_from_old
+
+    create_parser = subparsers.add_parser("create", help="Create a new blank project", allow_abbrev=False)
+    create_parser.set_defaults(_aeq_internal_func=functools.partial(create_project, create_parser))
+
+    copy_parser = subparsers.add_parser(
+        "backup",
+        help="Back up project databases and files",
+        description=_deindent_doc_string(backup),
+        formatter_class=argparse.RawTextHelpFormatter,
+        allow_abbrev=False,
+    )
+    copy_parser.add_argument("destination", help="New destination directory outside the source project")
+    copy_parser.set_defaults(_aeq_internal_func=functools.partial(copy_project, copy_parser, backup))
+
+    import_parser = subparsers.add_parser(
+        "copy-from-old",
+        help="Import old project database rows into the existing project schema",
+        description=_deindent_doc_string(copy_from_old),
+        formatter_class=argparse.RawTextHelpFormatter,
+        allow_abbrev=False,
+    )
+    import_parser.add_argument("source", help="Old project directory to read from")
+    import_parser.set_defaults(_aeq_internal_func=functools.partial(import_project, import_parser, copy_from_old))
+
     args, unparsed_args = parser.parse_known_args(argv)
 
     # args now contains the project and the "_aeq_internal_func" to run from .set_defaults. unparsed_args should
     # contain everything else.
     args._aeq_internal_func(args, unparsed_args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -121,4 +121,5 @@ In the following sections, we present the structure of each component of an Aequ
    aequilibrae_project/transit_database/data_model/datamodel
    aequilibrae_project/project_components
    aequilibrae_project/logging_internals
+   aequilibrae_project/backups
    _auto_examples/aequilibrae_project/index
