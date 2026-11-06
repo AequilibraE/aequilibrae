@@ -80,6 +80,7 @@ def stage_matrix_metadata(project_conn: sqlite3.Connection, folder: Optional[Pat
         copy = temporary / path.relative_to(folder / "matrices")
         copy.parent.mkdir(parents=True, exist_ok=True)
         copy2(path, copy)
+        logger.debug("Adding metadata to: %s", copy)
         with omx.open_file(copy, mode="r+") as matrix:
             conflicts = metadata.keys() & matrix.attrs.keys()
             if conflicts:
