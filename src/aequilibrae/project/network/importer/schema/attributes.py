@@ -33,7 +33,7 @@ def _row_to_json_dropping_nans(row: pd.Series):
     existing = row.get(JSON_COL)
     if isinstance(existing, str):
         existing = json.loads(existing)
-    payload = existing if isinstance(existing, dict) else {}
+    payload = existing.copy() if isinstance(existing, dict) else {}
     for key, value in row.items():
         if key == JSON_COL or is_missing(value):
             continue

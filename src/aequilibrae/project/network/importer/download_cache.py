@@ -61,12 +61,16 @@ class DownloadCache:
 
     def write_geoparquet(self, name: str, gdf) -> Path:
         """Write a GeoDataFrame, adding the ``.parquet`` suffix if needed."""
-        return self._write(name + ".parquet", gdf.to_parquet)
+        if not name.endswith(".parquet"):
+            name += ".parquet"
+        return self._write(name, gdf.to_parquet)
 
     def write_json(self, name: str, payload) -> Path:
         """Write JSON, adding the ``.json`` suffix if needed."""
         text = json.dumps(payload, indent=2, default=str)
-        return self._write(name + ".json", lambda target: target.write_text(text, encoding="utf-8"))
+        if not name.endswith(".json"):
+            name += ".json"
+        return self._write(name, lambda target: target.write_text(text, encoding="utf-8"))
 
     def write_manifest(self, manifest: dict) -> Path:
         """Write provenance and payload checksums to ``manifest.json``."""
