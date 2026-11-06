@@ -286,9 +286,6 @@ class GTFSReader(WorkerThread):
                     logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
                     continue
 
-                cleaner = stop_times.assign(seqkey=stop_times.stop.shift(-1) + "#####" + stop_times.stop)
-                cleaner = cleaner.drop_duplicates(["seqkey"], keep="first")
-                stop_times = cleaner.drop(columns=["seqkey"])
                 stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
                 stop_times["departure_time"] = stop_times.departure_time.astype(int)
                 self.stop_times[trip.trip] = stop_times
