@@ -58,6 +58,73 @@ API Changes
 Changes in Behaviour
 --------------------
 
+GTFS import
+~~~~~~~~~~~
+The behaviour of GTFS importer changed in AequilibraE 2.0. Models created with previous versions, particularly those
+that imported GTFS feeds that include ``frequencies.txt``, loop routes, scheduled dwell, consecutive stops with
+equal times, free fares or unlimited transfers would benefit from being imported again.
+
+Changes in behaviour and corrections include:
+
+- **Scheduled dwell** is kept: ``trips_schedule`` stores each stop's arrival and departure as published, rather than
+  the later of the two for both, which added the dwell at each stop to the run time towards it.
+- **Consecutive stops with equal times** no longer stop the import: run times of zero become one second, and negative
+  run times are repaired the same way. The number of times repaired is logged.
+- **Trips crossing midnight** in clock time (``23:58:00``, then ``00:02:00``) continue past ``24:00:00`` (``24:02:00``),
+  rather than going back in time. Times written past ``24:00:00``, as GTFS specifies, are kept as published.
+
+- **Maximum speeds** set with ``set_maximum_speeds`` are applied. Distances were measured in degrees, so they never
+  were. Distances are in metres and speeds in metres per second.
+
+- **frequencies.txt** trips are imported, one trip per departure from ``start_time`` up to but excluding ``end_time``,
+  in every window of the trip. Every trip defined by frequencies was skipped before. Their trip IDs, such as
+  ``F-25200`` for trip ``F`` leaving at 07:00, never replace a trip of the feed.
+
+- **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``, and
+  the links to a stop visited a second time follow the shape rather than a straight line.
+
+- **Patterns** are told apart by delimited stop IDs, so stop sequences such as ``1, 23`` and ``12, 3`` on one route are
+  no longer the same pattern. Pattern IDs of routes with several patterns may differ from those of earlier imports.
+
+- **Extended route types** (``100`` to ``1700``) take the default capacities, PCEs and maximum speeds of their basic
+  type, and map matching a basic type also matches its extended types, so extended bus types such as ``700`` can be
+  map matched.
+
+- **Fares** are stored as published: a free fare keeps its price of zero, empty ``transfers`` (unlimited transfers),
+  ``transfer_duration`` (no time limit) and ``payment_method`` are stored as NULL rather than zero, and fare zone IDs
+  are text. Transit migration 008 declares ``fare_rules.contains`` as text, though zone IDs that earlier imports
+  turned into numbers (such as ``07`` into ``7``) cannot be recovered.
+
+- **Non-ASCII characters** are kept. Every character outside ASCII was removed from the feed before, so
+  ``Peñuelas`` was imported as ``Peuelas``, in names, IDs and fare zones alike. Feeds must be encoded in UTF-8, as
+  GTFS requires.
+
+- **Fare rules** for a route or fare absent from the feed are skipped with a warning, and those for routes without
+  service on the date imported are not saved. A rule for an unknown route applied to every route, and one for an
+  unknown fare stopped the import. ``fare_zones`` lists the zones of every rule and stop, and stops without a zone
+  have a NULL ``transit_fare_zone``.
+
+- **Stations** that stops have as their ``parent_station`` are saved with the stops, so ``parent_station`` no longer
+  refers to a missing stop.
+
+- **Malformed files** no longer stop the import: rows that leave out their trailing empty fields, and files with a
+  single row that lack optional columns, are read. Stop times for stops absent from ``stops.txt`` are dropped, and
+  trips without times at their first or last stop are skipped, both with a warning.
+
+The GTFS export code was also overhauled.
+
+``Transit.export_gtfs`` writes the transit database to a zipped GTFS feed, with the GTFS IDs of the imported feeds.
+GTFS requires the URL and time zone of the agencies, which import does not keep, so they are arguments. Each agency
+gets its imported service date as its only service, in ``calendar_dates.txt``, and trips imported from
+``frequencies.txt`` are exported as individual trips. Agencies that share GTFS IDs can only be exported together
+with ``prefix_ids=True``, which prefixes each ID with its agency (e.g. ``Metro:1``), and also with the service date
+for an agency imported for several dates (e.g. ``Metro_20260105:1``). Stops keep their ``parent_station``, and
+stations are written with ``location_type`` 1.
+
+.. code-block:: python
+
+    transit.export_gtfs("feed.zip", agency_url="https://www.agency.com", agency_timezone="America/Santiago")
+
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
 The Connectivity Analysis procedure no longer returns a list of disconnected OD pairs, but rather a Numpy array

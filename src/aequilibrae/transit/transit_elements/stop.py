@@ -37,7 +37,7 @@ class Stop(BasicPTElement):
         self.dir = None
         self.srid = -1
         self.geo: Optional[Point] = None
-        self.route_type: Optional[int] = None
+        self.route_type = -1
         self.__map_matching_id__: Dict[Any, Any] = {}
         self.__moved_map_matching__ = 0
 
@@ -48,6 +48,7 @@ class Stop(BasicPTElement):
             key = key if key != "zone_id" else "zone"
             self.__dict__[key] = value
 
+        self.zone = self.zone or None
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
 

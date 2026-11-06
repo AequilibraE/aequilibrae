@@ -34,12 +34,9 @@ class Fare:
                 raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")
 
             # We convert route_id into route, as the the GTFS header for it is not maintained in our database
-            v = None if value in [0, ""] else value
             key = "fare" if key == "fare_id" else key
             key = "agency" if key == "agency_id" else key
-            if key in ["payment_method", "transfer", "transfer_duration"]:
-                v = v or self.__dict__[key]
-            self.__dict__[key] = v
+            self.__dict__[key] = None if value == "" else value
 
     def save_to_database(self, conn: Connection) -> None:
         """Saves Fare attributes to the database"""

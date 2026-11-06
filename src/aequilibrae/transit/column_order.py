@@ -72,12 +72,12 @@ column_order = {
     "fare_attributes.txt": OrderedDict(
         [
             ("fare_id", str),
-            ("price", float),
+            ("price", str),
             ("currency_type", str),
-            ("payment_method", int),
-            ("transfers", int),
+            ("payment_method", str),
+            ("transfers", str),
             # ("agency_id", str),
-            ("transfer_duration", float),
+            ("transfer_duration", str),
         ]
     ),
     "fare_rules.txt": OrderedDict(
