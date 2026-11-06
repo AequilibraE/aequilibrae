@@ -46,27 +46,27 @@ class DownloadCache:
             return None
         return self._folder.relative_to(self._project_base_path).as_posix()
 
-    def _write(self, name: str, suffix: str, write) -> Path:
+    def _write(self, name: str, write) -> Path:
         if not self._created:
             self._folder.mkdir(parents=True, exist_ok=True)
             self._created = True
             logger.info(f"Download cache folder: {self._folder}")
-        if not name.endswith(suffix):
-            name += suffix
+
         target = self._folder / name
         write(target)
+
         with target.open("rb") as fh:
             self._sha256s[name] = hashlib.file_digest(fh, "sha256").hexdigest()
         return target
 
     def write_geoparquet(self, name: str, gdf) -> Path:
         """Write a GeoDataFrame, adding the ``.parquet`` suffix if needed."""
-        return self._write(name, ".parquet", gdf.to_parquet)
+        return self._write(name + ".parquet", gdf.to_parquet)
 
     def write_json(self, name: str, payload) -> Path:
         """Write JSON, adding the ``.json`` suffix if needed."""
         text = json.dumps(payload, indent=2, default=str)
-        return self._write(name, ".json", lambda target: target.write_text(text, encoding="utf-8"))
+        return self._write(name + ".json", lambda target: target.write_text(text, encoding="utf-8"))
 
     def write_manifest(self, manifest: dict) -> Path:
         """Write provenance and payload checksums to ``manifest.json``."""
