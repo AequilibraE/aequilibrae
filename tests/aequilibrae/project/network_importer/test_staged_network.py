@@ -38,6 +38,16 @@ def test_minimal_staged_validates():
     net.validate()
 
 
+@pytest.mark.parametrize("table", ["nodes", "links"])
+@pytest.mark.parametrize("encoding", ["json", "wkt"])
+def test_equivalent_wgs84_crs_validates(table, encoding):
+    net = _make_minimal_staged()
+    gdf = getattr(net, table)
+    crs = gdf.crs.to_json() if encoding == "json" else gdf.crs.to_wkt()
+    setattr(net, table, gdf.set_crs(crs, allow_override=True))
+    net.validate()
+
+
 def test_missing_required_node_column_raises():
     net = _make_minimal_staged()
     net.nodes = net.nodes.drop(columns=["modes"])
@@ -96,8 +106,10 @@ def test_to_graph_decomposes_bidirectional_links():
     assert sum(ref.endswith("::ba") for ref in refs) == 1
 
 
-def test_non_wgs84_crs_raises():
+@pytest.mark.parametrize("table", ["nodes", "links"])
+@pytest.mark.parametrize("crs", [None, "EPSG:3857", "EPSG:4269"])
+def test_non_wgs84_crs_raises(table, crs):
     net = _make_minimal_staged()
-    net.nodes = net.nodes.to_crs("EPSG:3857")
-    with pytest.raises(StagedNetworkValidationError, match="EPSG:4326"):
+    setattr(net, table, getattr(net, table).set_crs(crs, allow_override=True))
+    with pytest.raises(StagedNetworkValidationError, match=f"{table} CRS must be EPSG:4326"):
         net.validate()

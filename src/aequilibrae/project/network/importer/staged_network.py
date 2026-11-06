@@ -28,7 +28,7 @@ class StagedNetwork:
             missing = [c for c in required if c not in gdf.columns]
             if missing:
                 raise StagedNetworkValidationError(f"{label} GeoDataFrame missing required columns: {missing}")
-            if str(gdf.crs).upper() != "EPSG:4326":
+            if gdf.crs != "EPSG:4326":
                 raise StagedNetworkValidationError(f"{label} CRS must be EPSG:4326, got {gdf.crs}")
 
         dtype = self.nodes["node_id"].dtype
