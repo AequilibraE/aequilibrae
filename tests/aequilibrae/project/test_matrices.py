@@ -257,7 +257,7 @@ def test_get_matrix_logs_unreadable_file_with_context(matrix_table, caplog, subs
         matrix_table.get_matrix(path.name, subset=subset)
 
     assert isinstance(caught.value.__cause__, OSError)
-    assert str(path) in caplog.text
+    assert repr(str(path)) in caplog.text
     assert any(record.levelname == "ERROR" for record in caplog.records)
 
 
@@ -266,7 +266,7 @@ def test_matrix_metadata_logs_unreadable_file_with_context(matrix_table, caplog)
     path.write_bytes(b"not an OMX file")
     with pytest.raises(OSError, match="Could not read metadata from OMX matrix file .*damaged.omx"):
         matrix_table.get_available_matrices_and_metadata()
-    assert str(path) in caplog.text
+    assert repr(str(path)) in caplog.text
 
 
 @pytest.mark.parametrize("extension", [".OMX", ".Omx"])
