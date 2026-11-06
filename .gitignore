@@ -91,6 +91,7 @@ __pycache__/
 
 # Distribution / packaging
 build/
+build-install/
 *.egg-info/
 *.egg
 

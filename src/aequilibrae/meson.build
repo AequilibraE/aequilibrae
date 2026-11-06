@@ -18,8 +18,14 @@ pkgs = [
   'utils',
 ]
 
+version_file = configure_file(
+  input: '_version.py.in',
+  output: '_version.py',
+  configuration: {'PROJECT_VERSION': meson.project_version()},
+)
+
 py.install_sources(
-  pyfiles,
+  pyfiles + [version_file],
   pure: false,
   subdir: thisdir,
 )

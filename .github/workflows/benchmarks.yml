@@ -77,7 +77,7 @@ jobs:
           ref: ${{ env.BASE_REF }}
 
       - name: Install AequilibraE (base)
-        run: uv pip install ".[dev]"
+        run: uv pip install --group tests .
 
       - name: Run benchmarks (base)
         env:
@@ -90,7 +90,7 @@ jobs:
           ref: ${{ env.PR_SHA }}
 
       - name: Install AequilibraE (PR)
-        run: uv pip install ".[dev]"
+        run: uv pip install --group tests .
 
       - name: Run benchmarks (PR)
         env:

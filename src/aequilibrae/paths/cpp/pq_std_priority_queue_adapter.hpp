@@ -26,15 +26,21 @@ private:
 
   using Entry = std::pair<T, std::size_t>;
 
-  std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pq_;
+  class Queue : public std::priority_queue<Entry, std::vector<Entry>,
+                                           std::greater<Entry>> {
+  public:
+    const std::vector<Entry> &entries() const noexcept { return this->c; }
+  };
+
+  Queue pq_;
   std::vector<T> keys_;
   std::vector<T> extracted_keys_;
   std::vector<ElementState> states_;
   std::size_t size_ = 0;
 
-  void init_heap_impl(std::size_t length) noexcept { this->alloc_heap(length); }
+  void init_heap_impl(std::size_t length) { this->alloc_heap(length); }
 
-  void alloc_heap_impl(std::size_t length) noexcept {
+  void alloc_heap_impl(std::size_t length) {
     this->free_heap();
     keys_.assign(length, kInfinity<T>);
     extracted_keys_.assign(length, kInfinity<T>);
@@ -109,6 +115,20 @@ private:
       return extracted_keys_[element_idx];
     }
     return keys_[element_idx];
+  }
+
+  template <class F> void for_each_pending_impl(F &&fn) const {
+    if (size_ == 0) {
+      return;
+    }
+    // Lazy decrease-key leaves stale entries in the backing container. Equal
+    // keys can also leave duplicate live entries; callbacks must be idempotent.
+    for (const Entry &entry : pq_.entries()) {
+      const std::size_t idx = entry.second;
+      if (states_[idx] == IN_HEAP && entry.first == keys_[idx]) {
+        fn(idx);
+      }
+    }
   }
 
   void discard_stale_entries() noexcept {

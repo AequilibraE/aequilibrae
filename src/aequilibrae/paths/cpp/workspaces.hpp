@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <variant>
 
@@ -45,11 +46,23 @@ template <typename T> struct SearchWorkspace {
   SearchHeapStorage<T> *heap = nullptr;
 };
 
-// A* also  needs tentative costs and per-node heuristic estimates.
+// Cached estimates survive copied workspace views and repeated searches to the
+// same destination. Epochs invalidate the cache without clearing every node.
+template <typename T> struct AStarEstimateCache {
+  std::size_t destination = 0;
+  std::uint64_t identity = 0;
+  T scale = 0;
+  std::uint32_t epoch = 0;
+  bool haversine = false;
+};
+
+// A* also needs tentative costs and per-node heuristic estimates.
 template <typename T> struct AStarWorkspace {
   SearchWorkspace<T> search;
-  T *costs = nullptr;     // [states]
-  T *estimates = nullptr; // [nodes]
+  T *costs = nullptr;                       // [states]
+  T *estimates = nullptr;                   // [nodes]
+  std::uint32_t *estimate_epochs = nullptr; // [nodes]
+  AStarEstimateCache<T> *estimate_cache = nullptr;
 };
 
 // Ordinary and selected loading can reuse this cascade scratch sequentially

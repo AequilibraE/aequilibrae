@@ -1,7 +1,7 @@
-import importlib.metadata
 import logging
 
 from aequilibrae import distribution, matrix, paths, project, transit
+from aequilibrae._version import version as version
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf, SyntheticGravityModel
 from aequilibrae.log import Log
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, MatrixStore
@@ -46,5 +46,3 @@ __all__ = [
 ]
 
 logger = global_logger = logging.getLogger(__name__)
-
-version = importlib.metadata.version("aequilibrae")

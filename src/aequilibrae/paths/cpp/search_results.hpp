@@ -15,6 +15,7 @@ struct SearchMetadata {
   std::size_t origin = invalid_state;
   std::size_t root = invalid_state;
   std::size_t settled_count = 0;
+  std::size_t terminal_count = 0;
   std::size_t target_count = 0;
   std::size_t reached_target_count = 0;
   bool exhausted = false;
@@ -53,19 +54,48 @@ template <typename T> struct MutableSearchResults {
   std::size_t *connectors = nullptr;
   std::size_t *settlement_order = nullptr;
   std::size_t *terminal_states = nullptr;
+  std::size_t *terminal_nodes = nullptr;
   T *distances = nullptr;
   T *turn_costs = nullptr;
   SearchMetadata *metadata = nullptr;
 
   void reset() const noexcept {
-    *metadata = SearchMetadata{};
     const auto infinity = std::numeric_limits<T>::infinity();
-    std::fill_n(predecessors, state_count, invalid_state);
-    std::fill_n(connectors, state_count, invalid_state);
-    std::fill_n(settlement_order, state_count, invalid_state);
-    std::fill_n(terminal_states, node_count, invalid_state);
-    std::fill_n(distances, state_count, infinity);
-    std::fill_n(turn_costs, state_count, infinity);
+    const auto settled_count = metadata->settled_count;
+    // Pending states are cleared before a search returns. Only its settled
+    // states and finalized terminal nodes can therefore contain old labels.
+    // Dense trees favour sequential writes over scattered state accesses.
+    if (settled_count >= state_count - state_count / 2) {
+      std::fill_n(predecessors, state_count, invalid_state);
+      std::fill_n(connectors, state_count, invalid_state);
+      std::fill_n(distances, state_count, infinity);
+      std::fill_n(turn_costs, state_count, infinity);
+    } else {
+      for (std::size_t i = 0; i < settled_count; ++i) {
+        const auto state = settlement_order[i];
+        predecessors[state] = invalid_state;
+        connectors[state] = invalid_state;
+        distances[state] = infinity;
+        turn_costs[state] = infinity;
+      }
+    }
+    std::fill_n(settlement_order, settled_count, invalid_state);
+
+    const auto terminal_count = metadata->terminal_count;
+    if (terminal_count >= node_count - node_count / 2) {
+      std::fill_n(terminal_states, node_count, invalid_state);
+    } else {
+      for (std::size_t i = 0; i < terminal_count; ++i) {
+        terminal_states[terminal_nodes[i]] = invalid_state;
+      }
+    }
+    *metadata = SearchMetadata{};
+  }
+
+  // Call only when the node receives its first finalized terminal.
+  void set_terminal(std::size_t node, std::size_t state) const noexcept {
+    terminal_nodes[metadata->terminal_count++] = node;
+    terminal_states[node] = state;
   }
 
   SearchResults<T> read_view() const noexcept {

@@ -1,13 +1,12 @@
 import os
 import sys
 import shutil
-from importlib.metadata import version as distribution_version
 
 npth = os.path.abspath(".")
 if npth not in sys.path:
     sys.path.append(npth)
 
-release_version = distribution_version("aequilibrae")
+from aequilibrae import version as release_version
 
 version = f"V.{release_version}"
 

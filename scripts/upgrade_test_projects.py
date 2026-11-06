@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 from aequilibrae.project.project import _upgrade
-from aequilibrae.project.project_creation import remove_triggers
+from aequilibrae.project.project_creation import _remove_triggers
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.logging_utils import basic_config
 
@@ -30,7 +30,7 @@ def upgrade_project(project_path: Path) -> None:
 
     if project_path.stem == "no_triggers_project":
         with commit_and_close(db_path, spatial=True) as conn:
-            remove_triggers(conn, "network")
+            _remove_triggers(conn, "network")
         print("Removed triggers from no_triggers_project")
 
 
