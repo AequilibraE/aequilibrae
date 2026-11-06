@@ -1,6 +1,7 @@
 """Upgrade all AequilibraE projects stored in test and reference data."""
 
 import logging
+import shutil
 import tempfile
 import zipfile
 from pathlib import Path
@@ -15,17 +16,22 @@ PROJECT_DATABASE = "project_database.sqlite"
 TRANSIT_DATABASE = "public_transport.sqlite"
 RESULTS_DATABASE = "results_database.sqlite"
 PROJECT_DATA_PATHS = (ROOT_PATH / "tests" / "data", ROOT_PATH / "src" / "aequilibrae" / "reference_files")
+RUN_FILE = ROOT_PATH / "src" / "aequilibrae" / "reference_files" / "demo.__init__.py"
 
 
 def upgrade_project(project_path: Path) -> None:
     """Open, upgrade, and close one project."""
     print(f"Upgrading {project_path}")
     db_path = project_path / "project_database.sqlite"
+    run_module = project_path / "run"
     transit_database_path = project_path / TRANSIT_DATABASE
     results_database_path = project_path / RESULTS_DATABASE
 
     transit_path = transit_database_path if transit_database_path.exists() else None
     results_path = results_database_path if results_database_path.exists() else None
+
+    run_module.mkdir(exist_ok=True)
+    shutil.copy2(RUN_FILE, project_path / "run" / "__init__.py")
     _upgrade(project_path=db_path, results_path=results_path, transit_path=transit_path)
 
     if project_path.stem == "no_triggers_project":
