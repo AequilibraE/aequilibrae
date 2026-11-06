@@ -88,10 +88,11 @@ def stage_matrix_metadata(project_conn: sqlite3.Connection, folder: Optional[Pat
         copy2(path, copy)
         logger.debug("Adding metadata to: %s", copy)
         with omx.open_file(copy, mode="r+") as matrix:
-            conflicts = metadata.keys() & matrix.attrs.keys()
+            conflicts = {key for key in metadata.keys() & matrix.attrs.keys() if matrix.attrs[key] != metadata[key]}
             if conflicts:
                 raise ValueError(
-                    f"Cannot migrate matrix metadata for {str(path)!r}: attributes already exist: {sorted(conflicts)}"
+                    f"Cannot migrate matrix metadata for {str(path)!r}: "
+                    f"attributes already exist with different values: {sorted(conflicts)}"
                 )
 
             matrix.attrs.update(metadata)
