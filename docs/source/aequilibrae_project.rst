@@ -66,9 +66,9 @@ is as follows:
 |
 
 The main component of an AequilibraE model is the **project_database.sqlite**,
-where the network and zoning system are stored and maintained, as well as the
-documentation records of all matrices and procedure results stored in other
-folders and databases.
+where the network and zoning system are stored and maintained. Matrix metadata
+is stored in the OMX files themselves, and procedure result metadata is stored
+alongside the result tables in **results_database.sqlite**.
 
 The second key component of any model is the **parameters.yaml** file, which
 holds the default values for a number of procedures (e.g. assignment
@@ -76,14 +76,15 @@ convergence), as well as the specification for networks imported from
 OpenStreetMap and other general import/export parameters.
 
 The third and last required component of an AequilibraE model is the **Matrices
-folder**, where all the matrices in binary format (in AequilibraE's native AEM or
-OMX formats) should be placed. This folder can be empty, however, as no
-particular matrix is required to exist in an AequilibraE model.
+folder**, where all the matrix files in OMX format should be placed. This
+folder can be empty, however, as no particular matrix is required to exist in
+an AequilibraE model.
 
-The database that stores results in tabular format (e.g. link loads from traffic
-assignment), **results_database.sqlite** is created on-the-fly the first time
-a command to save a tabular result into the model is invoked, so the user does
-not need to worry about its existence until it is automatically created.
+The database that stores results in tabular format (e.g. link loads from
+traffic assignment), **results_database.sqlite**, also stores the **results**
+metadata table. It is created on-the-fly the first time ``project.results`` or
+``project.results_connection`` is accessed, so the user does not need to create
+it manually.
 
 The **demand_database.sqlite** is envisioned to hold all the demand-related
 information, and it is not yet structured within the AequilibraE code, as there
@@ -116,6 +117,7 @@ In the following sections, we present the structure of each component of an Aequ
 
    aequilibrae_project/project_database
    aequilibrae_project/project_database/data_model/datamodel
+   aequilibrae_project/results_database/data_model/datamodel
    aequilibrae_project/parameter_file
    aequilibrae_project/transit_database
    aequilibrae_project/transit_database/data_model/datamodel

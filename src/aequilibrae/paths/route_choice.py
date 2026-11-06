@@ -752,8 +752,7 @@ class RouteChoice:
             index=self.demand.index,
             index_name=self.index_name,
         )
-        project.matrices.create(
-            name=matrix_name,
+        project.matrices.save_matrix(
             file_name=f"{matrix_name}.omx",
             matrix=out_matrix,
             procedure="Route choice OD select link",

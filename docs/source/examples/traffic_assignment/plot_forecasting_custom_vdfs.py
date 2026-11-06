@@ -1,5 +1,5 @@
 """
-.. _example_usage_forecasting:
+.. _example_usage_forecasting_custom_vdfs:
 
 Forecasting
 ===========
@@ -80,13 +80,13 @@ graph.set_skimming(["free_flow_time", "distance"])
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
+# Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
-proj_matrices.list()
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # Load the demand matrix core for computation.
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # Let's perform the traffic assignment
@@ -194,12 +194,12 @@ from aequilibrae.distribution import GravityCalibration
 
 # %%
 # Load the demand matrix core for computation.
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # We also need the skims we just saved into our project. We select the congested-time core.
 imped_core = "free_flow_time_final"
-imped = proj_matrices.get_matrix("base_year_assignment_skims_car", subset=[imped_core])
+imped = proj_matrices.get_matrix("base_year_assignment_skims_car.omx", subset=[imped_core])
 
 # Where ``free_flow_time_final`` is the congested time for the last iteration.
 # Use 75% of the closest zone for intrazonal impedance.
@@ -214,8 +214,7 @@ np.fill_diagonal(impedance_values, intrazonals)
 # Store the prepared core as a separate project matrix.
 del imped[imped_core]
 imped["final_time_with_intrazonals"] = impedance_values
-proj_matrices.create(
-    "base_year_assignment_skims_car_intrazonals",
+proj_matrices.save_matrix(
     "base_year_assignment_skims_car_intrazonals.omx",
     matrix=imped,
 )
@@ -287,8 +286,8 @@ ipf = Ipf(**args)
 ipf.fit()
 
 # %%
-# When saving our vector into the project, we'll get an output that it was recorded
-ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
+# Save the balanced matrix into the project's matrix folder
+ipf.save_to_project(file_name="demand_ipfd.omx")
 
 # %%
 # Impedance
@@ -296,7 +295,7 @@ ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 #
 # Let's get the base-year assignment skim for car we created before and prepare it for computation
 imped = proj_matrices.get_matrix(
-    "base_year_assignment_skims_car_intrazonals", subset=["final_time_with_intrazonals"]
+    "base_year_assignment_skims_car_intrazonals.omx", subset=["final_time_with_intrazonals"]
 )
 
 # %%
@@ -323,12 +322,11 @@ for function in ["power", "expo"]:
     gravity.apply()
 
     # We get the output matrix and save it to OMX too,
-    gravity.save_to_project(name=f"demand_{function}_modeled", file_name=f"demand_{function}_modeled.omx")
+    gravity.save_to_project(file_name=f"demand_{function}_modeled.omx")
 
 # %%
-# We update the matrices table/records and verify that the new matrices are indeed there
-proj_matrices.update_database()
-proj_matrices.list()
+# We inspect the matrix files and verify that the new matrices are indeed there
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # Traffic assignment with Select Link Analysis
@@ -336,7 +334,7 @@ proj_matrices.list()
 # We'll perform traffic assignment for the future year.
 # Let's get our future demand matrix, which corresponds to the IPF result we just saved,
 # and see what is the core we ended up getting. It should be ``matrix``.
-demand = proj_matrices.get_matrix("demand_ipfd_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand_ipfd.omx", subset=["matrix"])
 list(demand)
 
 # %%

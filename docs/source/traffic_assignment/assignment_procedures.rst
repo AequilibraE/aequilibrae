@@ -44,9 +44,9 @@ assigned. There are three pieces of information that are required in the instant
     >>> graph_truck = project.network.graphs['T']
 
     # And also get the matrices for cars and trucks
-    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
+    >>> matrix_car = project.matrices.get_matrix("demand_mc.omx", subset=["car"])
 
-    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
+    >>> matrix_truck = project.matrices.get_matrix("demand_mc.omx", subset=["trucks"])
 
     # We create the Traffic Classes
     >>> tc_car = TrafficClass("car", graph_car, matrix_car)
@@ -101,7 +101,8 @@ procedure.
 
     >>> assig.set_classes([tc_car, tc_truck])
 
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``, ``INRETS``, or ``AKCELIK``
+* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR`` [1]_, ``BPR2``,
+  ``CONICAL`` [2]_, ``INRETS``, or ``AKCELIK``
 
 .. doctest::
 
@@ -194,8 +195,8 @@ of zones and over 100 iterations of assignment.
 
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
-  [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
+  >>> assig.save_skims("another_matrix_name")
+  ['another_matrix_name_car.omx', 'another_matrix_name_truck.omx']
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
 iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*

@@ -78,11 +78,11 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
-proj_matrices.list()
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # We get the demand matrix, and prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # Copy the named matrices into sparse float64 storage. In practise these would
 # be stored in the sparse OMX extension rather than as a dense matrix, then

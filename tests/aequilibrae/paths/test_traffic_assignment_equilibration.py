@@ -27,7 +27,7 @@ def car_graph(project):
 
 @pytest.fixture
 def matrix(project):
-    mat = project.matrices.get_matrix("omx2", subset=["matrix"])
+    mat = project.matrices.get_matrix("SiouxFalls2.omx", subset=["matrix"])
     return mat
 
 
