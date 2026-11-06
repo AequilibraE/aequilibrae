@@ -14,18 +14,25 @@ from aequilibrae.project.data.matrices import Matrices
 
 def test_list_available_matrices(sioux_falls_example):
     mat = sioux_falls_example.scenario.matrices
-    assert mat.get_available_matrices_and_metadata() == {
-        "skims.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
-        "demand_mc.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
-        "demand.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
+    expected_metadata = {
+        "skims.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": "Example skim"},
+        "demand_mc.omx": {
+            "procedure": None,
+            "procedure_id": None,
+            "timestamp": "2021-02-24 00:51:35",
+            "description": None,
+        },
+        "demand.omx": {
+            "procedure": None,
+            "procedure_id": None,
+            "timestamp": "2020-11-24 08:47:18",
+            "description": "Original data imported to OMX format",
+        },
     }
+    assert mat.get_available_matrices_and_metadata() == expected_metadata
 
-    df = pd.DataFrame(columns=["procedure", "procedure_id", "timestamp", "description"])
+    df = pd.DataFrame(expected_metadata).T.sort_index()
     df.index.name = "file_name"
-    df.loc["demand.omx", :] = [None] * 4
-    df.loc["demand_mc.omx", :] = [None] * 4
-    df.loc["skims.omx", :] = [None] * 4
-
     pd.testing.assert_frame_equal(mat.list(), df)
 
     demand_matrix = mat.get_matrix("demand.omx", mode="r+")
@@ -39,16 +46,14 @@ def test_list_available_matrices(sioux_falls_example):
         }
     )
 
-    assert mat.get_available_matrices_and_metadata() == {
-        "skims.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
-        "demand_mc.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": None},
-        "demand.omx": {
-            "procedure": "testing",
-            "procedure_id": 2,
-            "timestamp": "now",
-            "description": "Finding out if this works!",
-        },
+    expected_metadata["demand.omx"] = {
+        "procedure": "testing",
+        "procedure_id": 2,
+        "timestamp": "now",
+        "description": "Finding out if this works!",
     }
+    assert mat.get_available_matrices_and_metadata() == expected_metadata
+    demand_matrix.close()
 
 
 def test_get_matrix(sioux_falls_example):
@@ -93,7 +98,7 @@ def test_new_project_has_no_matrices_database_table(empty_project):
 
 
 @pytest.fixture
-def matrices(tmp_path):
+def matrix_table(tmp_path):
     return Matrices(tmp_path)
 
 
@@ -111,7 +116,7 @@ def source_matrix(request, tmp_path):
         matrix.close()
 
 
-def test_save_matrix_persists_metadata_without_changing_source(matrices, source_matrix):
+def test_save_matrix_persists_metadata_without_changing_source(matrix_table, source_matrix):
     original_metadata = dict(source_matrix.metadata)
     metadata = {
         "procedure": "Test export",
@@ -120,13 +125,13 @@ def test_save_matrix_persists_metadata_without_changing_source(matrices, source_
         "description": "Exported demand",
     }
 
-    matrices.save_matrix("exported.omx", source_matrix, **metadata)
+    matrix_table.save_matrix("exported.omx", source_matrix, **metadata)
 
-    assert matrices.get_available_matrices_and_metadata()["exported.omx"] == metadata
+    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"] == metadata
     assert set(source_matrix.metadata) == set(original_metadata)
     for key, value in original_metadata.items():
         np.testing.assert_equal(source_matrix.metadata[key], value)
-    with matrices.get_matrix("exported.omx") as exported:
+    with matrix_table.get_matrix("exported.omx") as exported:
         np.testing.assert_array_equal(exported["demand"], source_matrix["demand"])
         assert exported.matrix_metadata("demand")["purpose"] == "work"
 
