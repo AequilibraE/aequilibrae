@@ -8,154 +8,71 @@ import openmatrix as omx
 import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_file
-from aequilibrae.project.project_table import NonSpatialProjectTable
-from aequilibrae.utils.db_utils import NestedTransactionManager
 
 logger = logging.getLogger(__name__)
 
 
-class Matrices(NonSpatialProjectTable):
-    """Matrix project database table manager."""
+class Matrices:
+    """Matrix project manager."""
 
-    name = "matrices"
-    key = "name"
-    record_name = "MatrixRecord"
-
-    def __init__(self, connection: NestedTransactionManager, matrices_path: str | Path) -> None:
+    def __init__(self, matrices_path: str | Path) -> None:
         """Create the matrix table manager.
 
         :Arguments:
-            **connection** (:obj:`NestedTransactionManager`): Manager for the
-            project database containing matrix metadata.
-
             **matrices_path** (:obj:`str` or :obj:`Path`): Directory containing
             matrix files.
         """
-        super().__init__(connection)
         self.folder: Path = Path(matrices_path)
 
-    def create(
-        self,
-        name: str,
-        file_name: str,
-        matrix: AequilibraeMatrix | MatrixStore | None = None,
-        *,
-        procedure: str | None = None,
-        procedure_id: str | None = None,
-        timestamp: str | None = None,
-        description: str | None = None,
-    ) -> Any:
+    def list(self) -> pd.DataFrame:
         """
-        Create matrix metadata and optionally export a matrix.
-
-        File system operations cannot be rolled back as part of the database transaction.
-
-        :Arguments:
-            **name** (:obj:`str`): Unique matrix name stored in project metadata.
-
-            **file_name** (:obj:`str`): OMX file name relative to the project's matrix directory.
-
-            **matrix** (:obj:`AequilibraeMatrix` or :obj:`MatrixStore`, *Optional*): Matrix to export.
-            If omitted, ``file_name`` must already exist.
-
-        :Returns:
-            **matrix record** (:obj:`Any`): Generated frozen metadata record.
+        Returns a DataFrame with a row per matrix with the corresponding metadata.
         """
-        path = self.folder / file_name
-        if name in self:
-            raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
-        if self._connection._connection.execute("SELECT 1 FROM matrices WHERE file_name=?", (file_name,)).fetchone():
-            raise ValueError(f"There is already a matrix record for file name ({file_name}). It must be unique.")
+        df = pd.DataFrame(self.get_available_matrices_and_metadata()).T
+        df.index.name = "file_name"
+        return df.sort_index()
 
-        suffix = path.suffix.lower()
-        if suffix != ".omx":
-            raise ValueError("Only OMX (.omx) matrices are supported")
-
-        created = False
-        temporary = None
-        if matrix is not None:
-            if path.exists():
-                raise FileExistsError(f"{file_name} already exists. Choose a different name")
-            temporary = path.with_name(f".{path.stem}.{uuid.uuid4().hex}.tmp{suffix}")
+    def get_available_matrices_and_metadata(self):
+        """
+        Returns a dictionary, with the keys being the available matrix omx
+        files, and the values being their corresponding metadata.
+        """
+        fnames = [f.name for f in self.folder.iterdir() if f.is_file() and f.suffix == ".omx"]
+        name_to_metadata = {}
+        for file_name in fnames:
+            path = self.folder / file_name
             try:
-                matrix.save_as_omx(temporary)
-                os.replace(temporary, path)
-                created = True
-            except BaseException:
-                if temporary.exists():
-                    temporary.unlink()
-                raise
-            cores = len(matrix)
-        else:
-            if not path.is_file():
-                raise FileNotFoundError(f"{file_name} does not exist. Cannot create this matrix record")
-            cores = self.__cores_on_disk(file_name)
+                with omx.open_file(path, mode="r") as matrix:
+                    name_to_metadata[file_name] = {
+                        "procedure": matrix.attrs.get("procedure"),
+                        "procedure_id": matrix.attrs.get("procedure_id"),
+                        "timestamp": matrix.attrs.get("timestamp"),
+                        "description": matrix.attrs.get("description"),
+                    }
+            except OSError as error:
+                message = f"Could not read metadata from OMX matrix file {str(path)!r}: {error}"
+                logger.error(message)
+                raise OSError(message) from error
 
-        try:
-            self.insert(
-                name=name,
-                file_name=file_name,
-                cores=cores,
-                procedure=procedure,
-                procedure_id=procedure_id,
-                timestamp=timestamp,
-                description=description,
-            )
-        except BaseException as primary:
-            if created:
-                try:
-                    path.unlink()
-                except BaseException as cleanup:
-                    primary.add_note(f"created matrix remains at {path}: {cleanup!r}")
-            raise
-        return self.get(name)
+        return name_to_metadata
 
-    def register_matrix(self, name: str, file_name: str) -> Any:
-        """Register an existing matrix file.
+    def file_exists(self, file_name: str) -> bool:
+        return (self.folder / file_name).is_file()
 
-        :Arguments:
-            **name** (:obj:`str`): Unique matrix name.
-
-            **file_name** (:obj:`str`): Existing matrix file name.
-
-        :Returns:
-            **matrix record** (:obj:`Any`): Generated frozen metadata record.
-        """
-        return self.create(name, file_name, matrix=None)
-
-    def delete_matrix(self, name: str) -> None:
-        """Delete matrix metadata and its underlying file.
-
-        :Arguments:
-            **name** (:obj:`str`): Matrix name to delete.
-        """
-        file_name = self.get(name, column="file_name")
+    def cores_on_disk(self, file_name: str) -> int:
         path = self.folder / file_name
-        tombstone = path.with_name(f".{path.name}.{uuid.uuid4().hex}.deleted")
-        moved = False
-        if path.exists():
-            os.replace(path, tombstone)
-            moved = True
-        try:
-            super().delete(name)
-        except BaseException as primary:
-            if moved:
-                try:
-                    os.replace(tombstone, path)
-                except BaseException as cleanup:
-                    primary.add_note(f"matrix is stranded at {tombstone}: {cleanup!r}")
-            raise
-        if moved:
-            tombstone.unlink()
+        with omx.open_file(path, mode="r") as matrix:
+            return len(matrix.list_matrices()) + len(matrix["/"].get("sparse", {}))
 
     def get_matrix(
         self,
-        name: str,
+        file_name: str,
+        index_name: str | None = None,
         subset: Sequence[str | dict[str, Any]] | None = None,
         **kwargs,
     ) -> AequilibraeMatrix | MatrixStore:
         """
-        Load a registered matrix, optionally selecting an in-memory subset.
+        Load a matrix file, optionally selecting an in-memory subset.
 
         Without ``subset``, the matrix is opened as a
         :class:`~aequilibrae.matrix.MatrixStore` for generic OMX access.  When
@@ -171,7 +88,7 @@ class Matrices(NonSpatialProjectTable):
         ``index_name`` explicitly.
 
         :Arguments:
-            **name** (:obj:`str`): Registered matrix name.
+            **file_name** (:obj:`str`): The filename of the matrix.
 
             **subset** (:obj:`Sequence`, *Optional*): Matrix names or metadata
                 queries to copy into an in-memory matrix. If omitted, returns a
@@ -185,57 +102,77 @@ class Matrices(NonSpatialProjectTable):
                 :class:`~aequilibrae.matrix.MatrixStore`): An in-memory matrix
                 when ``subset`` is supplied, otherwise an OMX matrix store.
 
-        :raises ValueError: If the file is not OMX, no usable index exists, or
-            multiple indices are ambiguous.
+        :raises ValueError: If the file is missing, no usable index exists,
+            or multiple indices are ambiguous.
+        :raises OSError: If the requested OMX file cannot be opened or read.
         """
-        file_name: str = self.get(name, column="file_name")
         path = self.folder / file_name
-        if path.suffix.lower() != ".omx":
+        if not path.is_file():
+            raise ValueError(f"matrices folder does not have a matrix file named '{file_name}'")
+
+        try:
+            return from_file(path, index_name=index_name, subset=subset, store=subset is None, **kwargs)
+        except OSError as error:
+            message = f"Could not load OMX matrix file {str(path)!r}: {error}"
+            logger.error(message)
+            raise OSError(message) from error
+
+    def save_matrix(
+        self,
+        file_name: str,
+        matrix: AequilibraeMatrix | MatrixStore,
+        *,
+        procedure: str | None = None,
+        procedure_id: str | None = None,
+        timestamp: str | None = None,
+        description: str | None = None,
+    ):
+        """
+        Export a matrix and its metadata to a new OMX file.
+
+        File system operations cannot be rolled back as part of the database transaction.
+        Supplied metadata overrides the exported attributes without changing the source matrix.
+
+        :Arguments:
+            **file_name** (:obj:`str`): OMX file name relative to the project's matrix directory.
+
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`MatrixStore`): Matrix to export.
+
+            **procedure** (:obj:`str`, *Optional*): Producing procedure name.
+
+            **procedure_id** (:obj:`str`, *Optional*): Producing procedure ID.
+
+            **timestamp** (:obj:`str`, *Optional*): Result timestamp.
+
+            **description** (:obj:`str`, *Optional*): Human-readable description.
+
+        Omitted metadata retains the source matrix's corresponding attributes.
+        """
+        path = self.folder / file_name
+        suffix = path.suffix
+        if suffix != ".omx":
             raise ValueError("Only OMX (.omx) matrices are supported")
+        if path.exists():
+            raise FileExistsError(f"There is already a matrix of name ({file_name}). It must be unique.")
 
-        if subset is not None:
-            return from_file(path, subset=subset, store=False, **kwargs)
-        else:
-            return from_file(path, subset=None, store=True, **kwargs)
-
-    def clear_database(self) -> None:
-        """Remove metadata records whose files are absent."""
-        with self._connection.transaction() as conn:
-            records = conn.execute("SELECT name, file_name FROM matrices").fetchall()
-            missing = [(name,) for name, file_name in records if not (self.folder / file_name).is_file()]
-            if missing:
-                conn.executemany("DELETE FROM matrices WHERE name=?", missing)
-        self._invalidate()
-
-    def update_database(self) -> None:
-        """Register unrecorded OMX files found in the matrix directory."""
-        existing = {record.file_name for record in self}
-        for path in self.folder.iterdir():
-            if path.name in existing or path.suffix.lower() != ".omx" or not path.is_file():
-                continue
-            candidate = path.name.replace(".", "_").replace(" ", "_")
-            name = candidate
-            sequence = 0
-            while name in self:
-                name = f"{candidate}_{sequence}"
-                sequence += 1
-            self.register_matrix(name, path.name)
-
-    def sync(self) -> None:
-        """Remove metadata for absent files, and register unrecorded files."""
-        self.clear_database()
-        self.update_database()
-
-    def list(self) -> pd.DataFrame:
-        frame = pd.read_sql_query("SELECT * FROM matrices", self._connection._connection)
-        frame["status"] = frame.file_name.map(
-            lambda file_name: "" if (self.folder / file_name).is_file() else "file missing"
-        )
-        return frame
-
-    def file_exists(self, name: str) -> bool:
-        return (self.folder / self.get(name, column="file_name")).is_file()
-
-    def __cores_on_disk(self, file_name: str) -> int:
-        with omx.open_file(self.folder / file_name, mode="r") as matrix:
-            return len(matrix.list_matrices())
+        temporary = path.with_name(f".{path.stem}.{uuid.uuid4().hex}.tmp{suffix}")
+        try:
+            matrix.save_as_omx(temporary)
+            metadata = {
+                key: value
+                for key, value in {
+                    "procedure": procedure,
+                    "procedure_id": procedure_id,
+                    "timestamp": timestamp,
+                    "description": description,
+                }.items()
+                if value is not None
+            }
+            if metadata:
+                with omx.open_file(temporary, mode="a") as exported:
+                    exported.attrs.update(metadata)
+            os.replace(temporary, path)
+        except BaseException:
+            if temporary.exists():
+                temporary.unlink()
+            raise

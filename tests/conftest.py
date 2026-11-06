@@ -41,8 +41,8 @@ def test_data_path():
 
 @pytest.fixture(scope="function")
 def omx_example(test_data_path, tmp_path):
-    file = tmp_path / "test_omx.omx"
-    shutil.copy(test_data_path / "test_omx.omx", file)
+    file = tmp_path / "SiouxFalls2.omx"
+    shutil.copy(test_data_path / "SiouxFalls2.omx", file)
     return file
 
 
@@ -142,7 +142,7 @@ def no_triggers_test(test_data_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_sioux_falls_single_class(test_data_path, cache_path):
-    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path / "sioux_falls_single_class")
+    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path)
 
 
 @pytest.fixture(scope="function")
@@ -187,12 +187,12 @@ def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_st_varent(test_data_path, cache_path):
-    # Zip includes top-level "St_Varent" dir.
+    # Zip includes "St_Varent_issue307/St_Varent" directories.
     zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(cache_path)
 
 
 @pytest.fixture(scope="function")
 def st_varent(cached_st_varent, cache_path, tmp_path) -> Project:
-    project = cached_model("St_Varent", cache_path, tmp_path)
+    project = cached_model("St_Varent_issue307/St_Varent", cache_path, tmp_path)
     yield project
     project.close()

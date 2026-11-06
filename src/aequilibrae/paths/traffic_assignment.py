@@ -213,7 +213,7 @@ class TrafficAssignment(AssignmentBase):
         >>> proj_matrices = project.matrices
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         # Creates the assignment class
         >>> assigclass = TrafficClass("car", graph, demand)
@@ -881,11 +881,11 @@ class TrafficAssignment(AssignmentBase):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[Any]:
-        """Saves the skims (if any) to the skim folder and registers in the matrix list
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[str]:
+        """Saves the skims (if any) to the project's matrix folder
 
         :Arguments:
-            **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
+            **matrix_name** (:obj:`str`): Base file name for the matrices, suffixed with each traffic class ID
 
             **which_ones** (:obj:`str`, *Optional*): 'final': Results of the final iteration,
                 'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
@@ -897,11 +897,11 @@ class TrafficAssignment(AssignmentBase):
                 Defaults to the active project
 
         :Returns:
-            **records** (:obj:`list`): Matrix records created for classes with skims to save.
+            **file_names** (:obj:`list`): OMX file names saved for classes with skims to save.
         """
         if which_ones not in ("final", "blended", "all"):
             raise ValueError("which_ones must be final, blended or all")
-        records = []
+        file_names = []
         mat_format = format.lower()
         if mat_format != "omx":
             raise ValueError("Only OMX matrix files are supported")
@@ -918,9 +918,6 @@ class TrafficAssignment(AssignmentBase):
 
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-            if mats.get(matrix_name, default=None) is not None:
-                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
             avg_skims = {} if cls.results.skims is None else cls.results.skims.matrices
             final = cls.congested_skims if cls.congested_skims is not None else cls._aon_results.skims
@@ -950,8 +947,7 @@ class TrafficAssignment(AssignmentBase):
             description = f"Skimming for assignment procedure. Class {cls._id}"
             out_skims.metadata["description"] = description
 
-            record = mats.create(
-                name=f"{matrix_name}_{cls._id}",
+            mats.save_matrix(
                 file_name=file_name,
                 matrix=out_skims,
                 procedure_id=self.procedure_id,
@@ -959,9 +955,9 @@ class TrafficAssignment(AssignmentBase):
                 procedure="Traffic Assignment",
                 description=description,
             )
-            records.append(record)
+            file_names.append(file_name)
 
-        return records
+        return file_names
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -1030,8 +1026,8 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.get(matrix_name, default=False):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+        # if mats.get_matrix(matrix_name, default=False):
+        #     raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         matrices = {}
         for cls in self.classes:

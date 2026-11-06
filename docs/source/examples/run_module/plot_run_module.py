@@ -96,7 +96,7 @@ with open(join(folder, "run", "__init__.py"), "a") as file:
 p = project.project_parameters
 p.parameters["run"]["create_delaunay"] = {}
 p.parameters["run"]["create_delaunay"]["source"] = "zones"
-p.parameters["run"]["create_delaunay"]["name"] = "demand_omx"
+p.parameters["run"]["create_delaunay"]["name"] = "demand.omx"
 p.parameters["run"]["create_delaunay"]["matrix_core"] = "matrix"
 p.parameters["run"]["create_delaunay"]["result_name"] = "my_run_module_example"
 p.write_back()

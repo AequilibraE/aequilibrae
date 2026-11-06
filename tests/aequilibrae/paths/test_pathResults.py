@@ -17,7 +17,7 @@ def p_results(sioux_falls_example):
     graph.set_graph("free_flow_time")
     graph.set_blocked_centroid_flows(False)
 
-    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     yield {"project": project, "g": graph, "matrix": matrix}
 

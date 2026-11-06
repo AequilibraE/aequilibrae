@@ -43,7 +43,7 @@ class GravityApplication:
         >>> model.beta = 0.0001
 
         # We load the impedance matrix
-        >>> matrix = project.matrices.get_matrix("skims", subset=["distance_blended"])
+        >>> matrix = project.matrices.get_matrix("skims.omx", subset=["distance_blended"])
 
         # We create the vectors we will use
         >>> query = "SELECT zone_id, population, employment FROM zones;"
@@ -191,12 +191,10 @@ class GravityApplication:
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
         self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
-    def save_to_project(self, name: str, file_name: str, project=None) -> None:
+    def save_to_project(self, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
 
         :Arguments:
-            **name** (:obj:`str`): Name of the desired matrix record
-
             **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
@@ -204,8 +202,7 @@ class GravityApplication:
         """
 
         project = project or get_active_project()
-        project.matrices.create(
-            name,
+        project.matrices.save_matrix(
             file_name,
             self.output,
             procedure="Synthetic gravity trip distribution",

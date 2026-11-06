@@ -1,15 +1,73 @@
 import string
 from math import floor
-from os.path import join
-from random import choice, randint
-from shutil import copyfile
+from random import choice
 
+import numpy as np
 import openmatrix as omx
+import pandas as pd
 import pytest
+from scipy.sparse import csr_array
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.project.data.matrices import Matrices
-from aequilibrae.utils.db_utils import NestedTransactionManager
+
+
+def test_list_available_matrices(sioux_falls_example):
+    mat = sioux_falls_example.scenario.matrices
+    expected_metadata = {
+        "skims.omx": {"procedure": None, "procedure_id": None, "timestamp": None, "description": "Example skim"},
+        "demand_mc.omx": {
+            "procedure": None,
+            "procedure_id": None,
+            "timestamp": "2021-02-24 00:51:35",
+            "description": None,
+        },
+        "demand.omx": {
+            "procedure": None,
+            "procedure_id": None,
+            "timestamp": "2020-11-24 08:47:18",
+            "description": "Original data imported to OMX format",
+        },
+    }
+    assert mat.get_available_matrices_and_metadata() == expected_metadata
+
+    df = pd.DataFrame(expected_metadata).T.sort_index()
+    df.index.name = "file_name"
+    pd.testing.assert_frame_equal(mat.list(), df)
+
+    demand_matrix = mat.get_matrix("demand.omx", mode="r+")
+
+    demand_matrix.metadata.update(
+        {
+            "procedure": "testing",
+            "procedure_id": 2,
+            "timestamp": "now",
+            "description": "Finding out if this works!",
+        }
+    )
+
+    expected_metadata["demand.omx"] = {
+        "procedure": "testing",
+        "procedure_id": 2,
+        "timestamp": "now",
+        "description": "Finding out if this works!",
+    }
+    assert mat.get_available_matrices_and_metadata() == expected_metadata
+    demand_matrix.close()
+
+
+def test_get_matrix(sioux_falls_example):
+    matrices = sioux_falls_example.matrices
+    with pytest.raises(ValueError, match="matrices folder does not have a matrix file named 'omxq.omx'"):
+        _ = matrices.get_matrix("omxq.omx")
+    mat = matrices.get_matrix("demand.omx")
+    assert isinstance(mat, MatrixStore)
+    assert floor(sum(values.sum() for values in mat.values())) == 360600, "Matrix loaded incorrectly"
+    mat.close()
+
+    selected = matrices.get_matrix("demand.omx", subset=["matrix"])
+    assert isinstance(selected, AequilibraeMatrix)
+    assert floor(sum(values.sum() for values in selected.values())) == 360600, "Matrix subset loaded incorrectly"
 
 
 def randomword(length):
@@ -21,116 +79,27 @@ def randomword(length):
 
 
 def mat_count(sioux_falls_example, should_have: int, error_message: str):
-    with sioux_falls_example.db_connection as conn:
-        cnt = conn.execute("Select count(*) from Matrices;").fetchone()[0]
+    cnt = len(sioux_falls_example.scenario.matrices.get_available_matrices_and_metadata())
     assert cnt == should_have, error_message
-
-
-def test_set_record(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    rec = matrices.get("demand_omx")
-    with pytest.raises(ValueError, match="matrix of name"):
-        matrices.register_matrix("demand_omx", rec.file_name)
-    with pytest.raises(ValueError, match="file name"):
-        matrices.register_matrix("another_matrix", rec.file_name)
-    assert rec.file_name == "demand.omx"
-    assert rec.cores == 1, "Setting a file that exists did not correct the number of cores"
-
-
-def test_clear_database(sioux_falls_test):
-    matrices = sioux_falls_test.matrices
-    mat_count(sioux_falls_test, 3, "The test data started wrong")
-    matrices.clear_database()
-    mat_count(sioux_falls_test, 2, "Did not clear the database appropriately")
-
-
-def test_update_database(sioux_falls_test):
-    matrices = sioux_falls_test.matrices
-    mat_count(sioux_falls_test, 3, "The test data started wrong")
-    matrices.update_database()
-    mat_count(sioux_falls_test, 4, "Did not add to the database appropriately")
-    rec = matrices.get("omx")
-    existing = join(matrices.folder, rec.file_name)
-    new_name = "test_name.omx"
-    new_name1 = "test_name1.omx"
-    copyfile(existing, join(matrices.folder, new_name))
-    matrices.register_matrix("test_name1", new_name)
-    copyfile(existing, join(matrices.folder, new_name1))
-    matrices.update_database()
-
-
-def test_get_matrix(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    with pytest.raises(ValueError, match="matrices has no record with name='omxq'"):
-        _ = matrices.get_matrix("omxq")
-    mat = matrices.get_matrix("demand_omx")
-    assert isinstance(mat, MatrixStore)
-    assert floor(sum(values.sum() for values in mat.values())) == 360600, "Matrix loaded incorrectly"
-    mat.close()
-
-    selected = matrices.get_matrix("demand_omx", subset=["matrix"])
-    assert isinstance(selected, AequilibraeMatrix)
-    assert floor(sum(values.sum() for values in selected.values())) == 360600, "Matrix subset loaded incorrectly"
 
 
 def test_get_record(sioux_falls_example):
     matrices = sioux_falls_example.matrices
-    rec = matrices.get("demand_mc")
-    assert rec.cores == 3, "record populated wrong. Number of cores"
-    assert rec.description is None, "record populated wrong. Description"
+    # rec = matrices.get_matrix("demand_mc.omx")
+    file_name = "demand_mc.omx"
+    assert matrices.cores_on_disk(file_name) == 3, "record populated wrong. Number of cores"
+    with omx.open_file(matrices.folder / file_name, mode="r") as matrix:
+        assert matrix.attrs.get("description") is None, "record populated wrong. Description"
 
 
-def test_record_update_cores(sioux_falls_test):
-    matrices = sioux_falls_test.matrices
-    matrices.update("omx", cores=2)
-    assert matrices.get("omx").cores == 2, "Cores update did not work"
-
-
-def test_save_record(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    text = randomword(randint(30, 100))
-    matrices.update("demand_mc", description=text)
-    with sioux_falls_example.db_connection as conn:
-        cnt = conn.execute('select description from matrices where name="demand_mc";').fetchone()[0]
-    assert text == cnt, "Saving matrix record description failed"
-
-
-def test_delete(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    matrices.delete_matrix("demand_omx")
-    with sioux_falls_example.db_connection as conn:
-        cnt = conn.execute('select count(*) from matrices where name="demand_omx";').fetchone()[0]
-    assert cnt == 0, "Deleting matrix record failed"
-    with pytest.raises(ValueError, match="matrices has no record with name='demand_omx'"):
-        matrices.get("demand_omx")
-
-
-def test_list(sioux_falls_example):
-    matrices = sioux_falls_example.matrices
-    df = matrices.list()
-    with sioux_falls_example.db_connection as conn:
-        cnt = conn.execute("select count(*) from Matrices").fetchone()[0]
-    assert df.shape[0] == cnt, "Returned the wrong number of matrices in the database"
-    assert df[df.status == "file missing"].shape[0] == 0, "Wrong # of records for missing matrix files"
+def test_new_project_has_no_matrices_database_table(empty_project):
+    with empty_project.db_connection as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='matrices'").fetchone() is None
 
 
 @pytest.fixture
 def matrix_table(tmp_path):
-    manager = NestedTransactionManager(":memory:")
-    manager._connection.execute(
-        """CREATE TABLE matrices (
-            name TEXT NOT NULL PRIMARY KEY,
-            file_name TEXT NOT NULL UNIQUE,
-            cores INTEGER NOT NULL DEFAULT 1,
-            procedure TEXT,
-            procedure_id TEXT,
-            timestamp DATETIME DEFAULT current_timestamp,
-            description TEXT
-        )"""
-    )
-    table = Matrices(manager, tmp_path)
-    yield table
-    manager.close()
+    return Matrices(tmp_path)
 
 
 @pytest.fixture(params=[AequilibraeMatrix, MatrixStore], ids=["memory", "store"])
@@ -147,86 +116,116 @@ def source_matrix(request, tmp_path):
         matrix.close()
 
 
-def test_create_exports_and_registers_a_matrix(matrix_table, source_matrix):
-    record = matrix_table.create("future_demand", "future_demand.omx", source_matrix)
+def test_save_matrix_persists_metadata_without_changing_source(matrix_table, source_matrix):
+    original_metadata = dict(source_matrix.metadata)
+    metadata = {
+        "procedure": "Test export",
+        "procedure_id": "export-id",
+        "timestamp": "2026-01-01 12:00:00",
+        "description": "Exported demand",
+    }
 
-    assert record == matrix_table.get("future_demand")
-    assert record.cores == 1
-    assert (matrix_table.folder / record.file_name).is_file()
-    assert matrix_table.get_matrix(record.name) == source_matrix
+    matrix_table.save_matrix("exported.omx", source_matrix, **metadata)
+
+    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"] == metadata
+    assert set(source_matrix.metadata) == set(original_metadata)
+    for key, value in original_metadata.items():
+        np.testing.assert_equal(source_matrix.metadata[key], value)
+    with matrix_table.get_matrix("exported.omx") as exported:
+        np.testing.assert_array_equal(exported["demand"], source_matrix["demand"])
+        assert exported.matrix_metadata("demand")["purpose"] == "work"
 
 
-def test_create_empty_matrix(matrix_table, source_matrix):
-    source_matrix.clear()
-    record = matrix_table.create("empty", "empty.omx", source_matrix)
-    assert record.cores == 0
-    assert matrix_table.get_matrix(record.name) == source_matrix
+def test_save_matrix_retains_omitted_metadata(matrix_table, source_matrix):
+    original_metadata = dict(source_matrix.metadata)
+
+    matrix_table.save_matrix("exported.omx", source_matrix, procedure="Test export")
+
+    metadata = matrix_table.get_available_matrices_and_metadata()["exported.omx"]
+    assert metadata == {
+        "procedure": "Test export",
+        "procedure_id": None,
+        "timestamp": None,
+        "description": "Future demand",
+    }
+    assert set(source_matrix.metadata) == set(original_metadata)
+    for key, value in original_metadata.items():
+        np.testing.assert_equal(source_matrix.metadata[key], value)
+
+
+def test_save_matrix_accepts_read_only_store(matrix_table, tmp_path):
+    source = AequilibraeMatrix(index=[10, 20])
+    source["demand"] = [[0, 1], [2, 0]]
+    source.save_as_omx(tmp_path / "read_only.omx")
+
+    with MatrixStore(tmp_path / "read_only.omx", mode="r") as store:
+        matrix_table.save_matrix("exported.omx", store, description="Exported demand")
+        assert "description" not in store.metadata
+
+    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"]["description"] == "Exported demand"
+
+
+@pytest.mark.parametrize("storage", ["dense", "sparse", "mixed"])
+@pytest.mark.parametrize("indices", ["default", "missing", "ambiguous"])
+def test_cores_on_disk_counts_dense_and_sparse_without_selecting_an_index(matrix_table, storage, indices):
+    path = matrix_table.folder / "cores.omx"
+    with MatrixStore(path, index=[10, 20], mode="x") as store:
+        if storage in {"dense", "mixed"}:
+            store["dense"] = [[0, 1], [2, 0]]
+        if storage in {"sparse", "mixed"}:
+            store["sparse"] = csr_array([[0, 3], [4, 0]])
+    with omx.open_file(path, mode="a") as matrix:
+        if indices != "default":
+            del matrix.lookup["main_index"]
+        if indices == "ambiguous":
+            matrix.lookup.create_dataset("zones", data=[10, 20])
+            matrix.lookup.create_dataset("other_zones", data=[10, 20])
+
+    assert matrix_table.cores_on_disk(path.name) == (2 if storage == "mixed" else 1)
 
 
 def test_get_matrix_uses_requested_index(matrix_table):
     matrix = AequilibraeMatrix(index=[30, 10], index_name="zones")
     matrix["demand"] = [[0, 3], [2, 0]]
-    matrix_table.create("demand", "demand.omx", matrix)
-    inferred = matrix_table.get_matrix("demand")
+    matrix_table.save_matrix("demand.omx", matrix)
+    inferred = matrix_table.get_matrix("demand.omx")
     assert isinstance(inferred, MatrixStore)
     assert inferred.index_name == "zones"
     inferred.close()
 
-    selected = matrix_table.get_matrix("demand", subset=["demand"])
+    selected = matrix_table.get_matrix("demand.omx", subset=["demand"])
     assert isinstance(selected, AequilibraeMatrix)
-    assert selected == matrix
+
+    np.testing.assert_array_equal(selected["demand"], matrix["demand"])
 
 
 def test_get_matrix_requires_index_when_multiple_nondefault_indices_exist(matrix_table):
     matrix = AequilibraeMatrix(index=[10, 20], index_name="zones")
     matrix["demand"] = [[0, 1], [2, 0]]
-    matrix_table.create("demand", "demand.omx", matrix)
+    matrix_table.save_matrix("demand.omx", matrix)
     with omx.open_file(matrix_table.folder / "demand.omx", mode="a") as file:
         file.lookup.create_dataset("other_zones", data=[10, 20])
 
     with pytest.raises(ValueError, match="Multiple zone indices"):
-        matrix_table.get_matrix("demand")
-    assert matrix_table.get_matrix("demand", index_name="zones", subset=["demand"]) == matrix
+        matrix_table.get_matrix("demand.omx")
+    np.testing.assert_array_equal(
+        matrix_table.get_matrix("demand.omx", index_name="zones", subset=["demand"])["demand"], matrix["demand"]
+    )
 
 
-@pytest.mark.parametrize("extension", [".aem", ".csv"])
+@pytest.mark.parametrize("extension", ["", ".aem", ".csv", ".OMX", ".Omx"])
 def test_create_rejects_other_formats(matrix_table, source_matrix, extension):
     with pytest.raises(ValueError, match="Only OMX"):
-        matrix_table.create("demand", f"demand{extension}", source_matrix)
-    assert "demand" not in matrix_table
-
-
-def test_register_rejects_other_formats(matrix_table):
-    path = matrix_table.folder / "demand.aem"
-    path.write_bytes(b"old matrix")
-    with pytest.raises(ValueError, match="Only OMX"):
-        matrix_table.register_matrix("demand", path.name)
-
-
-def test_register_counts_matrices_without_an_index(matrix_table, no_index_omx):
-    record = matrix_table.register_matrix("no_index", no_index_omx.name)
-    assert record.cores > 0
-
-
-def test_update_database_only_registers_omx_files(matrix_table):
-    matrix = AequilibraeMatrix(index=[1])
-    matrix["demand"] = [[2]]
-    matrix.save_as_omx(matrix_table.folder / "demand.OMX")
-    (matrix_table.folder / "old.aem").write_bytes(b"old matrix")
-    (matrix_table.folder / "notes.txt").write_text("notes")
-    (matrix_table.folder / "directory.omx").mkdir()
-
-    matrix_table.update_database()
-    assert [record.file_name for record in matrix_table] == ["demand.OMX"]
+        matrix_table.save_matrix(f"demand{extension}", source_matrix)
+    assert f"demand{extension}" not in matrix_table.get_available_matrices_and_metadata()
 
 
 def test_create_does_not_overwrite_existing_file(matrix_table, source_matrix):
     path = matrix_table.folder / "demand.omx"
     path.write_bytes(b"existing")
     with pytest.raises(FileExistsError):
-        matrix_table.create("demand", path.name, source_matrix)
+        matrix_table.save_matrix(path.name, source_matrix)
     assert path.read_bytes() == b"existing"
-    assert "demand" not in matrix_table
 
 
 def test_create_removes_partial_export(matrix_table, source_matrix, monkeypatch):
@@ -236,48 +235,61 @@ def test_create_removes_partial_export(matrix_table, source_matrix, monkeypatch)
 
     monkeypatch.setattr(source_matrix, "save_as_omx", fail)
     with pytest.raises(OSError, match="export failed"):
-        matrix_table.create("demand", "demand.omx", source_matrix)
+        matrix_table.save_matrix("demand.omx", source_matrix)
     assert not (matrix_table.folder / "demand.omx").exists()
     assert not list(matrix_table.folder.glob(".demand.*.tmp.omx"))
-    assert "demand" not in matrix_table
+    assert "demand" not in matrix_table.get_available_matrices_and_metadata()
 
 
-def test_create_removes_export_when_registration_fails(matrix_table, source_matrix, monkeypatch):
-    def fail(**kwargs):
-        raise ValueError("insert failed")
+@pytest.mark.parametrize("subset", [None, ["demand"]])
+def test_get_matrix_only_opens_requested_file(matrix_table, source_matrix, monkeypatch, subset):
+    matrix_table.save_matrix("valid.omx", source_matrix)
+    (matrix_table.folder / "damaged.omx").write_bytes(b"not an OMX file")
 
-    monkeypatch.setattr(matrix_table, "insert", fail)
-    with pytest.raises(ValueError, match="insert failed"):
-        matrix_table.create("demand", "demand.omx", source_matrix)
-    assert not (matrix_table.folder / "demand.omx").exists()
-    assert "demand" not in matrix_table
+    def unexpected_catalogue_scan():
+        pytest.fail("Loading one matrix must not scan other OMX files")
 
-
-def test_generic_and_resource_deletes_are_distinct(matrix_table, omx_example):
-    target = matrix_table.folder / "existing.omx"
-    copyfile(omx_example, target)
-    record = matrix_table.register_matrix("existing", target.name)
-
-    matrix_table.delete(record.name)
-    assert record.name not in matrix_table
-    assert target.is_file()
-
-    matrix_table.register_matrix(record.name, target.name)
-    matrix_table.delete_matrix(record.name)
-    assert record.name not in matrix_table
-    assert not target.exists()
+    monkeypatch.setattr(matrix_table, "get_available_matrices_and_metadata", unexpected_catalogue_scan)
+    assert matrix_table.file_exists("valid.omx")
+    assert not matrix_table.file_exists("missing.omx")
+    loaded = matrix_table.get_matrix("valid.omx", subset=subset)
+    try:
+        np.testing.assert_array_equal(loaded["demand"], source_matrix["demand"])
+    finally:
+        if isinstance(loaded, MatrixStore):
+            loaded.close()
 
 
-def test_sync_reconciles_matrix_files_and_metadata(matrix_table, omx_example):
-    missing = matrix_table.folder / "missing.omx"
-    copyfile(omx_example, missing)
-    matrix_table.register_matrix("missing", missing.name)
-    missing.unlink()
+@pytest.mark.parametrize("extension", [".omx", ".data", ""])
+@pytest.mark.parametrize("subset", [None, ["demand"]])
+def test_get_matrix_logs_unreadable_file_with_context(matrix_table, caplog, subset, extension):
+    path = matrix_table.folder / f"damaged{extension}"
+    path.write_bytes(b"not an OMX file")
 
-    orphan = matrix_table.folder / "orphan.omx"
-    copyfile(omx_example, orphan)
-    matrix_table.sync()
+    with pytest.raises(OSError, match=f"Could not load OMX matrix file .*{path.name}") as caught:
+        matrix_table.get_matrix(path.name, subset=subset)
 
-    assert "missing" not in matrix_table
-    assert any(record.file_name == orphan.name for record in matrix_table)
-    assert matrix_table.list().status.eq("").all()
+    assert isinstance(caught.value.__cause__, OSError)
+    assert repr(str(path)) in caplog.text
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
+def test_matrix_metadata_logs_unreadable_file_with_context(matrix_table, caplog):
+    path = matrix_table.folder / "damaged.omx"
+    path.write_bytes(b"not an OMX file")
+    with pytest.raises(OSError, match="Could not read metadata from OMX matrix file .*damaged.omx"):
+        matrix_table.get_available_matrices_and_metadata()
+    assert repr(str(path)) in caplog.text
+
+
+@pytest.mark.parametrize("extension", [".OMX", ".Omx"])
+def test_saving_and_discovery_require_exact_omx_suffix(matrix_table, source_matrix, extension):
+    path = matrix_table.folder / f"demand{extension}"
+    path.write_bytes(b"existing")
+
+    with pytest.raises(ValueError, match="Only OMX"):
+        matrix_table.save_matrix(path.name, source_matrix)
+
+    assert matrix_table.file_exists(path.name)
+    assert path.name not in matrix_table.get_available_matrices_and_metadata()
+    assert path.read_bytes() == b"existing"

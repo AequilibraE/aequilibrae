@@ -67,15 +67,15 @@ When the subset of matrices is known ahead of time, use ``from_file()`` with the
 ``from_file()`` returns an in-memory object by default. Providing
 ``store=True`` makes it return a store instead.
 
-For matrices registered with a project, ``project.matrices.get_matrix()``
+For matrix files in a project, ``project.matrices.get_matrix()``
 returns a ``MatrixStore`` by default. Supply ``subset`` to get an independent,
 in-memory ``AequilibraeMatrix`` for computation:
 
 .. code-block:: python
 
-    with project.matrices.get_matrix("demand_mc") as store:
+    with project.matrices.get_matrix("demand_mc.omx") as store:
         matrix_names = list(store)
-    demand = project.matrices.get_matrix("demand_mc", subset=["car", "bus"])
+    demand = project.matrices.get_matrix("demand_mc.omx", subset=["car", "trucks"])
 
 When ``index_name`` is omitted, ``from_file()`` selects the only index in the
 OMX file when there is exactly one. If there are several indices,

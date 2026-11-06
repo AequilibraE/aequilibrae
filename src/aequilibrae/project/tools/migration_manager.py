@@ -288,6 +288,9 @@ class MigrationManager:
             skip = set()
 
         with closure.transaction():
+            self.mark_all_as_seen(closure)
+
+        with closure.transaction():
             conn = self._database_connection(closure)
             connections = self._connections(closure)
             self._ensure_initial_is_applied(conn, connections)
