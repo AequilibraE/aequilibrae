@@ -31,6 +31,11 @@ class Results(NonSpatialProjectTable):
         """
         super().__init__(results_connection)
 
+    @property
+    def fields(self):
+        """Result metadata field editing is not supported yet."""
+        raise NotImplementedError("Result metadata field editing is not supported yet")
+
     def create(
         self,
         table_name: str,

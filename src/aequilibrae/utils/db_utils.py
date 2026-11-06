@@ -327,18 +327,21 @@ class ConnectionClosure:
         elif self.__results_connection is not None:
             raise RuntimeError("This scenario already has a results database")
 
+        from aequilibrae.project.project_creation import initialize_tables
+
         path = Path(path)
         if path.exists():
             raise FileExistsError(f"results database already exists: {path}")
         try:
             path.touch()
-            self.__results_connection = NestedTransactionManager(path)
+            self.__results_connection = NestedTransactionManager(path, spatial=True)
+            initialize_tables("results", conn=self.__results_connection._connection)
         except BaseException:
+            if self.__results_connection is not None:
+                self.__results_connection.close()
+                self.__results_connection = None
             path.unlink(missing_ok=True)
             raise
-        from aequilibrae.project.project_creation import initialize_tables
-
-        initialize_tables("results", self.__results_connection._connection)
         return self.__results_connection
 
     def create_transit_connection(self, path: PathLike[str] | str) -> NestedTransactionManager:

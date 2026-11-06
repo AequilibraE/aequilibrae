@@ -52,8 +52,10 @@ def upgrade_archive(archive_path: Path) -> None:
             archive.extractall(temporary_path)
 
         print(f"Upgrading projects in {archive_path}")
+        run_modules = []
         for database_path in temporary_path.rglob(PROJECT_DATABASE):
             upgrade_project(database_path.parent)
+            run_modules.append((database_path.parent / "run" / "__init__.py").relative_to(temporary_path))
 
         with tempfile.NamedTemporaryFile(dir=archive_path.parent, delete=False) as temporary_archive:
             temporary_archive_path = Path(temporary_archive.name)
@@ -67,6 +69,11 @@ def upgrade_archive(archive_path: Path) -> None:
                         arcname=member.filename,
                         compress_type=member.compress_type,
                     )
+                # Preserve the original member list, except for newly installed run modules.
+                original_names = {member.filename for member in members}
+                for run_module in run_modules:
+                    if run_module.as_posix() not in original_names:
+                        upgraded_archive.write(temporary_path / run_module, arcname=run_module.as_posix())
             temporary_archive_path.replace(archive_path)
         finally:
             temporary_archive_path.unlink(missing_ok=True)

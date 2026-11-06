@@ -5,7 +5,6 @@ pyfiles = [
   'attributes_documentation.sql',
   'link_types.sql',
   'links.sql',
-  'matrices.sql',
   'migrations.sql',
   'modes.sql',
   'nodes.sql',

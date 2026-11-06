@@ -6,7 +6,6 @@ nodes
 zones
 links
 turn_restrictions
-matrices
 migrations
 periods
 transit_graph_configs

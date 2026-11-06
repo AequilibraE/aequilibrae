@@ -6,10 +6,10 @@ import numpy as np
 import openmatrix as omx
 import pandas as pd
 import pytest
+from scipy.sparse import csr_array
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.project.data.matrices import Matrices
-from aequilibrae.utils.db_utils import NestedTransactionManager
 
 
 def test_list_available_matrices(sioux_falls_example):
@@ -75,8 +75,6 @@ def randomword(length):
 
 def mat_count(sioux_falls_example, should_have: int, error_message: str):
     cnt = len(sioux_falls_example.scenario.matrices.get_available_matrices_and_metadata())
-    # with sioux_falls_example.db_connection as conn:
-    #     cnt = conn.execute("Select count(*) from Matrices;").fetchone()[0]
     assert cnt == should_have, error_message
 
 
@@ -89,23 +87,14 @@ def test_get_record(sioux_falls_example):
         assert matrix.attrs.get("description") is None, "record populated wrong. Description"
 
 
+def test_new_project_has_no_matrices_database_table(empty_project):
+    with empty_project.db_connection as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='matrices'").fetchone() is None
+
+
 @pytest.fixture
-def matrix_table(tmp_path):
-    manager = NestedTransactionManager(":memory:")
-    manager._connection.execute(
-        """CREATE TABLE matrices (
-            name TEXT NOT NULL PRIMARY KEY,
-            file_name TEXT NOT NULL UNIQUE,
-            cores INTEGER NOT NULL DEFAULT 1,
-            procedure TEXT,
-            procedure_id TEXT,
-            timestamp DATETIME DEFAULT current_timestamp,
-            description TEXT
-        )"""
-    )
-    table = Matrices(tmp_path)
-    yield table
-    manager.close()
+def matrices(tmp_path):
+    return Matrices(tmp_path)
 
 
 @pytest.fixture(params=[AequilibraeMatrix, MatrixStore], ids=["memory", "store"])
@@ -122,7 +111,7 @@ def source_matrix(request, tmp_path):
         matrix.close()
 
 
-def test_save_matrix_persists_metadata_without_changing_source(matrix_table, source_matrix):
+def test_save_matrix_persists_metadata_without_changing_source(matrices, source_matrix):
     original_metadata = dict(source_matrix.metadata)
     metadata = {
         "procedure": "Test export",
@@ -131,13 +120,13 @@ def test_save_matrix_persists_metadata_without_changing_source(matrix_table, sou
         "description": "Exported demand",
     }
 
-    matrix_table.save_matrix("exported.omx", source_matrix, **metadata)
+    matrices.save_matrix("exported.omx", source_matrix, **metadata)
 
-    assert matrix_table.get_available_matrices_and_metadata()["exported.omx"] == metadata
+    assert matrices.get_available_matrices_and_metadata()["exported.omx"] == metadata
     assert set(source_matrix.metadata) == set(original_metadata)
     for key, value in original_metadata.items():
         np.testing.assert_equal(source_matrix.metadata[key], value)
-    with matrix_table.get_matrix("exported.omx") as exported:
+    with matrices.get_matrix("exported.omx") as exported:
         np.testing.assert_array_equal(exported["demand"], source_matrix["demand"])
         assert exported.matrix_metadata("demand")["purpose"] == "work"
 
@@ -169,6 +158,25 @@ def test_save_matrix_accepts_read_only_store(matrix_table, tmp_path):
         assert "description" not in store.metadata
 
     assert matrix_table.get_available_matrices_and_metadata()["exported.omx"]["description"] == "Exported demand"
+
+
+@pytest.mark.parametrize("storage", ["dense", "sparse", "mixed"])
+@pytest.mark.parametrize("indices", ["default", "missing", "ambiguous"])
+def test_cores_on_disk_counts_dense_and_sparse_without_selecting_an_index(matrix_table, storage, indices):
+    path = matrix_table.folder / "cores.omx"
+    with MatrixStore(path, index=[10, 20], mode="x") as store:
+        if storage in {"dense", "mixed"}:
+            store["dense"] = [[0, 1], [2, 0]]
+        if storage in {"sparse", "mixed"}:
+            store["sparse"] = csr_array([[0, 3], [4, 0]])
+    with omx.open_file(path, mode="a") as matrix:
+        if indices != "default":
+            del matrix.lookup["main_index"]
+        if indices == "ambiguous":
+            matrix.lookup.create_dataset("zones", data=[10, 20])
+            matrix.lookup.create_dataset("other_zones", data=[10, 20])
+
+    assert matrix_table.cores_on_disk(path.name) == (2 if storage == "mixed" else 1)
 
 
 def test_get_matrix_uses_requested_index(matrix_table):

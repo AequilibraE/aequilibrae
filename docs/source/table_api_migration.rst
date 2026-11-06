@@ -2,19 +2,21 @@ Migrating to the table API
 ==========================
 
 The project-table API replaces the mutable, cached ``Link``, ``Node``,
-``Zone``, ``Mode``, ``LinkType``, ``Period``, ``MatrixRecord``, and
-``ResultRecord`` objects. This is a breaking change: records returned by the
-new API are immutable records, and the removed classes and methods have no
-compatibility aliases.
+``Zone``, ``Mode``, ``LinkType``, ``Period``, and ``ResultRecord``
+objects. This is a breaking change: records returned by the new API are
+immutable records, and the removed classes and methods have no compatibility
+aliases.
 
 The same table workflow is used by ``links``, ``nodes``, ``modes``,
-``link_types``, ``periods``, ``turn_restrictions``, ``zones``, ``matrices``, and ``results``. The
-zones table has moved from ``project.zoning`` to ``project.network.zones``.
-The table class is now ``Zones`` in ``aequilibrae.project.network.zones``.
+``link_types``, ``periods``, ``turn_restrictions``, ``zones``, and
+``results``. Matrix files use the separate workflow described under `Matrices
+and results`_. The zones table has moved from ``project.zoning`` to
+``project.network.zones``.  The table class is now ``Zones`` in
+``aequilibrae.project.network.zones``.
 
-In general, create rows with ``insert()``, change them with ``update()``,
-and remove them with ``delete()``. Similarly, issue bulk operations
-through ``insert_from()``, ``update_from()``, and ``delete_from()``.
+In general, create rows with ``insert()``, change them with ``update()``, and
+remove them with ``delete()``. Similarly, issue bulk operations through
+``insert_from()``, ``update_from()``, and ``delete_from()``.
 
 Read and inspect records
 ------------------------
@@ -380,8 +382,7 @@ Matrices and results
 --------------------
 
 Result records support ``get()`` and metadata ``update()`` operations.  Matrix
-metadata is stored in OMX files rather than database records as AequilibraE
-1.0 did.
+metadata is stored in OMX files.
 
 For matrices, replace ``new_record()`` with ``save_matrix()`` to save an in-memory
 matrix and its metadata.
@@ -394,7 +395,6 @@ matrix and its metadata.
     )
     print(project.matrices.cores_on_disk("demand_2030.omx"))
 
-Files already in the project's matrix directory are discovered automatically.
 Use the filename, rather than a record name, to open them:
 
 .. code-block:: python

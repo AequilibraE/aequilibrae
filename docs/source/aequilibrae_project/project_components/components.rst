@@ -297,7 +297,7 @@ It is possible to access the log file contents, as presented in the next code bl
 
 This manager provides access to all the matrix files available in the model.
 Matrices are identified by their filenames, and their metadata is stored in the
-OMX files rather than a database table as AequilibraE 1.0 did.
+OMX files.
 
 ``get_matrix()`` returns a lazy ``MatrixStore`` by default, so OMX data can be
 inspected without loading every matrix into memory. Pass ``subset`` to load the
@@ -346,8 +346,6 @@ otherwise, provide ``index_name`` explicitly.
 
     * :func:`aequilibrae.project.data.matrices.Matrices`
         Class documentation
-    * :ref:`matrix_table`
-        Table documentation
 
 ``project.network.link_types``
 ------------------------------

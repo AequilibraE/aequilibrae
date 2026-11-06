@@ -137,6 +137,54 @@ def test_unnamed_and_multi_indexes_are_saved_as_columns(results):
     assert list(table.get_results("multi").columns) == ["link_id", "class", "flow"]
 
 
+def test_fields_are_explicitly_unsupported(results):
+    table, _ = results
+    with pytest.raises(NotImplementedError, match="field editing is not supported"):
+        _ = table.fields
+
+
+@pytest.mark.parametrize("direct_sql", [False, True])
+@pytest.mark.parametrize("replacement_exists", [False, True])
+def test_update_cannot_orphan_an_existing_result_table(results, direct_sql, replacement_exists):
+    table, conn = results
+    table.create("flows", assignment_frame())
+    if replacement_exists:
+        conn.execute("CREATE TABLE replacement (value REAL)")
+
+    with pytest.raises(sqlite3.IntegrityError, match="results table (still exists|does not exist)"):
+        if direct_sql:
+            conn.execute("UPDATE results SET table_name='replacement' WHERE table_name='flows'")
+        else:
+            table.update("flows", table_name="replacement")
+
+    assert "flows" in table
+    assert "replacement" not in table
+    assert table.table_exists("flows")
+
+
+@pytest.mark.parametrize("replacement_exists", [False, True])
+def test_update_after_old_table_is_removed_requires_an_existing_replacement(results, replacement_exists):
+    table, conn = results
+    table.create("flows", assignment_frame())
+    conn.execute("DROP TABLE flows")
+    if replacement_exists:
+        conn.execute("CREATE TABLE replacement (value REAL)")
+        table.update("flows", table_name="replacement")
+        assert "replacement" in table
+        assert "flows" not in table
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="results table does not exist"):
+            table.update("flows", table_name="replacement")
+        assert "flows" in table
+
+
+def test_update_of_metadata_and_unchanged_table_name_is_allowed(results):
+    table, _ = results
+    table.create("flows", assignment_frame())
+    table.update("flows", table_name="flows", description="Updated")
+    assert table.get("flows").description == "Updated"
+
+
 def test_format_dataframe_rejects_ambiguous_columns():
     duplicate_columns = pd.DataFrame([[1, 2]], columns=["value", "value"])
     with pytest.raises(ValueError, match="unique"):

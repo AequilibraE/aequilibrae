@@ -15,10 +15,6 @@ logger = logging.getLogger(__name__)
 class Matrices:
     """Matrix project manager."""
 
-    name = "matrices"
-    key = "name"
-    record_name = "MatrixRecord"
-
     def __init__(self, matrices_path: str | Path) -> None:
         """Create the matrix table manager.
 
@@ -66,7 +62,7 @@ class Matrices:
     def cores_on_disk(self, file_name: str) -> int:
         path = self.folder / file_name
         with omx.open_file(path, mode="r") as matrix:
-            return len(matrix.list_matrices())
+            return len(matrix.list_matrices()) + len(matrix["/"].get("sparse", {}))
 
     def get_matrix(
         self,
