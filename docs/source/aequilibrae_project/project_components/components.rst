@@ -295,9 +295,9 @@ It is possible to access the log file contents, as presented in the next code bl
 ``project.matrices``
 --------------------
 
-This table provides access to all the matrices available in the model, which
-allows us to update the records in the 'matrices' table. Each item in the
-'matrices' table is a ``MatrixRecord`` object.
+This manager provides access to all the matrix files available in the model.
+Matrices are identified by their filenames, and their metadata is stored in the
+OMX files.
 
 ``get_matrix()`` returns a lazy ``MatrixStore`` by default, so OMX data can be
 inspected without loading every matrix into memory. Pass ``subset`` to load the
@@ -307,9 +307,9 @@ selected matrices as an in-memory ``AequilibraeMatrix`` for computation:
 
     project = create_example(my_folder_path / "matrices")
     matrices = project.matrices
-    with matrices.get_matrix("demand_mc") as store:
+    with matrices.get_matrix("demand_mc.omx") as store:
         matrix_names = list(store)
-    demand = matrices.get_matrix("demand_mc", subset=["car", "truck"])
+    demand = matrices.get_matrix("demand_mc.omx", subset=["car", "trucks"])
 
 If ``index_name`` is omitted, the only OMX index is selected automatically.
 When an OMX file has multiple indices, ``main_index`` is preferred if present,
@@ -321,28 +321,24 @@ otherwise, provide ``index_name`` explicitly.
 
     >>> matrices = project.matrices
 
-    # One can also check all the project matrices as a Pandas' DataFrame
-    >>> matrices.list() # doctest: +SKIP
+    # One can also check all the project matrices as a Dictionary
+    >>> matrices.get_available_matrices_and_metadata() # doctest: +SKIP
 
     # We can add a new matrix
-    >>> matrices.create(...) # doctest: +SKIP
+    >>> demand = matrices.get_matrix("demand_mc.omx", subset=["car", "trucks"])
+    >>> matrices.save_matrix("demand_copy.omx", demand)
     
     # If you're unsure if you have a matrix in your project, you can check if it exists.
     # This function will return `True` or `False`.
-    >>> matrices.file_exists("demand_mc")
+    >>> matrices.file_exists("demand_copy.omx")
     True
 
-    # To delete a matrix from the 'matrices' table, we can delete the record directly
-    >>> matrices.delete_matrix("demand_mc")
+    # To delete a matrix from the project, we can delete the file directly
+    >>> (matrices.folder / "demand_copy.omx").unlink()
 
-    # Or by selecting the matrix and deleting it
-    >>> mat_record = matrices.get("demand_mc") # doctest: +SKIP
-    >>> matrices.delete_matrix(mat_record.name) # doctest: +SKIP
-
-    # If a matrix was added or deleted by an external process, synchronise the
-    # 'matrices' table to keep it organised. This will removed matrix records for files
-    # that are not present.
-    >>> matrices.sync()
+    # Or open a matrix file to edit its metadata
+    >>> with matrices.get_matrix("demand_mc.omx", mode="r+") as matrix:
+    ...     matrix.metadata["description"] = "Multi-class demand"
 
     >>> project.close()
 
@@ -350,8 +346,6 @@ otherwise, provide ``index_name`` explicitly.
 
     * :func:`aequilibrae.project.data.matrices.Matrices`
         Class documentation
-    * :ref:`matrix_table`
-        Table documentation
 
 ``project.network.link_types``
 ------------------------------

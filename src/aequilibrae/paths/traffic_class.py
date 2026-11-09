@@ -10,7 +10,6 @@ from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.results import TransitAssignmentResults
 
-
 @dataclass(frozen=True, kw_only=True)
 class TrafficClass:
     """Define a traffic class independently of a network or prepared graph.
@@ -29,7 +28,7 @@ class TrafficClass:
         >>> project = create_example(project_path)
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         >>> tc = TrafficClass(
         ...     name="car", mode="c", cost='free_flow_time', demand=demand, pce=1.3,
@@ -90,6 +89,110 @@ class TrafficClass:
             if not isinstance(name, str) or not name:
                 raise ValueError("Select-link set names must be nonempty strings")
             if " " in name:
+>>>>>>> variant B
+    _matrix_types = (AequilibraeMatrix, AequilibraeSparseMatrix)
+
+    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
+        """
+        Instantiates the class
+
+        :Arguments:
+            **name** (:obj:`str`): UNIQUE class name.
+
+            **graph** (:obj:`Graph`): Class/mode-specific graph
+
+            **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Class/mode-specific matrix.
+            Supports multiple user classes
+        """
+        super().__init__(name, graph, matrix)
+        self.pce = 1.0
+        self.vot = 1.0
+        self.mode = graph.mode
+        self.class_flow: np.array  # FIXME: Is this ever access?
+        self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
+        self.fixed_cost_field = ""
+        self.fc_multiplier = 1.0
+        self.results = AssignmentResults()
+        self._aon_results = AssignmentResults()
+        self._selected_links = {}  # maps human name to link_set
+        self.congested_time = np.array([])
+        self.congested_skims = None
+
+    def set_pce(self, pce: Union[float, int]) -> None:
+        """Sets Passenger Car equivalent
+
+        :Arguments:
+            **pce** (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
+        """
+        if isinstance(pce, bool) or not isinstance(pce, (float, int)):
+            raise ValueError("PCE must be a positive finite number")
+        value = float(pce)
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("PCE must be a positive finite number")
+        self.pce = value
+
+    def set_heap(self, heap: str) -> None:
+        """Sets the priority queue implementation used for path finding when assigning this class.
+
+        Must be one of ``AssignmentResults.get_heaps()``. Defaults to the 4-ary heap if not set.
+
+        :Arguments:
+            **heap** (:obj:`str`): Heap to use.
+        """
+        self.results.set_heap(heap)
+        self._aon_results.set_heap(heap)
+
+    def set_fixed_cost(self, field_name: str, multiplier=1):
+        """Sets value of time
+
+        :Arguments:
+             **field_name** (:obj:`str`): Name of the graph field with fixed costs for this class
+
+             **multiplier** (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
+        """
+        if field_name not in self.graph.graph.columns:
+            raise ValueError("Field does not exist in the graph")
+
+        self.fc_multiplier = float(multiplier)
+        self.fixed_cost_field = field_name
+        self.graph.graph[field_name] = pd.to_numeric(self.graph.graph[field_name], errors="raise").astype(np.float64)
+        if np.any(pd.isna(self.graph.graph[field_name].to_numpy())):
+            logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
+
+        if self.graph.graph[field_name].min() < 0:
+            msg = f"Cost field {field_name} has negative values. That is not allowed"
+            logger.error(msg)
+            raise ValueError(msg)
+
+    def set_vot(self, value_of_time: float) -> None:
+        """Sets value of time
+
+        :Arguments:
+            **value_of_time** (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
+        """
+
+        if isinstance(value_of_time, bool):
+            raise ValueError("Value of time must be a positive finite number")
+        try:
+            value = float(value_of_time)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Value of time must be a positive finite number") from exc
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("Value of time must be a positive finite number")
+        self.vot = value
+
+    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
+        """Set the selected links. Checks if the links and directions are valid. Translates link_id and
+        direction into unique link id used in compact graph.
+        Supply links=None to disable select link analysis.
+
+        :Arguments:
+            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
+            Link IDs and directions to be used in select link analysis"""
+        self._selected_links = {}
+        for name, link_set in (links or {}).items():
+            if len(name.split(" ")) != 1:
+
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = "_".join(name.split(" "))
             if name in selections:

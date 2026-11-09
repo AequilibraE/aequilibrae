@@ -15,7 +15,6 @@ State within this module should be avoided as this file may be run multiple time
 """
 
 import numpy as np
-import pandas as pd
 
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.graph import Graph
@@ -23,19 +22,17 @@ from aequilibrae.paths.graph import Graph
 
 def matrix_summary():
     """
-    Compute summary statistics about the matrices registered with the active project.
+    Compute summary statistics about the matrix files in the active project.
 
-    If no matrices are registered an empty dictionary will be returned.
+    If no matrix files are present an empty dictionary will be returned.
     """
     project = get_active_project()
     mats = project.matrices
-    df = mats.list()
+    mats_to_metadata = mats.get_available_matrices_and_metadata()
 
     res = {}
-    for name, file_name in zip(df["name"], df["file_name"], strict=True):
-        if not file_name.lower().endswith(".omx"):
-            continue
-        with mats.get_matrix(name) as mat:
+    for file_name in mats_to_metadata:
+        with mats.get_matrix(file_name) as mat:
             stats = {}
             for nm, array in mat.items():
                 stats[nm] = {
@@ -44,7 +41,7 @@ def matrix_summary():
                     "max": np.max(array),
                     "nnz": (array != 0.0).sum(),
                 }
-        res[name] = stats
+        res[file_name] = stats
 
     return res
 
@@ -66,13 +63,11 @@ def graph_summary(graph=None):
 
 def results_summary():
     """
-    Read the results table from the project database.
+    Read the metadata table from the results database.
     """
     project = get_active_project()
 
-    sql = """SELECT * from results;"""
-    with project.db_connection as conn:
-        return pd.read_sql(sql, conn)
+    return project.results.list()
 
 
 def example_function_with_kwargs(arg1: str = None, **kwargs):

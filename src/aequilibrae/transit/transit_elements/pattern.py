@@ -6,11 +6,11 @@ from typing import List
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import shapely.ops
+import shapely
 from shapely.geometry import LineString
-from shapely.ops import transform
 
 from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.route_types import lookup_by_route_type
 
 from .basic_element import BasicPTElement
 from .link import Link
@@ -146,26 +146,37 @@ class Pattern(BasicPTElement):
 
         if not self.__feed.map_matchers:
             self.__feed.builds_map_matchers()
-        if self.route_type not in mode_corresp or mode_corresp[self.route_type] not in self.__feed.map_matchers:
+        road_mode = lookup_by_route_type(mode_corresp, self.route_type)
+        if road_mode not in self.__feed.map_matchers:
             return
 
         df = pd.DataFrame(
             {"stop_id": [stop.stop_id for stop in self.stops], "geometry": [stop.geo for stop in self.stops]}
         )
-        map_matcher: RouteMapMatcher = self.__feed.map_matchers[mode_corresp[self.route_type]]  # type: RouteMapMatcher
+        map_matcher: RouteMapMatcher = self.__feed.map_matchers[road_mode]
 
         stops = gpd.GeoDataFrame(df, geometry="geometry", crs=f"EPSG:{self.__srid}").to_crs(map_matcher.crs)
 
         route_shape = self.raw_shape
         if route_shape is not None:
-            route_shape = transform(self.__feed.mm_transformer.transform, route_shape)
+            route_shape = shapely.transform(
+                route_shape,
+                self.__feed.mm_transformer.transform,
+                include_z=None,
+                interleaved=False,
+            )
         df = map_matcher.map_match_route(stops, route_shape, self.pattern_id)
 
         if df.shape[0] == 0:
             logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
 
-        self.shape = shapely.ops.transform(self.__feed.mm_transform_rev.transform, map_matcher.assemble_shape(df))
+        self.shape = shapely.transform(
+            map_matcher.assemble_shape(df),
+            self.__feed.mm_transform_rev.transform,
+            include_z=None,
+            interleaved=False,
+        )
         self.__build_pattern_mapping(df)
         logger.debug(f"Map-matched pattern {self.pattern_id}")
 
@@ -174,7 +185,7 @@ class Pattern(BasicPTElement):
         df_net = df.assign(seq=np.arange(df.shape[0]), pattern_id=self.pattern_id, srid=4326)
 
         df_net = df_net.merge(self.__geolinks[["link_id", "geometry"]], on="link_id", how="inner")
-        df_net.sort_values("seq", inplace=True)
+        df_net = df_net.sort_values("seq")
         df_net = gpd.GeoDataFrame(df_net, geometry="geometry", crs=self.__geolinks.crs)
         df_net = df_net.assign(wkb=df_net.geometry.to_wkb()).drop(columns=["geometry"])
         self.pattern_mapping = df_net[["pattern_id", "seq", "link_id", "wkb", "dir", "srid"]]

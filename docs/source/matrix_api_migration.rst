@@ -67,15 +67,15 @@ When the subset of matrices is known ahead of time, use ``from_file()`` with the
 ``from_file()`` returns an in-memory object by default. Providing
 ``store=True`` makes it return a store instead.
 
-For matrices registered with a project, ``project.matrices.get_matrix()``
+For matrix files in a project, ``project.matrices.get_matrix()``
 returns a ``MatrixStore`` by default. Supply ``subset`` to get an independent,
 in-memory ``AequilibraeMatrix`` for computation:
 
 .. code-block:: python
 
-    with project.matrices.get_matrix("demand_mc") as store:
+    with project.matrices.get_matrix("demand_mc.omx") as store:
         matrix_names = list(store)
-    demand = project.matrices.get_matrix("demand_mc", subset=["car", "bus"])
+    demand = project.matrices.get_matrix("demand_mc.omx", subset=["car", "trucks"])
 
 When ``index_name`` is omitted, ``from_file()`` selects the only index in the
 OMX file when there is exactly one. If there are several indices,
@@ -291,10 +291,37 @@ Replace ``create_from_trip_list()`` with a pandas read followed by
     demand_from_trips.save_as_omx("trip_demand.omx")
 
 Repeated origin-destination pairs are summed, and missing pairs default to
-zero. The index is inferred from the sorted unique origin and destination
-IDs. Pass ``index`` explicitly when a particular zone order or extra zones are
-required. Origin and destination IDs must follow the same integer rules as the
-zone index, whether the index is supplied or inferred.
+zero. The index can be inferred from the sorted unique origin and destination
+IDs but you should pass ``index`` explicitly when a particular zone order or
+extra zones are required. Pass ``sparse=True`` to construct an
+``AequilibraeSparseMatrix`` directly from the records without a dense
+intermediate, this requires ``fill_value=0``.
+
+Use sparse select-link results
+------------------------------
+
+Assignment select-link OD outputs are dictionaries of SciPy ``csr_array``
+objects, indexed first by selection name and then by demand field name.
+Route-choice outputs map selection names to ``AequilibraeSparseMatrix`` objects,
+which retain the demand's zone index as well as its field names and order:
+
+.. code-block:: python
+
+    selected = traffic_class.results.select_link_od.matrices
+    car = selected["screenline"]["car"]
+    print(car[0, 1], car.sum())
+
+    selected_routes = route_choice.get_select_link_od_matrix_results()
+    car_routes = selected_routes["screenline"]["car"]
+    zone_ids = selected_routes["screenline"].index
+
+The old ``Sparse``, ``COO`` and ``GeneralisedCOODemand`` classes have been
+removed.  Use ``RouteChoice.set_demand()`` to provide the complete
+``AequilibraeMatrix`` or ``AequilibraeSparseMatrix``, and
+``RouteChoice.prepare()`` for routing without demand. Only pairs with non-zero
+demand in at least one field will have a route set constructed. Use
+``RouteChoice.prepare()`` to generate route sets for arbitrary OD pairs without
+a demand matrix.
 
 Move existing files to OMX
 --------------------------

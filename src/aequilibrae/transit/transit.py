@@ -6,6 +6,7 @@ import pandas as pd
 if TYPE_CHECKING:
     from aequilibrae import Project
 
+from aequilibrae.transit.gtfs_exporter import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
@@ -76,6 +77,23 @@ class Transit(WorkerThread):
         gtfs.signal: PythonSignal = self.transit
         gtfs.gtfs_data.signal: PythonSignal = self.transit
         return gtfs
+
+    def export_gtfs(self, file_path: str, agency_url: str, agency_timezone: str, prefix_ids: bool = False) -> None:
+        """Writes the transit services of the transit database to a zipped GTFS feed
+
+        :Arguments:
+            **file_path** (:obj:`str`): Path of the zip file to write (e.g. 'D:/feeds/feed.zip')
+
+            **agency_url** (:obj:`str`): URL of the agencies (e.g. 'https://www.agency.com'), not kept on import
+
+            **agency_timezone** (:obj:`str`): Time zone of the agencies (e.g. 'America/Santiago'), not kept on import
+
+            **prefix_ids** (:obj:`bool`, *Optional*): Prefixes GTFS IDs with the agency, e.g. 'Metro:1', so agencies
+            sharing IDs can be exported together. Agencies imported for several dates also get the date, e.g.
+            'Metro_20260105:1'. Defaults to ``False``
+        """
+        with self.project.transit_connection as conn:
+            export_gtfs(conn, file_path, agency_url, agency_timezone, prefix_ids)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
         """

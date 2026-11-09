@@ -40,7 +40,7 @@ def test_turn_restrictions_has_modes_column(sioux_falls_example):
 
 
 def test_turn_restriction_geometry_is_populated(sioux_falls_example):
-    # Upgraded projects get their triggers from migration 009 rather than from add_triggers,
+    # Upgraded projects get their triggers from migration 009 rather than from _add_triggers,
     # so this also covers the geometry triggers being installed on the migration path.
     with sioux_falls_example.db_connection as conn:
         pair = _sample_turn_pair(conn)

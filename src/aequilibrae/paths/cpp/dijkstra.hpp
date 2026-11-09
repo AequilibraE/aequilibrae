@@ -6,7 +6,7 @@
 
 #include "context.hpp"
 #include "pq_heap_base.hpp"
-#include "queries.hpp"
+#include "search_query.hpp"
 #include "search_results.hpp"
 #include "workspaces.hpp"
 
@@ -23,12 +23,12 @@ inline bool reached_last_target(const SearchQuery &query, std::size_t node,
 
 // Contexts and queries contain only inputs. The result view writes through to
 // its Cython owner's arrays and metadata without changing the view itself.
-template <class Queue>
-void dijkstra_with_queue(const NodeBasedContext &context,
+template <class Queue, typename T>
+void dijkstra_with_queue(const NodeBasedContext<T> &context,
                          const SearchQuery &query,
-                         const MutableSearchResults &results,
+                         const MutableSearchResults<T> &results,
                          Queue &queue) noexcept {
-  static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
+  static_assert(std::is_base_of_v<PriorityQueueBase<Queue, T>, Queue>);
   results.reset();
   auto &metadata = *results.metadata;
   metadata.origin = query.origin;
@@ -41,11 +41,11 @@ void dijkstra_with_queue(const NodeBasedContext &context,
 
   while (!queue.is_empty()) {
     const auto state = queue.extract_min();
-    const double cost = queue.element_key(state);
+    const T cost = queue.element_key(state);
     results.settlement_order[metadata.settled_count++] = state;
     results.distances[state] = cost;
     results.turn_costs[state] = 0.0;
-    results.terminal_states[state] = state;
+    results.set_terminal(state, state);
 
     if (reached_last_target(query, state, metadata)) {
       stopped_at_targets = true;
@@ -62,7 +62,7 @@ void dijkstra_with_queue(const NodeBasedContext &context,
       if (next_state == SCANNED) {
         continue;
       }
-      const double next_cost = cost + context.costs[link];
+      const T next_cost = cost + context.costs[link];
       if (!std::isfinite(next_cost)) {
         continue;
       }
@@ -81,20 +81,18 @@ void dijkstra_with_queue(const NodeBasedContext &context,
   // The last target's outgoing links were not explored, even if the heap is
   // empty. Only completing the loop proves the reachable state space exhausted.
   metadata.exhausted = !stopped_at_targets;
-  for (std::size_t state = 0; state < results.state_count; ++state) {
-    if (queue.effective_state(state) == IN_HEAP) {
-      results.predecessors[state] = invalid_state;
-      results.connectors[state] = invalid_state;
-    }
-  }
+  queue.for_each_pending([&](std::size_t state) {
+    results.predecessors[state] = invalid_state;
+    results.connectors[state] = invalid_state;
+  });
 }
 
-template <class Queue>
-void dijkstra_with_queue(const TurnBasedContext &context,
+template <class Queue, typename T>
+void dijkstra_with_queue(const TurnBasedContext<T> &context,
                          const SearchQuery &query,
-                         const MutableSearchResults &results,
+                         const MutableSearchResults<T> &results,
                          Queue &queue) noexcept {
-  static_assert(std::is_base_of_v<PriorityQueueBase<Queue>, Queue>);
+  static_assert(std::is_base_of_v<PriorityQueueBase<Queue, T>, Queue>);
   const auto &graph = context.graph;
   // Link states preserve incoming-link history. One virtual root lets first
   // links leave the origin without paying a turn cost, including edgeless
@@ -113,13 +111,13 @@ void dijkstra_with_queue(const TurnBasedContext &context,
 
   while (!queue.is_empty()) {
     const auto state = queue.extract_min();
-    const double cost = queue.element_key(state);
+    const T cost = queue.element_key(state);
     const auto node = state == root ? query.origin : graph.heads[state];
     results.settlement_order[metadata.settled_count++] = state;
     results.distances[state] = cost;
 
     if (results.terminal_states[node] == invalid_state) {
-      results.terminal_states[node] = state;
+      results.set_terminal(node, state);
       if (reached_last_target(query, node, metadata)) {
         stopped_at_targets = true;
         break;
@@ -132,7 +130,8 @@ void dijkstra_with_queue(const TurnBasedContext &context,
     auto turn = state == root ? 0 : context.turn_fs[state];
     const auto turn_end = state == root ? 0 : context.turn_fs[state + 1];
     for (auto next = graph.fs[node]; next < graph.fs[node + 1]; ++next) {
-      if (queue.effective_state(next) == SCANNED) {
+      const auto next_state = queue.effective_state(next);
+      if (next_state == SCANNED) {
         continue;
       }
       // Sorted turn rows can be merged with outgoing links without
@@ -143,16 +142,16 @@ void dijkstra_with_queue(const TurnBasedContext &context,
       }
       const bool explicit_turn =
           turn < turn_end && context.turn_to_links[turn] == next;
-      const double penalty = explicit_turn ? context.turn_penalties[turn] : 0.0;
+      const T penalty = explicit_turn ? context.turn_penalties[turn] : T{0};
       if (state != root && !explicit_turn && !context.allow_uturns &&
           context.first_nodes[next] == context.last_nodes[state]) {
         continue;
       }
-      const double next_cost = cost + graph.costs[next] + penalty;
+      const T next_cost = cost + graph.costs[next] + penalty;
       if (!std::isfinite(next_cost)) {
         continue;
       }
-      if (queue.effective_state(next) == NOT_IN_HEAP) {
+      if (next_state == NOT_IN_HEAP) {
         queue.insert(next, next_cost);
       } else if (next_cost < queue.element_key(next)) {
         queue.decrease_key(next, next_cost);
@@ -167,19 +166,17 @@ void dijkstra_with_queue(const TurnBasedContext &context,
 
   metadata.exhausted = !stopped_at_targets;
   // Early exit must not expose tentative paths or their turn labels.
-  for (std::size_t state = 0; state < results.state_count; ++state) {
-    if (queue.effective_state(state) == IN_HEAP) {
-      results.predecessors[state] = invalid_state;
-      results.connectors[state] = invalid_state;
-      results.turn_costs[state] = std::numeric_limits<double>::infinity();
-    }
-  }
+  queue.for_each_pending([&](std::size_t state) {
+    results.predecessors[state] = invalid_state;
+    results.connectors[state] = invalid_state;
+    results.turn_costs[state] = std::numeric_limits<T>::infinity();
+  });
 }
 
-template <class Context>
+template <class Context, typename T>
 void dijkstra(const Context &context, const SearchQuery &query,
-              const MutableSearchResults &results,
-              const SearchWorkspace &workspace) noexcept {
+              const MutableSearchResults<T> &results,
+              const SearchWorkspace<T> &workspace) noexcept {
   workspace.heap->visit([&](auto &queue) {
     dijkstra_with_queue(context, query, results, queue);
   });

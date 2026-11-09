@@ -8,7 +8,7 @@ END;
 --#
 -- Prevents a mode record from being changed when referenced by turn restrictions
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_on_turn_restrictions_updating BEFORE UPDATE OF mode_id ON "modes"
-WHEN (Select count(*) from turn_restrictions where instr(modes, old.mode_id) > 0)>0
+WHEN EXISTS (SELECT 1 FROM turn_restrictions WHERE instr(modes, old.mode_id) > 0)
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
@@ -16,7 +16,7 @@ END;
 --#
 -- Prevents a mode record from being removed when referenced by turn restrictions
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_on_turn_restrictions_deleting BEFORE DELETE ON "modes"
-WHEN (Select count(*) from turn_restrictions where instr(modes, old.mode_id) > 0)>0
+WHEN EXISTS (SELECT 1 FROM turn_restrictions WHERE instr(modes, old.mode_id) > 0)
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
@@ -116,6 +116,18 @@ BEGIN
     WHERE from_node = new.node_id
        OR via_node = new.node_id
        OR to_node = new.node_id;
+END;
+
+--#
+-- Prevents removing a node that turn restrictions still reference. Merging nodes, and link
+-- edits that would leave such a node without links, fail with this message instead of a
+-- bare foreign key error, including on connections that do not enforce foreign keys.
+CREATE TRIGGER aequilibrae_turn_restrictions_keep_referenced_node BEFORE DELETE ON nodes
+WHEN EXISTS (SELECT 1 FROM turn_restrictions WHERE from_node = old.node_id)
+  OR EXISTS (SELECT 1 FROM turn_restrictions WHERE via_node = old.node_id)
+  OR EXISTS (SELECT 1 FROM turn_restrictions WHERE to_node = old.node_id)
+BEGIN
+    SELECT RAISE(ABORT, 'Node is referenced by turn restrictions. Remove those restrictions first');
 END;
 
 --#

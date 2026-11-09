@@ -3,12 +3,12 @@
 import numpy as np
 import pandas as pd
 import pytest
-
-from aequilibrae.paths import Network
-from aequilibrae.matrix import GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.route_choice import RouteChoice
 from aequilibrae.utils.cython.bridge import Bridge
+
+from aequilibrae.matrix import from_df
+from aequilibrae.paths import Network
+from aequilibrae.paths.route_choice import RouteChoice
 
 
 def junction(penalty, *, lonlat=None):
@@ -31,17 +31,21 @@ def junction(penalty, *, lonlat=None):
     )
 
 
+def single_od_demand(origin, destination, flow=1.0):
+    return from_df(
+        pd.DataFrame({"origin id": [origin], "destination id": [destination], "flow": [flow]}),
+        "origin id",
+        "destination id",
+        sparse=True,
+    )
+
+
 def batched_junction_routes(graph, bfsle, max_routes):
     ods = [(10, 40), (20, 40)]
-    demand = GeneralisedCOODemand(
-        "origin id", "destination id", graph.nodes_to_indices, shape=(graph.num_zones, graph.num_zones)
+    frame = pd.DataFrame(
+        {"flow": [1.0, 1.0]}, index=pd.MultiIndex.from_tuples(ods, names=["origin id", "destination id"])
     )
-    demand.add_df(
-        pd.DataFrame(
-            {"flow": [1.0, 1.0]},
-            index=pd.MultiIndex.from_tuples(ods, names=["origin id", "destination id"]),
-        )
-    )
+    demand = from_df(frame.reset_index(), "origin id", "destination id", index=graph.centroids, sparse=True)
     choice = RouteChoiceSet(graph)
     with Bridge() as bridge:
         choice.batched(
@@ -175,12 +179,7 @@ def test_generation_without_psl_does_not_need_turn_steps(algorithm):
 def recompute_imported_routes(graph, routes, *, destination=40, log_warnings=True, return_choice=False):
     choice = RouteChoice(graph)
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, destination)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, destination))
     supplied = pd.DataFrame(
         {"origin id": [10] * len(routes), "destination id": [destination] * len(routes), "route set": routes}
     )
@@ -288,12 +287,7 @@ def test_recomputed_psl_from_path_files_includes_turns(tmp_path):
 
     choice = RouteChoice(graph)
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     choice.execute_from_path_files(file, recompute_psl=True)
     rows = choice.get_results()
     table = {tuple(row["route set"]): row for _, row in rows.iterrows()}
@@ -332,16 +326,8 @@ def test_imported_link_absent_from_compact_graph_is_rejected():
         "c", cost="time", compact=True, block_centroid_flows=False
     )
     choice = RouteChoiceSet(graph)
-    demand = GeneralisedCOODemand(
-        "origin id", "destination id", graph.nodes_to_indices, shape=(graph.num_zones, graph.num_zones)
-    )
-    demand.add_df(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
-    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 99, -99, 12]]})
+    demand = single_od_demand(10, 40)
+    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 12]]})
     with pytest.raises(ValueError, match="absent from the compact graph"):
         choice.assign_from_df(supplied, demand, select_links={}, recompute_psl=True)
 
@@ -356,12 +342,7 @@ def test_imported_link_absent_from_compact_graph_is_rejected():
 def test_imported_route_validation_checks_od_endpoints(origin, destination, invalid, valid, reason, caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(origin, destination)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(origin, destination))
     df = pd.DataFrame(
         {
             "origin id": [origin, origin],
@@ -382,12 +363,7 @@ def test_imported_route_validation_checks_od_endpoints(origin, destination, inva
 def test_without_psl_uses_supplied_mask_without_renormalising(caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     df = pd.DataFrame(
         {
             "origin id": [10, 10],
@@ -416,12 +392,7 @@ def test_without_psl_uses_supplied_mask_without_renormalising(caplog):
 def test_imported_empty_route_set_loads_no_demand(routes, recompute_psl):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     df = pd.DataFrame(
         {
             "origin id": [10] * len(routes),
@@ -439,12 +410,7 @@ def test_imported_empty_route_set_loads_no_demand(routes, recompute_psl):
 def test_empty_route_row_is_omitted_from_nonempty_set(recompute_psl, expected_probability):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     df = pd.DataFrame(
         {
             "origin id": [10, 10],
@@ -464,12 +430,7 @@ def test_empty_route_row_is_omitted_from_nonempty_set(recompute_psl, expected_pr
 def test_path_file_without_psl_uses_supplied_mask(tmp_path, caplog):
     choice = RouteChoice(diamond())
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     file = tmp_path / "invalid_route.parquet"
     pd.DataFrame(
         {
@@ -569,12 +530,7 @@ def test_imported_supplied_mask_excludes_loading_and_select_links(recompute):
     choice = RouteChoice(graph)
     choice.set_choice_set_generation()
     choice.set_select_links({"banned": [[(71, 1)]], "used": [[(55, 1)]]})
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [10.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40, flow=10.0))
     supplied = pd.DataFrame(
         {
             "origin id": [10, 10],
@@ -689,12 +645,7 @@ def test_infinite_link_cost_is_masked_without_a_turn_ban():
 def test_without_psl_does_not_validate_or_recost(caplog):
     choice = RouteChoice(diamond(np.inf))
     choice.set_choice_set_generation()
-    choice.add_demand(
-        pd.DataFrame(
-            {"flow": [1.0]},
-            index=pd.MultiIndex.from_tuples([(10, 40)], names=["origin id", "destination id"]),
-        )
-    )
+    choice.set_demand(single_od_demand(10, 40))
     supplied = pd.DataFrame(
         {
             "origin id": [10, 10],

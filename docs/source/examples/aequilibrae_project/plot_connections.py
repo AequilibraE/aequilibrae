@@ -48,10 +48,10 @@ project = create_example(fldr, "sioux_falls")
 # %%
 # Each connection can be easily accessed as follows:
 with project.db_connection as conn:
-    matrices = pd.read_sql("SELECT * FROM matrices", conn)
+    modes = pd.read_sql("SELECT * FROM modes", conn)
 
 # %%
-matrices
+modes
 
 # %%
 # As the project database connection is spatial, it can also be used to query spatial data directly.

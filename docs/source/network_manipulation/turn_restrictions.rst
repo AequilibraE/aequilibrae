@@ -32,8 +32,8 @@ Turn restrictions are stored in the ``turn_restrictions`` table with the followi
 
 Turn definitions are node-sequences: ``from_node -> via_node -> to_node``.
 
-Trigger Behavior
-----------------
+Trigger Behaviour
+-----------------
 
 Database triggers enforce and maintain turn restriction integrity:
 
@@ -88,7 +88,7 @@ Use ``project.transaction()`` to group writes.
     >>> turns = project.network.turn_restrictions
 
     # Add a prohibited turn (penalty=None means prohibited)
-    >>> restriction_id = turns.insert(from_node=1, via_node=2, to_node=3, modes="c")
+    >>> restriction_id = turns.insert(from_node=1, via_node=2, to_node=6, modes="c")
 
     # Add a turn with a 30-second penalty
     >>> other_id = turns.insert(from_node=3, via_node=4, to_node=5, penalty=30.0, modes="c")
@@ -112,7 +112,7 @@ Bulk Loading from DataFrame
 
 Use ``insert_from()`` to load turns from a DataFrame. It returns the inserted
 IDs. Use ``update_from()`` with a ``restriction_id`` column to change existing
-turns. Include a ``modes`` column when inserting. Both methods normalize
+turns. Include a ``modes`` column when inserting. Both methods normalise
 penalties just like single-record writes and leave mode validation to the
 database. They roll back the whole batch if a row fails.
 
@@ -122,8 +122,8 @@ database. They roll back the whole batch if a row fails.
 
     >>> restrictions_df = pd.DataFrame({
     ...     'from_node': [1, 2, 3],
-    ...     'via_node': [2, 3, 4],
-    ...     'to_node': [3, 4, 5],
+    ...     'via_node': [2, 6, 4],
+    ...     'to_node': [6, 5, 5],
     ...     'modes': ['c', 'c', 'c'],
     ...     'penalty': [None, 15.0, 30.0],  # None or +inf = prohibited
     ... })
@@ -194,7 +194,7 @@ time costs during the equilibration process.
     >>> from aequilibrae.paths.vdf import bpr
 
     >>> network = project.network.build()
-    >>> demand_matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    >>> demand_matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     >>> traffic_class = TrafficClass(
     ...     mode='c',
     ...     cost='distance',

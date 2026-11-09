@@ -16,7 +16,7 @@ def p_results(sioux_falls_example):
         mode="c", cost="free_flow_time", skimming=["free_flow_time"], block_centroid_flows=False
     )
 
-    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     yield {"project": project, "g": graph, "matrix": matrix}
 

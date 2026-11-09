@@ -1,12 +1,15 @@
 import itertools
 import logging
-from typing import Union
 from collections import defaultdict
+from typing import Union
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
+from scipy.sparse import coo_array, issparse
+
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths import RouteChoice
 from aequilibrae.paths.graph import Graph
 
@@ -18,7 +21,7 @@ class SubAreaAnalysis:
         self,
         graph: Graph,
         subarea: gpd.GeoDataFrame,
-        demand: Union[pd.DataFrame, AequilibraeMatrix],
+        demand: Union[AequilibraeMatrix, AequilibraeSparseMatrix],
         project=None,
     ):
         """
@@ -37,7 +40,7 @@ class SubAreaAnalysis:
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
 
-            **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to
+            **demand** (:obj:`Union[AequilibraeMatrix, AequilibraeSparseMatrix]`): The demand matrix to
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
@@ -55,10 +58,14 @@ class SubAreaAnalysis:
         if isinstance(graph, Graph):
             self.node_ids = graph.full_node_ids
             retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
-            edges = pd.DataFrame({
-                "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
-                "a_node": graph.full_tails[retained], "b_node": graph.full_heads[retained],
-            })
+            edges = pd.DataFrame(
+                {
+                    "link_id": graph.full_link_ids[retained],
+                    "direction": graph.full_directions[retained],
+                    "a_node": graph.full_tails[retained],
+                    "b_node": graph.full_heads[retained],
+                }
+            )
         else:
             self.node_ids = graph.all_nodes
             edges = graph.graph.loc[
@@ -69,12 +76,14 @@ class SubAreaAnalysis:
         )
 
         entering = [
-            edge for edge, link in self.interior_graph.iterrows()
+            edge
+            for edge, link in self.interior_graph.iterrows()
             if self.node_ids[link.a_node] not in self.interior_nodes.index
             and self.node_ids[link.b_node] in self.interior_nodes.index
         ]
         exiting = [
-            edge for edge, link in self.interior_graph.iterrows()
+            edge
+            for edge, link in self.interior_graph.iterrows()
             if self.node_ids[link.a_node] in self.interior_nodes.index
             and self.node_ids[link.b_node] not in self.interior_nodes.index
         ]
@@ -100,16 +109,17 @@ class SubAreaAnalysis:
         :Returns:
             **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area demand matrix.
         """
+        assert self.rc.demand is not None
 
         if demand_cols is None:
-            demand_cols = self.rc.demand.df.columns
+            demand_cols = tuple(self.rc.demand)
 
         sl_od = self.rc.get_select_link_od_matrix_results()
-
+        index = self.rc.demand.index
         sub_area_demand = []
         for col in demand_cols:
-            edge_totals = {k: sl_od[k][col].to_scipy() for k in self.single_edges}
-            edge_pair_values = {k: sl_od[k][col].to_scipy() for k in self.edge_pairs}
+            edge_totals = {k: sl_od[k][col] for k in self.single_edges}
+            edge_pair_values = {k: sl_od[k][col] for k in self.edge_pairs}
 
             entered = defaultdict(float)
             exited = defaultdict(float)
@@ -117,8 +127,8 @@ class SubAreaAnalysis:
             for (link_id, dir), v in edge_totals.items():
                 link = self.interior_graph.loc[link_id, dir]
                 for (o, d), load in v.todok().items():
-                    o = self.graph.centroids[o]
-                    d = self.graph.centroids[d]
+                    o = index[o]
+                    d = index[d]
 
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
@@ -137,41 +147,62 @@ class SubAreaAnalysis:
                 link2 = self.interior_graph.loc[l2]
 
                 for (o, d), load in v.todok().items():
-                    o = self.graph.centroids[o]
-                    d = self.graph.centroids[d]
+                    o = index[o]
+                    d = index[d]
                     o_inside = o in self.interior_nodes.index
                     d_inside = d in self.interior_nodes.index
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
-                        through[
-                            (self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods
-                        ] += load
+                        through[(self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods] += load
+
+            subarea_od_keys = list(entered) + list(exited) + list(through)
+            subarea_od_values = list(entered.values()) + list(exited.values()) + list(through.values())
+            subarea_od_ids = np.asarray(subarea_od_keys, dtype=np.uint64).reshape(-1, 4 if keep_original_ods else 2)
+
+            id_columns = list(subarea_od_ids.T)
+            id_names = ["origin id", "destination id"]
+            if keep_original_ods:
+                id_names += ["original origin id", "original destination id"]
 
             sub_area_demand.append(
                 pd.DataFrame(
-                    list(entered.values()) + list(exited.values()) + list(through.values()),
-                    index=pd.MultiIndex.from_tuples(
-                        list(entered.keys()) + list(exited.keys()) + list(through.keys()),
-                        names=["origin id", "destination id"]
-                        + (["original origin id", "original destination id"] if keep_original_ods else []),
-                    ),
+                    subarea_od_values,
+                    index=pd.MultiIndex.from_arrays(id_columns, names=id_names),
                     columns=[col],
                 )
             )
 
         interior = []
-        for o, d in self.rc.demand.df.index:
-            if o in self.interior_nodes.index and d in self.interior_nodes.index:
-                interior.append((o, d))
+        inside = np.flatnonzero(np.isin(self.rc.demand.index, self.interior_nodes.index))
+        inside_ids = self.rc.demand.index[inside]
+        for col in demand_cols:
+            values = self.rc.demand[col]
+            values = values.tocsr()[inside][:, inside] if issparse(values) else values[np.ix_(inside, inside)]
+            records = coo_array(values)
+            nonzero = records.data != 0
+            interior.append(
+                pd.Series(
+                    records.data[nonzero],
+                    name=col,
+                    index=pd.MultiIndex.from_arrays(
+                        [
+                            inside_ids[records.row[nonzero]].astype(np.uint64, copy=False),
+                            inside_ids[records.col[nonzero]].astype(np.uint64, copy=False),
+                        ],
+                        names=["origin id", "destination id"],
+                    ),
+                )
+            )
 
         self.sub_area_demand = pd.concat(sub_area_demand, axis=1).fillna(0.0)
 
-        interior = self.rc.demand.df.loc[interior]
+        interior = pd.concat(interior, axis=1).fillna(0.0)
         if keep_original_ods:
             # We need to duplicate the interior ODs if we're "keeping the originals"
-            interior.index = pd.MultiIndex.from_tuples(
-                (x + x for x in interior.index), names=self.sub_area_demand.index.names
+            interior.index = pd.MultiIndex.from_arrays(
+                [np.asarray(interior.index.get_level_values(level % 2), dtype=np.uint64) for level in range(4)],
+                names=self.sub_area_demand.index.names,
             )
 
         self.sub_area_demand = pd.concat([self.sub_area_demand, interior]).sort_index()

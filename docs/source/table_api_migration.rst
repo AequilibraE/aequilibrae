@@ -2,19 +2,21 @@ Migrating to the table API
 ==========================
 
 The project-table API replaces the mutable, cached ``Link``, ``Node``,
-``Zone``, ``Mode``, ``LinkType``, ``Period``, ``MatrixRecord``, and
-``ResultRecord`` objects. This is a breaking change: records returned by the
-new API are immutable records, and the removed classes and methods have no
-compatibility aliases.
+``Zone``, ``Mode``, ``LinkType``, ``Period``, and ``ResultRecord``
+objects. This is a breaking change: records returned by the new API are
+immutable records, and the removed classes and methods have no compatibility
+aliases.
 
 The same table workflow is used by ``links``, ``nodes``, ``modes``,
-``link_types``, ``periods``, ``turn_restrictions``, ``zones``, ``matrices``, and ``results``. The
-zones table has moved from ``project.zoning`` to ``project.network.zones``.
-The table class is now ``Zones`` in ``aequilibrae.project.network.zones``.
+``link_types``, ``periods``, ``turn_restrictions``, ``zones``, and
+``results``. Matrix files use the separate workflow described under `Matrices
+and results`_. The zones table has moved from ``project.zoning`` to
+``project.network.zones``.  The table class is now ``Zones`` in
+``aequilibrae.project.network.zones``.
 
-In general, create rows with ``insert()``, change them with ``update()``,
-and remove them with ``delete()``. Similarly, issue bulk operations
-through ``insert_from()``, ``update_from()``, and ``delete_from()``.
+In general, create rows with ``insert()``, change them with ``update()``, and
+remove them with ``delete()``. Similarly, issue bulk operations through
+``insert_from()``, ``update_from()``, and ``delete_from()``.
 
 Read and inspect records
 ------------------------
@@ -379,43 +381,34 @@ scope is caught by an outer scope, only the inner scope is rolled back.
 Matrices and results
 --------------------
 
-Matrix and result records support the same ``get()``, metadata ``update()``,
-and metadata ``delete()`` operations. Use their file- and table-aware helpers
-when the associated matrix file or result table must change too.
+Result records support ``get()`` and metadata ``update()`` operations.  Matrix
+metadata is stored in OMX files.
 
-For matrices, replace ``new_record()`` with ``create()`` to save an in-memory
-matrix and register it. Saving through this method supports OMX files:
+For matrices, replace ``new_record()`` with ``save_matrix()`` to save an in-memory
+matrix and its metadata.
 
 .. code-block:: python
 
-    matrix_record = project.matrices.create(
-        "demand_2030",
+    project.matrices.save_matrix(
         "demand_2030.omx",
         matrix=demand,
     )
-    print(matrix_record.file_name, matrix_record.cores)
+    print(project.matrices.cores_on_disk("demand_2030.omx"))
 
-Use ``register_matrix()`` when the file already exists in the project's matrix
-directory:
-
-.. code-block:: python
-
-    skim_record = project.matrices.register_matrix(
-        "base_skims",
-        "base_skims.omx",
-    )
-    base_skims = project.matrices.get_matrix(skim_record.name)
-
-Metadata changes remain table operations:
+Use the filename, rather than a record name, to open them:
 
 .. code-block:: python
 
-    project.matrices.update("demand_2030", description="2030 demand")
-    project.matrices.delete_matrix("demand_2030")
+    with project.matrices.get_matrix("base_skims.omx") as base_skims:
+        print(list(base_skims))
 
-``delete_matrix()`` removes both metadata and the matrix file. In contrast,
-``project.matrices.delete(name)`` removes only metadata and leaves the file in
-place.
+Matrix metadata changes are file operations:
+
+.. code-block:: python
+
+    with project.matrices.get_matrix("demand_2030.omx", mode="r+") as matrix:
+        matrix.metadata["description"] = "2030 demand"
+    (project.matrices.folder / "demand_2030.omx").unlink()
 
 For results, replace ``new_record()`` followed by ``set_data()`` with one
 ``create()`` call. Named DataFrame index levels are stored as regular columns,
@@ -447,8 +440,10 @@ which makes a link-indexed result straightforward to retrieve:
 
 ``create()`` raises an error rather than replacing an existing metadata record
 or data table. ``delete_result()`` removes both metadata and its data table.
-Generic ``results.delete(name)`` removes metadata only.
+The more generic ``results.delete(name)`` removes metadata only after the data
+table has been removed.
 
-Both ``matrices`` and ``results`` provide ``clear_database()`` to remove stale
-metadata, ``update_database()`` to register unrecorded resources, and ``sync()``
-to run both reconciliation steps.
+``results`` provides ``clear_database()`` to remove stale metadata,
+``update_database()`` to register unrecorded tables, and ``sync()`` to run both
+reconciliation steps. Matrix files are discovered directly and need no
+synchronisation.

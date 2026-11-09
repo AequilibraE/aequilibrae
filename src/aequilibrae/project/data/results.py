@@ -21,20 +21,20 @@ class Results(NonSpatialProjectTable):
 
     def __init__(
         self,
-        project_connection: NestedTransactionManager,
         results_connection: NestedTransactionManager,
     ) -> None:
         """Create the result table.
 
         :Arguments:
-            **project_connection** (:obj:`NestedTransactionManager`): Manager for
-            result metadata in the project database.
-
             **results_connection** (:obj:`NestedTransactionManager`): Manager for
-            result tables.
+            result metadata and data tables in the results database.
         """
-        super().__init__(project_connection)
-        self._results_connection = results_connection
+        super().__init__(results_connection)
+
+    @property
+    def fields(self):
+        """Result metadata field editing is not supported yet."""
+        raise NotImplementedError("Result metadata field editing is not supported yet")
 
     def create(
         self,
@@ -103,7 +103,7 @@ class Results(NonSpatialProjectTable):
         placeholders = ",".join("?" for _ in columns_to_types)
         insert_sql = f"INSERT INTO {table} ({','.join(columns_to_escaped.values())}) VALUES ({placeholders})"
 
-        with self._results_connection.transaction() as conn:
+        with self._connection.transaction() as conn:
             conn.execute(f"CREATE TABLE {table} ({definitions})")
             conn.executemany(insert_sql, frame.itertuples(index=False, name=None))
 
@@ -127,7 +127,7 @@ class Results(NonSpatialProjectTable):
             )
         except BaseException as primary:
             try:
-                with self._results_connection.transaction() as conn:
+                with self._connection.transaction() as conn:
                     conn.execute(f"DROP TABLE {table}")
             except BaseException as cleanup:
                 primary.add_note(f"unregistered result table {table_name!r} remains: {cleanup!r}")
@@ -145,9 +145,7 @@ class Results(NonSpatialProjectTable):
             **results** (:obj:`pandas.DataFrame`): Stored result values.
         """
         record = self.get(table_name)
-        return pd.read_sql_query(
-            f"SELECT * FROM {escape_identifier(record.table_name)}", self._results_connection._connection
-        )
+        return pd.read_sql_query(f"SELECT * FROM {escape_identifier(record.table_name)}", self._connection._connection)
 
     def delete_result(self, table_name: str) -> None:
         """Delete result metadata and its table.
@@ -160,7 +158,7 @@ class Results(NonSpatialProjectTable):
         move = self.table_exists(table_name)
 
         if move:
-            with self._results_connection.transaction() as conn:
+            with self._connection.transaction() as conn:
                 conn.execute(f"ALTER TABLE {table} RENAME TO {tombstone}")
 
         try:
@@ -168,14 +166,14 @@ class Results(NonSpatialProjectTable):
         except BaseException as primary:
             if move:
                 try:
-                    with self._results_connection.transaction() as conn:
+                    with self._connection.transaction() as conn:
                         conn.execute(f"ALTER TABLE {tombstone} RENAME TO {table}")
                 except BaseException as cleanup:
                     primary.add_note(f"result table is stranded as {tombstone!r}: {cleanup!r}")
             raise
 
         if move:
-            with self._results_connection.transaction() as conn:
+            with self._connection.transaction() as conn:
                 conn.execute(f"DROP TABLE {tombstone}")
 
     def clear_database(self) -> None:
@@ -193,8 +191,8 @@ class Results(NonSpatialProjectTable):
         """Register existing, unrecorded tables."""
         result_tables = {
             row[0]
-            for row in self._results_connection._connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            for row in self._connection._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'results'"
             ).fetchall()
         }
         records = {row[0] for row in self._connection._connection.execute("SELECT table_name FROM results").fetchall()}
@@ -211,7 +209,7 @@ class Results(NonSpatialProjectTable):
 
     def table_exists(self, table_name: str) -> bool:
         return (
-            self._results_connection._connection.execute(
+            self._connection._connection.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
             ).fetchone()
             is not None

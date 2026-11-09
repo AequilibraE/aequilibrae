@@ -6,15 +6,17 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
 from aequilibrae import Network, TrafficAssignment, TrafficClass
-from aequilibrae.paths.graph import GraphBase
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.vdf import bpr
-from aequilibrae.matrix import AequilibraeMatrix
 
 
 def diamond(turn=False):
@@ -51,11 +53,18 @@ def diamond(turn=False):
 
 def matrix_for(graph, demand=None):
     if demand is None:
-        demand = np.zeros((graph.num_zones, graph.num_zones, 2))
-        demand[0, -1] = [8.0, 12.0]
+        demand = {
+            "work": np.zeros((graph.num_zones, graph.num_zones)),
+            "other": np.zeros((graph.num_zones, graph.num_zones)),
+        }
+        demand["work"][0, -1] = 8.0
+        demand["other"][0, -1] = 12.0
 
     matrix = AequilibraeMatrix(index=graph.centroids.copy())
-    if demand.ndim == 2:
+    if isinstance(demand, dict):
+        for name, values in demand.items():
+            matrix[name] = values
+    elif demand.ndim == 2:
         matrix["work"] = demand
     else:
         for index, name in enumerate(("work", "other")[: demand.shape[2]]):
@@ -164,7 +173,9 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
         assert loads.loc[link, "work_ab"] == 0.0
     np.testing.assert_allclose(results.link_loads, assignment._class_states[0]._aon_results.link_loads)
     np.testing.assert_allclose(assignment.assignment.total_flow, 2.5 * results.total_link_loads)
-    np.testing.assert_array_equal(results.select_link_od.matrices["upper"][0, 3], [8.0, 12.0])
+    np.testing.assert_array_equal(
+        [matrix[0, 3] for matrix in results.select_link_od.matrices["upper"].values()], [8.0, 12.0]
+    )
     np.testing.assert_array_equal(results.select_link_loading["either"], results.compact_link_loads)
     assert results.total_turn_penalty == (10.0 if turn else 0.0)
     assert assignment.assignment.fw_total_turn_cost == 2.5 * results.total_turn_penalty
@@ -184,8 +195,10 @@ def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
     upper = results.get_load_results().loc[71, "work_tot"] + results.get_load_results().loc[71, "other_tot"]
     assert results.total_turn_penalty == pytest.approx(0.5 * upper)
     np.testing.assert_allclose(results.select_link_loading["either"], results.compact_link_loads)
-    np.testing.assert_allclose(results.select_link_od.matrices["either"][0, 3], [8.0, 12.0])
-    assert results.select_link_od.matrices["upper"].sum() == pytest.approx(upper)
+    np.testing.assert_allclose(
+        [matrix[0, 3] for matrix in results.select_link_od.matrices["either"].values()], [8.0, 12.0]
+    )
+    assert sum(matrix.sum() for matrix in results.select_link_od.matrices["upper"].values()) == pytest.approx(upper)
 
     optimizer = assignment.assignment
     current = traffic.pce * (
@@ -214,19 +227,20 @@ def test_invalid_demand_rejected_at_assignment_entry(bad):
 
 def test_strided_demand_is_copied_once_without_reshaping_caller():
     graph = diamond()
-    source = np.arange(4 * 4 * 4, dtype=float).reshape(4, 4, 4)
-    view = source[:, :, 1:3]
+    source = np.arange(4 * 8, dtype=float).reshape(4, 8)
+    view = {"work": source[:, ::2], "other": source[:, 1::2]}
     matrix = matrix_for(graph, view)
     input_values = {name: values.copy() for name, values in matrix.items()}
     packed = assignment_demand(matrix, graph.centroids)
-    assert packed.flags.c_contiguous
-    assert not packed.flags.writeable
-    assert not np.shares_memory(packed, source)
-    np.testing.assert_array_equal(packed, np.stack([input_values[name] for name in matrix], axis=2))
+    assert isinstance(packed, DenseMatrix)
+    assert packed.field_names == tuple(matrix)
+    for name, values in packed.to_matrix(graph.centroids).items():
+        assert not np.shares_memory(values, source)
+        np.testing.assert_array_equal(values, input_values[name])
 
-    matrix = matrix_for(graph, source[:, :, 0])
+    matrix = matrix_for(graph, source[:, ::2])
     packed = assignment_demand(matrix, graph.centroids)
-    assert packed.shape == (4, 4, 1)
+    assert (packed.origin_count, packed.destination_count, packed.field_count) == (4, 4, 1)
     assert matrix["work"].ndim == 2
 
 
@@ -243,10 +257,13 @@ def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(c
     assert assignment.class_results[traffic.name].unassigned_demand == 10.0
     assert assignment._class_states[0]._aon_results.unassigned_demand == 10.0
     assert "10 demand could not be assigned" in caplog.text
-    assert np.isinf(assignment.class_results[traffic.name].skims.matrices["time"][3, 0])
-    assert assignment.class_results[traffic.name].skims.matrices["time"][3, 3] == 0.0
-    assert assignment.class_results[traffic.name].select_link_od.demand[3].sum() == 0.0
-    assert assignment.class_results[traffic.name].total_link_loads.sum() == 40.0
+    results = assignment.class_results[traffic.name]
+    assert np.isinf(results.skims.matrices["time"][3, 0])
+    assert results.skims.matrices["time"][3, 3] == 0.0
+    assert all(
+        matrix[3:4].nnz == 0 for matrices in results.select_link_od.matrices.values() for matrix in matrices.values()
+    )
+    assert results.total_link_loads.sum() == 40.0
 
     assignment.class_results[traffic.name].reset()
     assert assignment.class_results[traffic.name].unassigned_demand == 0.0
@@ -275,8 +292,13 @@ def test_shared_graph_classes_have_independent_cost_buffers():
     assert network._assignment_graph(replace(configuration, name="trucks")) is prepared
     first, second = [
         AssignmentInputs(
-            prepared, configuration.demand, "time", {}, 1,
-            field_values=network.field_values, skim_fields=graph.skim_fields,
+            prepared,
+            configuration.demand,
+            "time",
+            {},
+            1,
+            field_values=network.field_values,
+            skim_fields=graph.skim_fields,
         )
         for _ in range(2)
     ]
@@ -298,7 +320,7 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
     inputs = routing_inputs(graph, matrix, "time", {"upper": [0]}, 2)
     state = inputs.make_state(1, 10000)
     output = state.output
-    buffers = [output.loading.link_loads, output.skimming.skims, output.select_link.od.demand]
+    buffers = [output.loading.link_loads, output.skimming.skims]
     addresses = [buffer.ctypes.data for buffer in buffers]
     for cost in (1.0, 2.0, np.inf, 1.0):
         inputs.update_costs(np.full(graph.num_links, cost), np.zeros(graph.num_links))
@@ -307,13 +329,12 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
         assert [
             output.loading.link_loads.ctypes.data,
             output.skimming.skims.ctypes.data,
-            output.select_link.od.demand.ctypes.data,
         ] == addresses
         assert output.unassigned_demand == (20.0 if np.isinf(cost) else 0.0)
     output.reset()
     assert not np.any(buffers[0])
     assert np.isinf(buffers[1]).all()
-    assert not np.any(buffers[2])
+    assert all(matrix.nnz == 0 for matrix in output.select_link.od.matrices["upper"].values())
 
 
 def test_compressed_chain_and_removed_link_project_without_dummy_storage():
@@ -451,21 +472,26 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
     project = sioux_falls_single_class
     assignment, traffic = assignment_for(diamond(True))
     assignment.execute(max_iterations=8, rgap=0.0, cores=1, elementwise_cores=1)
-    assignment.save_skims("new_skims", which_ones="all", project=project)
+    file_names = assignment.save_skims("new_skims", which_ones="all", project=project)
+    assert file_names == ["new_skims_cars.omx"]
     assignment.save_select_link_matrices("new_selected", project=project)
-    project.matrices.update_database()
 
-    skims = project.matrices.get_matrix("new_skims_cars")
-    selected = project.matrices.get_matrix("new_selected_omx")
+    metadata = project.matrices.get_available_matrices_and_metadata()[file_names[0]]
+    assert metadata["procedure"] == "Traffic Assignment"
+    assert metadata["procedure_id"] == assignment.procedure_id
+    assert metadata["timestamp"] == assignment.procedure_date
+    skims = project.matrices.get_matrix(file_names[0])
+    selected = project.matrices.get_matrix("new_selected.omx", sparse=True)
     try:
         for name, values in assignment.class_results[traffic.name].skims.matrices.items():
             np.testing.assert_array_equal(skims[f"{name}_blended"], values)
             np.testing.assert_array_equal(skims[f"{name}_final"], values)
         expected_names = {f"{name}_cars_{column}" for name in ("upper", "either") for column in ("work", "other")}
         assert set(selected) == expected_names
-        for name, values in assignment.class_results[traffic.name].select_link_od.matrices.items():
-            for index, column in enumerate(("work", "other")):
-                np.testing.assert_array_equal(selected[f"{name}_cars_{column}"], values[:, :, index])
+        results = assignment.class_results[traffic.name]
+        for name, values in results.select_link_od.matrices.items():
+            for column, matrix in values.items():
+                np.testing.assert_array_equal(selected[f"{name}_cars_{column}"].toarray(), matrix.toarray())
     finally:
         skims.close()
         selected.close()

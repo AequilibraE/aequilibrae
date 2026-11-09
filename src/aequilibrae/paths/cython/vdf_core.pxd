@@ -89,8 +89,8 @@ cpdef void akcelik_cython(
     const int cores
 ) noexcept
 
-cpdef void akcelik_cython(
-    double[:] congested_time,
+cpdef void dakcelik_cython(
+    double[:] deltaresult,
     const double[:] link_flows,
     const double [:] capacity,
     const double [:] fftime,

@@ -7,6 +7,7 @@ from .conftest import (
     run_validation,
 )
 from .path_finding_benchmark import run_path_finding_search
+from .route_choice_benchmark import ROUTE_CHOICE_ROUTING_CASES, run_route_choice_benchmark
 from .skimming_benchmark import SKIMMING_CASES_WITH_LEFT_TURNS, run_skimming_benchmark
 
 MODEL_STUB = "ChicagoRegional"
@@ -43,3 +44,23 @@ def test_chicago_regional_path_finding(benchmark, tntp_graph, model_stub, model_
 @pytest.mark.parametrize("routing_case", SKIMMING_CASES_WITH_LEFT_TURNS)
 def test_chicago_regional_skimming(benchmark, tntp_graph, model_stub, model_folder, routing_case):
     run_skimming_benchmark(benchmark, tntp_graph, model_stub, model_folder, routing_case)
+
+
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+@pytest.mark.parametrize("routing_case", ROUTE_CHOICE_ROUTING_CASES)
+@pytest.mark.parametrize("a_star", [False, True], ids=["dijkstra", "a_star"])
+def test_chicago_regional_route_choice_generation(
+    benchmark, tntp_graph, model_stub, model_folder, algorithm, routing_case, a_star
+):
+    run_route_choice_benchmark(benchmark, tntp_graph, model_stub, model_folder, algorithm, routing_case, a_star)
+
+
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+@pytest.mark.parametrize("routing_case", ROUTE_CHOICE_ROUTING_CASES)
+@pytest.mark.parametrize("a_star", [False, True], ids=["dijkstra", "a_star"])
+def test_chicago_regional_route_choice_table(
+    benchmark, tntp_graph, model_stub, model_folder, algorithm, routing_case, a_star
+):
+    run_route_choice_benchmark(
+        benchmark, tntp_graph, model_stub, model_folder, algorithm, routing_case, a_star, table_only=True
+    )

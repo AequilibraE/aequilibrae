@@ -52,12 +52,9 @@ class Scenario:
         (self.base_path / "matrices").mkdir(parents=True, exist_ok=True)
         self.about = About(self.connections.db_connection)
         self.network = Network(self.connections, project)
-        self.matrices = Matrices(self.connections.db_connection, self.base_path / "matrices")
+        self.matrices = Matrices(self.base_path / "matrices")
 
-        if results_path is not None:
-            self._results = Results(self.connections.db_connection, self.connections.results_connection)
-        else:
-            self._results = None
+        self._results: Results | None = None
 
         # FIXME: Hack for getting transit to work
         self.__project = project
@@ -114,9 +111,9 @@ class Scenario:
 
     @property
     def results(self) -> Results:
-        """The results table gateway, creating its database on first access."""
+        """The lazily constructed results table gateway, creating its database on first access."""
         if self._results is None:
-            self._results = Results(self.connections.db_connection, self.results_connection)
+            self._results = Results(self.results_connection)
         return self._results
 
     @property

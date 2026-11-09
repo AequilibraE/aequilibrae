@@ -1,4 +1,3 @@
-from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_types cimport (
     RouteVec_t,
     RouteView_t,
@@ -15,7 +14,7 @@ from libc.stdint cimport *
 
 cdef class RouteChoiceSetResults:
     cdef:
-        GeneralisedCOODemand demand
+        vector[pair[long long, long long]] ods
         bint store_results
         bint perform_assignment
         double disutility_cutoff_constant
@@ -133,6 +132,13 @@ cdef class RouteChoiceSetResults:
     ) noexcept nogil
 
     cdef object make_df_from_results(RouteChoiceSetResults self)
+    cdef void copy_route_values(
+        RouteChoiceSetResults self,
+        double[::1] output,
+        const vector[shared_ptr[vector[double]]] &values,
+        double missing,
+        bint required,
+    ) except *
 
 cdef void recompute_route_probabilities(
     object df,

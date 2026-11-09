@@ -1,14 +1,13 @@
 import os
 import sys
-from importlib.metadata import version
 from pathlib import Path
+
+from aequilibrae import version as release_version
 
 npth = Path(__file__).parent.parent.parent
 if npth not in sys.path:
     sys.path.append(npth)
     print(npth)
-
-release_version = version("aequilibrae")
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced

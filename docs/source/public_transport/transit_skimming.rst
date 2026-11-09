@@ -11,6 +11,11 @@ defined based on the auto-generated link types. These include:
   - continuous: `'trav_time'`, `'on_board_trav_time'`, `'dwelling_time'`, `'egress_trav_time'`, `'access_trav_time'`,
     `'walking_trav_time'`, `'transfer_time'`, `'in_vehicle_trav_time'`, and `'waiting_time'`.
 
+Each transit class accepts either an ``AequilibraeMatrix`` or an ``AequilibraeSparseMatrix``
+containing exactly one demand matrix, with finite, non-negative float64 values. Use
+``matrix.subset(["pt"])`` to select a matrix before constructing the class if needed.
+Skims are always dense ``AequilibraeMatrix`` objects using the demand's zone index.
+
 
 .. testsetup::
 
@@ -62,7 +67,6 @@ defined based on the auto-generated link types. These include:
     >>> assig.set_skimming_fields(skim_cols) # Skimming must be set after a transit assignment class is added
 
     >>> assig.set_algorithm("os")
-    >>> assigclass.set_demand_matrix_core("pt")
 
     >>> assig.execute() # doctest: +SKIP
 
@@ -124,7 +128,6 @@ One example is skimming travel time in rail only.
     >>> assig.set_skimming_fields(["rail_trav_time"])  # doctest: +SKIP
 
     >>> assig.set_algorithm("os")
-    >>> assigclass.set_demand_matrix_core("pt")
 
     >>> assig.execute() # doctest: +SKIP
 

@@ -24,7 +24,7 @@ def aequilibrae_init(proj_path: str, cost: str):
     proj.open(proj_path)
     proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
     graph = proj.network.graphs["c"]
-    matrix = proj.matrices.get_matrix("demand_omx")
+    matrix = proj.matrices.get_matrix("demand.omx")
     matrix.computational_view()
     assignment = TrafficAssignment()
     car = TrafficClass("car", graph, matrix)
@@ -81,7 +81,7 @@ def arkansas(path: str):
     period = "am"
     logger.info(f"\n\n Assigning {period.upper()}")
     proj_matrices = proj.matrices
-    car_demand = proj_matrices.get_matrix(f"{period.upper()}_omx")
+    car_demand = proj_matrices.get_matrix(f"{period.upper()}.omx")
     car_demand.computational_view()  # 'AUTO')
     assig = TrafficAssignment()
     assig.procedure_id = f"{period}_baseline"

@@ -41,8 +41,8 @@ CREATE TABLE  if not exists links (ogc_fid           INTEGER PRIMARY KEY,
                                    other_attributes  TEXT
                                    CHECK(TYPEOF(link_id) == 'integer')
                                    CHECK(link_id > 0)
-                                   CHECK(TYPEOF(a_node) == 'integer')
-                                   CHECK(TYPEOF(b_node) == 'integer')
+                                   CHECK(TYPEOF(a_node) IN ('integer', 'null'))
+                                   CHECK(TYPEOF(b_node) IN ('integer', 'null'))
                                    CHECK(TYPEOF(direction) == 'integer')
                                    CHECK(LENGTH(modes)>0)
                                    CHECK(direction IN (-1, 0, 1)));

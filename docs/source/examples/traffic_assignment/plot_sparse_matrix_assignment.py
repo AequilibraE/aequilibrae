@@ -32,10 +32,13 @@ from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from scipy.sparse import csr_array
+
+from aequilibrae.matrix import from_dict
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.vdf import bpr
+from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.logging_utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
@@ -62,11 +65,19 @@ network = project.network
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
-proj_matrices.list()
+proj_matrices.get_available_matrices_and_metadata()
 
 # %%
 # We get the demand matrix, and prepare it for computation
-demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
+
+# Copy the named matrices into sparse float64 storage. In practise these would
+# be stored in the sparse OMX extension rather than as a dense matrix, then
+# converted to a sparse format.
+demand = from_dict(
+    {name: csr_array(values, dtype="float64") for name, values in demand.items()},
+    index=demand.index,
+)
 
 # %%
 # Let's perform the traffic assignment

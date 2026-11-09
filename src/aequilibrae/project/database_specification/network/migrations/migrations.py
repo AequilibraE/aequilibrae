@@ -13,4 +13,6 @@ migrations: list[pathlib.Path] = [
     path / "007_add_zones_table.py",
     path / "008_add_other_attributes.py",
     path / "009_add_turn_restrictions.py",
+    path / "010_refresh_network_triggers.py",
+    path / "011_move_results_table_to_results_database.py",
 ]

@@ -38,8 +38,8 @@ The required information is:
     >>> project = create_example(project_path)
 
     # Get the matrices for cars and trucks
-    >>> matrix_car = project.matrices.get_matrix("demand_mc", subset=["car"])
-    >>> matrix_truck = project.matrices.get_matrix("demand_mc", subset=["trucks"])
+    >>> matrix_car = project.matrices.get_matrix("demand_mc.omx", subset=["car"])
+    >>> matrix_truck = project.matrices.get_matrix("demand_mc.omx", subset=["trucks"])
 
     # Create the traffic classes
     >>> tc_car = TrafficClass(mode="c", cost="free_flow_time", demand=matrix_car,
@@ -86,7 +86,7 @@ current class configuration, then prepares the required routing contexts during 
 * **network**: the source network object or project network containing the links and modes
 * **classes**: one or more fully-specified ``TrafficClass`` objects
 * **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``,
-  ``INRETS``, or ``AKCELIK``
+  ``INRETS``, or ``AKCELIK``. Or a custom ``VDF`` object.
 * **name_mapping**: parameter names for the VDF, either as network fields or numeric constants
 * **time_field**: link field representing free-flow travel time
 * **capacity_field**: link field representing capacity
@@ -103,7 +103,7 @@ current class configuration, then prepares the required routing contexts during 
     ...     algorithm="bfw",
     ...     name_mapping={"alpha": 0.15, "beta": 4.0},
     ... )
-
+    
 Skimming while assigning
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -153,8 +153,8 @@ of zones and over 100 iterations of assignment.
 
   >>> assig.execute()
   >>> skims = assig.skim_congested(skim_fields=["distance"], return_matrices=True)
-  >>> assig.save_skims("another_matrix_name")  # doctest: +ELLIPSIS
-  [MatrixRecord(name='another_matrix_name_car', ...), MatrixRecord(name='another_matrix_name_truck', ...)]
+  >>> assig.save_skims("another_matrix_name")
+  ['another_matrix_name_car.omx', 'another_matrix_name_truck.omx']
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
 iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*

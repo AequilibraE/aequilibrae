@@ -12,15 +12,15 @@ import pandas as pd
 from numpy import nan_to_num
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.assignment_context import PreparedTrafficClass, validate_assignment_demand
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.network import Network
-from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
 from aequilibrae.paths.vdf import VDF
+from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores
 
 
@@ -141,7 +141,7 @@ class TrafficAssignment(AssignmentBase):
         >>> proj_matrices = project.matrices
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         # Creates the assignment class
         >>> assigclass = TrafficClass(
@@ -666,11 +666,11 @@ class TrafficAssignment(AssignmentBase):
             "Target RGap": self.rgap_target,
         }
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[Any]:
-        """Saves the skims (if any) to the skim folder and registers in the matrix list
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[str]:
+        """Saves the skims (if any) to the project's matrix folder
 
         :Arguments:
-            **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
+            **matrix_name** (:obj:`str`): Base file name for the matrices, suffixed with each traffic class ID
 
             **which_ones** (:obj:`str`, *Optional*): 'final': Results of the final iteration,
                 'blended': Averaged results for all iterations, 'all': Saves skims for both the final iteration and the
@@ -682,11 +682,11 @@ class TrafficAssignment(AssignmentBase):
                 Defaults to the active project
 
         :Returns:
-            **records** (:obj:`list`): Matrix records created for classes with skims to save.
+            **file_names** (:obj:`list`): OMX file names saved for classes with skims to save.
         """
         if which_ones not in ("final", "blended", "all"):
             raise ValueError("which_ones must be final, blended or all")
-        records = []
+        file_names = []
         mat_format = format.lower()
         if mat_format != "omx":
             raise ValueError("Only OMX matrix files are supported")
@@ -703,9 +703,6 @@ class TrafficAssignment(AssignmentBase):
 
             if path.isfile(export_name):
                 raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-            if mats.get(matrix_name, default=None) is not None:
-                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
             avg_skims = {} if cls.results.skims is None else cls.results.skims.matrices
             final = cls.congested_skims if cls.congested_skims is not None else cls._aon_results.skims
@@ -734,8 +731,7 @@ class TrafficAssignment(AssignmentBase):
             description = f"Skimming for assignment procedure. Class {cls.configuration.name}"
             out_skims.metadata["description"] = description
 
-            record = mats.create(
-                name=f"{matrix_name}_{cls.configuration.name}",
+            mats.save_matrix(
                 file_name=file_name,
                 matrix=out_skims,
                 procedure_id=self.procedure_id,
@@ -743,9 +739,9 @@ class TrafficAssignment(AssignmentBase):
                 procedure="Traffic Assignment",
                 description=description,
             )
-            records.append(record)
+            file_names.append(file_name)
 
-        return records
+        return file_names
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
@@ -760,7 +756,7 @@ class TrafficAssignment(AssignmentBase):
             df = cls.results.get_sl_results()
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls.configuration.name + "_" + x if (x != "index") else "link_id" for x in df.columns}
-            df.rename(columns=cls_cols, inplace=True)
+            df = df.rename(columns=cls_cols)
             class_flows.append(df)
         return pd.concat(class_flows, axis=1).rename_axis("link_id")
 
@@ -814,8 +810,8 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        if mats.get(matrix_name, default=False):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+        # if mats.get_matrix(matrix_name, default=False):
+        #     raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
         if not selected_classes:
@@ -823,22 +819,18 @@ class TrafficAssignment(AssignmentBase):
         centroids = np.unique(np.concatenate([cls.configuration.demand.index for cls in selected_classes]))
         matrices = {}
         for cls in selected_classes:
-            source_centroids = cls.configuration.demand.index
-            positions = np.searchsorted(centroids, source_centroids)
-            for name, values in cls.results.select_link_od.matrices.items():
-                for column, class_name in enumerate(cls.results.classes["names"]):
-                    key = f"{name}_{cls.configuration.name}_{class_name}"
+            selected = cls.results.select_link_od
+            if selected is None:
+                continue
+            for name, values in selected.matrices.items():
+                for class_name, matrix in values.items():
+                    key = f"{name}_{cls._id}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    if np.array_equal(source_centroids, centroids):
-                        matrices[key] = values[:, :, column]
-                    else:
-                        matrix = np.zeros((len(centroids), len(centroids)), dtype=np.float64)
-                        matrix[np.ix_(positions, positions)] = values[:, :, column]
-                        matrices[key] = matrix
+                    matrices[key] = matrix
         if not matrices:
             return
-        out_skims = AequilibraeMatrix(index=centroids)
+        out_skims = AequilibraeSparseMatrix(index=centroids)
         out_skims.update(matrices)
         out_skims.metadata["description"] = f"Select link matrix from procedure ID {self.procedure_id}_sl."
         out_skims.save_as_omx(export_name)
@@ -960,7 +952,7 @@ class TransitAssignment(AssignmentBase):
         for cls in self.classes:
             uclass = {}
 
-            uclass["matrix_totals"] = {name: np.sum(cls.matrix[name]) for name in cls.matrix}
+            uclass["matrix_totals"] = cls.matrix.totals()
             uclass["network mode"] = getattr(cls.matrix.index, "name", None) or f"transit_{cls._id}"
 
             classes[cls._id] = uclass

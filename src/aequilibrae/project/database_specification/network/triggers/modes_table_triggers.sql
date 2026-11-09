@@ -1,9 +1,7 @@
 -- Prevents a mode record to be changed when it is in use for any link
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_updating BEFORE UPDATE OF mode_id ON "modes"
 WHEN
-(
-    (Select count(*) from links where instr(modes, old.mode_id) > 0)
-)>0
+    exists (select 1 from links where instr(modes, old.mode_id) > 0)
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
@@ -12,9 +10,7 @@ END;
 -- Prevents a mode record to be removed when it is in use for any link
 CREATE TRIGGER aequilibrae_mode_keep_if_in_use_deleting BEFORE DELETE ON "modes"
 WHEN
-(
-    (Select count(*) from links where instr(modes, old.mode_id) > 0)
-)>0
+    exists (select 1 from links where instr(modes, old.mode_id) > 0)
 BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
@@ -50,13 +46,13 @@ update nodes
                  where (links.a_node = new.a_node) or (links.b_node = new.a_node)), mode_id) > 0)
     where nodes.node_id=new.a_node;
 
--- We update the modes for the node ID that just LOST a link ending in it
+-- We update the modes for the node ID that just LOST a link starting in it, if it changed
 update nodes
     set modes = (select GROUP_CONCAT(mode_id, '') from modes
                  where instr((select GROUP_CONCAT(modes, '')
                  from links
                  where (links.a_node = old.a_node) or (links.b_node = old.a_node)), mode_id) > 0)
-    where nodes.node_id=old.a_node;
+    where nodes.node_id=old.a_node and old.a_node is not new.a_node;
 end;
 
 --#
@@ -72,14 +68,14 @@ update nodes
                  where (links.a_node = new.b_node) or (links.b_node = new.b_node)), mode_id) > 0)
     where nodes.node_id=new.b_node;
 
--- We update the modes for the node ID that just LOST a link ending in it
+-- We update the modes for the node ID that just LOST a link ending in it, if it changed
 update nodes
     set modes = (select GROUP_CONCAT(mode_id, '') from modes
                 where instr((select GROUP_CONCAT(modes, '')
                              from links
                              where (links.a_node = old.b_node)
                              or (links.b_node = old.b_node)), mode_id) > 0)
-    where nodes.node_id=old.b_node;
+    where nodes.node_id=old.b_node and old.b_node is not new.b_node;
 end;
 
 --#

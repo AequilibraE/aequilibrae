@@ -109,7 +109,7 @@ class AssignmentInputs:
     def __init__(
         self,
         graph: Graph,
-        matrix: AequilibraeMatrix,
+        matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
         cores: int,

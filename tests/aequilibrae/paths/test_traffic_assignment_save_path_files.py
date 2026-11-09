@@ -12,7 +12,7 @@ from aequilibrae.paths.vdf import bpr
 @pytest.fixture
 def assignment(sioux_falls_single_class):
     project = sioux_falls_single_class
-    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     result = TrafficAssignment(
         network=project.network,
         classes=[TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix)],
