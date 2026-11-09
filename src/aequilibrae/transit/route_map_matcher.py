@@ -124,28 +124,21 @@ class RouteMapMatcher(WorkerThread):
         self.__graph_from_broken_net(net_gdf)
 
     def __graph_from_broken_net(self, net_data: pd.DataFrame):
-        net_data = net_data.copy()
-        if "modes" not in net_data:
-            net_data["modes"] = "c"
-        else:
-            net_data["modes"] = net_data["modes"].fillna("c")
         self._network_links = net_data.copy()
+        # Links are already filtered for the transit mode; connectors have no mode.
+        routing_links = net_data.drop(columns="modes", errors="ignore")
         centroids = np.array(self.stops.stop_id.values)
         all_nodes = np.unique(np.hstack([net_data.a_node.to_numpy(), net_data.b_node.to_numpy()]))
         centroids = centroids[np.isin(centroids, all_nodes)]
-        network = Network(net_data, centroids=centroids)
+        network = Network(routing_links, centroids=centroids)
         self._routing_network = network
-        self.graph = network.build_graph("c", cost="distance", skimming=["distance", "time"], compact=False)
-        reverse_links = net_data.copy()
-        reverse_links["a_node"], reverse_links["b_node"] = net_data.b_node, net_data.a_node
-        reverse_links["direction"] = -net_data.direction
-        for field in ("speed", "time"):
-            ab, ba = f"{field}_ab", f"{field}_ba"
-            if ab in net_data and ba in net_data:
-                reverse_links[ab], reverse_links[ba] = net_data[ba], net_data[ab]
+        self.graph = network.build_graph("map_match", cost="distance", skimming=["distance", "time"], compact=False)
+        # Swap endpoints only, preserving the original directional attributes on each reversed arc.
+        reverse_links = routing_links.copy()
+        reverse_links["a_node"], reverse_links["b_node"] = routing_links.b_node, routing_links.a_node
         self._reverse_network = Network(reverse_links, centroids=centroids)
         self.reverse_graph = self._reverse_network.build_graph(
-            "c", cost="distance", skimming=["distance", "time"], compact=False
+            "map_match", cost="distance", skimming=["distance", "time"], compact=False
         )
         self.available_stops = self.stop_ids["real_stop_id"][self.stop_ids.stop_id.isin(centroids)].to_numpy()
 
