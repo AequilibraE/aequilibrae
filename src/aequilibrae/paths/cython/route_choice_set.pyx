@@ -1255,8 +1255,11 @@ cdef class RouteChoiceSet:
             else:
                 break
 
-    def get_results(self):
+    def get_results(self, *, rebuild: bool = False):
         """
+        :Arguments:
+            **rebuild** (:obj:`bool`): Rebuild the cached table from stored routes. Defaults to ``False``.
+
         :Returns:
             **route sets** (:obj:`pa.DataFrame`): Returns a table of OD pairs to lists of link IDs for
                 each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
@@ -1264,6 +1267,8 @@ cdef class RouteChoiceSet:
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
+        if rebuild:
+            self.results.table = None
         return self.results.make_df_from_results()
 
     def get_link_loading(RouteChoiceSet self, cores: int = 0):
