@@ -676,6 +676,7 @@ cdef class RouteChoiceSetResults:
             origin = self.ods[i].first
             destination = self.ods[i].second
             # The ID columns are uint32, as before; refuse IDs that would wrap.
+
             if origin < 0 or origin > UINT32_MAX:
                 raise OverflowError(f"Python integer {origin} out of bounds for uint32")
             if destination < 0 or destination > UINT32_MAX:
@@ -685,9 +686,11 @@ cdef class RouteChoiceSetResults:
             route_count += d(routes).size()
             for j in range(d(routes).size()):
                 route = d(routes)[j].get()
+
                 if imported:
                     link_count += d(route).size()
                     continue
+
                 for link in d(route):
                     link_count += self.mapping_idx[link + 1] - self.mapping_idx[link]
 
@@ -695,6 +698,7 @@ cdef class RouteChoiceSetResults:
         destination_ids = np.empty(route_count, dtype="uint32")
         link_ids = np.empty(link_count, dtype="int64")
         offsets = np.empty(route_count + 1, dtype=np.intp)
+
         cdef:
             uint32_t[::1] origin_view = origin_ids
             uint32_t[::1] destination_view = destination_ids
@@ -703,21 +707,25 @@ cdef class RouteChoiceSetResults:
 
         for i in range(self.ods.size()):
             routes = self.__route_vecs[i].get()
+
             for j in range(d(routes).size()):
                 route = d(routes)[j].get()
                 origin_view[row] = <uint32_t>self.ods[i].first
                 destination_view[row] = <uint32_t>self.ods[i].second
                 offset_view[row] = position
                 row += 1
+
                 for link in d(route):
                     if imported:
                         link_view[position] = self.full_link_ids[link] * self.full_directions[link]
                         position += 1
                         continue
+
                     # Each compact link stands for a run of supernetwork links, signed by direction.
                     for k in range(self.mapping_idx[link], self.mapping_idx[link + 1]):
                         link_view[position] = self.link_id_direction[self.mapping_data[k]]
                         position += 1
+
         offset_view[row] = position
 
         columns = {"origin id": origin_ids, "destination id": destination_ids}
@@ -727,6 +735,7 @@ cdef class RouteChoiceSetResults:
             mask = np.empty(route_count, dtype="bool")
             path_overlap = np.empty(route_count, dtype="float64")
             probability = np.empty(route_count, dtype="float64")
+
             self.copy_route_values(cost, self.__cost_set, 0.0, False)
             self.copy_route_values(path_overlap, self.__path_overlap_set, 0.0, False)
             self.copy_route_values(probability, self.__prob_set, 0.0, True)
@@ -737,10 +746,13 @@ cdef class RouteChoiceSetResults:
             for i in range(self.ods.size()):
                 n_routes = d(self.__route_vecs[i]).size()
                 size = d(self.__mask_set[i]).size()
+
                 if size and size != n_routes:
                     raise RuntimeError(f"OD pair {i} has {n_routes} routes but {size} mask values")
+
                 for j in range(n_routes):
                     mask_view[row + j] = d(self.__mask_set[i])[j] != 0 if size else 1
+
                 row += n_routes
 
             columns |= {"cost": cost, "mask": mask, "path overlap": path_overlap, "probability": probability}
@@ -769,10 +781,13 @@ cdef class RouteChoiceSetResults:
         for i in range(self.ods.size()):
             n_routes = d(self.__route_vecs[i]).size()
             size = d(values[i]).size()
+
             if (size or required) and size != n_routes:
                 raise RuntimeError(f"OD pair {i} has {n_routes} routes but {size} values")
+
             for j in range(n_routes):
                 output[row + j] = d(values[i])[j] if size else missing
+
             row += n_routes
 
 

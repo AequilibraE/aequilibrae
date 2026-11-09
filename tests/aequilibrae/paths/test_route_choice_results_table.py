@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
