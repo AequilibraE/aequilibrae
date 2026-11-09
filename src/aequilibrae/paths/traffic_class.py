@@ -132,25 +132,21 @@ class TransitClass:
     """Transit demand bound to a transit graph for hyperpath assignment."""
 
     name: str
-    matrix: AequilibraeMatrix
+    matrix: AequilibraeMatrix | AequilibraeSparseMatrix
     graph: object = field(default=None, repr=False, compare=False)
-    matrix_core: str | None = None
     results: TransitAssignmentResults = field(default_factory=TransitAssignmentResults, repr=False, compare=False)
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("name must be a nonempty string")
-        if not isinstance(self.matrix, AequilibraeMatrix):
-            raise TypeError("Matrix must be an AequilibraeMatrix")
+        if not isinstance(self.matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("Matrix must be an AequilibraeMatrix or AequilibraeSparseMatrix")
         if any(values.dtype != np.float64 for values in self.matrix.values()):
             raise TypeError("Matrix values need to be of type np.float64")
 
     @property
     def _id(self):
         return self.name
-
-    def set_demand_matrix_core(self, core):
-        object.__setattr__(self, "matrix_core", core)
 
     @property
     def info(self):

@@ -138,8 +138,8 @@ cdef class RouteChoiceSet:
         self.cost_view = self.routing.costs
         self.full_cost_view = graph.full_costs.copy()
 
-        # The search loop needs a dense lookup without the GIL.
-        self.nodes_to_indices_view = graph.full_nodes_to_indices
+        # Search indices must follow the routing topology, not full-link expansion order.
+        self.nodes_to_indices_view = graph.nodes_to_indices
         self.num_nodes = self.routing.node_count
         self.num_links = self.routing.link_count
 

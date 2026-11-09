@@ -31,6 +31,55 @@ def junction(penalty, *, lonlat=None):
     )
 
 
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+@pytest.mark.parametrize("a_star", [False, True])
+def test_search_uses_routing_node_order(compact, turn, algorithm, a_star):
+    links = pd.DataFrame(
+        {
+            "link_id": np.arange(1, 9),
+            "a_node": [1, 2, 3, 3, 4, 4, 5, 6],
+            "b_node": [2, 3, 4, 5, 5, 6, 6, 7],
+            "direction": 0,
+            "time": 1.0,
+        }
+    )
+    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [0.5]}) if turn else None
+    graph = Network(links, centroids=[1, 7], turn_restrictions=turns).build_graph(
+        "c", cost="time", compact=compact, block_centroid_flows=False
+    )
+    if compact:
+        # Contracting node 2 shifts retained non-centroid indices, unlike centroid indices.
+        np.testing.assert_array_equal(graph.full_node_ids, [1, 7, 2, 3, 4, 5, 6])
+        np.testing.assert_array_equal(graph.all_nodes, [1, 7, 3, 4, 5, 6])
+    coordinates = pd.DataFrame({"x": graph.all_nodes.astype(float), "y": 0.0}, index=graph.all_nodes).iloc[::-1]
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_cores(1)
+    choice.set_choice_set_generation(
+        algorithm, max_routes=1, max_depth=1, a_star=a_star, heuristic_scale=0.5 if a_star else None
+    )
+    # Node 3 has an in-range but wrong full index; node 6's full index is out of routing bounds.
+    expected = {(1, 3): (1, 2), (3, 1): (-2, -1), (6, 7): (8,), (7, 6): (-8,)}
+    for (origin, destination), route in expected.items():
+        reference = graph.compute_path(origin, destination)
+        assert tuple(reference.path * reference.path_link_directions) == route
+        assert choice.execute_single(origin, destination) == [route]
+
+    # Batch routing shares the lookup across workers and must map both endpoints correctly.
+    choice.set_cores(2)
+    choice.prepare(list(expected))
+    choice.execute(perform_assignment=False)
+    rows = choice.get_results()
+    actual = {(row["origin id"], row["destination id"]): tuple(row["route set"]) for _, row in rows.iterrows()}
+    assert actual == expected
+
+    # Imported routes still use full-node indices when validating expanded links.
+    recosted = choice.recompute_psl(rows)
+    assert recosted["mask"].all()
+    np.testing.assert_allclose(recosted["cost"], rows["route set"].map(len))
+
+
 def single_od_demand(origin, destination, flow=1.0):
     return from_df(
         pd.DataFrame({"origin id": [origin], "destination id": [destination], "flow": [flow]}),
