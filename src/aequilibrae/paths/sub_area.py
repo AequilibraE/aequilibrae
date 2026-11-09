@@ -55,22 +55,16 @@ class SubAreaAnalysis:
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        if isinstance(graph, Graph):
-            self.node_ids = graph.full_node_ids
-            retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
-            edges = pd.DataFrame(
-                {
-                    "link_id": graph.full_link_ids[retained],
-                    "direction": graph.full_directions[retained],
-                    "a_node": graph.full_tails[retained],
-                    "b_node": graph.full_heads[retained],
-                }
-            )
-        else:
-            self.node_ids = graph.all_nodes
-            edges = graph.graph.loc[
-                ~graph.graph.link_id.isin(graph.dead_end_links), ["link_id", "direction", "a_node", "b_node"]
-            ]
+        self.node_ids = graph.full_node_ids
+        retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+        edges = pd.DataFrame(
+            {
+                "link_id": graph.full_link_ids[retained],
+                "direction": graph.full_directions[retained],
+                "a_node": graph.full_tails[retained],
+                "b_node": graph.full_heads[retained],
+            }
+        )
         self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
             ["link_id", "direction"]
         )
@@ -92,7 +86,7 @@ class SubAreaAnalysis:
         logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
 
         self.rc = RouteChoice(self.graph, project=project)
-        self.rc.add_demand(demand)
+        self.rc.set_demand(demand)
         self.rc.set_select_links(self.single_edges | self.edge_pairs, link_loading=False)
 
     def post_process(self, demand_cols=None, keep_original_ods: bool = False):
