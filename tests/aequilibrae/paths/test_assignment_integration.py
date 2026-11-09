@@ -14,7 +14,7 @@ from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import available_heaps
-from aequilibrae.paths.assignment_context import AssignmentInputs, assignment_demand
+from aequilibrae.paths.assignment_context import AssignmentInputs
 from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.vdf import bpr
 

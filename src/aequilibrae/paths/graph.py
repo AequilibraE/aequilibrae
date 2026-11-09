@@ -1417,7 +1417,7 @@ class TransitGraph(GraphBase):
         self.a_node_field = a_node_field
         self.b_node_field = b_node_field
         self.od_node_mapping = od_node_mapping.copy() if od_node_mapping is not None else None
-        
+
         # Build graph structure
         self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
             self.network, self.centroids, build_fs=False
@@ -1425,7 +1425,7 @@ class TransitGraph(GraphBase):
         self.num_nodes = len(self.all_nodes)
         self.num_links = len(self.graph)
         self.num_zones = len(self.centroids)
-        
+
         # Create hyperpath context for transit assignment
         o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
         self.context = HyperpathGenerating(
@@ -1439,7 +1439,7 @@ class TransitGraph(GraphBase):
             d_vert_ids=self.od_node_mapping[d_key].to_numpy(),
             nodes_to_indices=self.nodes_to_indices,
         )
-        
+
         # Setup config
         self._config = {
             "time_field": time_field,
@@ -1453,7 +1453,7 @@ class TransitGraph(GraphBase):
         }
         if config is not None:
             self._config.update(config)
-        
+
         self.mode = "t"
 
     def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
@@ -1461,7 +1461,7 @@ class TransitGraph(GraphBase):
         self.skimming_fields = list(skimming_fields or [])
         if self._config:
             self._config["skimming_fields"] = self.skimming_fields
-        
+
         # Rebuild context
         o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
         self.context = HyperpathGenerating(

@@ -327,7 +327,10 @@ def test_imported_link_absent_from_compact_graph_is_rejected():
     )
     choice = RouteChoiceSet(graph)
     demand = single_od_demand(10, 40)
-    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 12]]})
+    # The through route survives compression; only the spur to node 50 is removed.
+    removed = (graph.full_link_ids == 99) & (graph.full_directions == 1)
+    assert np.all(graph.mapping.crosswalk[graph.full_to_network[removed]] == graph.num_links)
+    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 99, -99, 12]]})
     with pytest.raises(ValueError, match="absent from the compact graph"):
         choice.assign_from_df(supplied, demand, select_links={}, recompute_psl=True)
 

@@ -272,8 +272,7 @@ On this machine, AequilibraE performed 1,000 iterations of
 biconjugate Frank-Wolfe assignment on the Chicago Network in around 442 seconds,
 or around 0.4422s per iteration (other algorithms are as low as 0.42 seconds per iteration).
 
-This performance is substantially better than seen on previous versions and is on par with
-that of commercial software.
+This performance is on par with that of commercial software.
 
 .. note::
    The biggest opportunity for performance in AequilibraE right now it to apply
@@ -669,7 +668,7 @@ understand, and then we'll perform the assignment.
 
         qtl_convergence is a DataFrame with columns 'relgap' (as percentage) and 'time'.
         Quetzal stores relgap as a percentage; divide by 100 to match AequilibraE's scale.
-        rgap_direction was removed from AequilibraE; only the AoN rgap is plotted.
+        AequilibraE's AoN relative gap is read from the 'rgap' report column.
         """
         sns.set_theme(style="whitegrid", context="paper")
         palette = sns.color_palette()

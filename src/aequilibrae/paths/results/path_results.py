@@ -128,8 +128,13 @@ class PathResults:
         skim_context = graph.skimming
         if graph.compact:
             self._expansion = (
-                graph.expansion_indices, graph.expansion_links, graph.full_link_ids, graph.full_directions,
-                graph.full_node_ids, graph.full_heads, graph.full_costs.copy(),
+                graph.expansion_indices,
+                graph.expansion_links,
+                graph.full_link_ids,
+                graph.full_directions,
+                graph.full_node_ids,
+                graph.full_heads,
+                graph.full_costs.copy(),
             )
         coordinates = coordinates.copy() if coordinates is not None else None
         lonlat = graph.lonlat_index.copy()
@@ -301,7 +306,7 @@ class PathResults:
             mileposts = [0.0]
             labels = results.distances[states]
             for index, link in enumerate(links):
-                chain = expansion[offsets[link]:offsets[link + 1]]
+                chain = expansion[offsets[link] : offsets[link + 1]]
                 expanded.extend(chain)
                 turn_cost = labels[index + 1] - labels[index] - costs[chain].sum()
                 mileposts.extend(mileposts[-1] + turn_cost + np.cumsum(costs[chain]))

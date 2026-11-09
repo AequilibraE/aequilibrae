@@ -48,14 +48,16 @@ class NetworkSimplifier(WorkerThread):
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation
         if not isinstance(graph, Graph):
             raise TypeError("graph must be a Graph built by Network.build_graph()")
-        
+
         if not graph.compact:
             raise ValueError("Network simplification requires a compact graph")
         compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
-        correspondence = pd.DataFrame({
-            "link_id": graph.full_link_ids,
-            "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
-        })
+        correspondence = pd.DataFrame(
+            {
+                "link_id": graph.full_link_ids,
+                "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
+            }
+        )
         link_set_df = self.link_layer.merge(correspondence, on="link_id")
         graph_link_ids = graph.full_link_ids
         centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]

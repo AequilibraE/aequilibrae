@@ -12,7 +12,7 @@ def assignment_setup(sioux_falls_example):
         ("truck", "T", "trucks", 2.5),
         ("motorcycle", "M", "motorcycle", 0.2),
     ):
-        matrix = sioux_falls_example.matrices.get_matrix("demand.mc", subset=[core])
+        matrix = sioux_falls_example.matrices.get_matrix("demand_mc.omx", subset=[core])
         classes.append(
             TrafficClass(
                 name=name,

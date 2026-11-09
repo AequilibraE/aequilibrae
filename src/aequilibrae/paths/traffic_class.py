@@ -5,7 +5,7 @@ from typing import Mapping
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
 from aequilibrae.paths.results import TransitAssignmentResults
@@ -29,7 +29,7 @@ class TrafficClass:
         >>> project = create_example(project_path)
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         >>> tc = TrafficClass(
         ...     name="car", mode="c", cost='free_flow_time', demand=demand, pce=1.3,
@@ -41,7 +41,7 @@ class TrafficClass:
 
     mode: str
     cost: str
-    demand: AequilibraeMatrix
+    demand: AequilibraeMatrix | AequilibraeSparseMatrix
     name: str | None = None
     pce: float = 1.0
     vot: float = 1.0
@@ -108,8 +108,8 @@ class TrafficClass:
                 links.append((int(link), direction))
             selections[name] = tuple(links)
         object.__setattr__(self, "select_link_sets", MappingProxyType(selections))
-        if not isinstance(self.demand, AequilibraeMatrix):
-            raise TypeError("Demand must be an AequilibraeMatrix")
+        if not isinstance(self.demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
         if any(values.dtype != np.float64 for values in self.demand.values()):
             raise TypeError("Demand matrices require float64 values")
         validate_assignment_demand(self.demand, self.demand.index)
@@ -129,11 +129,7 @@ class TrafficClass:
 
 @dataclass(frozen=True, kw_only=True)
 class TransitClass:
-    """Transit demand and its legacy transit-graph binding.
-
-    Transit hyperpath assignment has not yet adopted the independent network
-    workflow used by road TrafficClass.
-    """
+    """Transit demand bound to a transit graph for hyperpath assignment."""
 
     name: str
     matrix: AequilibraeMatrix

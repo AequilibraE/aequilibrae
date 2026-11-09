@@ -4,12 +4,13 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Any, Dict, List, Optional, Union
+from typing import Optional, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from numpy import nan_to_num
+from scipy.sparse import coo_array
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
@@ -63,7 +64,7 @@ class AssignmentBase(ABC):
 
         self.parameters = proj.parameters if proj else Parameters().parameters
 
-        self.classes: List[TrafficClass] = []
+        self.classes: list[TrafficClass] = []
         self.algorithm: str = None
         self.time_field: str = None
         self.assignment: Union[LinearApproximation, OptimalStrategies] = None
@@ -666,7 +667,7 @@ class TrafficAssignment(AssignmentBase):
             "Target RGap": self.rgap_target,
         }
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[str]:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> list[str]:
         """Saves the skims (if any) to the project's matrix folder
 
         :Arguments:
@@ -743,7 +744,7 @@ class TrafficAssignment(AssignmentBase):
 
         return file_names
 
-    def select_link_flows(self) -> Dict[str, pd.DataFrame]:
+    def select_link_flows(self) -> dict[str, pd.DataFrame]:
         """
         Returns a dataframe of the select link flows for each class
         """
@@ -810,9 +811,6 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        # if mats.get_matrix(matrix_name, default=False):
-        #     raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
-
         selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
         if not selected_classes:
             return
@@ -820,14 +818,19 @@ class TrafficAssignment(AssignmentBase):
         matrices = {}
         for cls in selected_classes:
             selected = cls.results.select_link_od
-            if selected is None:
-                continue
+            positions = np.searchsorted(centroids, cls.configuration.demand.index)
             for name, values in selected.matrices.items():
                 for class_name, matrix in values.items():
                     key = f"{name}_{cls._id}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    matrices[key] = matrix
+                    # Each class may have a different zone order and subset.
+                    # Remap sparse coordinates into the shared export index.
+                    entries = matrix.tocoo()
+                    matrices[key] = coo_array(
+                        (entries.data, (positions[entries.row], positions[entries.col])),
+                        shape=(len(centroids), len(centroids)),
+                    ).tocsr()
         if not matrices:
             return
         out_skims = AequilibraeSparseMatrix(index=centroids)
@@ -854,7 +857,7 @@ class TransitAssignment(AssignmentBase):
 
         self._config["Skimming Fields"] = None
 
-    def set_classes(self, classes: List[TransitClass]) -> None:
+    def set_classes(self, classes: list[TransitClass]) -> None:
         """
         Sets Transit classes to be assigned
 

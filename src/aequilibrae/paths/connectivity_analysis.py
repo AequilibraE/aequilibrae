@@ -60,7 +60,7 @@ def disconnected_analysis(
         # Build transition graph: links that can follow each link
         turn_anodes = []
         turn_bnodes = []
-        for node in (set(in_links.keys()) & set(out_links.keys())):
+        for node in set(in_links.keys()) & set(out_links.keys()):
             for in_link in in_links[node]:
                 for out_link in out_links[node]:
                     if in_link != out_link:

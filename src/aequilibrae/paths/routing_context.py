@@ -52,6 +52,7 @@ class GraphMapping:
     def node_index(self, node_id: int) -> int:
         """Find the local index of an external node ID."""
         import operator
+
         if isinstance(node_id, (bool, np.bool_)):
             raise TypeError("node_id must be an integer, not a boolean")
 
@@ -75,27 +76,25 @@ class GraphMapping:
         return nodes
 
 
-def make_routing_context(
-    graph: "Graph", costs: np.ndarray | None = None, *, compact: bool = False
-) -> GraphContext:
+def make_routing_context(graph: "Graph", costs: np.ndarray | None = None, *, compact: bool = False) -> GraphContext:
     """Copy topology from Graph into a full or compact routing context.
 
     Without costs, copy the graph's current cost buffer too. Supplied costs are
     borrowed so assignment can update its own buffer between searches. No Graph
     arrays are changed or retained by the context when costs are omitted.
-    
+
     Note: This function also handles internal GraphBase objects for freeze_graph().
     Users should only pass Graph objects.
     """
     from aequilibrae.paths.graph import Graph, GraphBase
-    
+
     # Handle Graph objects (public API)
     if isinstance(graph, Graph):
         if costs is None:
             costs = np.array(graph.routing.costs, copy=True)
             costs.flags.writeable = False
         return graph.routing.with_costs(costs)
-    
+
     # Handle GraphBase objects (internal use by freeze_graph)
     if isinstance(graph, GraphBase):
         if compact:
@@ -156,5 +155,5 @@ def make_routing_context(
             *topology,
             blocked_centroid_count=graph.num_zones if graph.block_centroid_flows else 0,
         )
-    
+
     raise TypeError(f"graph must be a Graph object, got {type(graph).__name__}")

@@ -71,7 +71,7 @@ def test_compact_dijkstra_allows_return_through_another_chain():
     graph_base = compressed_uturn_graph()
     assert 4 not in graph_base.compact_all_nodes
     assert 5 not in graph_base.compact_all_nodes
-    
+
     # Build a Graph for path computation
     graph = freeze_graph(graph_base, compact=False)
     np.testing.assert_array_equal(graph.compute_path(1, 6).path_nodes, [1, 2, 4, 3, 5, 2, 6])

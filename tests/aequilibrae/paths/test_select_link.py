@@ -58,15 +58,16 @@ def test_multiple_link_sets(select_link_setup):
     assignment.execute(max_iterations=1, cores=1)
 
     assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
     for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
             select_link_setup["matrix"],
             select_link_setup["car_graph"],
             assignclass.select_link_sets[key],
         )
-        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
     # Test if files are saved in the right place
     assignment.save_select_link_results("select_link_analysis")
@@ -98,13 +99,14 @@ def test_equals_demand_one_origin(select_link_setup):
     assignment.execute(max_iterations=1, cores=1)
 
     assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
     for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
             select_link_setup["matrix"], select_link_setup["car_graph"], assignclass.select_link_sets[key]
         )
-        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
 
 def test_single_demand(select_link_setup):
@@ -123,13 +125,14 @@ def test_single_demand(select_link_setup):
     assignment.execute(max_iterations=1, cores=1)
 
     assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
     for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
             select_link_setup["matrix"], select_link_setup["car_graph"], assignclass.select_link_sets[key]
         )
-        selected = assignclass.results.select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignclass.results.select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
 
 def test_select_link_network_loading(select_link_setup):
@@ -315,9 +318,9 @@ def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_cl
     exported = from_file(project.matrices.folder / "different_centroids.omx")
     np.testing.assert_array_equal(exported.index, [1, 2, 3, 4])
     for traffic in classes:
-        source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"][:, :, 0]
+        source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"]["flow"].toarray()
         assert source.sum() > 0
         expected = np.zeros((4, 4))
         positions = np.searchsorted(exported.index, traffic.demand.index)
         expected[np.ix_(positions, positions)] = source
-        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"], expected)
+        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"].toarray(), expected)

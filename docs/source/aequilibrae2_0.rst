@@ -127,12 +127,12 @@ stations are written with ``location_type`` 1.
 
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
-The Connectivity Analysis procedure no longer returns a list of disconnected OD pairs, but rather a Numpy array
-with the nodes that are not connected to the main portion of the network.
-This change comes in the heels of replacing the previous Depth-First Search implementation that returned
-a full connectivity matrix with the use of a *Connected Components* algorithm, which runs in a few seconds even
-for very large networks and is not limited to centroid connectivity, which is substantially more useful for network
-diagnostics and editing.
+
+The Connectivity Analysis procedure returns a Numpy array with the nodes that
+are not connected to the main portion of the network.  It uses a *Connected
+Components* algorithm, which runs in a few seconds even for very large networks
+and is not limited to centroid connectivity, which is substantially more useful
+for network diagnostics and editing.
 
 The connectivity analysis is also a feature of the AequilibraE graph, making it substantially easier to use.
 
