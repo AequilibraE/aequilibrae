@@ -57,10 +57,14 @@ network = project.network
 graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
-# With the method ``graph_summary()``, we can check the total number of links, nodes, and zones,
-# and whether the graph uses compact topology.
-
-project.run["graph_summary"](graph)
+# The graph exposes its full and compact topology counts directly.
+{
+    "num_links": len(graph.full_link_ids),
+    "num_nodes": len(graph.full_node_ids),
+    "num_zones": graph.num_zones,
+    "compact_num_links": graph.compact_num_links,
+    "compact_num_nodes": graph.compact_num_nodes,
+}
 
 # %%
 # Let's add a ``create_delaunay`` function to our ``run/__init__.py`` file.

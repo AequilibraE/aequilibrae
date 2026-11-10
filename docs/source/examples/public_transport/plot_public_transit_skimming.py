@@ -82,6 +82,7 @@ graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.
 transit_graph = graph_db.to_transit_graph()
+transit_graph.set_skimming_fields(["trav_time", "boardings", "freq"])
 
 # %%
 
@@ -107,7 +108,6 @@ assig.add_class(assigclass)
 # Set assignment
 assig.set_time_field("trav_time")
 assig.set_frequency_field("freq")
-assig.set_skimming_fields(["trav_time", "boardings", "freq"])
 assig.set_algorithm("os")
 
 # Perform the assignment for the transit classes added
