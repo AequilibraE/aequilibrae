@@ -10,7 +10,7 @@ from dataclasses import InitVar, dataclass, field
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths.cython.mapping import expand_links, project_loads
+from aequilibrae.paths.cython.mapping import aggregate_costs, expand_links, project_loads
 from aequilibrae.utils.cython.array_hash_map import ArrayHashMap
 
 
@@ -95,9 +95,11 @@ class NetworkMapping:
         required = {"link_id", "a_node", "b_node", "direction"}
         if missing := required - set(links.columns):
             raise ValueError(f"Network is missing required columns: {sorted(missing)}")
+
         physical_ids = _ids(links.link_id.to_numpy(), "link_id", scalar=False)
         if not pd.Index(physical_ids).is_unique:
             raise ValueError("Network link IDs must be unique")
+
         a_nodes = _ids(links.a_node.to_numpy(), "a_node", scalar=False)
         b_nodes = _ids(links.b_node.to_numpy(), "b_node", scalar=False)
         direction = _integers(links.direction.to_numpy(), "direction", scalar=False)
@@ -150,6 +152,7 @@ class NetworkMapping:
         directions = _integers(directions, "directions")
         if not np.all(np.isin(directions, [-1, 1])):
             raise ValueError("Lookup directions must be -1 or +1")
+
         link_ids, directions = np.broadcast_arrays(link_ids, directions)
         physical = _lookup(self._link_indices, link_ids)
         indices = self._directed_links[physical, (directions == -1).astype(np.intp)]
@@ -195,6 +198,7 @@ class GraphMapping:
         nodes = _indices(self.graph_node_to_network, self.network.node_count, "graph_node_to_network")
         links = _indices(self.expansion_links, self.network.link_count, "expansion_links")
         offsets = _indices(self.expansion_offsets, links.size + 1, "expansion_offsets")
+
         if nodes.ndim != 1 or links.ndim != 1 or offsets.ndim != 1:
             raise ValueError("Mapping arrays must be one-dimensional")
         if not len(offsets) or offsets[0] != 0 or offsets[-1] != len(links) or np.any(np.diff(offsets) <= 0):
@@ -269,6 +273,55 @@ class GraphMapping:
         links = expand_links(np.ascontiguousarray(np.atleast_1d(indices)), self.expansion_offsets, self.expansion_links)
         return self.network.link_ids[links], self.network.directions[links]
 
+    def aggregate_costs(self, network_costs, *, out=None):
+        """
+        Sum directed network costs along each graph link's ordered expansion.
+
+        :Arguments:
+            **network_costs** (:obj:`np.ndarray`): ``float32`` or ``float64``
+                values shaped ``(network_links,)`` or ``(network_links,
+                fields)``, in this mapping's directed network order.  Read-only
+                and non-contiguous arrays are accepted.
+
+            **out** (:obj:`np.ndarray`, optional): Writable output shaped
+                ``(graph_links,)`` or ``(graph_links, fields)``, matching the
+                input's dimensionality and dtype. It must not overlap the
+                input. Strided arrays are accepted. Existing values are
+                overwritten, not accumulated.
+
+        :Returns:
+            A new array, or **out** itself when supplied. Both accumulation and
+            output use the input dtype. Each field is summed independently in
+            traversal order; unmapped network links are ignored. Costs are not
+            otherwise validated: retained infinities and NaNs participate in
+            ordinary floating-point addition. This also suits additive skim
+            fields.
+        """
+        costs = np.asarray(network_costs)
+        if costs.ndim not in (1, 2) or costs.shape[0] != self.network.link_count:
+            raise ValueError("Costs must have one row per directed network link and one or two dimensions")
+        if costs.dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
+            raise ValueError("Costs must have native-endian float32 or float64 dtype")
+
+        shape = (self.link_count, *costs.shape[1:])
+
+        if out is None:
+            out = np.empty(shape, dtype=costs.dtype)
+        else:
+            if not isinstance(out, np.ndarray) or out.shape != shape:
+                raise ValueError(f"out must be a NumPy array with shape {shape}")
+            if out.dtype != costs.dtype:
+                raise ValueError("out dtype must match the input cost dtype")
+            if not out.flags.writeable:
+                raise ValueError("out must be writable")
+            if np.shares_memory(out, costs):
+                raise ValueError("out must not overlap the input costs")
+
+        source = costs[:, None] if costs.ndim == 1 else costs
+        target = out[:, None] if out.ndim == 1 else out
+        aggregate_costs(self.expansion_offsets, self.expansion_links, source, target)
+        return out
+
     def project_loads(self, graph_loads):
         """Copy graph loads to directed network order, filling unmapped rows with zero.
 
@@ -282,4 +335,5 @@ class GraphMapping:
             raise ValueError("Loads must have one row per graph link and one or two dimensions")
         if loads.dtype.kind not in "iuf":
             raise ValueError("Loads must contain real integer or floating-point values")
+
         return project_loads(self.network_link_to_graph, np.ascontiguousarray(loads))

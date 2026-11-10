@@ -28,6 +28,25 @@ cdef void expand_link_indices(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cdef void aggregate_link_costs(
+    const Py_ssize_t[::1] offsets,
+    const Py_ssize_t[::1] expansion,
+    const cython.floating[:, :] costs,
+    cython.floating[:, :] output,
+) noexcept nogil:
+    """Gather each expansion's costs, with no hashing or shared output writes."""
+    cdef Py_ssize_t link, field, position
+    cdef cython.floating total
+    for link in range(offsets.shape[0] - 1):
+        for field in range(costs.shape[1]):
+            total = 0
+            for position in range(offsets[link], offsets[link + 1]):
+                total += costs[expansion[position], field]
+            output[link, field] = total
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cdef void project_link_loads(
     const Py_ssize_t[::1] network_link_to_graph,
     const unsigned char[:, ::1] loads,
@@ -66,6 +85,17 @@ def expand_links(
     with nogil:
         expand_link_indices(graph_links, offsets, expansion, output)
     return result
+
+
+def aggregate_costs(
+    const Py_ssize_t[::1] offsets,
+    const Py_ssize_t[::1] expansion,
+    const cython.floating[:, :] costs,
+    cython.floating[:, :] output,
+):
+    """Dispatch float32/float64 buffers to the allocation-free aggregation kernel."""
+    with nogil:
+        aggregate_link_costs(offsets, expansion, costs, output)
 
 
 def project_loads(const Py_ssize_t[::1] network_link_to_graph, loads):
