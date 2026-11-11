@@ -11,12 +11,9 @@ from libc.stdint cimport int32_t, int64_t, uint8_t, uint32_t
 @cython.boundscheck(False)
 @cython.initializedcheck(False)
 cdef void _remove_dead_ends(
-    long long [:] graph_fs,
-    long long [:] all_nodes,
-    long long [:] nodes_to_indices,
-    const long long [:] a_nodes,
+    const long long [:] graph_fs,
+    Py_ssize_t node_count,
     const long long [:] b_nodes,
-    const signed char [:] directions,
     long long [:] in_degree,
     long long [:] out_degree,
     uint8_t [:] burnt_links,
@@ -39,7 +36,7 @@ cdef void _remove_dead_ends(
     # along a line.  For removal the node must have "no choices", that is, all outgoing edges point to the same node
     # *and* all incoming edges can be account for as from that same node.
     # The criteria for expansion is that there are no incoming edges *and* all outgoing edges point to the same node.
-    for starting_node_idx in range(all_nodes.shape[0]):
+    for starting_node_idx in range(node_count):
         Q.push(starting_node_idx)
         while not Q.empty():
             node_idx = Q.front()
@@ -238,7 +235,6 @@ def build_compressed_graph(graph, remove_dead_ends=True):
 
     graph_a_nodes = graph.graph.a_node.to_numpy(copy=False)
     graph_b_nodes = graph.graph.b_node.to_numpy(copy=False)
-    graph_directions = graph.graph.direction.to_numpy(copy=False)
     graph_link_ids = graph.graph.link_id.to_numpy(copy=False)
 
     in_degree = np.bincount(graph_b_nodes, minlength=graph.num_nodes)
@@ -261,11 +257,8 @@ def build_compressed_graph(graph, remove_dead_ends=True):
         burnt_links = np.full(len(graph.graph), False, dtype=bool)
         _remove_dead_ends(
             graph.fs,
-            graph.all_nodes,
-            graph.nodes_to_indices,
-            graph_a_nodes,
+            graph.num_nodes,
             graph_b_nodes,
-            graph_directions,
             in_degree,
             out_degree,
             burnt_links,
@@ -598,3 +591,198 @@ def create_compressed_link_network_mapping(graph):
         graph.compressed_link_network_mapping_data,
         graph.network_compressed_node_mapping
     )
+
+
+def _check_indices(values, name, limit=None):
+    values = np.asarray(values)
+    if values.ndim != 1 or (values.size and values.dtype.kind not in "iu"):
+        raise ValueError(f"{name} must be a one-dimensional integer array")
+    if np.any(values < 0) or np.any(values > np.iinfo(np.int64).max):
+        raise ValueError(f"{name} must contain nonnegative int64 indices")
+    if limit is not None and np.any(values >= limit):
+        raise ValueError(f"{name} contains an out-of-range index")
+
+    return values
+
+
+def find_dead_end_links(fs, heads, protected_nodes, *, allow_uturns=False):
+    """Return a directed-link mask using node indices."""
+    fs = _check_indices(fs, "fs")
+    if not fs.size or fs[0] != 0 or np.any(fs[1:] < fs[:-1]):
+        raise ValueError("fs must start at zero and be non-decreasing")
+
+    node_count = len(fs) - 1
+    heads = _check_indices(heads, "heads", node_count)
+    protected_nodes = _check_indices(protected_nodes, "protected_nodes", node_count)
+
+    if fs[-1] != len(heads):
+        raise ValueError("fs must end at the directed link count")
+    if not isinstance(allow_uturns, bool):
+        raise ValueError("allow_uturns must be a boolean")
+
+    fs = np.ascontiguousarray(fs, dtype=np.int64)
+    heads = np.ascontiguousarray(heads, dtype=np.int64)
+    in_degree = np.bincount(heads, minlength=node_count).astype(np.int64, copy=False)
+    out_degree = np.diff(fs)
+    in_degree[protected_nodes] = -1
+    out_degree[protected_nodes] = -1
+    burnt_links = np.zeros(len(heads), dtype=np.uint8)
+
+    _remove_dead_ends(fs, node_count, heads, in_degree, out_degree, burnt_links, allow_uturns)
+    return burnt_links.astype(bool)
+
+
+def compress_links(a_nodes, b_nodes, directions, node_count, protected_nodes, *, allow_uturns=False):
+    """Contract mixed physical links of degree-two."""
+    if isinstance(node_count, bool) or not isinstance(node_count, (int, np.integer)) or node_count < 0:
+        raise ValueError("node_count must be a nonnegative integer")
+
+    a_nodes = _check_indices(a_nodes, "a_nodes", node_count)
+    b_nodes = _check_indices(b_nodes, "b_nodes", node_count)
+    protected_nodes = _check_indices(protected_nodes, "protected_nodes", node_count)
+
+    directions = np.asarray(directions)
+    if directions.ndim != 1 or directions.dtype.kind not in "iu" or not np.isin(directions, [-1, 0, 1]).all():
+        raise ValueError("directions must be a one-dimensional array containing -1, 0 or +1")
+    if not len(a_nodes) == len(b_nodes) == len(directions):
+        raise ValueError("Physical link arrays must have matching lengths")
+    if not isinstance(allow_uturns, bool):
+        raise ValueError("allow_uturns must be a boolean")
+
+    a_nodes = np.ascontiguousarray(a_nodes, dtype=np.int64)
+    b_nodes = np.ascontiguousarray(b_nodes, dtype=np.int64)
+    directions = np.ascontiguousarray(directions, dtype=np.int8)
+
+    link_count = len(a_nodes)
+    link_indices = np.arange(link_count, dtype=np.int64)
+
+    nodes = np.concatenate((a_nodes, b_nodes))
+    links = np.concatenate((link_indices, link_indices))
+
+    counts = np.bincount(nodes, minlength=node_count).astype(np.int64, copy=False)
+    order = np.argsort(nodes, kind="stable")
+    all_links = links[order]
+    offsets = np.empty(node_count + 1, dtype=np.int64)
+    offsets[0] = 0
+    np.cumsum(counts, out=offsets[1:])
+
+    # We keep all centroids and turn via-nodes for sure.
+    counts[protected_nodes] = 999
+
+    # If U-turns are allowed, preserve nodes with both incoming and outgoing
+    # links. Otherwise contraction can remove them
+    if allow_uturns:
+        tails = np.concatenate((a_nodes[directions != -1], b_nodes[directions != 1]))
+        heads = np.concatenate((b_nodes[directions != -1], a_nodes[directions != 1]))
+        incoming = np.bincount(heads, minlength=node_count)
+        outgoing = np.bincount(tails, minlength=node_count)
+        counts[(counts == 2) & (incoming > 0) & (outgoing > 0)] = 998
+
+    degree_two = (counts == 2).astype(np.uint8)
+    link_edge = link_indices[degree_two[a_nodes] + degree_two[b_nodes] == 1]
+    chain_ids = np.full(link_count, -1, dtype=np.int64)
+    chain_directions = np.zeros(link_count, dtype=np.int8)
+    chain_tails = np.empty(link_count, dtype=np.int64)
+    chain_heads = np.empty(link_count, dtype=np.int64)
+    chain_traversal = np.empty(link_count, dtype=np.int64)
+
+    chain_count = _build_compressed_graph(
+        link_indices,
+        offsets,
+        link_edge,
+        a_nodes,
+        b_nodes,
+        directions,
+        link_count,
+        chain_ids,
+        chain_directions,
+        counts,
+        all_links,
+        chain_traversal,
+        chain_tails,
+        chain_heads,
+    )
+
+    # Keep cycles uncompressed to preserve their turns
+    cycles = np.flatnonzero(chain_tails[:chain_count] == chain_heads[:chain_count])
+    chain_ids[np.isin(chain_ids, cycles)] = -1
+    return (
+        chain_ids,
+        chain_directions,
+        chain_tails[:chain_count],
+        chain_heads[:chain_count],
+        chain_traversal[:chain_count],
+    )
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def order_link_expansions(groups, tails, heads, group_tails, group_order):
+    """
+    Find the order of source links for each graph link.
+
+    For output graph link i, its source links in traversal order are:
+        expansion[expansion_offsets[i] : expansion_offsets[i + 1]]
+    """
+    groups = _check_indices(groups, "groups", len(group_tails))
+    tails = _check_indices(tails, "tails")
+    heads = _check_indices(heads, "heads")
+    group_tails = _check_indices(group_tails, "group_tails")
+    group_order = _check_indices(group_order, "group_order", len(group_tails))
+
+    if not len(groups) == len(tails) == len(heads):
+        raise ValueError("Source-link arrays must have matching lengths")
+    expected = np.arange(len(group_tails), dtype=np.int64)
+    if not np.array_equal(np.unique(groups), expected):
+        raise ValueError("Every graph link must have a nonempty expansion")
+    if not np.array_equal(np.sort(group_order), expected):
+        raise ValueError("group_order must be a permutation of graph links")
+
+    cdef:
+        const int64_t[:] ordered = np.lexsort((tails, groups)).astype(np.int64, copy=False)
+        const int64_t[:] source_tails = np.ascontiguousarray(tails, dtype=np.int64)
+        const int64_t[:] source_heads = np.ascontiguousarray(heads, dtype=np.int64)
+        const int64_t[:] starts = np.ascontiguousarray(group_tails, dtype=np.int64)
+        const int64_t[:] traversal = np.ascontiguousarray(group_order, dtype=np.int64)
+        const int64_t[:] counts = np.bincount(groups.astype(np.int64), minlength=len(group_tails))
+
+        int64_t[:] group_offsets = np.empty(len(group_tails) + 1, dtype=np.int64)
+        int64_t[:] expansion_offsets = np.empty(len(group_tails) + 1, dtype=np.int64)
+        int64_t[:] expansion = np.empty(len(groups), dtype=np.int64)
+        Py_ssize_t row, _step, group, start, end, low, high, mid, position, output = 0
+        int64_t node
+
+    group_offsets[0] = 0
+    expansion_offsets[0] = 0
+    for row in range(len(group_tails)):
+        group_offsets[row + 1] = group_offsets[row] + counts[row]
+
+    # We must walk each chain to recover traversal order, input source links
+    # are not necessarily in path order. Within a group, tails are sorted so
+    # each next node can be found by a binary search.
+    for row in range(len(group_tails)):
+        group = traversal[row]
+        start, end = group_offsets[group], group_offsets[group + 1]
+        node = starts[group]
+
+        for _step in range(end - start):
+            low, high = start, end
+
+            while low < high:
+                mid = (low + high) // 2
+                if source_tails[ordered[mid]] < node:
+                    low = mid + 1
+                else:
+                    high = mid
+
+            if low == end or source_tails[ordered[low]] != node:
+                raise ValueError("Expansion links must form a connected chain in traversal order")
+
+            position = ordered[low]
+            expansion[output] = position
+            output += 1
+            node = source_heads[position]
+
+        expansion_offsets[row + 1] = output
+
+    return np.asarray(expansion_offsets), np.asarray(expansion)

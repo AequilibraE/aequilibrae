@@ -57,13 +57,17 @@ def test_multiple_link_sets(select_link_setup):
     )
     assignment.execute(max_iterations=1, cores=1)
 
-    for key in assignment.classes[0].select_link_sets:
+    assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
+    for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
-            select_link_setup["matrix"], select_link_setup["car_graph"], assignment.classes[0].select_link_sets[key]
+            select_link_setup["matrix"],
+            select_link_setup["car_graph"],
+            assignclass.select_link_sets[key],
         )
-        selected = assignment.class_results["car"].select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignment.class_results["car"].select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
     # Test if files are saved in the right place
     assignment.save_select_link_results("select_link_analysis")
@@ -73,7 +77,7 @@ def test_multiple_link_sets(select_link_setup):
 
     # Test if matrices are with the correct shape and are not empty
     sla = matrices.get_matrix("select_link_analysis.omx")
-    num_zones = len(assignment.classes[0].demand.index)
+    num_zones = len(assignclass.demand.index)
     for mat in sla:
         m = sla[mat]
         assert m.sum() > 0 and m.shape == (num_zones, num_zones)
@@ -94,13 +98,15 @@ def test_equals_demand_one_origin(select_link_setup):
     assignment = select_link_setup["make"]({"sl_1_4_3_and_2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
     assignment.execute(max_iterations=1, cores=1)
 
-    for key in assignment.classes[0].select_link_sets:
+    assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
+    for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
-            select_link_setup["matrix"], select_link_setup["car_graph"], assignment.classes[0].select_link_sets[key]
+            select_link_setup["matrix"], select_link_setup["car_graph"], assignclass.select_link_sets[key]
         )
-        selected = assignment.class_results["car"].select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignment.class_results["car"].select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
 
 def test_single_demand(select_link_setup):
@@ -118,13 +124,15 @@ def test_single_demand(select_link_setup):
     assignment = select_link_setup["make"]({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
     assignment.execute(max_iterations=1, cores=1)
 
-    for key in assignment.classes[0].select_link_sets:
+    assignclass = assignment.classes[0]
+    results = assignment.class_results[assignclass.name]
+    for key in assignclass.select_link_sets:
         od_mask, link_loading = create_od_mask(
-            select_link_setup["matrix"], select_link_setup["car_graph"], assignment.classes[0].select_link_sets[key]
+            select_link_setup["matrix"], select_link_setup["car_graph"], assignclass.select_link_sets[key]
         )
-        selected = assignment.class_results["car"].select_link_od.matrices[key]["matrix"]
+        selected = results.select_link_od.matrices[key]["matrix"]
         np.testing.assert_allclose(selected.toarray(), od_mask)
-        np.testing.assert_allclose(assignment.class_results["car"].select_link_loading[key], link_loading)
+        np.testing.assert_allclose(results.select_link_loading[key], link_loading)
 
 
 def test_select_link_network_loading(select_link_setup):

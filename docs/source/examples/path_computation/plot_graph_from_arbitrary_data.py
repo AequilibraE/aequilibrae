@@ -6,8 +6,8 @@ Graph from arbitrary data
 
 In this example, we demonstrate how to create an AequilibraE Graph from an arbitrary network.
 
-We are using 
-`Sioux Falls data <https://github.com/bstabler/TransportationNetworks/tree/master/SiouxFalls>`_, 
+The example uses
+`Sioux Falls data <https://github.com/bstabler/TransportationNetworks/tree/master/SiouxFalls>`_
 from TNTP.
 """
 
@@ -23,7 +23,7 @@ from TNTP.
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Network
 # sphinx_gallery_thumbnail_path = '../source/_images/graph_network.png'
 
 # %%
@@ -37,8 +37,8 @@ net_file = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/ma
 net = pd.read_csv(net_file, skiprows=8, sep="\t", lineterminator="\n", usecols=np.arange(1, 11))
 
 # %%
-# The Graph object requires several default fields: link_id, a_node, b_node, and direction.
-# 
+# The Network requires four fields: link_id, a_node, b_node, and direction.
+#
 # We need to manipulate the data to add the missing fields (link_id and direction) and
 # rename the node columns accordingly.
 net.insert(0, "link_id", np.arange(1, net.shape[0] + 1))
@@ -50,22 +50,12 @@ net.rename(columns={"init_node": "a_node", "term_node": "b_node"}, inplace=True)
 net.head()
 
 # %%
-# Building an AequilibraE graph from our network is pretty straightforward. We assign
-# our network to be the graph's network ...
-graph = Graph()
-graph.network = net
-
-# %%
-# ... and then set the graph's configurations.
-
-graph.prepare_graph(np.arange(1, 25))  # sets the centroids for which we will perform computation
-
-graph.set_graph("length")  # sets the cost field for path computation
-
-graph.set_skimming(["length", "free_flow_time"]) # sets the skims to be computed
-
-graph.set_blocked_centroid_flows(False)  # keep centroid connector turns allowed because all
-                                         # nodes in the Sioux Falls network are centroids
+# Create the source network, then build a graph with costs and skim fields.
+# All Sioux Falls nodes are centroids, so routes must be able to pass through them.
+network = Network(net, centroids=np.arange(1, 25))
+graph = network.build_graph(
+    "c", cost="length", skimming=["length", "free_flow_time"], block_centroid_flows=False,
+)
 
 # %%
 # Two of AequilibraE's new features consist in directly computing path or skims.
@@ -75,21 +65,17 @@ res = graph.compute_path(1, 17)
 
 # %%
 # ... and print the corresponding nodes...
-res.path_nodes
+print(res.path_nodes)
 
 # %%
 # ... and the path links.
-res.path
+print(res.path)
 # %%
-# For path computation, when we call the method ``graph.compute_path(1, 17)``, we are calling the class
-# ``PathComputation`` and storing its results into a variable.
-# 
-# Notice that other methods related to path computation, such as ``milepost`` can also be used with
-# ``res``.
+# ``graph.compute_path()`` returns a ``PathResults`` object.
+# Its ``milepost`` array contains the cumulative path costs.
 
 # %%
-# For skim computation, the process is quite similar. When calligng the method ``graph.compute_skims()``
-# we are actually calling the class ``NetworkSkimming``, and storing its results into ``skm``.
+# ``graph.compute_skims()`` runs ``NetworkSkimming`` and returns the skimmer.
 
 skm = graph.compute_skims()
 

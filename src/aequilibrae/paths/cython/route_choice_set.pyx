@@ -71,7 +71,7 @@ from aequilibrae.matrix import from_df
 from aequilibrae.paths.cython.a_star import validate_scale
 from aequilibrae.paths.cython.demand import validate_demand
 from aequilibrae.paths.cython.route_choice_set_results import check_disutility_cutoff_values
-from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph, _get_graph_to_network_mapping
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 from aequilibrae.paths.routing_context import make_routing_context
 
@@ -105,9 +105,9 @@ cdef class RouteChoiceSet:
     See the module documentation for the algorithms and reference.
     """
 
-    def __init__(self, graph: PreparedGraph, *, coordinates: pd.DataFrame | None = None):
-        if isinstance(graph, GraphBase):
-            graph = freeze_graph(graph, compact=True)
+    def __init__(self, graph: Graph, *, coordinates: pd.DataFrame | None = None):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         self.graph = graph
         self.routing = make_routing_context(graph)
         self.coordinates = coordinates.copy() if coordinates is not None else None
@@ -138,7 +138,7 @@ cdef class RouteChoiceSet:
         self.cost_view = self.routing.costs
         self.full_cost_view = graph.full_costs.copy()
 
-        # The search loop needs a dense lookup without the GIL.
+        # Search indices must follow the routing topology, not full-link expansion order.
         self.nodes_to_indices_view = graph.nodes_to_indices
         self.num_nodes = self.routing.node_count
         self.num_links = self.routing.link_count
@@ -274,7 +274,10 @@ cdef class RouteChoiceSet:
         heuristic_context = None
         if a_star:
             heuristic_context = make_heuristic_context(
-                self.node_ids, self.coordinates, self.lonlat, heuristic, heuristic_scale
+                self.node_ids,
+                self.coordinates if heuristic == "euclidean" else self.lonlat,
+                heuristic,
+                heuristic_scale,
             )
 
             if search_heuristic.haversine:

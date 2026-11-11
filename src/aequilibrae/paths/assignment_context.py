@@ -13,7 +13,7 @@ from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext,
 from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
-from aequilibrae.paths.graph import AssignmentMapping, PreparedGraph
+from aequilibrae.paths.graph import AssignmentMapping, Graph
 
 if TYPE_CHECKING:
     from aequilibrae.paths.cython.outputs import AoNOutputs
@@ -44,14 +44,18 @@ def validate_assignment_demand(matrix: AequilibraeMatrix | AequilibraeSparseMatr
     zones = len(centroids)
     if not zones or not len(matrix):
         raise ValueError("Demand must have shape (zones, zones, classes)")
-    sparse = isinstance(matrix, AequilibraeSparseMatrix)
     for values in matrix.values():
         if values.shape != (zones, zones):
             raise ValueError("Demand must have shape (zones, zones, classes)")
-        if not np.issubdtype(values.dtype, np.number) or np.iscomplexobj(values):
+        if not np.issubdtype(values.dtype, np.number) or np.issubdtype(values.dtype, np.complexfloating):
             raise TypeError("Demand must contain real numbers")
-        stored = values.tocoo(copy=False).data if sparse else values
-        if not np.all(np.isfinite(stored)) or np.any(stored < 0):
+        if isinstance(matrix, AequilibraeSparseMatrix):
+            # Canonicalise a copy: sparse formats may contain duplicate entries.
+            # Validate their OD totals without densifying or changing caller data.
+            values = values.tocsr(copy=True)
+            values.sum_duplicates()
+            values = values.data
+        if not np.all(np.isfinite(values)) or np.any(values < 0):
             raise ValueError("Demand must be finite and nonnegative")
 
 
@@ -101,7 +105,7 @@ class AssignmentInputs:
 
     def __init__(
         self,
-        graph: PreparedGraph,
+        graph: Graph,
         matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
         time_field: str,
         selected_links: dict[str, np.ndarray],
@@ -175,11 +179,12 @@ class AssignmentInputs:
 class PreparedTrafficClass:
     """Per-class state over an execution's shared network and compact graph."""
 
-    def __init__(self, configuration, network):
+    def __init__(self, configuration, network, fields):
         from aequilibrae.paths.results import AssignmentResults
 
         self.configuration = configuration
         self.network = network
+        self.fields = fields
         self.graph = network._assignment_graph(configuration)
         self.results = AssignmentResults()
         self._aon_results = AssignmentResults()

@@ -11,15 +11,16 @@ from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
-from aequilibrae import Graph, Network, TrafficAssignment, TrafficClass
+from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs
+from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.vdf import bpr
 
 
 def diamond(turn=False):
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
@@ -256,14 +257,13 @@ def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(c
     assert assignment.class_results[traffic.name].unassigned_demand == 10.0
     assert assignment._class_states[0]._aon_results.unassigned_demand == 10.0
     assert "10 demand could not be assigned" in caplog.text
-    assert np.isinf(assignment.class_results[traffic.name].skims.matrices["time"][3, 0])
-    assert assignment.class_results[traffic.name].skims.matrices["time"][3, 3] == 0.0
+    results = assignment.class_results[traffic.name]
+    assert np.isinf(results.skims.matrices["time"][3, 0])
+    assert results.skims.matrices["time"][3, 3] == 0.0
     assert all(
-        matrix[3:4].nnz == 0
-        for matrices in assignment.class_results[traffic.name].select_link_od.matrices.values()
-        for matrix in matrices.values()
+        matrix[3:4].nnz == 0 for matrices in results.select_link_od.matrices.values() for matrix in matrices.values()
     )
-    assert assignment.class_results[traffic.name].total_link_loads.sum() == 40.0
+    assert results.total_link_loads.sum() == 40.0
 
     assignment.class_results[traffic.name].reset()
     assert assignment.class_results[traffic.name].unassigned_demand == 0.0
@@ -286,8 +286,25 @@ def test_repeated_execution_clears_history_and_preserves_old_output_views():
 
 def test_shared_graph_classes_have_independent_cost_buffers():
     graph = diamond()
-    first = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    second = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
+    network = Network(graph.network.assign(modes="c"))
+    configuration = TrafficClass(mode="c", cost="time", demand=matrix_for(graph), block_centroid_flows=False)
+    prepared = network._assignment_graph(configuration)
+    assert network._assignment_graph(replace(configuration, name="trucks")) is prepared
+    first, second = [
+        AssignmentInputs(
+            prepared,
+            configuration.demand,
+            "time",
+            {},
+            1,
+            field_values=network.field_values,
+            skim_fields=graph.skim_fields,
+        )
+        for _ in range(2)
+    ]
+    assert first.mapping is second.mapping is prepared.mapping
+    assert np.shares_memory(first.routing.fs, second.routing.fs)
+    assert np.shares_memory(first.routing.heads, second.routing.heads)
     first.update_costs(np.ones(graph.num_links), np.zeros(graph.num_links))
     second.update_costs(np.full(graph.num_links, 3.0), np.zeros(graph.num_links))
     assert not np.shares_memory(first.costs, second.costs)
@@ -321,7 +338,7 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
 
 
 def test_compressed_chain_and_removed_link_project_without_dummy_storage():
-    graph = Graph()
+    graph = GraphBase()
     graph.network = pd.DataFrame(
         {
             "link_id": [9, 2, 7],
@@ -350,7 +367,7 @@ def test_compressed_chain_and_removed_link_project_without_dummy_storage():
 def test_zero_demand_without_skims_leaves_no_optional_outputs(turn):
     graph = diamond(turn)
     graph.set_skimming([])
-    matrix = matrix_for(graph, {"work": np.zeros((4, 4))})
+    matrix = matrix_for(graph, np.zeros((4, 4, 1)))
     inputs = routing_inputs(graph, matrix, "time", {}, 2)
     output = inputs.driver.run(inputs.driver.make_outputs())
     assert inputs.driver.origins.size == 0
@@ -414,7 +431,7 @@ def test_translation_preserves_existing_centroid_blocking_branch(turn):
     graph = diamond(turn)
     graph.set_blocked_centroid_flows(True)
     inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    # The existing turn branch relies on Graph's generated connector bans,
+    # The existing turn branch relies on the builder's generated connector bans,
     # rather than adding the routing context's blocked centroid prefix.
     expected = 0 if graph.has_turn_restrictions else graph.num_zones
     assert inputs.routing.blocked_centroid_count == expected
@@ -471,7 +488,8 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
             np.testing.assert_array_equal(skims[f"{name}_final"], values)
         expected_names = {f"{name}_cars_{column}" for name in ("upper", "either") for column in ("work", "other")}
         assert set(selected) == expected_names
-        for name, values in assignment.class_results[traffic.name].select_link_od.matrices.items():
+        results = assignment.class_results[traffic.name]
+        for name, values in results.select_link_od.matrices.items():
             for column, matrix in values.items():
                 np.testing.assert_array_equal(selected[f"{name}_cars_{column}"].toarray(), matrix.toarray())
     finally:

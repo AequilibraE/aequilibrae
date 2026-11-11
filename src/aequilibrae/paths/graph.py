@@ -6,6 +6,7 @@ import pickle
 import uuid
 import warnings
 from abc import ABC
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from datetime import datetime
 from os.path import join
@@ -16,14 +17,15 @@ import numpy.typing as npt
 import pandas as pd
 
 from aequilibrae.paths.connectivity_analysis import disconnected_analysis
-from aequilibrae.paths.cython.context import GraphContext, SkimmingContext
+from aequilibrae.paths.cython.context import GraphContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
-from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
+from aequilibrae.paths.mapping import GraphMapping
 
 if TYPE_CHECKING:
     from aequilibrae.paths import PathResults
+    from aequilibrae.paths.network_skimming import NetworkSkimming
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ def _get_graph_to_network_mapping(link_ids, directions):
 
 class GraphBase(ABC):  # noqa: B024
     """
-    Graph class.
+    Internal DataFrame-based builder for road topology.
 
     AequilibraE graphs implement two forms of compression.
         - link contraction, and
@@ -434,13 +436,11 @@ class GraphBase(ABC):  # noqa: B024
         self._id = uuid.uuid4().hex
 
     def disconnected_nodes(self) -> np.ndarray:
-        """
-        Executes strongly connected components analysis on the directed graph
+        """Identify disconnected nodes using strongly connected components analysis.
 
-        :Returns:
-            **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
+        This method is not available for builder graphs. Use a prepared Graph instead.
         """
-        return disconnected_analysis(self)
+        raise NotImplementedError("Call .disconnected_nodes() on a Graph prepared via Network.build_graph()")
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = list(self.required_fields)
@@ -1250,131 +1250,118 @@ class GraphBase(ABC):  # noqa: B024
         super().__setattr__(key, value)
 
 
-class Graph(GraphBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
 @dataclasses.dataclass(frozen=True, eq=False)
-class PreparedGraph:
+class Graph:
     """One routing context with fixed topology and mappings to source links.
 
-    Network tables and the temporary graph builder are not retained. Full-link
-    arrays describe path expansion and reporting, not a second routing context.
-    Only costs can change after construction.
+    Create graphs with ``Network.build_graph()``.
+    Network tables and construction intermediates are not retained. Routing,
+    correspondence and skim fields belong to their respective sub-objects.
+    Reconstruct the graph to change its configuration; routing costs can still
+    be rebound independently of the fixed topology.
     """
 
     routing: GraphContext
-    mapping: AssignmentMapping
-    graph_mapping: GraphMapping
-    compact: bool
-    mode: str
-    cost_field: str | None
+    mapping: GraphMapping
     skimming: SkimmingContext
-    full_node_ids: np.ndarray
-    full_link_ids: np.ndarray
-    full_directions: np.ndarray
-    full_tails: np.ndarray
-    full_heads: np.ndarray
-    full_to_network: np.ndarray
-    expansion_indices: np.ndarray
-    expansion_links: np.ndarray
-    full_turn_fs: np.ndarray
-    full_turn_to_arcs: np.ndarray
-    full_turn_penalties: np.ndarray
-    block_centroid_flows: bool
-    allow_path_uturns: bool
-    _full_costs: np.ndarray
-    _lonlat: np.ndarray
-    compact_num_links: int
-    compact_num_nodes: int
+    mode: str
+    cost_field: str | None = None
+    centroid_count: int = 0
+    block_centroid_flows: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.routing, GraphContext) or not isinstance(self.mapping, GraphMapping):
+            raise ValueError("Graph requires a routing context and a GraphMapping")
+        if not isinstance(self.skimming, SkimmingContext):
+            raise ValueError("skimming must be a SkimmingContext")
+        if self.routing.node_count != self.mapping.node_count or self.routing.link_count != self.mapping.link_count:
+            raise ValueError("Routing context and mapping dimensions must agree")
+        if self.skimming.link_count != self.routing.link_count:
+            raise ValueError("Skimming and routing contexts must have the same link count")
+        if not isinstance(self.mode, str) or not self.mode:
+            raise ValueError("mode must be a nonempty string")
+        if self.cost_field is not None and (not isinstance(self.cost_field, str) or not self.cost_field):
+            raise ValueError("cost_field must be a nonempty string")
+        if isinstance(self.centroid_count, bool) or not isinstance(self.centroid_count, int):
+            raise ValueError("centroid_count must be an integer")
+        if not 0 <= self.centroid_count <= self.routing.node_count:
+            raise ValueError("centroid_count must be between zero and the graph node count")
+        if not isinstance(self.block_centroid_flows, bool):
+            raise ValueError("block_centroid_flows must be a boolean")
 
     @property
-    def centroids(self):
-        return self.mapping.centroids
+    def centroids(self) -> npt.NDArray[np.uint64]:
+        return self.mapping.network_node(np.arange(self.centroid_count, dtype=np.intp))
 
     @property
-    def all_nodes(self):
-        return self.graph_mapping.node_ids
+    def all_nodes(self) -> npt.NDArray[np.uint64]:
+        return self.mapping.network_node(np.arange(self.mapping.node_count, dtype=np.intp))
 
     @property
-    def num_nodes(self):
+    def num_nodes(self) -> int:
         return self.routing.node_count
 
     @property
-    def num_links(self):
+    def num_links(self) -> int:
         return self.routing.link_count
 
     @property
-    def num_zones(self):
-        return len(self.centroids)
+    def num_zones(self) -> int:
+        return self.centroid_count
 
     @property
-    def cost(self):
+    def cost(self) -> npt.NDArray[np.float64]:
         return self.routing.costs
 
     @property
-    def has_turn_restrictions(self):
-        return bool(len(self.full_turn_penalties))
+    def has_turn_restrictions(self) -> bool:
+        return isinstance(self.routing, TurnBasedContext)
 
     @property
-    def full_costs(self):
-        values = self._full_costs.view()
-        values.flags.writeable = False
-        return values
-
-    @property
-    def skim_fields(self):
+    def skim_fields(self) -> list[str]:
         return list(self.skimming.field_names)
 
-    @property
-    def lonlat_index(self):
-        # A* accepts a DataFrame, but Graph stores only coordinates in local node order.
-        return pd.DataFrame(self._lonlat, index=self.all_nodes if len(self._lonlat) else [], columns=["lon", "lat"])
-
-    @property
-    def nodes_to_indices(self):
-        indices = np.full(int(self.all_nodes.max()) + 1, -1, dtype=np.int64)
-        indices[self.all_nodes] = np.arange(self.num_nodes)
-        return indices
-
-    @property
-    def full_nodes_to_indices(self):
-        indices = np.full(int(self.full_node_ids.max()) + 1, -1, dtype=np.int64)
-        indices[self.full_node_ids] = np.arange(len(self.full_node_ids))
-        return indices
-
-    def set_costs(self, costs):
+    def set_costs(self, costs: npt.ArrayLike) -> None:
         """Replace directed network costs. Positive infinity closes a link."""
-        costs = np.asarray(costs, dtype=np.float64)
-        if costs.shape != (self.mapping.link_count,):
+        costs = np.asarray(costs)
+        if costs.shape != (self.mapping.network.link_count,):
             raise ValueError("Costs must have one value per directed network link")
-        if np.isnan(costs).any() or np.any(costs < 0):
-            raise ValueError("Graph costs must be nonnegative and cannot contain NaN")
-        values = np.zeros(self.num_links, dtype=np.float64)
-        self.mapping.aggregate_costs(costs, values)
-        self.routing.update_costs(values)
-        self._full_costs[:] = costs[self.full_to_network]
+        if costs.dtype.kind not in "iuf" or np.isnan(costs).any() or np.any(costs < 0):
+            raise ValueError("Graph costs must be numeric, nonnegative and cannot contain NaN")
 
-    def selected_links(self, selections):
+        values = self.mapping.aggregate_costs(costs.astype(np.float64, copy=False))
+        values.flags.writeable = False
+        self.routing.update_costs(values)
+
+    def selected_links(self, selections: Mapping[str, Iterable[tuple[int, int]]]) -> dict[str, npt.NDArray[np.intp]]:
+        """Resolve named source-link selections, ignoring links absent from this graph."""
+        network = self.mapping.network
         result = {}
         for name, members in selections.items():
-            indices = set()
+            indices: set[int] = set()
             for link, direction in members:
-                mask = self.mapping.link_ids == link
+                if direction not in (-1, 0, 1):
+                    raise ValueError("Selected link directions must be -1, 0 or +1")
+                mask = network.link_ids == link
                 if direction:
-                    mask &= self.mapping.directions == direction
-                indices.update(self.mapping.crosswalk[mask])
-            indices.discard(self.num_links)
-            result[name] = np.array(sorted(indices), dtype=np.int64)
+                    mask &= network.directions == direction
+                indices.update(self.mapping.network_link_to_graph[mask])
+            indices.discard(-1)
+            result[name] = np.array(sorted(indices), dtype=np.intp)
         return result
 
-    def compute_path(self, origin, destination, **kwargs):
-        from aequilibrae.paths.results import PathResults
+    def compute_path(self, origin: int, destination: int, **kwargs: object) -> PathResults:
+        """Compute a path with nodes and mileposts on this built graph.
+
+        Additional arguments are passed to :class:`PathResults`, including
+        explicit coordinates and a heuristic scale when using A*.
+        """
+        from aequilibrae.paths.results.path_results import PathResults
 
         return PathResults(self, origin, destination, **kwargs)
 
-    def compute_skims(self, cores=None):
+    def compute_skims(self, cores: int | None = None) -> NetworkSkimming:
+        """Compute centroid skims using this graph's routing and skim contexts."""
         from aequilibrae.paths.network_skimming import NetworkSkimming
 
         skimmer = NetworkSkimming(self)
@@ -1383,8 +1370,22 @@ class PreparedGraph:
         skimmer.execute()
         return skimmer
 
-    def disconnected_nodes(self):
-        return disconnected_analysis(self)
+    def disconnected_nodes(self) -> np.ndarray:
+        """Identify all disconnected nodes using strongly connected components analysis.
+
+        Returns:
+            All nodes that are disconnected from the main portion of the network.
+        """
+        # Extract active directed links from the routing context
+        active = np.isfinite(self.cost)
+        tails = np.repeat(np.arange(self.num_nodes), np.diff(self.routing.fs).astype(np.int64))
+        return disconnected_analysis(
+            tails[active],
+            self.routing.heads[active].astype(np.int64),
+            self.all_nodes,
+            self.block_centroid_flows,
+            self.centroids,
+        )
 
 
 def sanitise_centroids(centroids: np.ndarray) -> np.ndarray:
@@ -1756,64 +1757,3 @@ def _prepare_network_graph(graph, mode, centroids, restrictions, block_centroid_
         graph._turn_restrictions = restrictions.copy()
         graph._turn_restrictions["penalty"] = restrictions.penalty.apply(graph._normalise_turn_penalty)
     graph.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)
-
-
-def freeze_graph(builder, *, compact, network=None, costs=None, fields=None, cost_name=None):
-    """Copy one prepared topology and its expansion mappings, then discard tables."""
-    full = builder.graph
-    links = builder.compact_graph if compact else full
-    count = len(links)
-    if network is None:
-        # Low-level builder consumers use the same array representation.
-        ordered = full.sort_values("__supernet_id__")
-        link_ids, directions = ordered.link_id.to_numpy(), ordered.direction.to_numpy()
-        positions = full.__supernet_id__.to_numpy()
-        costs = builder.cost[np.argsort(positions)]
-        fields = {name: full[name].to_numpy()[np.argsort(positions)] for name in builder.skim_fields}
-        cost_name = builder.cost_field
-        lonlat = builder.lonlat_index
-    else:
-        link_ids, directions = network.link_ids, network.directions
-        index = pd.MultiIndex.from_arrays([link_ids, directions])
-        positions = index.get_indexer(pd.MultiIndex.from_frame(full[["link_id", "direction"]]))
-        lonlat = network.lonlat
-    context_ids = full.__compressed_id__.to_numpy() if compact else full.id.to_numpy()
-    crosswalk = np.full(len(link_ids), count, dtype=np.int64)
-    crosswalk[positions] = context_ids
-    mapping = AssignmentMapping(builder.centroids, link_ids, directions, crosswalk, count)
-    routing_costs = np.zeros(count, dtype=np.float64)
-    mapping.aggregate_costs(costs, routing_costs)
-    routing = make_routing_context(builder, routing_costs, compact=compact)
-    nodes = builder.compact_all_nodes if compact else builder.all_nodes
-    graph_mapping = GraphMapping(routing, nodes, links.link_id.to_numpy(), links.direction.to_numpy())
-    skim_values = {}
-    for name, values in fields.items():
-        if name == cost_name:
-            continue
-        output = np.zeros(count, dtype=np.float64)
-        mapping.aggregate_costs(values, output)
-        skim_values[name] = output
-    skimming = SkimmingContext(count, link_fields=skim_values, cost_name=cost_name if cost_name in fields else None)
-    if compact:
-        indices, expansion, _ = builder.create_compressed_link_network_mapping()
-        # Builder expansions use supernetwork order; path tracing uses full row order.
-        expansion = np.argsort(full.__supernet_id__.to_numpy())[expansion]
-    else:
-        indices, expansion = np.arange(count + 1, dtype=np.uint32), np.arange(count)
-    arrays = [
-        builder.all_nodes, full.link_id.to_numpy(), full.direction.to_numpy(),
-        full.a_node.to_numpy(), full.b_node.to_numpy(), positions, indices, expansion,
-        builder.turn_fs, builder.turn_to_arcs, builder.turn_penalties,
-    ]
-    arrays = [np.array(values, copy=True) for values in arrays]
-    for values in arrays:
-        values.flags.writeable = False
-    coordinates = (
-        np.empty((0, 2)) if lonlat is None or lonlat.empty else lonlat.loc[nodes, ["lon", "lat"]].to_numpy(copy=True)
-    )
-    coordinates.flags.writeable = False
-    return PreparedGraph(
-        routing, mapping, graph_mapping, compact, builder.mode, cost_name, skimming, *arrays,
-        builder.block_centroid_flows, builder.allow_path_uturns, np.array(costs[positions], copy=True), coordinates,
-        builder.compact_num_links, builder.compact_num_nodes,
-    )

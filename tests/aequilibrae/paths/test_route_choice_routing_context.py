@@ -3,17 +3,16 @@
 import numpy as np
 import pandas as pd
 import pytest
-
-from aequilibrae import Graph
-from aequilibrae.matrix import from_df
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.route_choice import RouteChoice
 from aequilibrae.utils.cython.bridge import Bridge
 
+from aequilibrae.matrix import from_df
+from aequilibrae.paths import Network
+from aequilibrae.paths.route_choice import RouteChoice
 
-def junction(penalty):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+
+def junction(penalty, *, lonlat=None):
+    links = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14],
             "a_node": [10, 10, 30, 20],
@@ -22,13 +21,63 @@ def junction(penalty):
             "time": [1.0, 2.0, 1.0, 1.0],
         }
     )
-    graph.prepare_graph(np.array([10, 20, 30, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    graph.set_turn_restrictions(
-        pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [penalty]})
+    turns = (
+        None
+        if penalty is None
+        else pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [penalty]})
     )
-    return graph
+    return Network(links, centroids=np.array([10, 20, 30, 40]), turn_restrictions=turns, lonlat=lonlat).build_graph(
+        "c", cost="time", compact=True, block_centroid_flows=False
+    )
+
+
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("turn", [False, True])
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+@pytest.mark.parametrize("a_star", [False, True])
+def test_search_uses_routing_node_order(compact, turn, algorithm, a_star):
+    links = pd.DataFrame(
+        {
+            "link_id": np.arange(1, 9),
+            "a_node": [1, 2, 3, 3, 4, 4, 5, 6],
+            "b_node": [2, 3, 4, 5, 5, 6, 6, 7],
+            "direction": 0,
+            "time": 1.0,
+        }
+    )
+    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [0.5]}) if turn else None
+    graph = Network(links, centroids=[1, 7], turn_restrictions=turns).build_graph(
+        "c", cost="time", compact=compact, block_centroid_flows=False
+    )
+    if compact:
+        # Contracting node 2 shifts retained non-centroid indices, unlike centroid indices.
+        np.testing.assert_array_equal(graph.full_node_ids, [1, 7, 2, 3, 4, 5, 6])
+        np.testing.assert_array_equal(graph.all_nodes, [1, 7, 3, 4, 5, 6])
+    coordinates = pd.DataFrame({"x": graph.all_nodes.astype(float), "y": 0.0}, index=graph.all_nodes).iloc[::-1]
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_cores(1)
+    choice.set_choice_set_generation(
+        algorithm, max_routes=1, max_depth=1, a_star=a_star, heuristic_scale=0.5 if a_star else None
+    )
+    # Node 3 has an in-range but wrong full index; node 6's full index is out of routing bounds.
+    expected = {(1, 3): (1, 2), (3, 1): (-2, -1), (6, 7): (8,), (7, 6): (-8,)}
+    for (origin, destination), route in expected.items():
+        reference = graph.compute_path(origin, destination)
+        assert tuple(reference.path * reference.path_link_directions) == route
+        assert choice.execute_single(origin, destination) == [route]
+
+    # Batch routing shares the lookup across workers and must map both endpoints correctly.
+    choice.set_cores(2)
+    choice.prepare(list(expected))
+    choice.execute(perform_assignment=False)
+    rows = choice.get_results()
+    actual = {(row["origin id"], row["destination id"]): tuple(row["route set"]) for _, row in rows.iterrows()}
+    assert actual == expected
+
+    # Imported routes still use full-node indices when validating expanded links.
+    recosted = choice.recompute_psl(rows)
+    assert recosted["mask"].all()
+    np.testing.assert_allclose(recosted["cost"], rows["route set"].map(len))
 
 
 def single_od_demand(origin, destination, flow=1.0):
@@ -91,9 +140,8 @@ def test_batched_finite_turn_penalty_changes_route_and_cost(bfsle):
     assert rows[20, 40, (14,)]["cost"] == pytest.approx(1.0)
 
 
-def diamond(penalty=0.5):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+def diamond(penalty=0.5, *, cost="time", lonlat=None):
+    links = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
             "a_node": [10, 20, 10, 30],
@@ -103,13 +151,14 @@ def diamond(penalty=0.5):
             "distance": [30.0, 40.0, 50.0, 60.0],
         }
     )
-    graph.prepare_graph(np.array([10, 20, 30, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    graph.set_turn_restrictions(
-        pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [penalty]})
+    turns = (
+        None
+        if penalty is None
+        else pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [penalty]})
     )
-    return graph
+    return Network(links, centroids=np.array([10, 20, 30, 40]), turn_restrictions=turns, lonlat=lonlat).build_graph(
+        "c", cost=cost, compact=True, block_centroid_flows=False
+    )
 
 
 @pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
@@ -130,8 +179,7 @@ def test_generated_routes_keep_original_cost_and_turns(algorithm):
 
 
 def test_shared_turn_cost_counts_towards_overlap():
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14, 15],
             "a_node": [10, 20, 30, 30, 40],
@@ -140,10 +188,12 @@ def test_shared_turn_cost_counts_towards_overlap():
             "time": [1.0] * 5,
         }
     )
-    graph.prepare_graph(np.array([10, 20, 30, 40, 50]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    graph.set_turn_restrictions(pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [3.0]}))
+    network = Network(
+        links,
+        centroids=np.array([10, 20, 30, 40, 50]),
+        turn_restrictions=pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [3.0]}),
+    )
+    graph = network.build_graph("c", cost="time", compact=True, block_centroid_flows=False)
     choice = RouteChoice(graph)
     choice.set_choice_set_generation("bfsle", max_routes=2, max_depth=5)
     choice.execute_single(10, 50, demand=1.0)
@@ -237,8 +287,7 @@ def test_recomputed_psl_all_routes_banned(caplog):
 
 @pytest.mark.parametrize("allow_explicit_uturn", [False, True])
 def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [11, 12, 13, 14],
             "a_node": [10, 20, 10, 20],
@@ -247,9 +296,6 @@ def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
             "time": [1.0] * 4,
         }
     )
-    graph.prepare_graph(np.array([10, 20, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
     turns = pd.DataFrame(
         {
             "from_node": [10],
@@ -258,7 +304,8 @@ def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
             "penalty": [0.0],
         }
     )
-    graph.set_turn_restrictions(turns)
+    network = Network(links, centroids=np.array([10, 20, 40]), turn_restrictions=turns)
+    graph = network.build_graph("c", cost="time", compact=True, block_centroid_flows=False)
 
     rows = recompute_imported_routes(graph, [[11, 12, 13], [11, 14]])
     table = {tuple(row["route set"]): row for _, row in rows.iterrows()}
@@ -271,7 +318,8 @@ def test_recomputed_psl_applies_uturn_rules(allow_explicit_uturn, caplog):
         assert table[11, 12, 13]["probability"] == 0.0
         assert "disallowed U-turn" in caplog.text
 
-        graph.clear_turn_restrictions()
+        network.turn_restrictions = None
+        graph = network.build_graph("c", cost="time", compact=True, block_centroid_flows=False)
         node_rows = recompute_imported_routes(graph, [[11, 12, 13], [11, 14]])
         node_table = {tuple(row["route set"]): row for _, row in node_rows.iterrows()}
         assert not node_table[11, 12, 13]["mask"]
@@ -297,8 +345,7 @@ def test_recomputed_psl_from_path_files_includes_turns(tmp_path):
 
 
 def test_recomputed_psl_validates_node_routes_without_turn_tables(caplog):
-    graph = diamond()
-    graph.clear_turn_restrictions()
+    graph = diamond(None)
     rows = recompute_imported_routes(graph, [[71, 24], [55, 24]])
     table = {tuple(row["route set"]): row for _, row in rows.iterrows()}
     assert not table[71, 24]["mask"]
@@ -315,13 +362,24 @@ def test_recomputed_psl_masks_disconnected_links(caplog):
 
 
 def test_imported_link_absent_from_compact_graph_is_rejected():
-    graph = diamond()
-    # Prepare expansion first so this synthetic missing-link crosswalk does not affect its construction.
-    graph.create_compressed_link_network_mapping()
-    graph.graph.loc[graph.graph.link_id == 71, "__compressed_id__"] = graph.compact_num_links
+    links = pd.DataFrame(
+        {
+            "link_id": [71, 12, 99],
+            "a_node": [10, 20, 20],
+            "b_node": [20, 40, 50],
+            "direction": [0, 0, 0],
+            "time": [1.0, 1.0, 1.0],
+        }
+    )
+    graph = Network(links, centroids=np.array([10, 40])).build_graph(
+        "c", cost="time", compact=True, block_centroid_flows=False
+    )
     choice = RouteChoiceSet(graph)
     demand = single_od_demand(10, 40)
-    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 12]]})
+    # The through route survives compression; only the spur to node 50 is removed.
+    removed = (graph.full_link_ids == 99) & (graph.full_directions == 1)
+    assert np.all(graph.mapping.crosswalk[graph.full_to_network[removed]] == graph.num_links)
+    supplied = pd.DataFrame({"origin id": [10], "destination id": [40], "route set": [[71, 99, -99, 12]]})
     with pytest.raises(ValueError, match="absent from the compact graph"):
         choice.assign_from_df(supplied, demand, select_links={}, recompute_psl=True)
 
@@ -545,8 +603,7 @@ def test_imported_supplied_mask_excludes_loading_and_select_links(recompute):
 
 
 def test_imported_routes_use_graph_prepared_before_route_choice():
-    graph = diamond(5.0)
-    graph.set_graph("distance")
+    graph = diamond(5.0, cost="distance")
     choice = RouteChoice(graph)
     supplied = pd.DataFrame(
         {
@@ -562,8 +619,7 @@ def test_imported_routes_use_graph_prepared_before_route_choice():
 
 
 def compressed_chain():
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [11, 12, 13],
             "a_node": [10, 20, 30],
@@ -572,15 +628,14 @@ def compressed_chain():
             "time": [1.0, 2.0, 3.0],
         }
     )
-    graph.prepare_graph(np.array([10, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    return graph
+    return Network(links, centroids=np.array([10, 40])).build_graph(
+        "c", cost="time", compact=True, block_centroid_flows=False
+    )
 
 
 def test_validation_checks_links_before_compression():
     graph = compressed_chain()
-    assert graph.compact_num_links == 1
+    assert graph.num_links == 1
     choice = RouteChoice(graph)
     supplied = pd.DataFrame(
         {
@@ -622,8 +677,9 @@ def test_empty_routes_are_omitted_with_warning(caplog):
 
 def test_infinite_link_cost_is_masked_without_a_turn_ban():
     graph = diamond()
-    graph.graph.loc[graph.graph.link_id == 71, "time"] = np.inf
-    graph.set_graph("time")
+    costs = graph.full_costs.copy()
+    costs[graph.mapping.link_ids == 71] = np.inf
+    graph.set_costs(costs)
     choice = RouteChoice(graph)
     supplied = pd.DataFrame(
         {
@@ -660,8 +716,7 @@ def test_without_psl_does_not_validate_or_recost(caplog):
 
 
 def test_recompute_psl_blocks_intermediate_centroid(caplog):
-    graph = Graph()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [11, 12, 13],
             "a_node": [10, 20, 10],
@@ -670,9 +725,9 @@ def test_recompute_psl_blocks_intermediate_centroid(caplog):
             "time": [1.0, 1.0, 3.0],
         }
     )
-    graph.prepare_graph(np.array([10, 20, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(True)
-    graph.set_graph("time")
+    graph = Network(links, centroids=np.array([10, 20, 40])).build_graph(
+        "c", cost="time", compact=True, block_centroid_flows=True
+    )
     assert not graph.has_turn_restrictions  # Without explicit turns, block the centroid node.
     choice = RouteChoice(graph)
     supplied = pd.DataFrame(

@@ -11,7 +11,7 @@ from scipy.sparse import coo_array, issparse
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths import RouteChoice
-from aequilibrae.paths.graph import GraphBase, PreparedGraph
+from aequilibrae.paths.graph import Graph
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class SubAreaAnalysis:
     def __init__(
         self,
-        graph: GraphBase | PreparedGraph,
+        graph: Graph,
         subarea: gpd.GeoDataFrame,
         demand: Union[AequilibraeMatrix, AequilibraeSparseMatrix],
         project=None,
@@ -44,8 +44,8 @@ class SubAreaAnalysis:
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
-        if isinstance(graph, PreparedGraph) and not graph.compact:
-            raise ValueError("Sub-area analysis requires a compact prepared graph")
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         self.graph = graph
         self.sub_area_demand = None
 
@@ -55,29 +55,29 @@ class SubAreaAnalysis:
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        if isinstance(graph, PreparedGraph):
-            self.node_ids = graph.full_node_ids
-            retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
-            edges = pd.DataFrame({
-                "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
-                "a_node": graph.full_tails[retained], "b_node": graph.full_heads[retained],
-            })
-        else:
-            self.node_ids = graph.all_nodes
-            edges = graph.graph.loc[
-                ~graph.graph.link_id.isin(graph.dead_end_links), ["link_id", "direction", "a_node", "b_node"]
-            ]
+        self.node_ids = graph.full_node_ids
+        retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+        edges = pd.DataFrame(
+            {
+                "link_id": graph.full_link_ids[retained],
+                "direction": graph.full_directions[retained],
+                "a_node": graph.full_tails[retained],
+                "b_node": graph.full_heads[retained],
+            }
+        )
         self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
             ["link_id", "direction"]
         )
 
         entering = [
-            edge for edge, link in self.interior_graph.iterrows()
+            edge
+            for edge, link in self.interior_graph.iterrows()
             if self.node_ids[link.a_node] not in self.interior_nodes.index
             and self.node_ids[link.b_node] in self.interior_nodes.index
         ]
         exiting = [
-            edge for edge, link in self.interior_graph.iterrows()
+            edge
+            for edge, link in self.interior_graph.iterrows()
             if self.node_ids[link.a_node] in self.interior_nodes.index
             and self.node_ids[link.b_node] not in self.interior_nodes.index
         ]
@@ -148,9 +148,7 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
-                        through[
-                            (self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods
-                        ] += load
+                        through[(self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods] += load
 
             subarea_od_keys = list(entered) + list(exited) + list(through)
             subarea_od_values = list(entered.values()) + list(exited.values()) + list(through.values())

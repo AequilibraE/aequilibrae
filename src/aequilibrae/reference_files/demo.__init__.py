@@ -17,7 +17,7 @@ State within this module should be avoided as this file may be run multiple time
 import numpy as np
 
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import PreparedGraph
+from aequilibrae.paths.graph import Graph
 
 
 def matrix_summary():
@@ -52,8 +52,8 @@ def graph_summary(graph=None):
         return {}
     return {
         graph.mode: {
-            "num_links": len(graph.full_link_ids) if isinstance(graph, PreparedGraph) else graph.num_links,
-            "num_nodes": len(graph.full_node_ids) if isinstance(graph, PreparedGraph) else graph.num_nodes,
+            "num_links": len(graph.full_link_ids) if isinstance(graph, Graph) else graph.num_links,
+            "num_nodes": len(graph.full_node_ids) if isinstance(graph, Graph) else graph.num_nodes,
             "num_zones": graph.num_zones,
             "compact_num_links": graph.compact_num_links,
             "compact_num_nodes": graph.compact_num_nodes,

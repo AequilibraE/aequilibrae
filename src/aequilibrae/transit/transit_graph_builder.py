@@ -1088,7 +1088,9 @@ class TransitGraphBuilder:
                 res = PathResults(graph, *nodes.iloc[ids].index.values)
 
                 if res.path_nodes is not None:
-                    line = chain_line(start, links.loc[res.path].geometry, end)
+                    # The path holds graph link indices; the project links are indexed by link_id
+                    path_link_ids, _ = res.get_network_links()
+                    line = chain_line(start, links.loc[path_link_ids].geometry, end)
                 else:
                     line = shapely.LineString((start, end))
 

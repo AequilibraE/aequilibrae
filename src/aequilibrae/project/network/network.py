@@ -23,7 +23,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 if TYPE_CHECKING:
-    from aequilibrae.paths.graph import PreparedGraph
+    from aequilibrae.paths.graph import Graph
     from aequilibrae.project import Project
 
 logger = logging.getLogger(__name__)
@@ -186,8 +186,11 @@ class Network(WorkerThread):
             raise ValueError(f"Modes are not available in this network: {sorted(missing)}")
         links, centroids, restrictions, allow_uturns = self._load_graph_data(fields, limit_to_area)
         return Network(
-            links, modes=available if modes is None else modes, centroids=centroids,
-            turn_restrictions=restrictions, allow_uturns=allow_uturns,
+            links,
+            modes=available if modes is None else modes,
+            centroids=centroids,
+            turn_restrictions=restrictions,
+            allow_uturns=allow_uturns,
             lonlat=self.nodes.lonlat.set_index("node_id"),
         )
 
@@ -204,15 +207,20 @@ class Network(WorkerThread):
         compact=False,
         turn_restrictions=None,
         allow_uturns=None,
-    ) -> "PreparedGraph":
+    ) -> "Graph":
         """Build a standalone graph without retaining project connections."""
         if isinstance(skimming, str):
             skimming = [skimming]
         if fields is not None:
             fields = list(dict.fromkeys([*fields, cost, *(skimming or [])]))
         return self.build(fields=fields, modes=[mode], limit_to_area=limit_to_area).build_graph(
-            mode, cost, centroids=centroids, skimming=skimming or (), compact=compact,
-            block_centroid_flows=block_centroid_flows, turn_restrictions=turn_restrictions,
+            mode,
+            cost,
+            centroids=centroids,
+            skimming=skimming or (),
+            compact=compact,
+            block_centroid_flows=block_centroid_flows,
+            turn_restrictions=turn_restrictions,
             allow_uturns=allow_uturns,
         )
 

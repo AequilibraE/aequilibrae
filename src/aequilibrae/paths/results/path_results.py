@@ -3,19 +3,17 @@ import pandas as pd
 
 from aequilibrae.paths.cython.a_star import a_star as run_a_star
 from aequilibrae.paths.cython.a_star import validate_scale
-from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.cython.dijkstra import dijkstra
+from aequilibrae.paths.cython.dijkstra import available_heaps, dijkstra
 from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.skimming import skimming
-from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace, SkimmingWorkspace
-from aequilibrae.paths.graph import GraphBase, PreparedGraph, freeze_graph
+from aequilibrae.paths.cython.workspaces import AStarWorkspace, SearchWorkspace, SkimmingWorkspace
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
-from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
 
 
 class PathResults:
-    """Path computation result holder
+    """Path computation result holder.
 
     .. code-block:: python
 
@@ -31,7 +29,7 @@ class PathResults:
 
     def __init__(
         self,
-        graph: GraphBase | PreparedGraph,
+        graph: Graph,
         origin: int,
         destination: int,
         early_exit: bool = False,
@@ -68,8 +66,8 @@ class PathResults:
                 paths. Use ``estimate_heuristic_scale`` to calculate a conservative coefficient.
 
         :Raises:
-            **ValueError**: If an external node ID is not in the graph snapshot, or required A* coordinates or the
-                explicit scale are invalid.
+            **KeyError**: If an external node ID is not in the graph.
+            **ValueError**: If required A* coordinates or the explicit scale are invalid.
         """
         self._check_search_options(a_star, heuristic, heap, heuristic_scale)
         self._heap = "4ary"
@@ -102,42 +100,35 @@ class PathResults:
         if heap is not None and heap not in available_heaps():
             raise ValueError(f"heap must be one of {available_heaps()}")
 
-    def set_graph_data(self, graph: GraphBase | PreparedGraph, *, coordinates: pd.DataFrame | None = None) -> None:
+    def set_graph_data(self, graph: Graph, *, coordinates: pd.DataFrame | None = None) -> None:
         """
         Prepare graph data for path and skim computation.
 
         :Arguments:
-            **graph** (:obj:`Graph`): Prepared graph with a cost field. Its topology, costs, skim fields, external IDs
-                and longitude/latitude coordinates are copied.
+            **graph** (:obj:`Graph`): Prepared graph with a cost field. Fixed topology, mappings and skim fields are
+                shared.
 
-            **coordinates** (:obj:`pandas.DataFrame`, optional): Planar ``x`` and ``y`` columns indexed by external node
-                ID, copied for Euclidean A*.
+            **coordinates** (:obj:`pandas.DataFrame`, optional): ``x`` and ``y`` columns for Euclidean A*, or ``lon``
+                and ``lat`` columns in degrees for Haversine A*, indexed by external node ID. Copied for later searches.
 
         :Returns:
-            ``None``. The existing result buffers are replaced for the new snapshot and cleared before the next search.
+            ``None``. The existing result buffers are replaced and cleared before the next search.
 
         :Raises:
             **ValueError**: If the graph does not have context-compatible IDs or a required node/link mapping is
                 invalid.
         """
-        if isinstance(graph, GraphBase):
-            graph = freeze_graph(graph, compact=False)
-        context = make_routing_context(graph)
-        self._expansion = None
-        mapping = GraphMapping(context, graph.all_nodes, graph.graph_mapping.link_ids, graph.graph_mapping.directions)
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
+        costs = graph.cost.copy()
+        costs.flags.writeable = False
+        context = graph.routing.with_costs(costs)
         skim_context = graph.skimming
-        if graph.compact:
-            self._expansion = (
-                graph.expansion_indices, graph.expansion_links, graph.full_link_ids, graph.full_directions,
-                graph.full_node_ids, graph.full_heads, graph.full_costs.copy(),
-            )
         coordinates = coordinates.copy() if coordinates is not None else None
-        lonlat = graph.lonlat_index.copy()
 
         self.context = context
-        self._mapping = mapping
+        self._mapping = graph.mapping
         self._coordinates = coordinates
-        self._lonlat = lonlat
         self._a_star_context = None
         self._a_star_context_key = None
         self.nodes = context.node_count
@@ -193,14 +184,14 @@ class PathResults:
             ``None``. The search arrays, skims and traced path are updated in place.
 
         :Raises:
-            **ValueError**: If an external node ID is not in the prepared graph, or required A* coordinates or the
-                explicit scale are invalid.
+            **KeyError**: If an external node ID is not in the prepared graph.
+            **ValueError**: If required A* coordinates or the explicit scale are invalid.
         """
         self._check_search_options(a_star, heuristic, heap, heuristic_scale)
         selected_heap = self._heap if heap is None else heap
         selected_heuristic = self._heuristic if heuristic is None else heuristic
-        origin_index = self._mapping.node_index(origin)
-        destination_index = self._mapping.node_index(destination)
+        origin_index = self._mapping.graph_node(origin)
+        destination_index = self._mapping.graph_node(destination)
         targets = None
 
         if early_exit or a_star:
@@ -213,7 +204,10 @@ class PathResults:
             key = (selected_heuristic, heuristic_scale)
             if self._a_star_context_key != key:
                 self._a_star_context = make_heuristic_context(
-                    self.node_ids, self._coordinates, self._lonlat, selected_heuristic, heuristic_scale
+                    self.node_ids,
+                    self._coordinates,
+                    selected_heuristic,
+                    heuristic_scale,
                 )
                 self._a_star_context_key = key
 
@@ -259,18 +253,18 @@ class PathResults:
             **destination** (:obj:`int`): External ID of the new destination.
 
         :Returns:
-            ``None``. ``path``, ``path_nodes``, ``path_link_directions`` and ``milepost`` are replaced for the requested
-            destination.
+            ``None``. ``path``, ``path_nodes`` and ``milepost`` are replaced for the requested destination.
 
         :Raises:
             **RuntimeError**: If no search has been performed.
-            **ValueError**: If the destination is not in the prepared graph.
+            **KeyError**: If the destination is not in the prepared graph.
         """
-        index = self._mapping.node_index(destination)
+        index = self._mapping.graph_node(destination)
         results = self.search_results
         if results.origin is None:
             raise RuntimeError("Compute a path before updating its trace")
 
+        assert self.origin is not None
         if not results.reachable_to(index) and not results.exhausted:
             self.compute_path(
                 self.origin,
@@ -295,36 +289,37 @@ class PathResults:
 
         links = results.connectors[states[1:]]
 
-        if self._expansion is not None:
-            offsets, expansion, link_ids, directions, nodes, heads, costs = self._expansion
-            expanded = []
-            mileposts = [0.0]
-            labels = results.distances[states]
-            for index, link in enumerate(links):
-                chain = expansion[offsets[link]:offsets[link + 1]]
-                expanded.extend(chain)
-                turn_cost = labels[index + 1] - labels[index] - costs[chain].sum()
-                mileposts.extend(mileposts[-1] + turn_cost + np.cumsum(costs[chain]))
-            expanded = np.asarray(expanded, dtype=np.int64)
-            self.path = link_ids[expanded]
-            self.path_link_directions = directions[expanded]
-            self.path_nodes = np.concatenate(([self._mapping.node_ids[results.origin]], nodes[heads[expanded]]))
-            self.milepost = np.asarray(mileposts)
-        else:
-            self.path = self._mapping.link_ids[links]
-            self.path_link_directions = self._mapping.directions[links]
-            self.path_nodes = self._mapping.path_nodes(results.origin, links)
-            # Stored labels preserve the cost of each actual arrival, including turns.
-            self.milepost = results.distances[states]
+        self.path = links
+        nodes = np.empty(links.size + 1, dtype=np.uintp)
+        nodes[0] = results.origin
+        nodes[1:] = self.context.heads[links]
+        self.path_nodes = self._mapping.network_node(nodes)
+        # Stored labels preserve the cost of each actual arrival, including turns.
+        self.milepost = results.distances[states]
+
+    def get_network_links(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """
+        Return network link IDs and directions for the currently traced path.
+
+        Compact graph links are expanded in traversal order.
+
+        :Returns:
+            A tuple of ``(link_ids, directions)`` arrays, with directions +1 or
+            -1.  Returns ``None`` when no path is available, and two empty
+            arrays for a path from a node to itself.
+        """
+        if self.path is None:
+            return None
+        return self._mapping.expand_links(self.path)
 
     def _clear_path(self) -> None:
         self.path = None
         self.path_nodes = None
-        self.path_link_directions = None
         self.milepost = None
 
     def reset(self) -> None:
-        """Clear search results, paths, labels and skims in place.
+        """
+        Clear search results, paths, labels and skims in place.
 
         :Returns:
             ``None``. Allocated result buffers and their read-only views remain
@@ -387,7 +382,7 @@ class PathResults:
     @property
     def node_ids(self) -> np.ndarray:
         """External node IDs in context and skim destination order."""
-        return self._mapping.node_ids
+        return self._mapping.network_node(np.arange(self.nodes, dtype=np.intp))
 
     @property
     def predecessors(self) -> np.ndarray:

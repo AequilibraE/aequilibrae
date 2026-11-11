@@ -7,8 +7,8 @@ make it as fast as possible, without making it overly complex to use, develop an
 we know that *complex* is subjective.
 
 Running traffic assignment in AequilibraE consists in creating the traffic classes that are going
-to be assigned, add them to a traffic assignment object, set the traffic assignment parameters, and
-run the assignment.
+to be assigned, passing them to a traffic assignment object with the assignment parameters, and
+running the assignment.
 
 ``TrafficClass``
 ----------------
@@ -19,7 +19,7 @@ The required information is:
 
 * **mode**: the network mode identifier (for example ``"c"`` for cars)
 * **cost**: the free-flow generalized cost field used for route choice
-* **demand**: the ``AequilibraeMatrix`` containing OD demand for that class
+* **demand**: the ``AequilibraeMatrix`` or ``AequilibraeSparseMatrix`` containing OD demand for that class
 * **name**: an optional class label; when omitted, it defaults to the mode
 
 .. testsetup::
@@ -58,9 +58,18 @@ It is also possible to set the common assignment parameters during class definit
 
 .. doctest::
 
-    >>> tc_truck = TrafficClass(mode="T", cost="free_flow_time", demand=matrix_truck,
-    ...                      name="truck", pce=2.5, vot=0.35,
-    ...                      fixed_cost_field="distance", fixed_cost_multiplier=1.0)
+    >>> tc_truck = TrafficClass(
+    ...     mode="T",
+    ...     cost="free_flow_time",
+    ...     demand=matrix_truck,
+    ...     name="truck",
+    ...     pce=2.5,
+    ...     vot=0.35,
+    ...     fixed_cost_field="distance",
+    ...     fixed_cost_multiplier=1.0,
+    ...     skimming=("free_flow_time", "distance"),
+    ...     block_centroid_flows=False,
+    ... )
 
 ``TrafficAssignment``
 ---------------------
@@ -86,7 +95,7 @@ current class configuration, then prepares the required routing contexts during 
 * **network**: the source network object or project network containing the links and modes
 * **classes**: one or more fully-specified ``TrafficClass`` objects
 * **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR`` [1]_, ``BPR2``, ``CONICAL`` [2]_,
-  ``INRETS``, or ``AKCELIK``
+  ``INRETS``, or ``AKCELIK``. Or a custom ``VDF`` object.
 * **name_mapping**: parameter names for the VDF, either as network fields or numeric constants
 * **time_field**: link field representing free-flow travel time
 * **capacity_field**: link field representing capacity
@@ -103,7 +112,7 @@ current class configuration, then prepares the required routing contexts during 
     ...     algorithm="bfw",
     ...     name_mapping={"alpha": 0.15, "beta": 4.0},
     ... )
-
+    
 Skimming while assigning
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,22 +123,24 @@ This is the case because, strictly speaking, the equilibrium travel time is the 
 at the end of the last assignment iteration, while the most correct distance and toll skims, for example,
 are those resulting from the blended skim of all iterations.
 
-The user can select the fields they want to skim with the ``skimming`` argument of each ``TrafficClass``, as well as
-save the skims to disk (and the project)
+The user can select the fields they want to skim, as well save the skims to disk (and the project)
 at the end of the assignment procedure, where skims are tagged with suffixes *"_final"* and *"_blended"*
 for easy identification.
 
-::
+The ``skimming`` fields are set on each ``TrafficClass`` before constructing the assignment, as above.
 
-  >>> results = assignment.execute() # doctest: +SKIP
-  >>> assignment.save_skims("one_matrix_name") # doctest: +SKIP
+.. doctest::
+
+  >>> _ = assignment.execute(max_iterations=10, cores=1)
+  >>> assignment.save_skims("one_matrix_name", which_ones="all")
+  ['one_matrix_name_car.omx', 'one_matrix_name_truck.omx']
 
 Unassigned demand
 ~~~~~~~~~~~~~~~~~
 
-Unassigned demand is demand that present within the demand matrix but it's destination was unreachable from the origin,
-it is not loaded on the network and ``traffic_class._aon_results.unassigned_demand`` gives the latest AoN total,
-excluding intrazonal demand. ``traffic_class.results.unassigned_demand`` gives the total of the accepted solution.
+Unassigned demand has an unreachable destination and is not loaded on the network.
+``assignment.class_results["car"].unassigned_demand`` gives the total for the accepted solution,
+excluding intrazonal demand.
 
 Assigning sparse matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -138,7 +149,7 @@ demand matrices, which opens up a significant opportunity to save time during as
 during the path-computation phase of assignment.
 
 AequilibraE is capable of leveraging this opportunity, and it does so automatically whenever the user
-**does NOT set skimming for the assignment or any individual traffic class graphs**.
+**does NOT set skimming fields on the traffic classes**.
 
 In this case, AequilibraE has a convenient method to skim the final iteration of the assignment
 as it had been computed during the assignment itself. This method call requires a new iteration
@@ -151,14 +162,13 @@ of zones and over 100 iterations of assignment.
 
 ::
 
-  >>> results = assignment.execute()
   >>> skims = assignment.skim_congested(skim_fields=["distance"], return_matrices=True)
   >>> assignment.save_skims("another_matrix_name")
   ['another_matrix_name_car.omx', 'another_matrix_name_truck.omx']
 
 The list of fields defined by the user for skimming is added to the congested time and the assignment cost from the last
 iteration of the assignment by default. These matrices are named *__congested_time__* and *__assignment_cost__*
-respectively. The returned values are ``SkimmingOutputs`` objects, also stored in ``traffic_class.congested_skims``.
+respectively. The returned dictionary maps traffic class names to ``SkimmingOutputs`` objects.
 Congested time includes link travel time and turn delay, but excludes fixed costs. Assignment cost includes those fixed
 costs, converted to time units with the traffic classes value of time.
 
@@ -206,8 +216,8 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
     >>> transit = project.scenario.create_transit_database()
     >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)
 
-    # Add the preload to the assignment
-    >>> assignment = TrafficAssignment(..., preload=preload) # doctest: +SKIP
+Pass a nonempty preload table to the assignment constructor using ``preload=preload``.
+The table must contain ``link_id``, ``direction`` and ``preload`` columns; its flow values are in PCE units.
 
 
 Executing an Assignment
@@ -217,7 +227,7 @@ Finally, run traffic assignment!
 
 .. doctest::
 
-  >>> results = assignment.execute()
+  >>> results = assignment.execute(max_iterations=10, cores=1)
 
   >>> project.close()
 

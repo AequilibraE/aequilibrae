@@ -215,11 +215,14 @@ inside_nodes.head()
 # Let's filter those network links to graph links, dropping any dead ends and creating a `link_id`,
 # `dir` multi-index.
 retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
-g = pd.DataFrame({
-    "link_id": graph.full_link_ids[retained], "direction": graph.full_directions[retained],
-    "a_node": graph.full_node_ids[graph.full_tails[retained]],
-    "b_node": graph.full_node_ids[graph.full_heads[retained]],
-})
+g = pd.DataFrame(
+    {
+        "link_id": graph.full_link_ids[retained],
+        "direction": graph.full_directions[retained],
+        "a_node": graph.full_node_ids[graph.full_tails[retained]],
+        "b_node": graph.full_node_ids[graph.full_heads[retained]],
+    }
+)
 g = g.loc[g.link_id.isin(inner_links.link_id)].set_index(["link_id", "direction"])
 g.head()
 

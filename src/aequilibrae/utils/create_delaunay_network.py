@@ -100,8 +100,14 @@ class DelaunayAnalysis:
         network = Network(df, centroids=centroids)
         traffic = TrafficClass(name="delaunay", mode="d", cost="distance", demand=matrix)
         ta = TrafficAssignment(
-            network=network, classes=[traffic], time_field="distance", capacity_field="capacity",
-            vdf=bpr, name_mapping={"alpha": 0.0, "beta": 1.0}, algorithm="all-or-nothing", project=self.project,
+            network=network,
+            classes=[traffic],
+            time_field="distance",
+            capacity_field="capacity",
+            vdf=bpr,
+            name_mapping={"alpha": 0.0, "beta": 1.0},
+            algorithm="all-or-nothing",
+            project=self.project,
         )
         ta.execute()
 

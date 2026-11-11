@@ -13,7 +13,7 @@ from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import GraphBase, PreparedGraph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -33,7 +33,7 @@ class NetworkSimplifier(WorkerThread):
 
         logger.warning("This will alter your database in place. Make sure you have a backup.")
 
-    def simplify(self, graph: GraphBase | PreparedGraph, max_speed_ratio: float = 1.1):
+    def simplify(self, graph: Graph, max_speed_ratio: float = 1.1):
         """
         Simplifies the network by merging links that are shorter than a given threshold
 
@@ -46,22 +46,21 @@ class NetworkSimplifier(WorkerThread):
         self.graph = graph
 
         # Creates the sequence of compressed link IDs so we don't have to rebuild through path computation
-        if isinstance(graph, PreparedGraph):
-            if not graph.compact:
-                raise ValueError("Network simplification requires a compact graph")
-            compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
-            correspondence = pd.DataFrame({
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
+
+        if not graph.compact:
+            raise ValueError("Network simplification requires a compact graph")
+        compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
+        correspondence = pd.DataFrame(
+            {
                 "link_id": graph.full_link_ids,
                 "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
-            })
-            link_set_df = self.link_layer.merge(correspondence, on="link_id")
-            graph_link_ids = graph.full_link_ids
-            centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]
-        else:
-            compressed_idx, compressed_link_data, _ = self.graph.create_compressed_link_network_mapping()
-            link_set_df = self.graph.network.merge(self.graph.graph[["link_id", "__compressed_id__"]], on="link_id")
-            graph_link_ids = self.graph.graph.link_id.to_numpy()
-            centroid_connectors = self.graph.network.query("link_id not in @self.link_layer.link_id").link_id.to_numpy()
+            }
+        )
+        link_set_df = self.link_layer.merge(correspondence, on="link_id")
+        graph_link_ids = graph.full_link_ids
+        centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]
 
         # compressed_ids that appear for more than one link
         relevant_compressed_ids = pd.DataFrame(link_set_df.value_counts("__compressed_id__")).query("count>1").index

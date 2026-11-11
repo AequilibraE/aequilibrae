@@ -17,7 +17,7 @@ choice set generation and path-size logit calculations.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph.Graph.set_turn_restrictions`
+#     * :class:`aequilibrae.paths.network.Network`
 #     * :func:`aequilibrae.paths.route_choice.RouteChoice`
 
 # %%
@@ -25,12 +25,11 @@ choice set generation and path-size logit calculations.
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Graph, RouteChoice
+from aequilibrae.paths import Network, RouteChoice
 
 # %%
 # Create a small network with two routes from node 10 to node 40.
-graph = Graph()
-graph.network = pd.DataFrame(
+links = pd.DataFrame(
     {
         "link_id": [71, 12, 55, 24],
         "a_node": [10, 20, 10, 30],
@@ -39,22 +38,19 @@ graph.network = pd.DataFrame(
         "time": [1.0, 1.0, 2.0, 2.0],
     }
 )
-graph.prepare_graph(np.array([10, 20, 30, 40]), remove_dead_ends=False)
-graph.set_blocked_centroid_flows(False)
-graph.set_graph("time")
 
 # %%
-# Add a five-unit turn penalty to the direct route.
-graph.set_turn_restrictions(
-    pd.DataFrame(
-        {
-            "from_node": [10],
-            "via_node": [20],
-            "to_node": [40],
-            "penalty": [5.0],
-        }
-    )
+# Add a five-unit turn penalty to the direct route before building the graph.
+turns = pd.DataFrame(
+    {
+        "from_node": [10],
+        "via_node": [20],
+        "to_node": [40],
+        "penalty": [5.0],
+    }
 )
+network = Network(links, centroids=np.array([10, 20, 30, 40]), turn_restrictions=turns)
+graph = network.build_graph("c", cost="time", compact=True, block_centroid_flows=False)
 
 # %%
 # Generate the route choice set. The direct route has a cost of 2 plus the
@@ -64,7 +60,7 @@ rc.set_choice_set_generation("bfsle", max_routes=2, max_depth=5)
 rc.execute_single(10, 40, demand=1.0)
 
 route_choice_results = rc.get_results()
-route_choice_results
+print(route_choice_results)
 
 # %%
 # We can also recalculate path-size logit results for routes imported from
@@ -83,4 +79,4 @@ imported_routes = pd.DataFrame(
 # connectivity and turn restrictions before calculating costs, overlap and
 # probabilities.
 imported_results = rc.recompute_psl(imported_routes)
-imported_results
+print(imported_results)

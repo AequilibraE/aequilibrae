@@ -18,7 +18,8 @@ def p_results(sioux_falls_example):
 
     matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
-    yield {"project": project, "g": graph, "matrix": matrix}
+    coordinates = project.network.nodes.lonlat.set_index("node_id")
+    yield {"project": project, "g": graph, "matrix": matrix, "coordinates": coordinates}
 
 
 def test_reset(p_results):
@@ -27,7 +28,7 @@ def test_reset(p_results):
 
     assert result.path is None
     assert result.path_nodes is None
-    assert result.path_link_directions is None
+    assert result.get_network_links() is None
     assert result.milepost is None
     assert np.all(result.predecessors == result.search_results.sentinel)
     assert np.all(result.connectors == result.search_results.sentinel)
@@ -40,14 +41,15 @@ def test_reset(p_results):
 
 def test_compute_paths(p_results):
     graph = p_results["g"]
-    result = PathResults(graph, origin, dest, early_exit=True)
+    coordinates = p_results["coordinates"]
+    result = PathResults(graph, origin, dest, early_exit=True, coordinates=coordinates)
 
     for early_exit in [True, False]:
         for a_star, heuristic in [(False, None), (True, "haversine")]:
-            scale = estimate_heuristic_scale(graph, heuristic=heuristic) if a_star else None
+            scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic) if a_star else None
             result.compute_path(5, 2, early_exit=early_exit, a_star=a_star, heuristic=heuristic, heuristic_scale=scale)
-            assert list(result.path) == [12, 14]
-            assert list(result.path_link_directions) == [1, 1]
+            np.testing.assert_array_equal(result.path, graph.mapping.graph_link([12, 14], 1))
+            np.testing.assert_array_equal(result.get_network_links(), ([12, 14], [1, 1]))
             assert list(result.path_nodes) == [5, 6, 2]
             assert list(result.milepost) == [0, 4, 9]
 
@@ -67,8 +69,8 @@ def test_update_trace(p_results, heap):
     for early_exit in [True, False]:
         result = PathResults(graph, origin, 2, early_exit=early_exit, heap=heap)
         result.update_trace(10)
-        assert list(result.path) == [13, 25]
-        assert list(result.path_link_directions) == [1, 1]
+        np.testing.assert_array_equal(result.path, graph.mapping.graph_link([13, 25], 1))
+        np.testing.assert_array_equal(result.get_network_links(), ([13, 25], [1, 1]))
         assert list(result.path_nodes) == [5, 9, 10]
         assert list(result.milepost) == [0, 5, 8]
 
@@ -93,7 +95,7 @@ def test_triangle_compute_paths(triangle_blocking_setup):
         for origin_id, destination, nodes, links in expected:
             result = PathResults(graph, origin_id, destination, early_exit=early_exit)
             assert list(result.path_nodes) == nodes
-            assert list(result.path) == links
+            assert list(result.get_network_links()[0]) == links
 
 
 def test_triangle_compute_blocking_paths(triangle_blocking_setup):
@@ -110,7 +112,7 @@ def test_triangle_compute_blocking_paths(triangle_blocking_setup):
         for origin_id, destination, nodes, links in expected:
             result = PathResults(graph, origin_id, destination, early_exit=early_exit)
             assert list(result.path_nodes) == nodes
-            assert list(result.path) == links
+            assert list(result.get_network_links()[0]) == links
 
 
 def test_triangle_update_trace(triangle_blocking_setup):
@@ -118,10 +120,10 @@ def test_triangle_update_trace(triangle_blocking_setup):
     for early_exit in [True, False]:
         result = PathResults(graph, 1, 2, early_exit=early_exit)
         assert list(result.path_nodes) == [1, 3, 2]
-        assert list(result.path) == [1, 2]
+        assert list(result.get_network_links()[0]) == [1, 2]
         result.update_trace(3)
         assert list(result.path_nodes) == [1, 3]
-        assert list(result.path) == [1]
+        assert list(result.get_network_links()[0]) == [1]
 
 
 def test_triangle_update_blocking_trace(triangle_blocking_setup):
@@ -129,28 +131,28 @@ def test_triangle_update_blocking_trace(triangle_blocking_setup):
     for early_exit in [True, False]:
         result = PathResults(graph, 4, 5, early_exit=early_exit)
         assert list(result.path_nodes) == [4, 1, 3, 2, 5]
-        assert list(result.path) == [4, 1, 2, 5]
+        assert list(result.get_network_links()[0]) == [4, 1, 2, 5]
         result.update_trace(6)
         assert list(result.path_nodes) == [4, 1, 3, 6]
-        assert list(result.path) == [4, 1, 6]
+        assert list(result.get_network_links()[0]) == [4, 1, 6]
 
 
 def test_triangle_update_trace_early_exit(triangle_blocking_setup):
     result = PathResults(triangle_blocking_setup["g"], 1, 6, early_exit=True)
     assert list(result.path_nodes) == [1, 3, 6]
-    assert list(result.path) == [1, 6]
+    assert list(result.get_network_links()[0]) == [1, 6]
     result.update_trace(2)
     assert list(result.path_nodes) == [1, 3, 2]
-    assert list(result.path) == [1, 2]
+    assert list(result.get_network_links()[0]) == [1, 2]
 
 
 def test_triangle_update_trace_full(triangle_blocking_setup):
     result = PathResults(triangle_blocking_setup["g"], 1, 6, early_exit=False)
     assert list(result.path_nodes) == [1, 3, 6]
-    assert list(result.path) == [1, 6]
+    assert list(result.get_network_links()[0]) == [1, 6]
     result.update_trace(2)
     assert list(result.path_nodes) == [1, 3, 2]
-    assert list(result.path) == [1, 2]
+    assert list(result.get_network_links()[0]) == [1, 2]
 
 
 def test_compute_paths_centroid_last_node_id(st_varent):

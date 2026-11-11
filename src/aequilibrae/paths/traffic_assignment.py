@@ -4,13 +4,13 @@ import socket
 from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from numpy import nan_to_num
-from scipy.sparse import csr_array
+from scipy.sparse import coo_array
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
@@ -18,10 +18,10 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.paths.assignment_context import PreparedTrafficClass, validate_assignment_demand
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.network import Network
-from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
-from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
+from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
 from aequilibrae.paths.vdf import VDF
+from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores
 
 
@@ -64,7 +64,7 @@ class AssignmentBase(ABC):
 
         self.parameters = proj.parameters if proj else Parameters().parameters
 
-        self.classes: List[TrafficClass] = []
+        self.classes: list[TrafficClass] = []
         self.algorithm: str = None
         self.time_field: str = None
         self.assignment: Union[LinearApproximation, OptimalStrategies] = None
@@ -170,7 +170,6 @@ class TrafficAssignment(AssignmentBase):
 
         # skims are here
         >>> avg_skims = assig.class_results['car'].skims # blended ones
-        >>> last_skims = assig._class_states[0]._aon_results.skims # those for the last iteration
 
         >>> project.close()
 
@@ -250,6 +249,8 @@ class TrafficAssignment(AssignmentBase):
         }
         self.network = self._load_network()
         self._validate_network_configuration(self.network)
+        for cls in self.classes:
+            validate_assignment_demand(cls.demand, cls.demand.index)
 
     @property
     def class_results(self):
@@ -262,7 +263,14 @@ class TrafficAssignment(AssignmentBase):
         return {name: results.skims for name, results in self.class_results.items()}
 
     def _validate_network_configuration(self, network):
-        field_values = network.field_values
+        fields = [self.time_field, self.capacity_field]
+        for cls in self.classes:
+            fields.extend([cls.cost, *cls.skimming])
+            if cls.fixed_cost_field:
+                fields.append(cls.fixed_cost_field)
+        fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
+        field_arrays = network._field_arrays(fields)
+        field_values = field_arrays.__getitem__
         for field in (self.time_field, self.capacity_field):
             values = field_values(field)
             if not np.isfinite(values).all() or np.any(values <= 0):
@@ -273,7 +281,6 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"No links are available for mode '{cls.mode}'")
             network.validate_centroids(cls.demand.index)
             network._validate_turns(cls.mode)
-            validate_assignment_demand(cls.demand, cls.demand.index)
             for field in [cls.cost, *cls.skimming]:
                 values = field_values(field)
                 if not np.isfinite(values).all() or np.any(values < 0):
@@ -299,6 +306,7 @@ class TrafficAssignment(AssignmentBase):
             arrays[name] = field_values(value) if isinstance(value, str) else np.array([value], dtype=float)
         self._validate_vdf_arrays(arrays)
         self._validate_network_preload(network)
+        return field_arrays
 
     def _validate_network_preload(self, network):
         preload = self.preload
@@ -385,7 +393,7 @@ class TrafficAssignment(AssignmentBase):
         if isinstance(cores, bool):
             raise ValueError("cores must be an integer")
         network = self.network.copy()
-        self._validate_network_configuration(network)
+        fields = self._validate_network_configuration(network)
         self.max_iter = max_iterations
         self.rgap_target = float(rgap)
         self.bfw_conjugacy = bfw_conjugacy.lower()
@@ -394,7 +402,7 @@ class TrafficAssignment(AssignmentBase):
         self._prepared_network = network
         states = []
         for cls in self.classes:
-            state = PreparedTrafficClass(cls, network)
+            state = PreparedTrafficClass(cls, network, fields)
             for results in (state.results, state._aon_results):
                 results.set_cores(self.cores, threading_threshold, elementwise_cores)
             states.append(state)
@@ -402,12 +410,13 @@ class TrafficAssignment(AssignmentBase):
         first = states[0]
         self.elementwise_cores = first.results.elementwise_cores
         self.threading_threshold = first.results.threading_threshold
-        self.free_flow_tt = self._network_field(self.time_field)
-        self.capacity = self._network_field(self.capacity_field)
+        # VDF memoryviews need writable buffers, separate from shared class attributes.
+        self.free_flow_tt = fields[self.time_field].copy()
+        self.capacity = fields[self.capacity_field].copy()
         self.total_flow = np.zeros_like(self.free_flow_tt)
         self.congested_time = self.free_flow_tt.copy()
         self.vdf_parameters = {
-            name: self._network_field(value) if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
+            name: fields[value].copy() if isinstance(value, str) else np.full_like(self.free_flow_tt, value)
             for name, value in self._vdf_sources.items()
         }
         self.assignment = LinearApproximation(self, self.algorithm, project=self.project)
@@ -434,11 +443,6 @@ class TrafficAssignment(AssignmentBase):
             fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
             return self.network.build(fields=list(dict.fromkeys(fields)))
         return self.network.copy()
-
-    def _network_field(self, field):
-        # VDF callables receive writable memoryviews. Keep their buffers separate
-        # from the immutable attributes shared by class routing inputs.
-        return self._prepared_network.field_values(field).copy()
 
     def _prepare_preload(self):
         if self.preload is None:
@@ -663,7 +667,7 @@ class TrafficAssignment(AssignmentBase):
             "Target RGap": self.rgap_target,
         }
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[str]:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> list[str]:
         """Saves the skims (if any) to the project's matrix folder
 
         :Arguments:
@@ -723,7 +727,7 @@ class TrafficAssignment(AssignmentBase):
                 output_matrices.update({f"{core}_final": values for core, values in last_skims.items()})
             if which_ones in ["blended", "all"]:
                 output_matrices.update({f"{core}_blended": values for core, values in avg_skims.items()})
-            out_skims = AequilibraeMatrix(index=cls.graph.mapping.centroids)
+            out_skims = AequilibraeMatrix(index=cls.configuration.demand.index)
             out_skims.update(output_matrices)
             description = f"Skimming for assignment procedure. Class {cls.configuration.name}"
             out_skims.metadata["description"] = description
@@ -740,7 +744,7 @@ class TrafficAssignment(AssignmentBase):
 
         return file_names
 
-    def select_link_flows(self) -> Dict[str, pd.DataFrame]:
+    def select_link_flows(self) -> dict[str, pd.DataFrame]:
         """
         Returns a dataframe of the select link flows for each class
         """
@@ -807,29 +811,26 @@ class TrafficAssignment(AssignmentBase):
         if path.isfile(export_name):
             raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        # if mats.get_matrix(matrix_name, default=False):
-        #     raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
-
         selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
         if not selected_classes:
             return
-        centroids = np.unique(np.concatenate([cls.graph.mapping.centroids for cls in selected_classes]))
+        centroids = np.unique(np.concatenate([cls.configuration.demand.index for cls in selected_classes]))
         matrices = {}
         for cls in selected_classes:
-            source_centroids = cls.graph.mapping.centroids
-            positions = np.searchsorted(centroids, source_centroids)
-            for name, values in cls.results.select_link_od.matrices.items():
+            selected = cls.results.select_link_od
+            positions = np.searchsorted(centroids, cls.configuration.demand.index)
+            for name, values in selected.matrices.items():
                 for class_name, matrix in values.items():
-                    key = f"{name}_{cls.configuration.name}_{class_name}"
+                    key = f"{name}_{cls._id}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    if not np.array_equal(source_centroids, centroids):
-                        matrix = matrix.tocoo()
-                        matrix = csr_array(
-                            (matrix.data, (positions[matrix.row], positions[matrix.col])),
-                            shape=(len(centroids), len(centroids)),
-                        )
-                    matrices[key] = matrix
+                    # Each class may have a different zone order and subset.
+                    # Remap sparse coordinates into the shared export index.
+                    entries = matrix.tocoo()
+                    matrices[key] = coo_array(
+                        (entries.data, (positions[entries.row], positions[entries.col])),
+                        shape=(len(centroids), len(centroids)),
+                    ).tocsr()
         if not matrices:
             return
         out_skims = AequilibraeSparseMatrix(index=centroids)
@@ -856,28 +857,28 @@ class TransitAssignment(AssignmentBase):
 
         self._config["Skimming Fields"] = None
 
-    def set_classes(self, classes: List[TransportClassBase]) -> None:
+    def set_classes(self, classes: list[TransitClass]) -> None:
         """
-        Sets Transport classes to be assigned
+        Sets Transit classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TransportClassBase]`): List of TransportClass's for assignment
+            **classes** (:obj:`List[TransitClass]`): List of TransitClass's for assignment
         """
 
         ids = {x._id for x in classes}
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
-        self.classes = classes  # type: List[TransportClassBase]
+        self.classes = classes  # type: List[TransitClass]
         if "Skimming Fields" in self._config:
             for transport_class in self.classes:
                 transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
-    def add_class(self, transport_class: TransportClassBase) -> None:
+    def add_class(self, transport_class: TransitClass) -> None:
         """
-        Adds a Transport class to the assignment
+        Adds a Transit class to the assignment
 
         :Arguments:
-            **transport_class** (:obj:`TransportClassBase`): Transport class
+            **transport_class** (:obj:`TransitClass`): Transit class
         """
 
         ids = [x._id for x in self.classes if x._id == transport_class._id]
@@ -891,7 +892,7 @@ class TransitAssignment(AssignmentBase):
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
         if not self.classes:
-            raise ValueError("You need add at least one transport class first")
+            raise ValueError("You need add at least one transit class first")
 
         for c in self.classes:
             if field not in c.graph.graph.columns:
@@ -1050,7 +1051,7 @@ class TransitAssignment(AssignmentBase):
             results.insert(0, "period_id", periods.pop())
         return results
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> List[str]:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> list[str]:
         """Saves the skims of each class to the project's matrix folder
 
         Each class gets a ``{matrix_name}_{class}.omx`` file, whose metadata records the class's period, graph

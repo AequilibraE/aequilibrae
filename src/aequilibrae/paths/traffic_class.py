@@ -1,5 +1,4 @@
 import warnings
-from abc import ABC
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -11,61 +10,9 @@ import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
 from aequilibrae.paths.assignment_context import validate_assignment_demand
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.paths.graph import GraphBase, TransitGraph
+from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.paths.transit_costing import TransitCosting
 from aequilibrae.paths.results import TransitAssignmentResults
-
-
-class TransportClassBase(ABC):  # noqa: B024
-    _matrix_types = (AequilibraeMatrix,)
-
-    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
-        """
-        Instantiates the class
-
-        :Arguments:
-            **name** (:obj:`str`): UNIQUE class name.
-
-            **graph** (:obj:`Graph`): Class/mode-specific graph
-
-            **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Class/mode-specific matrix.
-            Supports multiple user classes
-        """
-        if not isinstance(matrix, self._matrix_types):
-            names = " or ".join(matrix_type.__name__ for matrix_type in self._matrix_types)
-            raise TypeError(f"Matrix must be an {names}")
-        if not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-        if any(values.dtype != np.float64 for values in matrix.values()):
-            raise TypeError("Matrix values need to be of type np.float64")
-        self._config = {}
-        self.graph = graph
-        self.matrix = matrix
-        self._id = name
-
-        graph_config = {
-            "Mode": graph.mode,
-            "Block through centroids": graph.block_centroid_flows,
-            "Number of centroids": graph.num_zones,
-            "Links": graph.num_links,
-            "Nodes": graph.num_nodes,
-        }
-        self._config["Graph"] = str(graph_config)
-
-        matrix_names = tuple(matrix)
-        mat_config = {
-            "Source": matrix.metadata.get("source", ""),
-            "Number of centroids": len(matrix.index),
-            "Matrix cores": matrix_names,
-        }
-
-        mat_config["Matrix totals"] = matrix.totals()
-        self._config["Matrix"] = str(mat_config)
-
-    @property
-    def info(self) -> dict:
-        config = deepcopy(self._config)
-        return {self._id: config}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -76,8 +23,8 @@ class TrafficClass:
     the change in travel time. Fixed costs are multiplied by
     ``fixed_cost_multiplier`` and divided by ``vot``.
 
-    Demand is a dense or sparse matrix of float64 values. ``name`` defaults to
-    the mode. Classes with the same mode need distinct names.
+    Demand matrices must contain float64 values. ``name`` defaults to the
+    mode. Classes with the same mode need distinct names.
 
     .. code-block:: python
 
@@ -149,6 +96,8 @@ class TrafficClass:
             if " " in name:
                 warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
                 name = "_".join(name.split(" "))
+            if name in selections:
+                raise ValueError(f"Duplicate select-link set name after replacing spaces: {name}")
             links = []
             for member in members:
                 link, direction = (member, 0) if isinstance(member, (int, np.integer)) else member
@@ -178,11 +127,11 @@ class TrafficClass:
             "Value-of-time": self.vot,
             "Fixed cost field": self.fixed_cost_field,
             "Fixed cost multiplier": self.fixed_cost_multiplier,
-            "matrix_totals": self.demand.totals(),
+            "matrix_totals": {name: float(values.sum()) for name, values in self.demand.items()},
         }
 
 
-class TransitClass(TransportClassBase):
+class TransitClass:
     """A transit demand class and the costing it is assigned with.
 
     On a graph from ``TransitGraphBuilder``, the class evaluates ``costing`` into edge costs and frequencies, and
@@ -218,8 +167,6 @@ class TransitClass(TransportClassBase):
         ``TransitCosting()`` on graphs from ``TransitGraphBuilder``.
     """
 
-    _matrix_types = (AequilibraeMatrix, AequilibraeSparseMatrix)
-
     def __init__(
         self,
         name: str,
@@ -227,14 +174,35 @@ class TransitClass(TransportClassBase):
         matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
         costing: TransitCosting | None = None,
     ):
-        super().__init__(name, graph, matrix)
+        if not isinstance(name, str) or not name:
+            raise ValueError("name must be a nonempty string")
+        if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("Matrix must be an AequilibraeMatrix or AequilibraeSparseMatrix")
+        if not np.array_equal(matrix.index, graph.centroids):
+            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
+        if any(values.dtype != np.float64 for values in matrix.values()):
+            raise TypeError("Matrix values need to be of type np.float64")
         if len(matrix) != 1:
             raise ValueError("Transit assignment requires exactly one demand matrix per class")
         validate_assignment_demand(matrix, graph.centroids)
-        self._config["Graph"] = str(graph._config)
+
+        self.graph = graph
+        self.matrix = matrix
+        self._id = name
+        mat_config = {
+            "Source": matrix.metadata.get("source", ""),
+            "Number of centroids": len(matrix.index),
+            "Matrix cores": tuple(matrix),
+            "Matrix totals": matrix.totals(),
+        }
+        self._config = {"Graph": str(graph._config), "Matrix": str(mat_config)}
         self.results = TransitAssignmentResults()
 
         self.set_costing(costing)
+
+    @property
+    def info(self) -> dict:
+        return {self._id: deepcopy(self._config)}
 
     def set_costing(self, costing: TransitCosting | None = None) -> None:
         """Set how the class perceives the graph, and write the resulting costs to the graph's fields.

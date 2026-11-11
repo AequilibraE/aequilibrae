@@ -5,9 +5,8 @@ from uuid import uuid4
 import numpy as np
 
 from aequilibrae.paths.cython.network_skimming_core import skimming_parallel
-from aequilibrae.paths.graph import GraphBase, freeze_graph
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.core_setter import clamp_cores
 from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
@@ -44,7 +43,9 @@ class NetworkSkimming(WorkerThread):
 
     signal = SIGNAL(object)
 
-    def __init__(self, graph, origins=None, project=None):
+    def __init__(self, graph: Graph, origins=None, project=None):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         WorkerThread.__init__(self, None)
         self.project = project
         self.origins = origins
@@ -76,31 +77,24 @@ class NetworkSkimming(WorkerThread):
             self.signal.emit(["finished"])
             return
 
-        graph = freeze_graph(self.graph, compact=True) if isinstance(self.graph, GraphBase) else self.graph
-        routing = make_routing_context(graph)
+        graph = self.graph
+        routing = graph.routing
 
         # The routing objective includes turn penalties. Other fields are plain
-        # compact link sums, as in PathResults.
+        # graph link sums.
         inputs = graph.skimming
-        nodes_to_indices = graph.nodes_to_indices
         output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
         # Keep the requested field order and centroid index while sharing the
         # origin-major output buffer with the public AequilibraeMatrix.
         self.results.prepare(graph, output=output)
 
         origins = []
-        for row, orig in enumerate(graph.centroids):
-            if orig >= len(nodes_to_indices):
-                self.report.append(f"Centroid {orig} is outside the compact graph")
-                continue
-
-            node = int(nodes_to_indices[orig])
-            if node < 0 or node >= routing.node_count:
-                self.report.append(f"Centroid {orig} is outside the compact graph")
-            elif routing.fs[node] == routing.fs[node + 1]:
+        # Centroids occupy the graph-node prefix in the supplied demand order.
+        for node, orig in enumerate(graph.centroids):
+            if routing.fs[node] == routing.fs[node + 1]:
                 self.report.append(f"Centroid {orig} has no outgoing edges")
             else:
-                origins.append((row, node))
+                origins.append((node, node))
 
         skimming_parallel(
             routing,
