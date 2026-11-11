@@ -19,7 +19,6 @@ import pandas as pd
 from aequilibrae.paths.connectivity_analysis import disconnected_analysis
 from aequilibrae.paths.cython.context import GraphContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
-from aequilibrae.paths.cython.parallel_numpy import aggregate_link_costs, project_link_loads
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 from aequilibrae.paths.mapping import GraphMapping
 
@@ -1634,52 +1633,6 @@ def _build_directed_graph(
     fs = _build_forward_star(graph, num_nodes) if build_fs else None
 
     return all_nodes, nodes_to_indices, fs, graph
-
-
-class AssignmentMapping:
-    """Map compact assignment loads to full-network reporting order.
-
-    This is separate from GraphMapping, whose IDs describe only context links.
-    """
-
-    def __init__(self, centroids, link_ids, directions, crosswalk, compact_link_count):
-        self.centroids = np.array(centroids, copy=True)
-        self.link_ids = np.array(link_ids, dtype=np.int64, copy=True)
-        self.directions = np.array(directions, dtype=np.int8, copy=True)
-        self.crosswalk = np.array(crosswalk, dtype=np.int64, copy=True)
-        self.network_indices = _get_graph_to_network_mapping(self.link_ids, self.directions)
-        self.link_count = len(self.link_ids)
-        self.compact_link_count = compact_link_count
-        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact_link_count):
-            raise ValueError("Invalid compact link mapping")
-        for values in (self.centroids, self.link_ids, self.directions, self.crosswalk):
-            values.flags.writeable = False
-
-    def aggregate_costs(self, full_costs: np.ndarray, compact_costs: np.ndarray) -> None:
-        aggregate_link_costs(full_costs, compact_costs, self.crosswalk)
-
-    def project_loads(
-        self, compact: np.ndarray, output: np.ndarray, cores: int = 1, threading_threshold: int = 10000
-    ) -> None:
-        if cores < 1:
-            raise ValueError("cores must be positive")
-        if output.ndim != 2 or compact.ndim != 2:
-            raise ValueError("compact and output must be two-dimensional")
-        if output.shape[0] != self.link_count or compact.shape[0] != self.compact_link_count:
-            raise ValueError("projection link counts must match the assignment context")
-        if output.shape[1] != compact.shape[1]:
-            raise ValueError("projection class counts must match")
-        if np.any(self.crosswalk < 0) or np.any(self.crosswalk > compact.shape[0]):
-            raise ValueError("crosswalk contains an invalid compact link")
-
-        project_link_loads(output, compact, self.crosswalk, cores, threading_threshold)
-
-    def full_loads(self, compact: np.ndarray) -> np.ndarray:
-        """Make a reporting snapshot in supernetwork order."""
-        output = np.empty((self.link_count, compact.shape[1]), dtype=np.float64)
-        self.project_loads(compact, output)
-        output.flags.writeable = False
-        return output
 
 
 def _prepare_network_graph(graph, mode, centroids, restrictions, block_centroid_flows, allow_uturns):

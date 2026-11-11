@@ -392,7 +392,7 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("steps_below_needed_to_terminate must be a positive integer")
         if isinstance(cores, bool):
             raise ValueError("cores must be an integer")
-        network = self.network.copy()
+        network = self.network
         fields = self._validate_network_configuration(network)
         self.max_iter = max_iterations
         self.rgap_target = float(rgap)
@@ -442,7 +442,7 @@ class TrafficAssignment(AssignmentBase):
                     fields.append(cls.fixed_cost_field)
             fields.extend(value for value in self._vdf_sources.values() if isinstance(value, str))
             return self.network.build(fields=list(dict.fromkeys(fields)))
-        return self.network.copy()
+        return self.network
 
     def _prepare_preload(self):
         if self.preload is None:

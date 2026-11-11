@@ -13,7 +13,8 @@ from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext,
 from aequilibrae.paths.cython.demand import assignment_demand
 from aequilibrae.paths.cython.outputs import SkimmingOutputs
 from aequilibrae.paths.cython.parallel_numpy import sum_axis1
-from aequilibrae.paths.graph import AssignmentMapping, Graph
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.mapping import GraphMapping
 
 if TYPE_CHECKING:
     from aequilibrae.paths.cython.outputs import AoNOutputs
@@ -67,7 +68,7 @@ class AssignmentState:
     """
 
     def __init__(
-        self, output: AoNOutputs, mapping: AssignmentMapping, cores: int, threading_threshold: int, skim_layout=None
+        self, output: AoNOutputs, mapping: GraphMapping, cores: int, threading_threshold: int, skim_layout=None
     ):
         self.skim_layout = skim_layout
         self._skim_cache = None
@@ -75,15 +76,13 @@ class AssignmentState:
         self.mapping = mapping
         self.cores = cores
         self.threading_threshold = threading_threshold
-        self.compact_totals = np.zeros(mapping.compact_link_count, dtype=np.float64)
-        self.total_link_loads = np.zeros(mapping.link_count, dtype=np.float64)
+        self.graph_totals = np.zeros(mapping.link_count, dtype=np.float64)
+        self.total_link_loads = np.zeros(mapping.network.link_count, dtype=np.float64)
 
     def update_totals(self) -> None:
         self._skim_cache = None
-        sum_axis1(self.compact_totals, self.output.loading.link_loads, self.cores, self.threading_threshold)
-        self.mapping.project_loads(
-            self.compact_totals[:, None], self.total_link_loads[:, None], self.cores, self.threading_threshold
-        )
+        sum_axis1(self.graph_totals, self.output.loading.link_loads, self.cores, self.threading_threshold)
+        self.mapping.project_loads(self.graph_totals, out=self.total_link_loads)
 
     @property
     def skims(self):
@@ -118,11 +117,11 @@ class AssignmentInputs:
         select_link_od=True,
     ):
         self.mapping = graph.mapping
-        self.demand = assignment_demand(matrix, self.mapping.centroids)
+        self.demand = assignment_demand(matrix, graph.centroids)
         self.class_names = tuple(matrix)
-        links = self.mapping.compact_link_count
+        links = self.mapping.link_count
         self.costs = np.zeros(links, dtype=np.float64)
-        self.full_costs = np.zeros(self.mapping.link_count, dtype=np.float64)
+        self.full_costs = np.zeros(self.mapping.network.link_count, dtype=np.float64)
         self.routing = graph.routing.with_costs(self.costs)
         fields = {}
         self.time_skim = None
@@ -136,7 +135,7 @@ class AssignmentInputs:
             if name == time_field:
                 self.time_skim = values
             else:
-                self.mapping.aggregate_costs(field_values(name), values)
+                self.mapping.aggregate_costs(field_values(name), out=values)
             fields[name] = values
         turn_cost_name = None
         if self.time_skim is not None and isinstance(self.routing, TurnBasedContext):
@@ -145,12 +144,8 @@ class AssignmentInputs:
                 turn_cost_name = "_" + turn_cost_name
         self.skim_layout = SkimLayout(time_field, turn_cost_name)
         self.skimming = SkimmingContext(links, link_fields=fields, cost_name=cost_label, turn_cost_name=turn_cost_name)
-        # A selected link removed by compression can never be used by a path.
-        selections = {}
-        for name, indices in selected_links.items():
-            indices = np.asarray(indices)
-            selections[name] = indices[indices != links]
-        self.selection = SelectLinkContext(links, selections)
+        # Graph selections already exclude links removed by graph reductions.
+        self.selection = SelectLinkContext(links, selected_links)
         self.driver = PreparedAoN(
             self.routing,
             self.demand,
@@ -163,10 +158,10 @@ class AssignmentInputs:
 
     def update_costs(self, congested_time: np.ndarray, fixed_cost: np.ndarray) -> None:
         np.add(congested_time, fixed_cost, out=self.full_costs)
-        self.mapping.aggregate_costs(self.full_costs, self.costs)
+        self.mapping.aggregate_costs(self.full_costs, out=self.costs)
         self.routing.update_costs(self.costs)
         if self.time_skim is not None:
-            self.mapping.aggregate_costs(congested_time, self.time_skim)
+            self.mapping.aggregate_costs(congested_time, out=self.time_skim)
 
     def report_skims(self, output: SkimmingOutputs) -> SkimmingOutputs:
         """Add turn delay to a separate travel-time skim, without changing raw outputs."""
@@ -190,7 +185,7 @@ class PreparedTrafficClass:
         self._aon_results = AssignmentResults()
         self.results.set_heap(configuration.heap)
         self._aon_results.set_heap(configuration.heap)
-        self.fixed_cost = np.zeros(self.graph.mapping.link_count, dtype=np.float64)
+        self.fixed_cost = np.zeros(self.graph.mapping.network.link_count, dtype=np.float64)
         self.congested_time = np.array([])
         self.congested_skims = None
         self._selected_links = self.graph.selected_links(configuration.select_link_sets)

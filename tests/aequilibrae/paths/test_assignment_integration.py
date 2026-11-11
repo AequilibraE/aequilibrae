@@ -318,13 +318,13 @@ def test_shared_graph_classes_have_independent_cost_buffers():
     assert first.mapping is second.mapping is prepared.mapping
     assert np.shares_memory(first.routing.fs, second.routing.fs)
     assert np.shares_memory(first.routing.heads, second.routing.heads)
-    first.update_costs(np.ones(graph.num_links), np.zeros(graph.num_links))
-    second.update_costs(np.full(graph.num_links, 3.0), np.zeros(graph.num_links))
+    first.update_costs(np.ones(network.mapping.link_count), np.zeros(network.mapping.link_count))
+    second.update_costs(np.full(network.mapping.link_count, 3.0), np.zeros(network.mapping.link_count))
     assert not np.shares_memory(first.costs, second.costs)
     assert first.time_skim is not second.time_skim
     assert "time" in first.skimming.fields
-    np.testing.assert_array_equal(first.routing.costs, np.ones(graph.compact_num_links))
-    np.testing.assert_array_equal(second.routing.costs, np.full(graph.compact_num_links, 3.0))
+    np.testing.assert_array_equal(first.routing.costs, np.ones(prepared.mapping.link_count))
+    np.testing.assert_array_equal(second.routing.costs, np.full(prepared.mapping.link_count, 3.0))
 
 
 def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
@@ -365,15 +365,16 @@ def test_compressed_chain_and_removed_link_project_without_dummy_storage():
     graph.set_blocked_centroid_flows(False)
     graph.set_graph("time")
     inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    full = graph.graph.sort_values("__supernet_id__").time.to_numpy(dtype=np.float64)
+    full = Network(graph.network).field_values("time")
     inputs.update_costs(full, np.zeros_like(full))
     output = inputs.driver.run(inputs.driver.make_outputs())
-    projected = inputs.mapping.full_loads(output.loading.link_loads)
-    for row, (link_id, direction) in enumerate(zip(inputs.mapping.link_ids, inputs.mapping.directions, strict=True)):
+    projected = inputs.mapping.project_loads(output.loading.link_loads)
+    network = inputs.mapping.network
+    for row, (link_id, direction) in enumerate(zip(network.link_ids, network.directions, strict=True)):
         expected = [8.0, 12.0] if link_id in (9, 2) and direction == 1 else [0.0, 0.0]
         np.testing.assert_array_equal(projected[row], expected)
-    assert output.loading.link_count == graph.compact_num_links
-    assert graph.compact_num_links < graph.num_links
+    assert output.loading.link_count == inputs.mapping.link_count
+    assert inputs.mapping.link_count < inputs.mapping.network.link_count
 
 
 @pytest.mark.parametrize("turn", [False, True])
@@ -445,7 +446,9 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
 
 
 @pytest.mark.parametrize("turn", [False, True])
-def test_translation_preserves_existing_centroid_blocking_branch(turn):
+def test_translation_preserves_graph_centroid_blocking(turn):
+    from .routing_helpers import search
+
     graph = diamond(turn)
     graph.set_blocked_centroid_flows(True)
     inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
@@ -453,10 +456,7 @@ def test_translation_preserves_existing_centroid_blocking_branch(turn):
     # rather than adding the routing context's blocked centroid prefix.
     expected = 0 if graph.has_turn_restrictions else graph.num_zones
     assert inputs.routing.blocked_centroid_count == expected
-    if graph.has_turn_restrictions:
-        np.testing.assert_array_equal(inputs.routing.turn_fs, graph.compact_turn_fs)
-        np.testing.assert_array_equal(inputs.routing.turn_to_links, graph.compact_turn_to_arcs)
-        np.testing.assert_array_equal(inputs.routing.turn_penalties, graph.compact_turn_penalties)
+    assert not search(inputs.routing, 0).reachable_to(3)
 
 
 def test_core_settings_can_change_after_algorithm_selection():
@@ -529,7 +529,7 @@ def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields()
     np.testing.assert_array_equal(original_skims.skims, original_values)
     assert graph.skim_fields == original_fields
     full_times = assignment._class_states[0].congested_time
-    by_link = dict(zip(assignment.class_results[traffic.name].state.mapping.link_ids, full_times, strict=True))
+    by_link = dict(zip(assignment.class_results[traffic.name].state.mapping.network.link_ids, full_times, strict=True))
     shortest = min(by_link[71] + by_link[12] + 0.5, by_link[55] + by_link[24])
     assert output.matrices["__assignment_cost__"][0, 3] == pytest.approx(shortest)
     assert output.matrices["__congested_time__"][0, 3] == pytest.approx(shortest)
@@ -549,8 +549,8 @@ def test_assignment_time_and_cost_skims_have_separate_meanings(turn):
         skim_fields=["time", "distance", "assignment_cost"],
         cost_name="assignment_cost",
     )
-    full = graph.graph.sort_values("__supernet_id__").time.to_numpy(dtype=np.float64)
-    inputs.update_costs(full, np.full(graph.num_links, 0.25))
+    full = Network(graph.network).field_values("time")
+    inputs.update_costs(full, np.full(inputs.mapping.network.link_count, 0.25))
     raw = inputs.driver.run(inputs.driver.make_outputs()).skimming
     output = inputs.report_skims(raw)
     assert output.matrices["time"][0, 3] == (2.5 if turn else 2.0)
@@ -596,7 +596,7 @@ def test_congested_skim_reporting_does_not_add_turn_delay_twice():
         skim_fields=["time", "distance", "assignment_cost"],
         cost_name="assignment_cost",
     )
-    full = graph.graph.sort_values("__supernet_id__").time.to_numpy(dtype=np.float64)
+    full = Network(graph.network).field_values("time")
     inputs.update_costs(full, np.zeros_like(full))
     raw = inputs.driver.run(inputs.driver.make_outputs()).skimming
     original = raw.skims.copy()
