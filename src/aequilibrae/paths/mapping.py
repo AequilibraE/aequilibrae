@@ -335,7 +335,7 @@ class GraphMapping:
         aggregate_costs(self.expansion_offsets, self.expansion_links, source, target)
         return out
 
-    def project_loads(self, graph_loads):
+    def project_loads(self, graph_loads, *, out=None):
         """Copy graph loads to directed network order, filling unmapped rows with zero.
 
         Accept real integer or floating-point arrays shaped ``(graph_links,)``
@@ -346,7 +346,17 @@ class GraphMapping:
         loads = np.asarray(graph_loads)
         if loads.ndim not in (1, 2) or loads.shape[0] != self.link_count:
             raise ValueError("Loads must have one row per graph link and one or two dimensions")
-        if loads.dtype.kind not in "iuf":
-            raise ValueError("Loads must contain real integer or floating-point values")
+        shape = (self.network.link_count, *loads.shape[1:])
+        if out is None:
+            out = np.empty(shape, dtype=loads.dtype)
+        else:
+            if not isinstance(out, np.ndarray) or out.shape != shape:
+                raise ValueError(f"out must be a NumPy array with shape {shape}")
+            if np.shares_memory(out, loads):
+                raise ValueError("out must not overlap the input loads")
 
-        return project_loads(self.network_link_to_graph, np.ascontiguousarray(loads))
+        source = np.ascontiguousarray(loads)
+        source = source[:, None] if loads.ndim == 1 else source
+        target = out[:, None] if loads.ndim == 1 else out
+        project_loads(self.network_link_to_graph, source, target)
+        return out

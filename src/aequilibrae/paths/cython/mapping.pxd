@@ -19,6 +19,6 @@ cdef void aggregate_link_costs(
 
 cdef void project_link_loads(
     const Py_ssize_t[::1] network_link_to_graph,
-    const unsigned char[:, ::1] loads,
-    unsigned char[:, ::1] output,
+    const cython.floating[:, ::1] loads,
+    cython.floating[:, ::1] output,
 ) noexcept nogil

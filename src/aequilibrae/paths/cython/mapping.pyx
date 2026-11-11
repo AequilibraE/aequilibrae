@@ -49,16 +49,11 @@ cdef void aggregate_link_costs(
 @cython.wraparound(False)
 cdef void project_link_loads(
     const Py_ssize_t[::1] network_link_to_graph,
-    const unsigned char[:, ::1] loads,
-    unsigned char[:, ::1] output,
+    const cython.floating[:, ::1] loads,
+    cython.floating[:, ::1] output,
 ) noexcept nogil:
-    """Copy byte rows, preserving numeric dtype without doing arithmetic.
-
-    Each row contains all classes for one directed link. Unmapped rows use -1
-    and are zero-filled. All-zero bytes represent zero for the supported real
-    integer and floating-point NumPy dtypes, regardless of byte order.
-    """
-    cdef Py_ssize_t row, link, width = loads.shape[1]
+    """Copy floating-point rows without doing arithmetic."""
+    cdef Py_ssize_t row, link, width = loads.shape[1] * sizeof(cython.floating)
     if width == 0:
         return
     for row in range(network_link_to_graph.shape[0]):
@@ -98,13 +93,11 @@ def aggregate_costs(
         aggregate_link_costs(offsets, expansion, costs, output)
 
 
-def project_loads(const Py_ssize_t[::1] network_link_to_graph, loads):
-    """Allocate a directed-network load array and copy complete numeric rows."""
-    shape = (network_link_to_graph.shape[0], *loads.shape[1:])
-    result = np.empty(shape, dtype=loads.dtype)
-    row_bytes = loads.dtype.itemsize * (loads.shape[1] if loads.ndim == 2 else 1)
-    cdef const unsigned char[:, ::1] source = loads.view(np.uint8).reshape(loads.shape[0], row_bytes)
-    cdef unsigned char[:, ::1] output = result.view(np.uint8).reshape(result.shape[0], row_bytes)
+def project_loads(
+    const Py_ssize_t[::1] network_link_to_graph,
+    const cython.floating[:, ::1] loads,
+    cython.floating[:, ::1] output,
+):
+    """Copy complete floating-point rows into a directed-network load array."""
     with nogil:
-        project_link_loads(network_link_to_graph, source, output)
-    return result
+        project_link_loads(network_link_to_graph, loads, output)
