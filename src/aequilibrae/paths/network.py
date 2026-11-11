@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike, NDArray
 
+from aequilibrae.paths.mapping import NetworkMapping
+
 if TYPE_CHECKING:
     from aequilibrae.paths.graph import Graph
     from aequilibrae.paths.traffic_class import TrafficClass
@@ -25,6 +27,7 @@ class Network:
     and turn restrictions. The same network can support graphs with different
     modes, costs, skim fields and centroid-flow policies, while retaining a
     consistent directed-link order for costs and reported results.
+    Modes are single-character mode codes, not mode names.
     """
 
     links: pd.DataFrame
@@ -34,9 +37,8 @@ class Network:
     allow_uturns: bool = field(default=False, kw_only=True)
     lonlat: pd.DataFrame | None = field(default=None, kw_only=True)
 
-    _node_ids: NDArray[np.int64] = field(init=False, repr=False)
+    mapping: NetworkMapping = field(init=False, repr=False)
     _link_rows: NDArray[np.intp] = field(init=False, repr=False)
-    _link_directions: NDArray[np.int8] = field(init=False, repr=False)
     _graphs: dict[tuple[str, tuple[int, ...], bool], Graph] = field(init=False, default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -75,23 +77,19 @@ class Network:
         centroids = None if self.centroids is None else np.array(self.centroids, copy=True)
         lonlat = None if self.lonlat is None else self.lonlat.copy(deep=True)
 
-        # We map each directed entry to its positional row in links (not its
-        # index label). Forward entries use rows with direction 0 or +1 and
-        # backward entries use 0 or -1.  Bidirectional rows therefore appear
-        # twice, paired with travel directions +1 and -1.  We then sort both
-        # arrays together by ascending link ID, then direction (-1 before +1).
-        # Then field extraction can use these repeated row positions to read
-        # the same source row for both directions, selecting its _ab or _ba
-        # column as appropriate, without worrying about bi-directional links.
-        direction = links["direction"].to_numpy()
-        forward = np.flatnonzero(direction != -1)
-        backward = np.flatnonzero(direction != 1)
-        rows = np.concatenate((forward, backward))
-        directions = np.concatenate((np.ones(len(forward), dtype=np.int8), -np.ones(len(backward), dtype=np.int8)))
-        order = np.lexsort((directions, links["link_id"].to_numpy(dtype=np.int64)[rows]))
-        rows, directions = rows[order], directions[order]
+        mapping = NetworkMapping(links)
 
-        for values in (node_ids, rows, directions, centroids):
+        # We map each directed entry to its positional row in links (not its
+        # index label). NetworkMapping follows physical row order, emitting +1
+        # before -1 for bidirectional links. Such rows therefore appear twice.
+        # Field extraction uses these repeated row positions to read the same
+        # source row for both directions, selecting its _ab or _ba column as
+        # appropriate, without worrying about bi-directional links.
+        direction = links["direction"].to_numpy()
+        counts = (direction != -1).astype(np.intp) + (direction != 1)
+        rows = np.repeat(np.arange(len(links), dtype=np.intp), counts)
+
+        for values in (rows, centroids):
             if values is not None:
                 values.flags.writeable = False
 
@@ -100,9 +98,8 @@ class Network:
         object.__setattr__(self, "centroids", centroids)
         object.__setattr__(self, "turn_restrictions", turns)
         object.__setattr__(self, "lonlat", lonlat)
-        object.__setattr__(self, "_node_ids", node_ids)
+        object.__setattr__(self, "mapping", mapping)
         object.__setattr__(self, "_link_rows", rows)
-        object.__setattr__(self, "_link_directions", directions)
 
     @staticmethod
     def _validate_links(links: pd.DataFrame) -> None:
@@ -123,8 +120,11 @@ class Network:
             if not pd.api.types.is_integer_dtype(links[column]) or links[column].isna().any():
                 raise ValueError(f"{column} must contain integer IDs without missing values")
 
-        if not links["direction"].isin([-1, 0, 1]).all():
-            raise ValueError("Link directions must be -1, 0 or 1")
+            if (links[column] < 0).any():
+                raise ValueError(f"{column} must contain nonnegative IDs")
+
+        if not pd.api.types.is_integer_dtype(links["direction"]) or not links["direction"].isin([-1, 0, 1]).all():
+            raise ValueError("Link directions must be integers: -1, 0 or 1")
 
     @staticmethod
     def _normalise_modes(modes: str | Iterable[str] | None) -> tuple[str, ...] | None:
@@ -154,7 +154,7 @@ class Network:
         return values.str.contains(pattern, regex=len(modes) > 1).to_numpy(dtype=bool)
 
     @staticmethod
-    def _validate_centroid_nodes(centroids: ArrayLike, nodes: NDArray[np.int64]) -> None:
+    def _validate_centroid_nodes(centroids: ArrayLike, nodes: ArrayLike) -> None:
         values = np.asarray(centroids)
         if values.ndim != 1 or not np.issubdtype(values.dtype, np.integer):
             raise ValueError("Centroids must be a one-dimensional array of integers")
@@ -186,7 +186,7 @@ class Network:
 
     @staticmethod
     def _validate_turn_table(turns: pd.DataFrame, links: pd.DataFrame, *, modes: tuple[str, ...] | None = None) -> None:
-        from aequilibrae.paths.graph import GraphBase
+        from aequilibrae.paths.graph_building import normalise_turn_penalty
 
         if not isinstance(turns, pd.DataFrame):
             raise ValueError("turn_restrictions must be a DataFrame")
@@ -204,7 +204,7 @@ class Network:
         if turns.empty:
             return
 
-        turns["penalty"].apply(GraphBase._normalise_turn_penalty)
+        turns["penalty"].apply(normalise_turn_penalty)
 
         forward = links.loc[links["direction"] >= 0, ["a_node", "b_node"]]
         backward = links.loc[links["direction"] <= 0, ["b_node", "a_node"]].set_axis(["a_node", "b_node"], axis=1)
@@ -224,15 +224,15 @@ class Network:
         )
 
     @property
-    def link_ids(self) -> NDArray[np.int64]:
-        return self.links["link_id"].to_numpy(dtype=np.int64)[self._link_rows]
+    def link_ids(self) -> NDArray[np.uint64]:
+        return self.mapping.link_ids
 
     @property
     def directions(self) -> NDArray[np.int8]:
-        return self._link_directions
+        return self.mapping.directions
 
     def field_values(self, field: str) -> NDArray[np.float64]:
-        """Return numeric values in ascending link-ID and direction order."""
+        """Return numeric values in the shared mapping's directed network order."""
         return self._field_arrays([field])[field]
 
     def _field_arrays(self, fields: Iterable[str]) -> dict[str, NDArray[np.float64]]:
@@ -272,7 +272,7 @@ class Network:
         return self._modes_mask(self.links, (mode,))
 
     def validate_centroids(self, centroids: ArrayLike) -> None:
-        self._validate_centroid_nodes(centroids, self._node_ids)
+        self._validate_centroid_nodes(centroids, self.mapping.node_ids)
 
     def _validate_turns(self, mode: str) -> None:
         """Check mode-specific turns without preparing routing topology."""
@@ -291,20 +291,31 @@ class Network:
         centroids: ArrayLike | None = None,
         skimming: str | Iterable[str] = (),
         compact: bool = False,
+        remove_dead_ends: bool = False,
         block_centroid_flows: bool = True,
         turn_restrictions: pd.DataFrame | None = None,
         allow_uturns: bool | None = None,
     ) -> Graph:
-        """Prepare one full or compact graph from the stored source tables.
+        """Prepare one routing graph from the stored source tables.
 
+        ``mode`` is a single-character mode code, not a mode name.
         Costs use the named field. ``Graph.set_costs()`` accepts replacement
         arrays in directed network order, including infinity for link closures.
-        Compact graphs retain centroids and expand paths back to source links.
+        Link contraction (``compact``) and dead-end removal are independent,
+        opt-in reductions. Both retain centroids and require them to be supplied.
+        Mappings expand every retained graph link back to its source links.
         """
-        from aequilibrae.paths.graph import GraphBase, _prepare_network_graph, freeze_graph
+        from aequilibrae.paths.cython.context import SkimmingContext
+        from aequilibrae.paths.graph import Graph
+        from aequilibrae.paths.graph_building import build_graph_mapping
+        from aequilibrae.paths.routing_context import make_routing_context
 
         self.validate_mode(mode)
-        for name, value in (("compact", compact), ("block_centroid_flows", block_centroid_flows)):
+        for name, value in (
+            ("compact", compact),
+            ("remove_dead_ends", remove_dead_ends),
+            ("block_centroid_flows", block_centroid_flows),
+        ):
             if not isinstance(value, bool):
                 raise ValueError(f"{name} must be a boolean")
 
@@ -316,8 +327,8 @@ class Network:
             self.validate_centroids(centroids)
             centroids = np.asarray(centroids)
 
-        if compact and centroids is None:
-            raise ValueError("Compact graphs require centroids")
+        if (compact or remove_dead_ends) and centroids is None:
+            raise ValueError("Link contraction and dead-end removal require centroids")
 
         if cost is not None and (not isinstance(cost, str) or not cost):
             raise ValueError("cost must be a nonempty field name")
@@ -334,11 +345,15 @@ class Network:
         if not selected_links.any():
             raise ValueError(f"No links are available for mode '{mode}'")
 
+        links = self.links.loc[selected_links]
+        if centroids is not None:
+            nodes = np.union1d(links["a_node"], links["b_node"])
+            self._validate_centroid_nodes(centroids, nodes)
+
         turns = self.turn_restrictions if turn_restrictions is None else turn_restrictions
         if turns is not None:
-            self._validate_turn_table(turns, self.links)
-            selected_turns = turns.loc[self._modes_mask(turns, (mode,))]
-            self._validate_turn_table(selected_turns, self.links.loc[selected_links])
+            self._validate_turn_table(turns, links, modes=(mode,))
+            turns = turns.loc[self._modes_mask(turns, (mode,))]
 
         field_names = skim_names if cost is None else (*skim_names, cost)
         arrays = self._field_arrays(field_names)
@@ -347,20 +362,49 @@ class Network:
         if np.isnan(costs).any() or np.any(costs < 0):
             raise ValueError("Graph costs must be nonnegative and cannot contain NaN")
 
-        builder = GraphBase()
         # Mode-excluded links belong in reporting mappings, not routing topology.
-        builder.network = self.links.loc[selected_links, ["link_id", "a_node", "b_node", "direction"]].copy()
-        builder.network["modes"] = mode
-
-        _prepare_network_graph(
-            builder,
-            mode,
-            centroids,
-            turns,
-            block_centroid_flows,
-            self.allow_uturns if allow_uturns is None else allow_uturns,
+        # All input validation precedes topology construction and owned snapshots.
+        allow_uturns = self.allow_uturns if allow_uturns is None else allow_uturns
+        mapping = build_graph_mapping(
+            self.mapping,
+            links,
+            centroids=centroids,
+            turn_restrictions=turns,
+            compact=compact,
+            remove_dead_ends=remove_dead_ends,
+            allow_uturns=allow_uturns,
         )
-        return freeze_graph(builder, compact=compact, network=self, costs=costs, fields=fields, cost_name=cost)
+        centroid_count = 0 if centroids is None else len(centroids)
+        routing = make_routing_context(
+            mapping,
+            costs,
+            turn_restrictions=turns,
+            centroid_count=centroid_count,
+            block_centroid_flows=block_centroid_flows,
+            allow_uturns=allow_uturns,
+        )
+
+        skim_values = {}
+        for name, values in fields.items():
+            if name != cost:
+                values = mapping.aggregate_costs(values)
+                values.flags.writeable = False
+                skim_values[name] = values
+
+        skimming = SkimmingContext(
+            mapping.link_count,
+            link_fields=skim_values,
+            cost_name=cost if cost in fields else None,
+        )
+        return Graph(
+            routing=routing,
+            mapping=mapping,
+            skimming=skimming,
+            mode=mode,
+            cost_field=cost,
+            centroid_count=centroid_count,
+            block_centroid_flows=block_centroid_flows,
+        )
 
     def _assignment_graph(self, configuration: TrafficClass) -> Graph:
         """Share assignment topology for classes with the same routing policy."""

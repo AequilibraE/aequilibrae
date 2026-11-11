@@ -1,8 +1,8 @@
 """Standalone network and compression mappings, independent of routing contexts.
 
 Network IDs are external identifiers; every internal index is zero-based. No
-array is sized by an external ID. Existing graph consumers do not yet use these
-classes.
+array is sized by an external ID. Network and graph construction share these
+mappings; legacy graph consumers have not all been adapted yet.
 """
 
 from dataclasses import InitVar, dataclass, field
@@ -261,6 +261,20 @@ class GraphMapping:
         ids = self.network.node_ids[self.graph_node_to_network[indices]]
         return int(ids) if ids.ndim == 0 else ids
 
+    def expand_link_indices(self, graph_links):
+        """Return flat directed network link indices in traversal order.
+
+        Accept a scalar or one-dimensional array of graph link indices. Multiple
+        expansions are concatenated in query order, preserving duplicates;
+        queries need not themselves describe a connected path. Even scalar
+        queries return arrays. Empty queries return an empty array.
+
+        The result is a new, contiguous ``np.intp`` array. Use it to index any
+        attribute array in the shared mapping's directed network link order.
+        """
+        indices = _indices(graph_links, self.link_count, "graph_links")
+        return expand_links(np.ascontiguousarray(np.atleast_1d(indices)), self.expansion_offsets, self.expansion_links)
+
     def expand_links(self, graph_links):
         """Return flat ``(link_ids, directions)`` arrays in traversal order.
 
@@ -269,8 +283,7 @@ class GraphMapping:
         queries need not themselves describe a connected path. Even scalar
         queries return arrays. Empty queries return two empty arrays.
         """
-        indices = _indices(graph_links, self.link_count, "graph_links")
-        links = expand_links(np.ascontiguousarray(np.atleast_1d(indices)), self.expansion_offsets, self.expansion_links)
+        links = self.expand_link_indices(graph_links)
         return self.network.link_ids[links], self.network.directions[links]
 
     def aggregate_costs(self, network_costs, *, out=None):

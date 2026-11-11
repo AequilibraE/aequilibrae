@@ -73,6 +73,7 @@ def test_scalar_queries(mapping, scalar):
     assert mapping.network_node(scalar(0)) == BASE + 40
     assert type(mapping.network_node(scalar(0))) is int
     assert type(mapping.network.node_index(scalar(BASE + 10))) is int
+    np.testing.assert_array_equal(mapping.expand_link_indices(scalar(0)), [0, 3, 4])
 
 
 def test_array_queries_and_broadcasting(mapping):
@@ -91,6 +92,7 @@ def test_noncontiguous_readonly_queries(mapping):
     graph_links = np.array([1, 9, 0, 9])[::2]
     graph_links.flags.writeable = False
     np.testing.assert_array_equal(mapping.expand_links(graph_links)[0] - BASE, [7, 2, 9, 9, 2, 7])
+    np.testing.assert_array_equal(mapping.expand_link_indices(graph_links), [5, 2, 1, 0, 3, 4])
 
 
 @pytest.mark.parametrize("link,direction", [(99, 1), (4, 1), (4, -1)])
@@ -127,6 +129,8 @@ def test_invalid_external_ids(mapping, value):
 @pytest.mark.parametrize("value", [-1, 2, 2**63, 0.5, True, [[0]]])
 def test_invalid_graph_indices(mapping, value):
     with pytest.raises(ValueError):
+        mapping.expand_link_indices(value)
+    with pytest.raises(ValueError):
         mapping.expand_links(value)
     with pytest.raises(ValueError):
         mapping.network_node(value)
@@ -135,6 +139,32 @@ def test_invalid_graph_indices(mapping, value):
 def test_broadcast_mismatch(mapping):
     with pytest.raises(ValueError):
         mapping.graph_link([BASE + 9, BASE + 2], [1, -1, 1])
+
+
+@pytest.mark.parametrize(
+    "graph_links,expected",
+    [(0, [0, 3, 4]), ([1, 0, 1], [5, 2, 1, 0, 3, 4, 5, 2, 1]), ([], [])],
+)
+def test_expand_link_indices(mapping, graph_links, expected):
+    indices = mapping.expand_link_indices(graph_links)
+    np.testing.assert_array_equal(indices, expected)
+    assert indices.dtype == np.dtype(np.intp)
+    assert indices.flags.c_contiguous
+    assert indices.flags.writeable
+    assert not np.shares_memory(indices, mapping.expansion_links)
+    ids, directions = mapping.expand_links(graph_links)
+    np.testing.assert_array_equal(mapping.network.link_ids[indices], ids)
+    np.testing.assert_array_equal(mapping.network.directions[indices], directions)
+
+
+def test_expand_link_indices_gathers_attributes(mapping):
+    indices = mapping.expand_link_indices([1, 0])
+    costs = np.array([2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0])
+    labels = np.array(["a", "b", "c", "d", "e", "f", "g"])
+    attributes = np.column_stack((costs, costs * 2))
+    np.testing.assert_array_equal(costs[indices], [13, 5, 3, 2, 7, 11])
+    np.testing.assert_array_equal(labels[indices], ["f", "c", "b", "a", "d", "e"])
+    np.testing.assert_array_equal(attributes[indices], [[13, 26], [5, 10], [3, 6], [2, 4], [7, 14], [11, 22]])
 
 
 def test_ordered_expansion(mapping):
@@ -185,6 +215,7 @@ def test_empty_queries(mapping):
         mapping.graph_link([], 1),
         mapping.graph_node([]),
         mapping.network_node([]),
+        mapping.expand_link_indices([]),
         *mapping.expand_links([]),
     ):
         assert result.shape == (0,)
@@ -210,6 +241,7 @@ def test_identity_mapping_shares_network(network, mapping):
     np.testing.assert_array_equal(ids, network.link_ids)
     np.testing.assert_array_equal(directions, network.directions)
     np.testing.assert_array_equal(identity.project_loads(np.arange(7)), np.arange(7))
+    np.testing.assert_array_equal(identity.expand_link_indices(np.arange(7)), np.arange(7))
 
 
 def test_snapshots_are_readonly_and_independent(links, network):
@@ -232,6 +264,9 @@ def test_snapshots_are_readonly_and_independent(links, network):
     result, _ = mapping.expand_links(0)
     result[:] = 0
     assert mapping.expand_links(0)[0][0] == BASE + 9
+    indices = mapping.expand_link_indices(0)
+    indices[:] = 0
+    np.testing.assert_array_equal(mapping.expand_link_indices(0), [0, 3, 4])
 
 
 def test_empty_network():
@@ -239,6 +274,9 @@ def test_empty_network():
     mapping = GraphMapping(network, [], [0], [])
     assert network.node_count == network.link_count == mapping.node_count == mapping.link_count == 0
     assert mapping.project_loads(np.empty((0, 3))).shape == (0, 3)
+    assert mapping.expand_link_indices([]).shape == (0,)
+    with pytest.raises(ValueError):
+        mapping.expand_link_indices(0)
     with pytest.raises(KeyError):
         mapping.graph_node(0)
 
