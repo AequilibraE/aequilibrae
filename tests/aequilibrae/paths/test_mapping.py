@@ -53,7 +53,13 @@ def test_network_order_and_sparse_ids(network):
     assert network.link_count == 7
     # Mode metadata does not filter the whole-network mapping.
     assert network.link_index(BASE + 4, 1) == 6
-    assert network._directed_links.shape == (4, 2)
+    np.testing.assert_array_equal(network.directed_link_indices, [[0, 1], [2, 3], [4, 5], [6, -1]])
+    assert not network.directed_link_indices.flags.writeable
+
+
+def test_directed_link_indices_mark_missing_directions(links):
+    network = NetworkMapping(links.assign(direction=[0, -1, 1, -1]))
+    np.testing.assert_array_equal(network.directed_link_indices, [[0, 1], [-1, 2], [3, -1], [-1, 4]])
 
 
 def test_node_order_is_first_appearance(links):

@@ -137,6 +137,10 @@ class NetworkMapping:
     def node_count(self):
         return len(self.node_ids)
 
+    @property
+    def directed_link_indices(self) -> np.ndarray:
+        return self._directed_links
+
     def node_index(self, node_ids):
         """Map external node IDs to network indices, preserving query order."""
         return _lookup(self._node_indices, _ids(node_ids, "node_ids"))

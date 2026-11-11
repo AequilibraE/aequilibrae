@@ -5,8 +5,12 @@ import pandas as pd
 
 from aequilibrae.parameters import Parameters
 from aequilibrae.paths.cython.dijkstra import available_heaps
-from aequilibrae.utils.core_setter import clamp_cores, resolve_cores, resolve_elementwise_cores
-from aequilibrae.utils.core_setter import resolve_threading_threshold
+from aequilibrae.utils.core_setter import (
+    clamp_cores,
+    resolve_cores,
+    resolve_elementwise_cores,
+    resolve_threading_threshold,
+)
 
 
 class AssignmentResultsBase(ABC):
@@ -68,7 +72,9 @@ class AssignmentResults(AssignmentResultsBase):
     @property
     def link_loads(self):
         """Read-only snapshot of loads in supernetwork order."""
-        return self.state.mapping.full_loads(self.output.loading.link_loads)
+        values = self.state.mapping.project_loads(self.output.loading.link_loads)
+        values.flags.writeable = False
+        return values
 
     @property
     def compact_link_loads(self):
@@ -114,24 +120,23 @@ class AssignmentResults(AssignmentResultsBase):
     def get_heaps():
         return available_heaps()
 
-    def get_graph_to_network_mapping(self):
-        return self.state.mapping.network_indices
-
-    def _load_frame(self, compact, prefix=""):
+    def _load_frame(self, graph_loads, prefix=""):
         mapping = self.state.mapping
-        network = self.get_graph_to_network_mapping()
-        loads = mapping.full_loads(compact)
-        link_ids = np.unique(mapping.link_ids)
+        loads = mapping.project_loads(graph_loads)
+        indices = mapping.network.directed_link_indices
+        valid = indices >= 0
+
+        directional = np.zeros((len(indices), 2, loads.shape[1]), dtype=loads.dtype)
+        directional[valid] = loads[indices[valid]]
+        ab, ba = directional[:, 0], directional[:, 1]
+
         columns = {}
         for index, name in enumerate(self.classes["names"]):
-            ab = np.zeros(len(link_ids), dtype=np.float64)
-            ba = np.zeros(len(link_ids), dtype=np.float64)
-            ab[network.network_ab_idx] = loads[network.graph_ab_idx, index]
-            ba[network.network_ba_idx] = loads[network.graph_ba_idx, index]
-            columns[f"{prefix}{name}_ab"] = ab
-            columns[f"{prefix}{name}_ba"] = ba
-            columns[f"{prefix}{name}_tot"] = ab + ba
-        return pd.DataFrame(columns, index=link_ids)
+            columns[f"{prefix}{name}_ab"] = ab[:, index]
+            columns[f"{prefix}{name}_ba"] = ba[:, index]
+            columns[f"{prefix}{name}_tot"] = ab[:, index] + ba[:, index]
+
+        return pd.DataFrame(columns, index=mapping.network.physical_link_ids)
 
     def get_load_results(self):
         """Return directional link loads in external network link order."""
@@ -142,7 +147,7 @@ class AssignmentResults(AssignmentResultsBase):
         frames = [self._load_frame(loads, f"{name}_") for name, loads in self.select_link_loading.items()]
         if frames:
             return pd.concat(frames, axis=1)
-        return pd.DataFrame(index=np.unique(self.state.mapping.link_ids))
+        return pd.DataFrame(index=self.state.mapping.network.physical_link_ids)
 
 
 class TransitAssignmentResults(AssignmentResultsBase):

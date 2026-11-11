@@ -25,23 +25,6 @@ from aequilibrae.project.network.network import Network as ProjectNetwork
 from aequilibrae.utils.core_setter import clamp_cores, resolve_cores
 
 
-def _assign_aggregation_fields(
-    aggregation,
-    field_ab,
-    field_ba,
-    graph_ab_values,
-    graph_ba_values,
-    network_ab_idx,
-    network_ba_idx,
-):
-    ab = aggregation[field_ab].to_numpy(copy=True)
-    ba = aggregation[field_ba].to_numpy(copy=True)
-    ab[network_ab_idx] = nan_to_num(graph_ab_values)
-    ba[network_ba_idx] = nan_to_num(graph_ba_values)
-    aggregation[field_ab] = ab
-    aggregation[field_ba] = ba
-
-
 def _safe_delay_factor(congested_time, free_flow_time):
     return np.divide(
         congested_time,
@@ -323,9 +306,8 @@ class TrafficAssignment(AssignmentBase):
                         raise ValueError("Preload contains an invalid link or direction")
             else:
                 values = np.asarray(preload, dtype=float)
-                count = sum((network.links.direction != -d).sum() for d in (-1, 1))
-                if values.shape != (count,):
-                    raise ValueError("Preload must have one value per directed link, ordered by link ID and direction")
+                if values.shape != (network.mapping.link_count,):
+                    raise ValueError("Preload must have one value per directed link in network mapping order")
             if not np.isfinite(values).all() or np.any(values < 0):
                 raise ValueError("Preload must be nonnegative and finite")
 
@@ -548,102 +530,44 @@ class TrafficAssignment(AssignmentBase):
             raise RuntimeError("Run the assignment before requesting its results")
         assig_results = [cls.results.get_load_results() for cls in self._class_states]
 
-        class1 = self._class_states[0]
-        res1 = assig_results[0]
-
+        network = self._prepared_network.mapping
         tot_flow = self.assignment.total_flow
-        capacity = self.capacity
-        voc = tot_flow / capacity
-        congested_time = self.congested_time
-        free_flow_tt = self.free_flow_tt
-        if self.assignment.preload is None:
-            preload = np.full(len(tot_flow), np.nan)
-        else:
-            preload = self.assignment.preload
+        preload = self.assignment.preload
+        if preload is None:
+            preload = np.zeros(network.link_count)
+
+        # Report shared network values independently of each class's routing graph.
+        values = np.column_stack(
+            (
+                preload,
+                self.congested_time,
+                _safe_delay_factor(self.congested_time, self.free_flow_tt),
+                tot_flow / self.capacity,
+                tot_flow,
+            )
+        )
+
+        indices = network.directed_link_indices
+        valid = indices >= 0
+        directional = np.zeros((len(indices), 2, values.shape[1]), dtype=values.dtype)
+        directional[valid] = nan_to_num(values[indices[valid]])
+        ab, ba = directional[:, 0], directional[:, 1]
 
         fields = [
-            "Preload_AB",
-            "Preload_BA",
-            "Preload_tot",
-            "Congested_Time_AB",
-            "Congested_Time_BA",
-            "Congested_Time_Max",
-            "Delay_factor_AB",
-            "Delay_factor_BA",
-            "Delay_factor_Max",
-            "VOC_AB",
-            "VOC_BA",
-            "VOC_max",
-            "PCE_AB",
-            "PCE_BA",
-            "PCE_tot",
+            ("Preload", "Preload_tot", np.nansum),
+            ("Congested_Time", "Congested_Time_Max", np.nanmax),
+            ("Delay_factor", "Delay_factor_Max", np.nanmax),
+            ("VOC", "VOC_max", np.nanmax),
+            ("PCE", "PCE_tot", np.nansum),
         ]
+        columns = {}
+        for index, (name, total_name, reduce) in enumerate(fields):
+            columns[f"{name}_AB"] = ab[:, index]
+            columns[f"{name}_BA"] = ba[:, index]
+            columns[total_name] = reduce([ab[:, index], ba[:, index]], axis=0)
 
-        agg = pd.DataFrame([], columns=fields, index=res1.index[:]).astype(float)
-        agg.fillna(0.0, inplace=True)
+        assig_results.append(pd.DataFrame(columns, index=network.physical_link_ids))
 
-        # Use the first class to get a graph -> network link ID mapping
-        m = class1.results.get_graph_to_network_mapping()
-        graph_ab_idx, graph_ba_idx = m.graph_ab_idx, m.graph_ba_idx
-
-        _assign_aggregation_fields(
-            agg,
-            "Preload_AB",
-            "Preload_BA",
-            preload[m.graph_ab_idx],
-            preload[m.graph_ba_idx],
-            m.network_ab_idx,
-            m.network_ba_idx,
-        )
-        agg["Preload_tot"] = np.nansum([agg.Preload_AB, agg.Preload_BA], axis=0)
-
-        _assign_aggregation_fields(
-            agg,
-            "Congested_Time_AB",
-            "Congested_Time_BA",
-            congested_time[m.graph_ab_idx],
-            congested_time[m.graph_ba_idx],
-            m.network_ab_idx,
-            m.network_ba_idx,
-        )
-        agg["Congested_Time_Max"] = np.nanmax([agg.Congested_Time_AB, agg.Congested_Time_BA], axis=0)
-
-        delay_factor_ab = _safe_delay_factor(congested_time[graph_ab_idx], free_flow_tt[graph_ab_idx])
-        delay_factor_ba = _safe_delay_factor(congested_time[graph_ba_idx], free_flow_tt[graph_ba_idx])
-        _assign_aggregation_fields(
-            agg,
-            "Delay_factor_AB",
-            "Delay_factor_BA",
-            delay_factor_ab,
-            delay_factor_ba,
-            m.network_ab_idx,
-            m.network_ba_idx,
-        )
-        agg["Delay_factor_Max"] = np.nanmax([agg.Delay_factor_AB, agg.Delay_factor_BA], axis=0)
-
-        _assign_aggregation_fields(
-            agg,
-            "VOC_AB",
-            "VOC_BA",
-            voc[m.graph_ab_idx],
-            voc[m.graph_ba_idx],
-            m.network_ab_idx,
-            m.network_ba_idx,
-        )
-        agg["VOC_max"] = np.nanmax([agg.VOC_AB, agg.VOC_BA], axis=0)
-
-        _assign_aggregation_fields(
-            agg,
-            "PCE_AB",
-            "PCE_BA",
-            tot_flow[m.graph_ab_idx],
-            tot_flow[m.graph_ba_idx],
-            m.network_ab_idx,
-            m.network_ba_idx,
-        )
-        agg["PCE_tot"] = np.nansum([agg.PCE_AB, agg.PCE_BA], axis=0)
-
-        assig_results.append(agg)
         return pd.concat(assig_results, axis=1).rename_axis("link_id")
 
     def info(self) -> dict:
