@@ -75,7 +75,15 @@ def matrix_for(graph, demand=None):
 def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
     network = Network(graph.network.assign(modes="c"), turn_restrictions=graph._turn_restrictions)
     prepared = network._assignment_graph(
-        SimpleNamespace(mode="c", demand=matrix, block_centroid_flows=graph.block_centroid_flows)
+        SimpleNamespace(
+            mode="c",
+            demand=matrix,
+            graph_options={
+                "compact": True,
+                "remove_dead_ends": True,
+                "block_centroid_flows": graph.block_centroid_flows,
+            },
+        )
     )
     return AssignmentInputs(
         prepared,
@@ -99,7 +107,7 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, name
         demand=matrix or matrix_for(graph),
         pce=pce,
         skimming=graph.skim_fields,
-        block_centroid_flows=False,
+        graph_options={"block_centroid_flows": False},
         select_link_sets={"upper": [(71, 1)], "either": [(71, 1), (55, 1)]},
         **options,
     )
@@ -287,7 +295,12 @@ def test_repeated_execution_clears_history_and_preserves_old_output_views():
 def test_shared_graph_classes_have_independent_cost_buffers():
     graph = diamond()
     network = Network(graph.network.assign(modes="c"))
-    configuration = TrafficClass(mode="c", cost="time", demand=matrix_for(graph), block_centroid_flows=False)
+    configuration = TrafficClass(
+        mode="c",
+        cost="time",
+        demand=matrix_for(graph),
+        graph_options={"block_centroid_flows": False},
+    )
     prepared = network._assignment_graph(configuration)
     assert network._assignment_graph(replace(configuration, name="trucks")) is prepared
     first, second = [
@@ -404,7 +417,12 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
     graph.network.loc[graph.network.link_id == 71, "toll"] = 10.0
     network = Network(graph.network.assign(modes="c"), centroids=graph.centroids)
     cars = TrafficClass(
-        name="cars", mode="c", cost="time", demand=matrix_for(graph), pce=0.5, block_centroid_flows=False
+        name="cars",
+        mode="c",
+        cost="time",
+        demand=matrix_for(graph),
+        pce=0.5,
+        graph_options={"block_centroid_flows": False},
     )
     trucks = replace(cars, name="trucks", pce=3.0, vot=2.0, fixed_cost_field="toll")
     assignment = TrafficAssignment(

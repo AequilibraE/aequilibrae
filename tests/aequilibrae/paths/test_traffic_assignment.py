@@ -12,7 +12,13 @@ def configuration(sioux_falls_example):
     return {
         "network": project.network,
         "classes": [
-            TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand, block_centroid_flows=False)
+            TrafficClass(
+                name="car",
+                mode="c",
+                cost="free_flow_time",
+                demand=demand,
+                graph_options={"block_centroid_flows": False},
+            )
         ],
         "time_field": "free_flow_time",
         "capacity_field": "capacity",

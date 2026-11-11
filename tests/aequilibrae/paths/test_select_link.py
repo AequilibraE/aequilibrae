@@ -22,7 +22,7 @@ def select_link_setup(sioux_falls_single_class):
             mode="c",
             cost="free_flow_time",
             demand=matrix,
-            block_centroid_flows=False,
+            graph_options={"block_centroid_flows": False},
             select_link_sets=links or {},
         )
         return TrafficAssignment(
@@ -187,7 +187,7 @@ def test_kaitang(test_data_path, tmp_path):
         demand=aem_mat,
         fixed_cost_field="a_toll",
         vot=1.1,
-        block_centroid_flows=False,
+        graph_options={"block_centroid_flows": False},
         select_link_sets={"trace": [(7, 0), (13, 0)]},
     )
     assign = TrafficAssignment(
@@ -299,7 +299,7 @@ def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_cl
                 mode="c",
                 cost="time",
                 demand=demand,
-                block_centroid_flows=False,
+                graph_options={"block_centroid_flows": False},
                 select_link_sets={"chosen": [11, 12, 13]},
             )
         )

@@ -21,7 +21,7 @@ def assignment_setup(sioux_falls_example):
                 demand=matrix,
                 pce=pce,
                 skimming=["free_flow_time", "distance"],
-                block_centroid_flows=False,
+                graph_options={"block_centroid_flows": False},
             )
         )
     yield TrafficAssignment(

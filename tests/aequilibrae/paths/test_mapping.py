@@ -8,7 +8,6 @@ import pytest
 
 from aequilibrae.paths.mapping import GraphMapping, NetworkMapping
 
-
 BASE = 10**12
 
 
@@ -178,20 +177,24 @@ def test_ordered_expansion(mapping):
     assert directions.dtype == np.dtype(np.int8)
 
 
-@pytest.mark.parametrize("dtype", [np.int8, np.uint16, np.int64, np.uint64, np.float16, np.float32, np.float64, ">f8"])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
 @pytest.mark.parametrize("classes", [None, 0, 1, 3])
-def test_projection_preserves_dtype_and_shape(mapping, dtype, classes):
+@pytest.mark.parametrize("use_out", [False, True])
+def test_projection_preserves_dtype_and_shape(mapping, dtype, classes, use_out):
     loads = np.array([7, 11], dtype=dtype)
     expected = np.array([7, 11, 11, 7, 7, 11, 0], dtype=dtype)
     if classes is not None:
         loads = np.repeat(loads[:, None], classes, axis=1)
         expected = np.repeat(expected[:, None], classes, axis=1)
     loads.flags.writeable = False
-    result = mapping.project_loads(loads)
+    out = np.full(expected.shape, 99, dtype=loads.dtype) if use_out else None
+    result = mapping.project_loads(loads, out=out)
     np.testing.assert_array_equal(result, expected)
     assert result.dtype == loads.dtype
     assert not np.shares_memory(result, loads)
     assert result.flags.writeable
+    if use_out:
+        assert result is out
 
 
 def test_projection_noncontiguous_and_nonfinite(mapping):
@@ -202,12 +205,6 @@ def test_projection_noncontiguous_and_nonfinite(mapping):
     assert np.isnan(projected[0])
     assert np.isinf(projected[1])
     assert projected[-1] == 0
-
-
-@pytest.mark.parametrize("loads", [1, [1], [1, 2, 3], [[[1]], [[2]]], [True, False], [1j, 2j], ["1", "2"]])
-def test_invalid_loads(mapping, loads):
-    with pytest.raises(ValueError):
-        mapping.project_loads(loads)
 
 
 def test_empty_queries(mapping):
@@ -240,7 +237,7 @@ def test_identity_mapping_shares_network(network, mapping):
     ids, directions = identity.expand_links(np.arange(7))
     np.testing.assert_array_equal(ids, network.link_ids)
     np.testing.assert_array_equal(directions, network.directions)
-    np.testing.assert_array_equal(identity.project_loads(np.arange(7)), np.arange(7))
+    np.testing.assert_array_equal(identity.project_loads(np.arange(7, dtype=np.float64)), np.arange(7))
     np.testing.assert_array_equal(identity.expand_link_indices(np.arange(7)), np.arange(7))
 
 

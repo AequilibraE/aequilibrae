@@ -30,7 +30,13 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
         assert scenario != "root"
         return
 
-    traffic = TrafficClass(name="car", mode="c", cost="distance", demand=mat, block_centroid_flows=False)
+    traffic = TrafficClass(
+        name="car",
+        mode="c",
+        cost="distance",
+        demand=mat,
+        graph_options={"block_centroid_flows": False},
+    )
     assignment = TrafficAssignment(
         network=network,
         classes=[traffic],

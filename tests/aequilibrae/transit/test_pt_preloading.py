@@ -31,7 +31,12 @@ def demand(graph):
 def _assignment(graph: Network, demand: AequilibraeMatrix, preload=None) -> TrafficAssignment:
     network = graph
     traffic = TrafficClass(
-        name="car", mode="c", cost="travel_time", demand=demand, skimming=["travel_time"], block_centroid_flows=False
+        name="car",
+        mode="c",
+        cost="travel_time",
+        demand=demand,
+        skimming=["travel_time"],
+        graph_options={"block_centroid_flows": False},
     )
     return TrafficAssignment(
         network=network,

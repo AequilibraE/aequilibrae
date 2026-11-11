@@ -25,7 +25,7 @@ def configuration(sioux_falls_test):
                 cost="free_flow_time",
                 demand=demand,
                 skimming=["free_flow_time", "distance"],
-                block_centroid_flows=False,
+                graph_options={"block_centroid_flows": False},
             )
         ],
         "time_field": "free_flow_time",

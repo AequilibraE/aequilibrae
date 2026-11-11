@@ -1,7 +1,7 @@
 import warnings
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping
 
 import numpy as np
 
@@ -50,50 +50,92 @@ class TrafficClass:
     fixed_cost_multiplier: float = 1.0
     select_link_sets: Mapping[str, tuple] = field(default_factory=dict)
     select_link_od: bool = True
-    block_centroid_flows: bool = True
+    graph_options: Mapping[str, bool] = field(default_factory=dict)
     heap: str = "4ary"
 
-    def __post_init__(self):
-        for label, value in (
-            ("mode", self.mode),
-            ("cost", self.cost),
-            ("name", self.mode if self.name is None else self.name),
-        ):
+    def __post_init__(self) -> None:
+        name = self.mode if self.name is None else self.name
+        for label, value in (("mode", self.mode), ("cost", self.cost), ("name", name)):
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{label} must be a nonempty string")
-        object.__setattr__(self, "name", self.mode if self.name is None else self.name)
-        for label, value in (("PCE", self.pce), ("Value of time", self.vot)):
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not np.isfinite(value) or value <= 0:
-                raise ValueError(f"{label} must be a positive finite number")
-        if (
-            isinstance(self.fixed_cost_multiplier, bool)
-            or not isinstance(self.fixed_cost_multiplier, (int, float))
-            or not np.isfinite(self.fixed_cost_multiplier)
-            or self.fixed_cost_multiplier < 0
-        ):
-            raise ValueError("Fixed cost multiplier must be nonnegative and finite")
-        if self.fixed_cost_field is not None and (
-            not isinstance(self.fixed_cost_field, str) or not self.fixed_cost_field
-        ):
-            raise ValueError("fixed_cost_field must be a nonempty string")
+
+        self._validate_cost_parameters(self.pce, self.vot, self.fixed_cost_multiplier, self.fixed_cost_field)
         if self.heap not in available_heaps():
             raise ValueError(f"heap must be one of {available_heaps()}")
-        if isinstance(self.skimming, str):
+
+        skimming = self._normalise_skimming(self.skimming)
+        if not isinstance(self.select_link_od, bool):
+            raise TypeError("select_link_od must be a boolean")
+
+        graph_options = self._normalise_graph_options(self.graph_options)
+        selections = self._normalise_select_link_sets(self.select_link_sets)
+        self._validate_demand(self.demand)
+
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "skimming", skimming)
+        object.__setattr__(self, "graph_options", MappingProxyType(graph_options))
+        object.__setattr__(self, "select_link_sets", MappingProxyType(selections))
+
+    @staticmethod
+    def _validate_cost_parameters(
+        pce: float, vot: float, fixed_cost_multiplier: float, fixed_cost_field: str | None
+    ) -> None:
+        for label, value in (("PCE", pce), ("Value of time", vot)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not np.isfinite(value) or value <= 0:
+                raise ValueError(f"{label} must be a positive finite number")
+
+        if (
+            isinstance(fixed_cost_multiplier, bool)
+            or not isinstance(fixed_cost_multiplier, (int, float))
+            or not np.isfinite(fixed_cost_multiplier)
+            or fixed_cost_multiplier < 0
+        ):
+            raise ValueError("Fixed cost multiplier must be nonnegative and finite")
+
+        if fixed_cost_field is not None and (not isinstance(fixed_cost_field, str) or not fixed_cost_field):
+            raise ValueError("fixed_cost_field must be a nonempty string")
+
+    @staticmethod
+    def _normalise_skimming(skimming: Iterable[str]) -> tuple[str, ...]:
+        if isinstance(skimming, str):
             raise ValueError("skimming must contain field names")
-        object.__setattr__(self, "skimming", tuple(self.skimming))
-        if any(not isinstance(name, str) or not name for name in self.skimming):
+
+        skimming = tuple(skimming)
+        if any(not isinstance(name, str) or not name for name in skimming):
             raise ValueError("skimming must contain field names")
-        if not isinstance(self.select_link_od, bool) or not isinstance(self.block_centroid_flows, bool):
-            raise TypeError("select_link_od and block_centroid_flows must be booleans")
+
+        return skimming
+
+    @staticmethod
+    def _normalise_graph_options(options: Mapping[str, bool]) -> dict[str, bool]:
+        if not isinstance(options, Mapping):
+            raise TypeError("graph_options must be a mapping")
+
+        graph_options = {"compact": True, "remove_dead_ends": True, "block_centroid_flows": True}
+        if unknown := options.keys() - graph_options.keys():
+            raise ValueError(f"Unknown graph options: {list(unknown)}")
+
+        graph_options.update(options)
+        for name, value in graph_options.items():
+            if not isinstance(value, bool):
+                raise TypeError(f"Graph option '{name}' must be a boolean")
+
+        return graph_options
+
+    @staticmethod
+    def _normalise_select_link_sets(select_link_sets: Mapping[str, tuple]) -> dict[str, tuple]:
         selections = {}
-        for name, members in self.select_link_sets.items():
+        for name, members in select_link_sets.items():
             if not isinstance(name, str) or not name:
                 raise ValueError("Select-link set names must be nonempty strings")
+
             if " " in name:
-                warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=2)
+                warnings.warn("Input string name has a space in it. Replacing with _", stacklevel=3)
                 name = "_".join(name.split(" "))
+
             if name in selections:
                 raise ValueError(f"Duplicate select-link set name after replacing spaces: {name}")
+
             links = []
             for member in members:
                 link, direction = (member, 0) if isinstance(member, (int, np.integer)) else member
@@ -105,14 +147,21 @@ class TrafficClass:
                     or direction not in (-1, 0, 1)
                 ):
                     raise ValueError("Selected links require an integer link ID and a direction of -1, 0 or 1")
+
                 links.append((int(link), direction))
             selections[name] = tuple(links)
-        object.__setattr__(self, "select_link_sets", MappingProxyType(selections))
-        if not isinstance(self.demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+
+        return selections
+
+    @staticmethod
+    def _validate_demand(demand: AequilibraeMatrix | AequilibraeSparseMatrix) -> None:
+        if not isinstance(demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
             raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
-        if any(values.dtype != np.float64 for values in self.demand.values()):
+
+        if any(values.dtype != np.float64 for values in demand.values()):
             raise TypeError("Demand matrices require float64 values")
-        validate_assignment_demand(self.demand, self.demand.index)
+
+        validate_assignment_demand(demand, demand.index)
 
     @property
     def info(self):
