@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Network, estimate_heuristic_scale
+from aequilibrae.paths import Network
 from aequilibrae.paths.results import PathResults
 
 from .routing_helpers import diamond_graph
