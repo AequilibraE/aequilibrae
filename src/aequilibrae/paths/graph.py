@@ -1350,14 +1350,15 @@ class Graph:
             result[name] = np.array(sorted(indices), dtype=np.intp)
         return result
 
-    # TODO: Reintroduce path computation using the shared mapping objects.
-    # Ordered expansions recover source-link identity, not individual attribute
-    # values. Contracted routing costs cannot recover per-source-link mileposts.
-    # NetworkMapping is shared across objectives and should not own those costs.
-    # Path results will use built-graph mileposts, without network expansion.
-    # Source costs and coordinates remain on Network for now.
     def compute_path(self, origin: int, destination: int, **kwargs: object) -> PathResults:
-        raise NotImplementedError("Path computation helpers have not been adapted to the new graph mappings")
+        """Compute a path with nodes and mileposts on this built graph.
+
+        Additional arguments are passed to :class:`PathResults`, including
+        explicit coordinates and a heuristic scale when using A*.
+        """
+        from aequilibrae.paths.results.path_results import PathResults
+
+        return PathResults(self, origin, destination, **kwargs)
 
     def compute_skims(self, cores: int | None = None) -> NetworkSkimming:
         """Compute centroid skims using this graph's routing and skim contexts."""

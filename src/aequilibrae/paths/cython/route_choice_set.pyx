@@ -274,7 +274,10 @@ cdef class RouteChoiceSet:
         heuristic_context = None
         if a_star:
             heuristic_context = make_heuristic_context(
-                self.node_ids, self.coordinates, self.lonlat, heuristic, heuristic_scale
+                self.node_ids,
+                self.coordinates if heuristic == "euclidean" else self.lonlat,
+                heuristic,
+                heuristic_scale,
             )
 
             if search_heuristic.haversine:
