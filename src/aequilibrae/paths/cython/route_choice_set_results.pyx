@@ -652,6 +652,9 @@ cdef class RouteChoiceSetResults:
 
         Generated compact link IDs are expanded to full network link IDs.
         Imported full-link indices are mapped directly to their original signed IDs.
+
+        Each column is sized in one pass over the stored routes and filled in a second, so no Python object is
+        created per link. Route sets are slices of one array of signed link IDs.
         """
 
         if self.table is not None:
@@ -660,99 +663,132 @@ cdef class RouteChoiceSetResults:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
-            size_t link, tmp, n_routes, idx_min, idx_max, supernet_id
+            size_t i, j, k, n_routes, size
+            size_t route_count = 0, link_count = 0, row = 0, position = 0
+            long long link, origin, destination
             bint have_assignment_results = self.perform_assignment and self.store_results
-            const int64_t [::] supernet_ids
-
-        columns = {
-            "origin id": [],
-            "destination id": [],
-        }
-        route_set_col = []  # We treat this one differently when constructing it
-
-        types = {"cost": "float64", "mask": "bool", "path overlap": "float64", "probability": "float64",
-                 "origin id": "uint32", "destination id": "uint32"}
-
-        if have_assignment_results:
-            columns["cost"] = []
-            columns["mask"] = []
-            columns["path overlap"] = []
-            columns["probability"] = []
-
-        if have_assignment_results:
-            for i in range(self.ods.size()):
-                n_routes = d(self.__route_vecs[i]).size()
-                if not d(self.__route_vecs[i]).size():  # If there's no routes to add just skip these.
-                    continue
-
-                # Empty numeric vectors use defaults for results without these fields.
-                tmp = d(self.__cost_set[i]).size()
-                columns["cost"].append(
-                    np.asarray(<double[:tmp]>d(self.__cost_set[i]).data())
-                    if tmp
-                    else np.zeros(n_routes, dtype="float64")
-                )
-
-                tmp = d(self.__mask_set[i]).size()
-                columns["mask"].append(
-                    np.asarray(<bint[:tmp]>d(self.__mask_set[i]).data()).astype(bool)
-                    if tmp
-                    else np.ones(n_routes, dtype="bool")
-                )
-
-                tmp = d(self.__path_overlap_set[i]).size()
-                columns["path overlap"].append(
-                    np.asarray(<double[:tmp]>d(self.__path_overlap_set[i]).data())
-                    if tmp
-                    else np.zeros(n_routes, dtype="float64")
-                )
-
-                tmp = d(self.__prob_set[i]).size()
-                columns["probability"].append(
-                    np.asarray(<double[:tmp]>d(self.__prob_set[i]).data())
-                )
+            bint imported = self.full_link_ids is not None
+            RouteVec_t *routes
+            vector[long long] *route
+            uint8_t[::1] mask_view
 
         for i in range(self.ods.size()):
-            route_set = self.__route_vecs[i]
+            origin = self.ods[i].first
+            destination = self.ods[i].second
+            # The ID columns are uint32, as before; refuse IDs that would wrap.
 
-            columns["origin id"].append(np.full(d(route_set).size(), self.ods[i].first, "uint32"))
-            columns["destination id"].append(np.full(d(route_set).size(), self.ods[i].second, "uint32"))
+            if origin < 0 or origin > UINT32_MAX:
+                raise OverflowError(f"Python integer {origin} out of bounds for uint32")
+            if destination < 0 or destination > UINT32_MAX:
+                raise OverflowError(f"Python integer {destination} out of bounds for uint32")
 
-            # Instead of constructing a "list of lists" style object for storing the route sets we instead will
-            # construct one big array of link IDs (with direction as sign) with a corresponding offsets array that
-            # indicates where each new row (path) starts.
-            for j in range(d(route_set).size()):
-                if self.full_link_ids is not None:
-                    route_set_col.append(np.array(
-                        [self.full_link_ids[link] * self.full_directions[link] for link in d(d(route_set)[j])],
-                        dtype=np.int64
-                    ))
+            routes = self.__route_vecs[i].get()
+            route_count += d(routes).size()
+            for j in range(d(routes).size()):
+                route = d(routes)[j].get()
+
+                if imported:
+                    link_count += d(route).size()
                     continue
 
-                links = []
-                for link in d(d(route_set)[j]):
-                    # Translate compressed link IDs to __supernet_id__ then to link_id * direction
-                    idx_min = self.mapping_idx[link]
-                    idx_max = self.mapping_idx[link + 1]
+                for link in d(route):
+                    link_count += self.mapping_idx[link + 1] - self.mapping_idx[link]
 
-                    # If there's just one link we can do a little better but just adding that single link ID
-                    if idx_max - idx_min == 1:
-                        links.append(self.link_id_direction[self.mapping_data[idx_min]])
-                    else:
-                        # Otherwise we pull out the full range and translate that
-                        supernet_ids = self.mapping_data[idx_min:idx_max]
-                        for supernet_id in supernet_ids:
-                            links.append(self.link_id_direction[supernet_id])
+        origin_ids = np.empty(route_count, dtype="uint32")
+        destination_ids = np.empty(route_count, dtype="uint32")
+        link_ids = np.empty(link_count, dtype="int64")
+        offsets = np.empty(route_count + 1, dtype=np.intp)
 
-                route_set_col.append(np.hstack(links))
+        cdef:
+            uint32_t[::1] origin_view = origin_ids
+            uint32_t[::1] destination_view = destination_ids
+            int64_t[::1] link_view = link_ids
+            Py_ssize_t[::1] offset_view = offsets
 
-        columns = {
-            k: np.hstack(v, casting="no") if len(v) else np.array([], dtype=types[k]) for k, v in columns.items()
-        }
-        columns["route set"] = route_set_col
+        for i in range(self.ods.size()):
+            routes = self.__route_vecs[i].get()
+
+            for j in range(d(routes).size()):
+                route = d(routes)[j].get()
+                origin_view[row] = <uint32_t>self.ods[i].first
+                destination_view[row] = <uint32_t>self.ods[i].second
+                offset_view[row] = position
+                row += 1
+
+                for link in d(route):
+                    if imported:
+                        link_view[position] = self.full_link_ids[link] * self.full_directions[link]
+                        position += 1
+                        continue
+
+                    # Each compact link stands for a run of supernetwork links, signed by direction.
+                    for k in range(self.mapping_idx[link], self.mapping_idx[link + 1]):
+                        link_view[position] = self.link_id_direction[self.mapping_data[k]]
+                        position += 1
+
+        offset_view[row] = position
+
+        columns = {"origin id": origin_ids, "destination id": destination_ids}
+
+        if have_assignment_results:
+            cost = np.empty(route_count, dtype="float64")
+            mask = np.empty(route_count, dtype="bool")
+            path_overlap = np.empty(route_count, dtype="float64")
+            probability = np.empty(route_count, dtype="float64")
+
+            self.copy_route_values(cost, self.__cost_set, 0.0, False)
+            self.copy_route_values(path_overlap, self.__path_overlap_set, 0.0, False)
+            self.copy_route_values(probability, self.__prob_set, 0.0, True)
+
+            # Results without a mask keep every route.
+            mask_view = mask.view(np.uint8)
+            row = 0
+            for i in range(self.ods.size()):
+                n_routes = d(self.__route_vecs[i]).size()
+                size = d(self.__mask_set[i]).size()
+
+                if size and size != n_routes:
+                    raise RuntimeError(f"OD pair {i} has {n_routes} routes but {size} mask values")
+
+                for j in range(n_routes):
+                    mask_view[row + j] = d(self.__mask_set[i])[j] != 0 if size else 1
+
+                row += n_routes
+
+            columns |= {"cost": cost, "mask": mask, "path overlap": path_overlap, "probability": probability}
+
+        # An object array keeps each route a separate entry, whatever the route lengths.
+        route_sets = np.empty(route_count, dtype=object)
+        for j in range(route_count):
+            route_sets[j] = link_ids[offset_view[j]:offset_view[j + 1]]
+        columns["route set"] = route_sets
 
         self.table = pd.DataFrame(columns)
         return self.table
+
+    @cython.wraparound(False)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void copy_route_values(
+        RouteChoiceSetResults self,
+        double[::1] output,
+        const vector[shared_ptr[vector[double]]] &values,
+        double missing,
+        bint required,
+    ) except *:
+        """Lay out one value per stored route, using missing for pairs that stored none unless required."""
+        cdef size_t i, j, n_routes, size, row = 0
+        for i in range(self.ods.size()):
+            n_routes = d(self.__route_vecs[i]).size()
+            size = d(values[i]).size()
+
+            if (size or required) and size != n_routes:
+                raise RuntimeError(f"OD pair {i} has {n_routes} routes but {size} values")
+
+            for j in range(n_routes):
+                output[row + j] = d(values[i])[j] if size else missing
+
+            row += n_routes
 
 
 cdef void recompute_route_probabilities(

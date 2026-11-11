@@ -15,7 +15,7 @@ def migrate(
 ):
     """Extend the default period to the whole service day, so it keeps trips that run past midnight."""
     if project_conn is None:
-        raise RuntimeError("Network migration 010 requires a project_conn connection")
+        raise RuntimeError("Network migration 012 requires a project_conn connection")
 
     if project_conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='periods'").fetchone() is None:
         logger.info("Migration finished, no periods table found.")

@@ -12,7 +12,7 @@ from aequilibrae.paths.cython.workspaces cimport (
 
 cdef extern from "select_link_loading.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
     void cpp_select_link_loading "aequilibrae::paths::cpp::routing::select_link_loading"[T, DemandRow](
-        const CppSearchResults &results,
+        const CppSearchResults[double] &results,
         const DemandRow &query,
         const CppSelectLinkContext &context,
         const CppSelectLinkWorkspace &selection,

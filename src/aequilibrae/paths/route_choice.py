@@ -220,9 +220,6 @@ class RouteChoice:
         if not isinstance(demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
             raise TypeError("demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
 
-        if self._nodes is not None and demand is not None:
-            raise ValueError("provide either a `demand` matrix or `nodes`, not both")
-
         self.demand = demand
         self._nodes = None
         self.__rc.clear_results()
@@ -755,8 +752,7 @@ class RouteChoice:
             index=self.demand.index,
             index_name=self.index_name,
         )
-        project.matrices.create(
-            name=matrix_name,
+        project.matrices.save_matrix(
             file_name=f"{matrix_name}.omx",
             matrix=out_matrix,
             procedure="Route choice OD select link",

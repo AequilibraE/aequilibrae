@@ -15,22 +15,22 @@ cdef extern from "aon.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
         CppSearchQuery search
         DemandRow loading
 
-    cdef cppclass CppAoNInputs "aequilibrae::paths::cpp::routing::AoNInputs":
+    cdef cppclass CppAoNInputs "aequilibrae::paths::cpp::routing::AoNInputs"[T]:
         CppAoNInputs() noexcept
 
-        CppSkimmingContext[double] skimming
+        CppSkimmingContext[T] skimming
         CppSelectLinkContext selection
 
-    cdef cppclass CppAoNWorkerView "aequilibrae::paths::cpp::routing::AoNWorkerView":
+    cdef cppclass CppAoNWorkerView "aequilibrae::paths::cpp::routing::AoNWorkerView"[T]:
         CppAoNWorkerView() noexcept
 
-        CppMutableSearchResults search
-        CppAoNWorkspace[double] workspace
-        CppLoadingOutputs[double] loading
-        CppSelectLinkLoadingOutputsView[double] selected_loading
+        CppMutableSearchResults[T] search
+        CppAoNWorkspace[T] workspace
+        CppLoadingOutputs[T] loading
+        CppSelectLinkLoadingOutputsView[T] selected_loading
 
-        double turn_cost_total
-        double unassigned_demand
+        T turn_cost_total
+        T unassigned_demand
         void reset() noexcept
 
 

@@ -66,7 +66,7 @@ project = create_example(fldr, "sioux_falls")
 # Load the network and demand matrix.
 network = project.network.build()
 
-matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # %%
 # Base assignment.

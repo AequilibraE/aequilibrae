@@ -31,11 +31,11 @@ def heuristic_for(context, name, x=None, y=None, scale=None):
     return cls(x, y, estimate_context_scale(context, raw) if scale is None else scale)
 
 
-def run(context, origin, destination, heuristic, heap="4ary", results=None):
+def run(context, origin, destination, heuristic, heap="4ary", results=None, workspace=None):
     mask = np.zeros(context.node_count, dtype=bool)
     mask[destination] = True
     results = allocate_results(context) if results is None else results
-    workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap)
+    workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap) if workspace is None else workspace
     return a_star(context, SearchQuery(context.node_count, origin, mask), destination, heuristic, results, workspace)
 
 
@@ -204,16 +204,62 @@ def test_random_parallel_graph_matches_dijkstra(heap, turn, name):
     )
     heuristic = heuristic_for(context, name, rng.uniform(-5, 5, n), rng.uniform(-5, 5, n))
     results = allocate_results(context)
+    workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap)
     for origin in range(n):
         reference = search(context, origin)
         for destination in range(n):
-            run(context, origin, destination, heuristic, heap, results)
+            run(context, origin, destination, heuristic, heap, results, workspace)
             assert results.path_cost_to(destination) == pytest.approx(reference.path_cost_to(destination))
             assert_state_tree(context, results)
             # Every published terminal, not only the destination, must be optimal.
             for node in range(n):
                 if results.reachable_to(node):
                     assert results.path_cost_to(node) == pytest.approx(reference.path_cost_to(node))
+
+
+@pytest.mark.parametrize("heap", available_heaps())
+@pytest.mark.parametrize("name", ["euclidean", "haversine"])
+@pytest.mark.parametrize("turn", [False, True])
+def test_workspace_reuses_estimates_and_invalidates_changed_heuristic(heap, name, turn):
+    context = make_context([0, 2, 3, 4, 4], [1, 2, 3, 3], [1, 2, 1, 2], turn=turn)
+    results = allocate_results(context)
+    workspace = AStarWorkspace(context.node_count, context.state_count, heap=heap)
+    heuristic = heuristic_for(context, name, [0, 1, 0, 0], scale=0)
+
+    def check(current, origin, destination, estimate):
+        expected = run(current, origin, destination, estimate, heap)
+        run(current, origin, destination, estimate, heap, results, workspace)
+        assert results.settled_count == expected.settled_count
+        for field in ("predecessors", "connectors", "settlement_order", "terminal_states", "distances", "turn_costs"):
+            np.testing.assert_array_equal(getattr(results, field), getattr(expected, field))
+        assert_state_tree(current, results)
+
+    check(context, 0, 3, heuristic)
+    assert results.path_cost_to(3) == 2
+    heuristic.update_scale(100)
+    check(context, 0, 3, heuristic)
+    assert results.path_cost_to(3) == 4  # An intentionally unsafe scale favors the expensive branch.
+    check(context, 0, 3, heuristic)  # Same destination and context reuse cached estimates.
+
+    replacement = heuristic_for(context, name, [0, 0, 1, 0], scale=100)
+    check(context, 0, 3, replacement)
+    assert results.path_cost_to(3) == 2
+    check(context, 0, 3, heuristic)
+    assert results.path_cost_to(3) == 4
+    heuristic.update_scale(0)
+    check(context, 0, 3, heuristic)
+    assert results.path_cost_to(3) == 2
+
+    # Route choice reuses a destination's heuristic while rebinding link costs.
+    changed = context.with_costs(np.array([10.0, 20.0, 10.0, 20.0]))
+    check(changed, 0, 3, heuristic)
+    assert results.path_cost_to(3) == 20
+    for origin, destination in [(0, 1), (2, 3), (3, 0), (0, 3), (1, 1)]:
+        check(context, origin, destination, replacement)
+    other_kind = "haversine" if name == "euclidean" else "euclidean"
+    other = heuristic_for(context, other_kind, [0, 1, 0, 0], scale=100)
+    check(context, 0, 3, other)
+    assert results.path_cost_to(3) == 4
 
 
 def coordinates_for(graph):
@@ -316,7 +362,7 @@ def test_coordinate_validation_is_deferred_for_dijkstra(problem):
 def test_missing_coordinates_and_heuristic_selection():
     graph = diamond()
     result = PathResults(graph, 10, 40)
-    with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
+    with pytest.raises(ValueError, match="coordinate columns"):
         result.compute_path(10, 40, a_star=True, heuristic_scale=1)
     with pytest.raises(ValueError, match="coordinates must include every graph node ID"):
         result.compute_path(10, 40, a_star=True, heuristic="haversine", heuristic_scale=1)

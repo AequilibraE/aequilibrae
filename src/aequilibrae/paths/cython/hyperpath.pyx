@@ -17,6 +17,8 @@ from libcpp.vector cimport vector
 
 from cython.parallel import prange, threadid
 
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.sparse_matrix cimport SparseMatrix
 from aequilibrae.utils.cython.bridge cimport Bridge
 from aequilibrae.utils.cython.bar cimport Bar
 
@@ -110,6 +112,34 @@ def csc_structure(tail: np.ndarray, head: np.ndarray, vertex_count: int):
     indptr = np.zeros(vertex_count + 1, dtype=np.uint32)
     np.cumsum(counts, out=indptr[1:])
     return indptr, np.argsort(head, kind="stable").astype(np.uint32)
+
+
+def packed_entries(_MatrixBase matrix not None):
+    """Return the row and column positions and the values of the nonzero entries of a packed matrix with one field.
+
+    Entries go row by row, in increasing column order within each row.
+    """
+    cdef SparseMatrix packed
+    if matrix.field_count != 1:
+        raise ValueError("the packed matrix must have exactly one field")
+
+    values = np.asarray(matrix._values)
+    if isinstance(matrix, SparseMatrix):
+        packed = matrix
+        counts = np.diff(np.asarray(packed.row_index).astype(np.int64))
+        rows = np.repeat(np.arange(matrix.origin_count, dtype=np.int64), counts)
+        columns = np.asarray(packed.col_index).astype(np.int64)
+        data = values[:, 0]
+    else:
+        rows, columns = np.nonzero(values[:, :, 0])
+        data = values[rows, columns, 0]
+
+    nonzero = data != 0
+    return (
+        rows[nonzero].astype(np.int64),
+        columns[nonzero].astype(np.int64),
+        np.ascontiguousarray(data[nonzero], dtype=DATATYPE_PY),
+    )
 
 
 @cython.boundscheck(False)

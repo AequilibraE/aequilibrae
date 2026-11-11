@@ -146,7 +146,7 @@ cdef class SparseMatrixBuilder(_MatrixBase):
         return self.storage64.get().rows.size()
 
     def to_df(self, row="origin", col="destination"):
-        """Return independent OD records using the original zone IDs."""
+        """Return independent OD records using zero-based coordinates."""
         if self.origin_count != self.destination_count:
             raise ValueError("zone-labelled DataFrames require a square builder")
         if row == col or row in self.field_names or col in self.field_names:

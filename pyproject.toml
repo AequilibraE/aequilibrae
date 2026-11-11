@@ -42,7 +42,7 @@ dependencies = [
   "requests",
   "rtree",
   "scipy>=1.4",
-  "shapely>=2.0",
+  "shapely>=2.1",
   "tqdm",
   "numexpr",
 ]
@@ -54,6 +54,16 @@ create = [
   "pyrosm>=0.6.2",
   "neatnet>=0.1.6",
   "overturemaps>=1.0"
+]
+
+[dependency-groups]
+build = [
+  "meson-python>=0.15.0",
+  "ninja",
+  "cython>=3.1",
+  "cysignals",
+  "build",
+  "spin>=0.19",
 ]
 
 docs = [
@@ -88,7 +98,10 @@ tests = [
 ]
 
 dev = [
-  "aequilibrae[tests, docs, create]",
+  { include-group = "build" },
+  { include-group = "tests" },
+  { include-group = "docs" },
+  "ipython",
   "scipy-stubs",
 ]
 
@@ -99,6 +112,24 @@ sphinx-autodoc-annotation = ["setuptools"]
 [project.scripts]
 aeq = "aequilibrae.project.tools.cli:cli"
 aeq-sim = "aequilibrae.utils.simwrapper.generate_simwrapper_config:main"
+
+[tool.spin]
+package = "aequilibrae"
+
+[tool.spin.commands]
+Build = ["spin.cmds.meson.build", "spin.cmds.pip.install", "spin.cmds.build.sdist", "spin.cmds.build.wheel"]
+Checks = ["spin.cmds.meson.test", ".spin/cmds.py:lint", ".spin/cmds.py:doctest"]
+Environments = ["spin.cmds.meson.python", "spin.cmds.meson.ipython", "spin.cmds.meson.shell", "spin.cmds.meson.run"]
+Documentation = ["spin.cmds.meson.docs"]
+Debugging = ["spin.cmds.meson.gdb", "spin.cmds.meson.lldb"]
+Introspection = ["spin.cmds.meta.introspect"]
+
+[tool.spin.kwargs]
+"spin.cmds.meson.build" = { meson_args = ["--vsenv", "-Dbuildtype=release"] }
+"spin.cmds.meson.test" = { n_jobs = "8", pytest_args = [
+  "--random-order-bucket=global", "--random-order", "--durations=50",
+] }
+".spin/cmds.py:doctest" = { n_jobs = "1", pytest_args = [] }
 
 [tool.ruff]
 lint.select = ["B", "C", "E", "F", "W"]

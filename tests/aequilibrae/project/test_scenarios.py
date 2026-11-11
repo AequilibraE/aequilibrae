@@ -8,7 +8,7 @@ import pytest
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae import TrafficAssignment, TrafficClass
+from aequilibrae import MatrixStore, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.paths.vdf import bpr
@@ -24,7 +24,7 @@ def test_traffic_assignment_scenarios(scenario_example, scenario):
     network = scenario_example.network
 
     try:
-        mat = scenario_example.matrices.get_matrix("demand_omx", subset=["matrix"])
+        mat = scenario_example.matrices.get_matrix("demand.omx", subset=["matrix"])
     except Exception:
         # Expected to fail for non-sioux_falls scenarios as theres no demand_omx
         assert scenario != "root"
@@ -75,7 +75,6 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     assig.set_time_field("trav_time")
     assig.set_frequency_field("freq")
     assig.set_algorithm("os")
-    assigclass.set_demand_matrix_core("pt")
 
     assig.execute()
 
@@ -98,10 +97,10 @@ def test_matrices_scenarios(scenario_example, scenario):
     df = matrices.list()
 
     if len(df) > 0:
-        first_matrix = df.iloc[0]["name"]
-        rec = matrices.get(first_matrix)
-        assert rec.name is not None
-        assert rec.name == first_matrix
+        first_matrix = df.index[0]
+        with matrices.get_matrix(first_matrix) as matrix:
+            assert isinstance(matrix, MatrixStore)
+            assert len(matrix) > 0
     else:
         assert scenario != "root"
 
@@ -219,9 +218,9 @@ def test_scenario_result_isolation(scenario_example, scenario):
     results = scenario_example.results
     table_name = f"isolation_test_{scenario}"
 
-    # Create scenario-specific result
-    _ = results.insert(
-        table_name=table_name,
+    results.create(
+        table_name,
+        pd.DataFrame({"value": [1]}),
         procedure="isolation_test",
         procedure_id=f"isolation_{scenario}",
         description=f"Testing isolation for {scenario}",
@@ -364,7 +363,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Add some data to root
     results = scenario_example.results
-    results.insert(table_name="root_specific", procedure="test", procedure_id="test_id", description="Root only data")
+    results.create(
+        "root_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Root only data",
+    )
 
     # Create empty scenario
     scenario_example.create_empty_scenario("isolated_empty", "Isolated test")
@@ -387,7 +392,13 @@ def test_scenario_isolation_after_creation(scenario_example):
 
     # Modify clone data shouldn't affect root
     results = scenario_example.results
-    results.insert(table_name="clone_specific", procedure="test", procedure_id="test_id", description="Clone only data")
+    results.create(
+        "clone_specific",
+        pd.DataFrame({"value": [1]}),
+        procedure="test",
+        procedure_id="test_id",
+        description="Clone only data",
+    )
 
     scenario_example.use_scenario("root")
     root_results = scenario_example.results.list()
@@ -400,7 +411,7 @@ def test_scenario_run_module_persistence(scenario_example, scenario):
 
     # For the root module we should have one matrix in the summary
     if scenario == "root":
-        assert "demand_omx" in scenario_example.run["matrix_summary"]()
+        assert "demand.omx" in scenario_example.run["matrix_summary"]()
     else:
         # For the others we shouldn't have any matrices, and the "run" dir shouldn't exist
         assert len(scenario_example.run["matrix_summary"]()) == 0

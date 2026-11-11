@@ -1,6 +1,7 @@
 """Single-destination A* with caller-supplied heuristic inputs."""
 
 import operator
+from itertools import count
 import numpy as np
 
 from libc.math cimport isfinite
@@ -9,6 +10,11 @@ from aequilibrae.paths.cython.search_query cimport SearchQuery
 from aequilibrae.paths.cython.search_results cimport SearchResults
 from aequilibrae.paths.cython.workspaces cimport AStarWorkspace, CppAStarWorkspace
 from aequilibrae.utils.cython.array_allocations cimport const_array_pointer
+
+
+# Coordinates are private copies. A stable identity avoids reusing estimates
+# when a destroyed heuristic's allocation addresses are recycled.
+_heuristic_identities = count(1)
 
 
 def validate_scale(scale):
@@ -46,13 +52,15 @@ cdef class EuclideanContext:
         x, y = _coordinates(x, y)
         self.scale = validate_scale(scale)
         self.x, self.y = x, y
+        self.cache_identity = next(_heuristic_identities)
         self.node_count = x.size
 
     def update_scale(self, scale: float):
         self.scale = validate_scale(scale)
 
-    cdef CppEuclideanContext view(self) noexcept nogil:
-        cdef CppEuclideanContext context
+    cdef CppEuclideanContext[double] view(self) noexcept nogil:
+        cdef CppEuclideanContext[double] context
+        context.cache_identity = self.cache_identity
         context.node_count = self.node_count
         context.x = const_array_pointer[double](self.x)
         context.y = const_array_pointer[double](self.y)
@@ -75,13 +83,15 @@ cdef class HaversineContext:
         self.longitudes = np.deg2rad(longitudes)
         self.latitudes = np.deg2rad(latitudes)
         self.cos_latitudes = np.cos(self.latitudes)
+        self.cache_identity = next(_heuristic_identities)
         self.node_count = latitudes.size
 
     def update_scale(self, scale: float):
         self.scale = validate_scale(scale)
 
-    cdef CppHaversineContext view(self) noexcept nogil:
-        cdef CppHaversineContext context
+    cdef CppHaversineContext[double] view(self) noexcept nogil:
+        cdef CppHaversineContext[double] context
+        context.cache_identity = self.cache_identity
         context.node_count = self.node_count
         context.longitudes = const_array_pointer[double](self.longitudes)
         context.latitudes = const_array_pointer[double](self.latitudes)
@@ -126,8 +136,8 @@ def a_star(
 
     cdef size_t target = destination
     cdef CppSearchQuery cpp_query = query.view()
-    cdef CppMutableSearchResults cpp_results = results.view()
-    cdef CppAStarWorkspace cpp_workspace = workspace.a_star_view()
+    cdef CppMutableSearchResults[double] cpp_results = results.view()
+    cdef CppAStarWorkspace[double] cpp_workspace = workspace.a_star_view()
 
     with nogil:
         cpp_a_star(context.view(), cpp_query, target, heuristic.view(), cpp_results, cpp_workspace)
@@ -136,7 +146,7 @@ def a_star(
 
 
 cdef double estimate_scale(
-    const CppNodeBasedContext &graph, const CppHeuristicContext &heuristic,
+    const CppNodeBasedContext[double] &graph, const CppHeuristicContext &heuristic,
 ) noexcept nogil:
     cdef size_t node, link
     cdef double distance, candidate, scale = -1.0

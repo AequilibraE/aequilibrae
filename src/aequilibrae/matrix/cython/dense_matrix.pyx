@@ -38,8 +38,8 @@ cdef class DenseMatrix(_MatrixBase):
         self._values = values
 
     @classmethod
-    def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order."""
+    def from_matrix(cls, matrix, dtype=None, *, transpose=False):
+        """Copy all named matrices into one packed buffer, keeping their order, optionally transposed."""
         if not isinstance(matrix, AequilibraeMatrix):
             raise TypeError("matrix must be an AequilibraeMatrix")
 
@@ -55,11 +55,11 @@ cdef class DenseMatrix(_MatrixBase):
 
         if not matrix:
             return cls(matrix.shape[0], (), dtype=np.float64 if dtype is None else dtype)
-        return cls.from_dict({name: matrix[name] for name in matrix}, dtype=dtype)
+        return cls.from_dict({name: matrix[name] for name in matrix}, dtype=dtype, transpose=transpose)
 
     @classmethod
-    def from_dict(cls, matrices, dtype=None):
-        """Copy named two-dimensional arrays into one packed buffer."""
+    def from_dict(cls, matrices, dtype=None, *, transpose=False):
+        """Copy named two-dimensional arrays into one packed buffer, optionally transposed."""
         if not isinstance(matrices, Mapping):
             raise TypeError("matrices must be a mapping of names to arrays")
 
@@ -85,10 +85,13 @@ cdef class DenseMatrix(_MatrixBase):
 
             dtype = next(iter(dtypes), np.dtype(np.float64))
 
+        if transpose:
+            shape = shape[::-1]
+
         cdef DenseMatrix output = cls(shape[1], names, dtype=dtype, origin_count=shape[0])
         values = np.asarray(output._values)
         for field, name in enumerate(names):
-            np.copyto(values[:, :, field], sources[name], casting="same_kind")
+            np.copyto(values[:, :, field], sources[name].T if transpose else sources[name], casting="same_kind")
 
         return output
 

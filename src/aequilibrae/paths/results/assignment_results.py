@@ -170,7 +170,9 @@ class TransitAssignmentResults(AssignmentResultsBase):
         self.lids = graph.graph.link_id.to_numpy(copy=False)
 
     def reset(self):
-        self.link_loads.fill(0)
+        # Loads may borrow a read-only pandas buffer; leave retained results untouched.
+        self.link_loads = np.zeros_like(self.link_loads)
+        self.skims = None
 
     def get_load_results(self):
         if not self.link_loads.shape[0]:

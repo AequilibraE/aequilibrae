@@ -1,29 +1,19 @@
 import json
+import sqlite3
 
 import pandas as pd
 import pytest
 
 from aequilibrae.project.data.results import Results, format_dataframe
+from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.utils.db_utils import ConnectionClosure
 
 
 @pytest.fixture
 def results():
     closure = ConnectionClosure(":memory:", ":memory:")
-    closure.db_connection._connection.execute(
-        """CREATE TABLE results (
-            scenario TEXT,
-            year TEXT,
-            table_name TEXT NOT NULL PRIMARY KEY,
-            reference_table TEXT,
-            procedure TEXT NOT NULL,
-            procedure_id TEXT NOT NULL,
-            procedure_report TEXT NOT NULL,
-            timestamp DATETIME DEFAULT current_timestamp,
-            description TEXT
-        )"""
-    )
-    table = Results(closure.db_connection, closure.results_connection)
+    initialize_tables("results", closure.results_connection._connection)
+    table = Results(closure.results_connection)
     yield table, closure.results_connection._connection
     closure.close()
 
@@ -82,16 +72,15 @@ def test_create_validates_input_and_does_not_replace_resources(results):
     assert "collision" not in table
 
 
-def test_delete_and_delete_result_have_distinct_resource_semantics(results):
+def test_delete_requires_absent_data_and_delete_result_removes_both(results):
     table, results_connection = results
     table.create("metadata_only", assignment_frame())
-    table.delete("metadata_only")
+    with pytest.raises(sqlite3.IntegrityError, match="results table still exists"):
+        table.delete("metadata_only")
 
-    assert "metadata_only" not in table
+    assert "metadata_only" in table
     assert results_connection.execute("SELECT 1 FROM metadata_only LIMIT 1").fetchone() is not None
 
-    table.update_database()
-    assert "metadata_only" in table
     table.delete_result("metadata_only")
     assert "metadata_only" not in table
     assert (
@@ -102,7 +91,8 @@ def test_delete_and_delete_result_have_distinct_resource_semantics(results):
 
 def test_clear_update_and_sync_reconcile_metadata_and_data(results):
     table, results_connection = results
-    table.insert(table_name="result_with_missing_data")
+    table.create("result_with_missing_data", assignment_frame())
+    results_connection.execute("DROP TABLE result_with_missing_data")
     results_connection.execute("CREATE TABLE orphan (link_id INTEGER, value REAL)")
 
     table.sync()
@@ -110,6 +100,29 @@ def test_clear_update_and_sync_reconcile_metadata_and_data(results):
     assert "result_with_missing_data" not in table
     assert "orphan" in table
     assert table.get("orphan").procedure == ""
+    assert "results" not in table
+
+
+def test_sync_does_not_register_the_metadata_table(results):
+    table, _ = results
+    table.sync()
+    table.sync()
+    assert len(table) == 0
+
+
+def test_insert_requires_an_existing_data_table(results):
+    table, _ = results
+    with pytest.raises(sqlite3.IntegrityError, match="results table does not exist"):
+        table.insert(table_name="missing")
+    assert "missing" not in table
+
+
+def test_delete_allows_metadata_removal_after_data_is_dropped(results):
+    table, results_connection = results
+    table.create("missing", assignment_frame())
+    results_connection.execute("DROP TABLE missing")
+    table.delete("missing")
+    assert "missing" not in table
 
 
 def test_unnamed_and_multi_indexes_are_saved_as_columns(results):
@@ -122,6 +135,54 @@ def test_unnamed_and_multi_indexes_are_saved_as_columns(results):
     multi = pd.DataFrame({"flow": [1.5, 2.5]}, index=index)
     table.create("multi", multi)
     assert list(table.get_results("multi").columns) == ["link_id", "class", "flow"]
+
+
+def test_fields_are_explicitly_unsupported(results):
+    table, _ = results
+    with pytest.raises(NotImplementedError, match="field editing is not supported"):
+        _ = table.fields
+
+
+@pytest.mark.parametrize("direct_sql", [False, True])
+@pytest.mark.parametrize("replacement_exists", [False, True])
+def test_update_cannot_orphan_an_existing_result_table(results, direct_sql, replacement_exists):
+    table, conn = results
+    table.create("flows", assignment_frame())
+    if replacement_exists:
+        conn.execute("CREATE TABLE replacement (value REAL)")
+
+    with pytest.raises(sqlite3.IntegrityError, match="results table (still exists|does not exist)"):
+        if direct_sql:
+            conn.execute("UPDATE results SET table_name='replacement' WHERE table_name='flows'")
+        else:
+            table.update("flows", table_name="replacement")
+
+    assert "flows" in table
+    assert "replacement" not in table
+    assert table.table_exists("flows")
+
+
+@pytest.mark.parametrize("replacement_exists", [False, True])
+def test_update_after_old_table_is_removed_requires_an_existing_replacement(results, replacement_exists):
+    table, conn = results
+    table.create("flows", assignment_frame())
+    conn.execute("DROP TABLE flows")
+    if replacement_exists:
+        conn.execute("CREATE TABLE replacement (value REAL)")
+        table.update("flows", table_name="replacement")
+        assert "replacement" in table
+        assert "flows" not in table
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="results table does not exist"):
+            table.update("flows", table_name="replacement")
+        assert "flows" in table
+
+
+def test_update_of_metadata_and_unchanged_table_name_is_allowed(results):
+    table, _ = results
+    table.create("flows", assignment_frame())
+    table.update("flows", table_name="flows", description="Updated")
+    assert table.get("flows").description == "Updated"
 
 
 def test_format_dataframe_rejects_ambiguous_columns():

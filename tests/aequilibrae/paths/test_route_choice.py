@@ -15,11 +15,14 @@ from aequilibrae.paths.route_choice import RouteChoice
 @pytest.fixture(scope="function")
 def route_choice_setup(sioux_falls_single_class):
     graph = sioux_falls_single_class.network.build_graph(
-        mode="c", cost="distance", fields=["distance", "free_flow_time"],
-        block_centroid_flows=False, compact=True,
+        mode="c",
+        cost="distance",
+        fields=["distance", "free_flow_time"],
+        block_centroid_flows=False,
+        compact=True,
     )
 
-    mat = sioux_falls_single_class.matrices.get_matrix("demand_omx", subset=["matrix"])
+    mat = sioux_falls_single_class.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
 
@@ -190,6 +193,9 @@ def test_saving(route_choice_setup):
 
     rc.save_link_flows("ll")
     rc.save_select_link("sl")
+    metadata = project.matrices.get_available_matrices_and_metadata()["sl.omx"]
+    assert metadata["procedure"] == "Route choice OD select link"
+    assert metadata["procedure_id"] == rc.procedure_id
 
     with project.results_connection as conn:
         for table, df in [

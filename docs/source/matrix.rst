@@ -497,37 +497,3 @@ Dense and sparse matrices share the store's file metadata and zone mapping. A
 store's ``subset()`` returns an independent ``AequilibraeSparseMatrix`` when
 selecting one or more sparse matrices, or an ``AequilibraeMatrix`` for dense or
 empty selections. The result can be used after the store closes.
-
-Native sparse buffers
----------------------
-
-Use ``SparseMatrix`` to pack a sparse collection for C++ code:
-
-.. code-block:: python
-
-    from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
-
-    packed = SparseMatrix.from_matrix(demand_from_sparse)
-    shared = packed.to_matrix(demand_from_sparse.index, index_name="zones")
-
-``from_matrix()`` copies the union of all stored positions into one CSR index.
-All fields use that index, with zero for positions missing from a source field.
-Stored zeros are kept and duplicate positions are summed. The source arrays,
-their formats and their values are not changed. Zone IDs and metadata are not
-retained in the packed buffer.
-
-All packed values use one dtype, either float32 or float64. Source dtypes must
-match unless you pass ``dtype=`` to convert them. Complex values are rejected.
-Empty buffers are allowed.
-
-``to_matrix()`` returns an ``AequilibraeSparseMatrix`` with CSR arrays built
-from the row pointers, column indices and shared value buffer. Named data
-arrays may be strided. Value changes at existing positions are shared with the
-packed buffer. The arrays keep the buffer alive. Adding or removing stored
-positions is not supported by this shared view. The supplied zone index is
-copied and normal whole-matrix assignment still copies values.
-
-Cython code can borrow a ``CppSparseMatrix[float]`` or
-``CppSparseMatrix[double]`` with ``packed.view[float]()`` or
-``packed.view[double]()``. The type must match the packed dtype. The view can
-be used without the GIL, but its owner must remain alive while it is in use.

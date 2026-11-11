@@ -14,7 +14,7 @@ from aequilibrae.paths.vdf import bpr
 def select_link_setup(sioux_falls_single_class):
     project = sioux_falls_single_class
     network = project.network
-    matrix = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+    matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     def make(links=None, algorithm="msa"):
         traffic = TrafficClass(
@@ -69,11 +69,10 @@ def test_multiple_link_sets(select_link_setup):
     assignment.save_select_link_results("select_link_analysis")
 
     matrices = project.matrices
-    matrices.update_database()
-    assert "select_link_analysis.omx" in matrices.list()["file_name"].tolist()
+    assert "select_link_analysis.omx" in matrices.get_available_matrices_and_metadata()
 
     # Test if matrices are with the correct shape and are not empty
-    sla = matrices.get_matrix("select_link_analysis_omx")
+    sla = matrices.get_matrix("select_link_analysis.omx")
     num_zones = len(assignment.classes[0].demand.index)
     for mat in sla:
         m = sla[mat]
@@ -237,9 +236,9 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
         mask = graph.full_link_ids == link_id
         if direction:
             mask &= graph.full_directions == direction
-        sl_links.extend(zip(
-            graph.full_node_ids[graph.full_tails[mask]], graph.full_node_ids[graph.full_heads[mask]], strict=True
-        ))
+        sl_links.extend(
+            zip(graph.full_node_ids[graph.full_tails[mask]], graph.full_node_ids[graph.full_heads[mask]], strict=True)
+        )
     mask = {}
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):
@@ -269,22 +268,42 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
 
 def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_class):
     project = sioux_falls_single_class
-    network = Network(pd.DataFrame({
-        "link_id": [11, 12, 13], "a_node": [1, 2, 3], "b_node": [2, 3, 4],
-        "direction": [0, 0, 0], "modes": ["c"] * 3,
-        "time": [1.0] * 3, "capacity": [100.0] * 3,
-    }))
+    network = Network(
+        pd.DataFrame(
+            {
+                "link_id": [11, 12, 13],
+                "a_node": [1, 2, 3],
+                "b_node": [2, 3, 4],
+                "direction": [0, 0, 0],
+                "modes": ["c"] * 3,
+                "time": [1.0] * 3,
+                "capacity": [100.0] * 3,
+            }
+        )
+    )
     classes = []
     for name, centroids in (("first", [3, 1, 2]), ("second", [4, 2])):
         demand = AequilibraeMatrix(index=np.array(centroids))
         demand["flow"] = np.ones((len(centroids), len(centroids)), dtype=np.float64)
-        classes.append(TrafficClass(
-            name=name, mode="c", cost="time", demand=demand, block_centroid_flows=False,
-            select_link_sets={"chosen": [11, 12, 13]},
-        ))
+        classes.append(
+            TrafficClass(
+                name=name,
+                mode="c",
+                cost="time",
+                demand=demand,
+                block_centroid_flows=False,
+                select_link_sets={"chosen": [11, 12, 13]},
+            )
+        )
     assignment = TrafficAssignment(
-        network=network, classes=classes, time_field="time", capacity_field="capacity",
-        vdf=bpr, name_mapping={"alpha": 0.0, "beta": 1.0}, algorithm="msa", project=project,
+        network=network,
+        classes=classes,
+        time_field="time",
+        capacity_field="capacity",
+        vdf=bpr,
+        name_mapping={"alpha": 0.0, "beta": 1.0},
+        algorithm="msa",
+        project=project,
     )
     assignment.execute(max_iterations=1, cores=1)
     assignment.save_select_link_matrices("different_centroids", project=project)

@@ -1,12 +1,13 @@
 """Upgrade all AequilibraE projects stored in test and reference data."""
 
 import logging
+import shutil
 import tempfile
 import zipfile
 from pathlib import Path
 
 from aequilibrae.project.project import _upgrade
-from aequilibrae.project.project_creation import remove_triggers
+from aequilibrae.project.project_creation import _remove_triggers
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.logging_utils import basic_config
 
@@ -15,22 +16,27 @@ PROJECT_DATABASE = "project_database.sqlite"
 TRANSIT_DATABASE = "public_transport.sqlite"
 RESULTS_DATABASE = "results_database.sqlite"
 PROJECT_DATA_PATHS = (ROOT_PATH / "tests" / "data", ROOT_PATH / "src" / "aequilibrae" / "reference_files")
+RUN_FILE = ROOT_PATH / "src" / "aequilibrae" / "reference_files" / "demo.__init__.py"
 
 
 def upgrade_project(project_path: Path) -> None:
     """Open, upgrade, and close one project."""
     print(f"Upgrading {project_path}")
     db_path = project_path / "project_database.sqlite"
+    run_module = project_path / "run"
     transit_database_path = project_path / TRANSIT_DATABASE
     results_database_path = project_path / RESULTS_DATABASE
 
     transit_path = transit_database_path if transit_database_path.exists() else None
     results_path = results_database_path if results_database_path.exists() else None
+
+    run_module.mkdir(exist_ok=True)
+    shutil.copy2(RUN_FILE, project_path / "run" / "__init__.py")
     _upgrade(project_path=db_path, results_path=results_path, transit_path=transit_path)
 
     if project_path.stem == "no_triggers_project":
         with commit_and_close(db_path, spatial=True) as conn:
-            remove_triggers(conn, "network")
+            _remove_triggers(conn, "network")
         print("Removed triggers from no_triggers_project")
 
 
@@ -46,8 +52,10 @@ def upgrade_archive(archive_path: Path) -> None:
             archive.extractall(temporary_path)
 
         print(f"Upgrading projects in {archive_path}")
+        run_modules = []
         for database_path in temporary_path.rglob(PROJECT_DATABASE):
             upgrade_project(database_path.parent)
+            run_modules.append((database_path.parent / "run" / "__init__.py").relative_to(temporary_path))
 
         with tempfile.NamedTemporaryFile(dir=archive_path.parent, delete=False) as temporary_archive:
             temporary_archive_path = Path(temporary_archive.name)
@@ -61,6 +69,11 @@ def upgrade_archive(archive_path: Path) -> None:
                         arcname=member.filename,
                         compress_type=member.compress_type,
                     )
+                # Preserve the original member list, except for newly installed run modules.
+                original_names = {member.filename for member in members}
+                for run_module in run_modules:
+                    if run_module.as_posix() not in original_names:
+                        upgraded_archive.write(temporary_path / run_module, arcname=run_module.as_posix())
             temporary_archive_path.replace(archive_path)
         finally:
             temporary_archive_path.unlink(missing_ok=True)

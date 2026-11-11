@@ -106,8 +106,7 @@ skims["distance"][:3, :3]
 
 # %%
 # We can save it to the project if we want
-project.matrices.create(
-    "base_skims",
+project.matrices.save_matrix(
     "base_skims.omx",
     skims,
     procedure="Network skimming",
@@ -116,12 +115,10 @@ project.matrices.create(
 )
 
 # %%
-# We can also retrieve this skim record to write something to its description
+# We can also open this skim file to write something to its description
 matrices = project.matrices
-matrices.update(
-    "base_skims",
-    description="minimized distance while also skimming distance for just a few nodes",
-)
+with matrices.get_matrix("base_skims.omx", mode="r+") as matrix:
+    matrix.metadata["description"] = "minimised distance while also skimming distance for just a few nodes"
 
 # %%
 project.close()

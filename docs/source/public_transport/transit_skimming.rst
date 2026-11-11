@@ -36,6 +36,11 @@ mode choice model cannot mistake them for free trips. Their demand is not loaded
 the class results as ``unassigned_demand`` and ``unassigned_od``. Skims follow the order of the
 graph's centroids, which is the zone order of the demand matrix.
 
+Each transit class accepts either an ``AequilibraeMatrix`` or an ``AequilibraeSparseMatrix``
+containing exactly one demand matrix, with finite, non-negative float64 values. Use
+``matrix.subset(["pt"])`` to select a matrix before constructing the class if needed.
+Skims are always dense ``AequilibraeMatrix`` objects using the demand's zone index.
+
 On the Spiess and Florian (1989) example network, with waits of half a headway and no penalties, the
 expected trip from A to B takes 27.75 minutes: 3.0 minutes of first wait, 1.25 minutes of transfer
 wait and 23.5 minutes in vehicle, with 1.5 boardings and 0.5 transfers.
@@ -84,14 +89,13 @@ wait and 23.5 minutes in vehicle, with 1.5 boardings and 0.5 transfers.
     >>> assig.set_skimming_fields(skim_cols) # Skimming must be set after a transit assignment class is added
 
     >>> assig.set_algorithm("os")
-    >>> assigclass.set_demand_matrix_core("pt")
 
     >>> assig.execute()
 
     >>> skims = assig.get_skim_results()["pt"]
 
-    >>> # Saving the skims registers them with the project, with the period, graph and costing they came from
-    >>> records = assig.save_skims("pt_skims", project=project)
+    >>> # Saving the skims writes an OMX file per class, recording the period, graph and costing they came from
+    >>> file_names = assig.save_skims("pt_skims", project=project)
 
     >>> project.close()
 
@@ -145,7 +149,6 @@ One example is skimming in-vehicle time in rail only. The graph's physical ``run
     >>> assig.set_skimming_fields(["rail_trav_time"])
 
     >>> assig.set_algorithm("os")
-    >>> assigclass.set_demand_matrix_core("pt")
 
     >>> assig.execute()
 

@@ -91,7 +91,7 @@ with project.db_connection as conn:
 network = project.network
 
 # Get the demand matrix
-mat = project.matrices.get_matrix("demand_omx", subset=["matrix"])
+mat = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # Create traffic assignment with alternative parameters
 traffic = TrafficClass(name="car", mode="c", cost="distance", demand=mat, block_centroid_flows=False)

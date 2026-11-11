@@ -4,6 +4,7 @@ import hashlib
 import json
 
 import geopandas as gpd
+import pytest
 from shapely.geometry import Point
 
 from aequilibrae.project.network.importer import DownloadCache
@@ -16,15 +17,16 @@ def test_cache_is_lazy(tmp_path):
     assert not (tmp_path / "downloaded data").exists()
 
 
-def test_write_geoparquet_creates_folder_and_round_trips(tmp_path):
+@pytest.mark.parametrize("name", ["payload", "payload.parquet"])
+def test_write_geoparquet_creates_folder_and_round_trips(tmp_path, name):
     cache = DownloadCache(tmp_path, "osm-overpass", "test")
     gdf = gpd.GeoDataFrame(
         {"name": ["a", "b"], "geometry": [Point(0, 0), Point(1, 1)]},
         crs="EPSG:4326",
     )
-    path = cache.write_geoparquet("payload", gdf)
+    path = cache.write_geoparquet(name, gdf)
     assert path.exists()
-    assert path.suffix == ".parquet"
+    assert path.name == "payload.parquet"
     assert cache.relative_path is not None
     assert "downloaded data" in cache.relative_path
     assert "osm-overpass" in cache.relative_path
@@ -35,11 +37,12 @@ def test_write_geoparquet_creates_folder_and_round_trips(tmp_path):
     assert list(back["name"]) == ["a", "b"]
 
 
-def test_write_json_round_trips(tmp_path):
+@pytest.mark.parametrize("name", ["notes", "notes.json"])
+def test_write_json_round_trips(tmp_path, name):
     cache = DownloadCache(tmp_path, "osm-overpass", "test")
-    path = cache.write_json("notes", {"hello": "world"})
+    path = cache.write_json(name, {"hello": "world"})
     assert path.exists()
-    assert path.suffix == ".json"
+    assert path.name == "notes.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload == {"hello": "world"}
 

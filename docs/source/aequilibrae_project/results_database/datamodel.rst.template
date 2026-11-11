@@ -1,0 +1,19 @@
+.. _results_data_model:
+
+Results database SQL data model
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The data model presented in this section describes the metadata table in
+``results_database.sqlite``. The same database stores the result data tables
+referenced by its ``table_name`` column.
+
+.. Do not touch below this line unless you know EXACTLY what you are doing.
+.. it will be automatically populated
+
+Results tables
+''''''''''''''
+
+.. toctree::
+   :maxdepth: 1
+
+   LIST_OF_TABLES

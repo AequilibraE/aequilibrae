@@ -36,7 +36,7 @@ Two migrations reach transit models:
   were never saved. The GTFS supply tables (stops, routes, trips, schedules, fares, map matching) are
   untouched. Each dropped graph's configuration is logged as a warning, in JSON, so it can be
   rebuilt with the same settings.
-* **Network migration 010** extends the default period (``period_id = 1``) to the whole service
+* **Network migration 012** extends the default period (``period_id = 1``) to the whole service
   day, from ``0`` to ``172800`` seconds (``48:00:00``).
 
 A dropped graph is rebuilt from its logged configuration. Configurations saved by 1.x name
@@ -304,8 +304,11 @@ New tools
   two zones: every edge it may use, by ``link_id``, with its expected volume and its split, the share
   of the flow through its tail that takes it. When the graph's edges have geometry (call
   ``create_line_geometry`` before ``to_transit_graph``), it is a GeoDataFrame ready for QGIS.
-* ``TransitAssignment.save_skims(matrix_name)`` saves each class's skims as an OMX matrix and
-  registers it in the project, as ``TrafficAssignment.save_skims`` does.
+* ``TransitClass`` takes an ``AequilibraeMatrix`` or ``AequilibraeSparseMatrix`` holding exactly one
+  demand matrix. ``matrix_core`` and ``set_demand_matrix_core`` are gone: pass ``matrix.subset([...])``
+  to assign one core of a larger matrix.
+* ``TransitAssignment.save_skims(matrix_name)`` saves each class's skims as an OMX file in the
+  project's matrix folder and returns the file names, as ``TrafficAssignment.save_skims`` does.
 * Saved results and skims record where they came from: the period, the graph configuration and its
   hash, the scenario and the class costing, in the procedure report and in the skim matrix's
   ``provenance`` metadata. ``TransitAssignment.results()`` includes the ``period_id``, since transit
@@ -313,7 +316,9 @@ New tools
 * ``TransitAssignmentResults`` reports ``unassigned_demand``, ``unassigned_od`` and
   ``weighted_waiting_time``: edge costs times volumes plus ``weighted_waiting_time`` equal demand times
   expected cost.
-* The Spiess & Florian kernel now runs in C++. ``HyperpathGenerating`` keeps its interface and adds
-  ``update_costs(trav_time, freq, headway_fraction=..., wait_weight=...)``, which replaces costs
-  without rebuilding the graph, and ``strategy(origin, destination)`` for one trip between two
-  vertices. Results are bitwise identical between runs with the same number of threads.
+* The Spiess & Florian kernel now runs in C++. ``HyperpathGenerating.assign`` takes packed demand, as
+  ``assignment_demand(matrix, centroids, transpose=True)`` builds it from one dense or sparse matrix, and
+  ``skim_matrix`` is a packed ``DenseMatrix`` (``to_matrix(index)`` gives an ``AequilibraeMatrix``).
+  ``HyperpathGenerating`` also adds ``update_costs(trav_time, freq, headway_fraction=..., wait_weight=...)``,
+  which replaces costs without rebuilding the graph, and ``strategy(origin, destination)`` for one trip
+  between two vertices. Results are bitwise identical between runs with the same number of threads.

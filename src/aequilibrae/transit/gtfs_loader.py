@@ -1,6 +1,6 @@
 import hashlib
-import zipfile
 import logging
+import zipfile
 from copy import deepcopy
 from datetime import datetime
 from os.path import basename, splitext
@@ -286,6 +286,9 @@ class GTFSReader(WorkerThread):
                     logger.warning(f"Trip {trip.trip} had less than two stops, so we skipped it.")
                     continue
 
+                stop_times["arrival_time"] = stop_times.arrival_time.astype(int)
+                stop_times["departure_time"] = stop_times.departure_time.astype(int)
+                self.stop_times[trip.trip] = stop_times
                 trip.stops = list(stop_times.stop_id.values)
                 pattern_key = "\x1f".join([trip.route, *stop_times.stop.values])
                 trip.pattern_hash = hashlib.md5(pattern_key.encode()).hexdigest()

@@ -3,14 +3,14 @@
 Usage
 -----
 .. code-block:: python
-    :caption: Generate SimWrapper dashboard for an open project
+    :caption: Generate SimWrapper dashboard for an example project
 
-    >>> from aequilibrae.project import Project
+    >>> from aequilibrae.utils.create_example import create_example
     >>> from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator
-    >>> prj = Project()
-    >>> prj.open('/path/to/project')
+    >>> prj = create_example(project_path)
     >>> gen = SimwrapperConfigGenerator(prj, output_dir='simwrapper')
     >>> gen.write_yamls()
+    >>> prj.close()
 
 Notes
 -----

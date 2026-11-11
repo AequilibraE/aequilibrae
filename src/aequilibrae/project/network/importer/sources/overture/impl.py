@@ -1,6 +1,5 @@
 import geopandas as gpd
 import json
-import logging
 from datetime import datetime, timezone
 from typing import Sequence
 from urllib.request import urlopen
@@ -10,8 +9,6 @@ from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.sources.overture.schema_to_staged import build_staged_from_overture
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.utils.optional_dependency import require
-
-logger = logging.getLogger(__name__)
 
 _STAC_CATALOG_URL = "https://stac.overturemaps.org/catalog.json"
 
@@ -53,7 +50,7 @@ def acquire_cloud(
     source_meta = {
         "source": "overture",
         "backend": "cloud",
-        "source_url": _overture_url(release),
+        "source_url": f"s3://overturemaps-us-west-2/release/{release}",
         "release": release,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -86,11 +83,5 @@ def _fetch_table(overturemaps, theme_type: str, bbox, *, release):
 def table_to_gdf(table) -> gpd.GeoDataFrame:
     """Convert a pyarrow table with a WKB geometry column into an EPSG:4326 GeoDataFrame."""
     df = table.to_pandas(use_threads=True)
-    if "geometry" not in df.columns:
-        raise ImporterError("Overture table must contain a geometry column")
     df["geometry"] = gpd.GeoSeries.from_wkb(df["geometry"], crs="EPSG:4326")
     return gpd.GeoDataFrame(df, geometry="geometry")
-
-
-def _overture_url(release) -> str:
-    return f"s3://overturemaps-us-west-2/release/{release}"

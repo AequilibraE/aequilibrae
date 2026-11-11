@@ -132,6 +132,13 @@ cdef class RouteChoiceSetResults:
     ) noexcept nogil
 
     cdef object make_df_from_results(RouteChoiceSetResults self)
+    cdef void copy_route_values(
+        RouteChoiceSetResults self,
+        double[::1] output,
+        const vector[shared_ptr[vector[double]]] &values,
+        double missing,
+        bint required,
+    ) except *
 
 cdef void recompute_route_probabilities(
     object df,

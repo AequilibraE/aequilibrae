@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from aequilibrae import Project
-from aequilibrae.project.project_creation import remove_triggers
+from aequilibrae.project.project_creation import _remove_triggers
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
@@ -41,8 +41,8 @@ def test_data_path():
 
 @pytest.fixture(scope="function")
 def omx_example(test_data_path, tmp_path):
-    file = tmp_path / "test_omx.omx"
-    shutil.copy(test_data_path / "test_omx.omx", file)
+    file = tmp_path / "SiouxFalls2.omx"
+    shutil.copy(test_data_path / "SiouxFalls2.omx", file)
     return file
 
 
@@ -118,7 +118,7 @@ def cached_empty_no_triggers_project(cache_path):
 @pytest.fixture
 def empty_no_triggers_project(empty_project, tmp_path) -> Project:
     with empty_project.db_connection as conn:
-        remove_triggers(conn, db_type="network")
+        _remove_triggers(conn, db_type="network")
         tables = ["nodes", "links"]
         for tbl in tables:
             conn.execute(f"DELETE FROM {tbl}")
@@ -142,7 +142,7 @@ def no_triggers_test(test_data_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_sioux_falls_single_class(test_data_path, cache_path):
-    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path / "sioux_falls_single_class")
+    zipfile.ZipFile(test_data_path / "sioux_falls_single_class.zip").extractall(cache_path)
 
 
 @pytest.fixture(scope="function")
@@ -187,12 +187,12 @@ def scenario_example(cached_scenario_example, cache_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_st_varent(test_data_path, cache_path):
-    # Zip includes top-level "St_Varent" dir.
+    # Zip includes "St_Varent_issue307/St_Varent" directories.
     zipfile.ZipFile(test_data_path / "St_Varent_issue307.zip").extractall(cache_path)
 
 
 @pytest.fixture(scope="function")
 def st_varent(cached_st_varent, cache_path, tmp_path) -> Project:
-    project = cached_model("St_Varent", cache_path, tmp_path)
+    project = cached_model("St_Varent_issue307/St_Varent", cache_path, tmp_path)
     yield project
     project.close()

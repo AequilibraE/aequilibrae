@@ -26,7 +26,6 @@ import numpy as np
 import pandas as pd
 import pyproj
 import shapely
-import shapely.ops
 from pandas.api.types import is_integer_dtype
 from pandas.core.frame import DataFrame
 from scipy.spatial import KDTree
@@ -353,7 +352,7 @@ class TransitGraphBuilder:
             ).transform
         else:
             transformer = self.__to_projected()
-        geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        geometry = [shapely.transform(p, transformer, include_z=None, interleaved=False) for p in geometry]
         centroids = shapely.centroid(geometry)
 
         # Zones in zone_id order, which is the centroid order of the graph and its skims
@@ -362,10 +361,16 @@ class TransitGraphBuilder:
             {
                 "zone_id": zones.zone_id.to_numpy()[order].astype(int),
                 "geometry": shapely.to_wkb(
-                    [shapely.ops.transform(self.transformer_p_to_g, geometry[i]) for i in order]
+                    [
+                        shapely.transform(geometry[i], self.transformer_p_to_g, include_z=None, interleaved=False)
+                        for i in order
+                    ]
                 ),
                 "centroids": shapely.to_wkb(
-                    [shapely.ops.transform(self.transformer_p_to_g, centroids[i]) for i in order]
+                    [
+                        shapely.transform(centroids[i], self.transformer_p_to_g, include_z=None, interleaved=False)
+                        for i in order
+                    ]
                 ),
             }
         )
@@ -495,7 +500,7 @@ class TransitGraphBuilder:
         """Create boarding vertices."""
         assert self.__line_segments is not None
         boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
-        boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        boarding_vertices = boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"})
         assert self.__stop_vertices is not None
         boarding_vertices = pd.merge(
             boarding_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
@@ -512,7 +517,7 @@ class TransitGraphBuilder:
         assert self.__line_segments is not None
         assert self.__stop_vertices is not None
         alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        alighting_vertices = alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"})
         alighting_vertices = pd.merge(
             alighting_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
@@ -628,7 +633,7 @@ class TransitGraphBuilder:
         )
 
         # reset index and copy it to column
-        self.vertices.reset_index(drop=True, inplace=True)
+        self.vertices = self.vertices.reset_index(drop=True)
 
         o_vertices = self.__od_vertices[self.__od_vertices.node_type.isin(["origin", "od"])]
         node_id_min = o_vertices.taz_id.max() + 1
@@ -644,8 +649,8 @@ class TransitGraphBuilder:
 
         # data types
         self.vertices.node_id = self.vertices.node_id.astype("int64")
-        self.vertices.stop_id = self.vertices.stop_id.fillna("").astype(str)
-        self.vertices.line_id = self.vertices.line_id.fillna("").astype(str)
+        self.vertices.stop_id = self.vertices.stop_id.astype("string").fillna("").astype(str)
+        self.vertices.line_id = self.vertices.line_id.astype("string").fillna("").astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
         self.vertices.taz_id = self.vertices.taz_id.astype("int64")
 
@@ -921,7 +926,7 @@ class TransitGraphBuilder:
         self.edges = pd.concat(edges, axis=0)
 
         # reset index and copy it to column
-        self.edges.reset_index(drop=True, inplace=True)
+        self.edges = self.edges.reset_index(drop=True)
         self.edges["link_id"] = self.edges.index + 1
         for col, default in EDGE_DEFAULTS.items():
             self.edges[col] = self.edges[col].fillna(default) if col in self.edges else default
@@ -930,9 +935,9 @@ class TransitGraphBuilder:
 
     @staticmethod
     def _set_edge_dtypes(edges: pd.DataFrame):
-        edges["line_id"] = edges.line_id.fillna("").astype(str)
-        edges["stop_id"] = edges.stop_id.fillna("").astype(str)
-        edges["segment_id"] = edges.segment_id.fillna("").astype(str)
+        edges["line_id"] = edges.line_id.astype("string").fillna("").astype(str)
+        edges["stop_id"] = edges.stop_id.astype("string").fillna("").astype(str)
+        edges["segment_id"] = edges.segment_id.astype("string").fillna("").astype(str)
         edges["line_seg_idx"] = edges.line_seg_idx.fillna(-1).astype("int64")
         edges["a_node"] = edges.a_node.astype("int64")
         edges["b_node"] = edges.b_node.astype("int64")
@@ -1052,8 +1057,12 @@ class TransitGraphBuilder:
         """
         to_projected = self.__to_projected()
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
-        nodes["geometry"] = nodes["geometry"].apply(lambda geometry: shapely.ops.transform(to_projected, geometry))
-        links["geometry"] = links["geometry"].apply(lambda geometry: shapely.ops.transform(to_projected, geometry))
+        nodes["geometry"] = nodes["geometry"].apply(
+            lambda geometry: shapely.transform(geometry, to_projected, include_z=None, interleaved=False)
+        )
+        links["geometry"] = links["geometry"].apply(
+            lambda geometry: shapely.transform(geometry, to_projected, include_z=None, interleaved=False)
+        )
         nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
         kdtree = KDTree(nodes_geometries)
 
@@ -1064,8 +1073,8 @@ class TransitGraphBuilder:
         lines = []
         assert self.edges is not None
         for row in self.edges[connector_rows].itertuples():
-            start = shapely.ops.transform(to_projected, points.loc[row.a_node])
-            end = shapely.ops.transform(to_projected, points.loc[row.b_node])
+            start = shapely.transform(points.loc[row.a_node], to_projected, include_z=None, interleaved=False)
+            end = shapely.transform(points.loc[row.b_node], to_projected, include_z=None, interleaved=False)
 
             _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
 
@@ -1083,7 +1092,7 @@ class TransitGraphBuilder:
                 else:
                     line = shapely.LineString((start, end))
 
-            line = shapely.ops.transform(self.transformer_p_to_g, line)
+            line = shapely.transform(line, self.transformer_p_to_g, include_z=None, interleaved=False)
             lines.append((geodesic_length(line), line.wkb))
         return lines
 
@@ -1376,8 +1385,8 @@ class TransitGraphBuilder:
 
         graph.vertices.node_id = graph.vertices.node_id.astype("int64")
         graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
-        graph.vertices.stop_id = graph.vertices.stop_id.fillna("").astype(str)
-        graph.vertices.line_id = graph.vertices.line_id.fillna("").astype(str)
+        graph.vertices.stop_id = graph.vertices.stop_id.astype("string").fillna("").astype(str)
+        graph.vertices.line_id = graph.vertices.line_id.astype("string").fillna("").astype(str)
 
         cls._set_edge_dtypes(graph.edges)
 
@@ -1415,14 +1424,14 @@ class TransitGraphBuilder:
                 left_on=o_zone_col,
                 right_on="taz_id",
             )[["node_id", d_zone_col, "demand"]]
-            od_matrix.rename(columns={"node_id": "o_node_id"}, inplace=True)
+            od_matrix = od_matrix.rename(columns={"node_id": "o_node_id"})
             od_matrix = pd.merge(
                 od_matrix,
                 self.od_node_mapping[["node_id", "taz_id"]],
                 left_on=d_zone_col,
                 right_on="taz_id",
             )[["o_node_id", "node_id", "demand"]]
-            od_matrix.rename(columns={"node_id": "d_node_id"}, inplace=True)
+            od_matrix = od_matrix.rename(columns={"node_id": "d_node_id"})
         return od_matrix
 
     @property

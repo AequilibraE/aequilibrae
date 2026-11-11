@@ -80,7 +80,7 @@ struct Workspace {
   std::vector<double> volume;               // v_i
   std::vector<std::uint32_t> order;         // attractive edges as extracted
   std::vector<double> skims;                // [vertices, fields]
-  FourAryHeap heap;
+  FourAryHeap<double> heap;
 };
 
 inline double edge_skim(std::uint8_t op, double value, double head_skim,

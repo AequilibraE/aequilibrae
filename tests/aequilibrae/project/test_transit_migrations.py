@@ -63,7 +63,7 @@ def add_pre_phase1_graph(transit_path: Path, project_path: Path):
 
 
 def restore_one_day_default_period(project_path: Path):
-    """Put back the default period and protecting trigger that projects had before migration 010."""
+    """Put back the default period and protecting trigger that projects had before migration 012."""
     with commit_and_close(project_path, spatial=False) as conn:
         conn.execute("DROP TRIGGER aequilibrae_default_period_update")
         conn.execute(
@@ -77,7 +77,7 @@ def restore_one_day_default_period(project_path: Path):
                 SELECT RAISE(ABORT,'Cannot update default period');
             END"""
         )
-        forget_migration(conn, 10)
+        forget_migration(conn, 12)
 
 
 def test_upgrade_drops_saved_graphs_and_logs_their_configs(coquimbo_example, caplog):
@@ -141,7 +141,7 @@ def test_load_skips_configs_without_saved_graphs(coquimbo_example):
 
 
 def test_upgrade_extends_the_default_period_to_the_service_day(coquimbo_example):
-    """Test that migration 010 makes the default period 00:00 to 48:00 and keeps it protected from updates."""
+    """Test that migration 012 makes the default period 00:00 to 48:00 and keeps it protected from updates."""
     project_path = coquimbo_example.project_base_path / "project_database.sqlite"
     restore_one_day_default_period(project_path)
 
@@ -150,7 +150,7 @@ def test_upgrade_extends_the_default_period_to_the_service_day(coquimbo_example)
     default = coquimbo_example.network.periods.get(1)
     assert (default.period_start, default.period_end) == (0, 172800)
     assert default.period_description == "Default time period, whole service day"
-    assert status(project_path, 10) == MigrationStatus.APPLIED.name
+    assert status(project_path, 12) == MigrationStatus.APPLIED.name
     with pytest.raises(sqlite3.IntegrityError, match="Cannot update default period"):
         coquimbo_example.network.periods.update(1, period_end=86400)
 
@@ -170,7 +170,7 @@ def test_upgrade_migrates_every_scenario(scenario_example):
 
     scenario_example.upgrade()
 
-    assert status(coquimbo / "project_database.sqlite", 10) == MigrationStatus.APPLIED.name
+    assert status(coquimbo / "project_database.sqlite", 12) == MigrationStatus.APPLIED.name
     assert status(coquimbo / "public_transport.sqlite", 7) == MigrationStatus.APPLIED.name
     scenario_example.use_scenario("coquimbo")
     assert scenario_example.network.periods.get(1).period_end == 172800
@@ -210,15 +210,15 @@ def test_frozen_schemas_match_the_schema_before_phase_1():
 
 
 def test_new_migrations_are_registered():
-    """Test that transit migrations 007 and 008 and network migration 010 are part of their migration series."""
+    """Test that transit migrations 007 and 008 and network migration 012 are part of their migration series."""
     transit = MigrationManager(MigrationManager.transit_migration_file).migrations
     network = MigrationManager(MigrationManager.network_migration_file).migrations
     assert transit[7].name == "physical_transit_graphs"
-    assert network[10].name == "default_period_whole_service_day"
+    assert network[12].name == "default_period_whole_service_day"
     assert transit[8].name == "fare_rule_zones_as_text"
     assert max(transit) == 8
-    assert max(network) == 10
-    assert (NETWORK_MIGRATIONS / "010_default_period_whole_service_day.py").exists()
+    assert max(network) == 12
+    assert (NETWORK_MIGRATIONS / "012_default_period_whole_service_day.py").exists()
 
 
 def test_projects_without_turn_restrictions_open_and_upgrade(empty_project):
@@ -231,6 +231,7 @@ def test_projects_without_turn_restrictions_open_and_upgrade(empty_project):
             "aequilibrae_mode_keep_if_in_use_on_turn_restrictions_updating",
             "aequilibrae_mode_keep_if_in_use_on_turn_restrictions_deleting",
             "aequilibrae_turn_restrictions_update_geometry_on_node_move",
+            "aequilibrae_turn_restrictions_keep_referenced_node",
         ):
             conn.execute(f"DROP TRIGGER {trigger}")
         conn.execute("SELECT DropTable(NULL, 'turn_restrictions')")

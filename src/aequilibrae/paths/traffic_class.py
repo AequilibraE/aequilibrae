@@ -86,7 +86,7 @@ class TrafficClass:
         >>> project = create_example(project_path)
         >>> proj_matrices = project.matrices
 
-        >>> demand = proj_matrices.get_matrix("demand_omx", subset=["matrix"])
+        >>> demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
 
         >>> tc = TrafficClass(
         ...     name="car", mode="c", cost='free_flow_time', demand=demand, pce=1.3,
@@ -210,35 +210,31 @@ class TransitClass(TransportClassBase):
 
         **graph** (:obj:`TransitGraph`): Graph to assign on.
 
-        **matrix** (:obj:`AequilibraeMatrix`): Demand.
+        **matrix** (:obj:`AequilibraeMatrix` or :obj:`AequilibraeSparseMatrix`): Demand, as exactly one matrix of
+        finite, nonnegative float64 values over the graph's centroids. Use ``matrix.subset(["pt"])`` to select one
+        from a matrix that holds more.
 
         **costing** (:obj:`TransitCosting`, optional): How the class perceives the graph. Defaults to
         ``TransitCosting()`` on graphs from ``TransitGraphBuilder``.
     """
 
+    _matrix_types = (AequilibraeMatrix, AequilibraeSparseMatrix)
+
     def __init__(
-        self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix, costing: TransitCosting | None = None
+        self,
+        name: str,
+        graph: TransitGraph,
+        matrix: AequilibraeMatrix | AequilibraeSparseMatrix,
+        costing: TransitCosting | None = None,
     ):
         super().__init__(name, graph, matrix)
+        if len(matrix) != 1:
+            raise ValueError("Transit assignment requires exactly one demand matrix per class")
+        validate_assignment_demand(matrix, graph.centroids)
         self._config["Graph"] = str(graph._config)
         self.results = TransitAssignmentResults()
 
-        if len(matrix) == 1:
-            self.matrix_core = next(iter(matrix))
-        else:
-            self.matrix_core = None
-
         self.set_costing(costing)
-
-    def set_demand_matrix_core(self, core: str):
-        """
-        Set the matrix core to use for demand.
-
-        :Arguments:
-            **core** (:obj:`str`):"""
-        if core not in self.matrix:
-            raise KeyError(f"'{core}' is not present in the matrix")
-        self.matrix_core = core
 
     def set_costing(self, costing: TransitCosting | None = None) -> None:
         """Set how the class perceives the graph, and write the resulting costs to the graph's fields.

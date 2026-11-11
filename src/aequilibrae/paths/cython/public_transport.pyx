@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.context import get_active_project
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.paths.cython.demand import validate_demand
 
 from aequilibrae.utils.cython.bridge cimport Bridge
 
@@ -253,12 +254,7 @@ class HyperpathGenerating:
     def run(self, origin, destination, volume):
         """Load ``volume`` trips from vertex ``origin`` to vertex ``destination`` and keep the destination's labels
         in ``u_i_vec``."""
-        self.assign(
-            np.array([origin]),
-            np.array([destination]),
-            np.array([volume], dtype=DATATYPE_PY),
-            threads=1
-        )
+        self._assign_vertices(np.array([origin]), np.array([destination]), np.array([volume]), threads=1)
 
     def strategy(self, origin, destination) -> pd.DataFrame:
         """Return the optimal strategy of one trip between two vertices.
@@ -291,15 +287,6 @@ class HyperpathGenerating:
         )
         return frame
 
-    def _check_vertex_idx(self, idx):
-        assert isinstance(idx, int)
-        assert idx >= 0
-        assert idx < self.vertex_count
-
-    def _check_volume(self, v):
-        assert isinstance(v, float)
-        assert v >= 0.0
-
     def _check_edges(self, edges, tail, head, trav_time, freq, skim_cols):
         if not isinstance(edges, pd.core.frame.DataFrame):
             raise TypeError("edges should be a pandas DataFrame")
@@ -331,48 +318,48 @@ class HyperpathGenerating:
             if edges[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
 
-    def assign(
-        self,
-        origin_column,
-        destination_column,
-        demand_column,
-        check_demand=False,
-        threads=None
-    ):
+    def assign(self, demand, threads=None):
         """
         Assigns demand to the edges of the graph.
 
-        Assumes the `*_column` arguments are provided as numpy arrays that form a COO sprase matrix. Demand from an
-        origin that cannot reach its destination is not loaded, and is reported in ``unassigned_demand``.
+        Demand is packed in [destinations, origins, fields] order, with one field. Pack user-facing matrices with
+        ``transpose=True`` before assigning, as ``assignment_demand(matrix, centroids, transpose=True)`` does. Zone
+        positions follow ``o_vert_ids`` and ``d_vert_ids`` supplied at construction. Skims are returned in a packed
+        dense ``skim_matrix`` in [origins, destinations, fields] order. Demand from an origin that cannot reach its
+        destination is not loaded, and is reported in ``unassigned_demand``.
 
         :Arguments:
-            **origin_column** (:obj:`np.ndarray`, optional): The column for the origin vertices.
-            Default is "orig_vert_idx".
-
-            **destination_column** (:obj:`np.ndarray`, optional): The column or the destination vertices.
-            Default is "dest_vert_idx".
-
-            **demand_column** (:obj:`np.ndarray`, optional): The column for the demand values.
-            Default is "demand".
-
-            **check_demand** (:obj:`bool`, optional): If ``True``, check the validity of the demand data.
-            Default is ``False``.
+            **demand** (:obj:`DenseMatrix` or :obj:`SparseMatrix`): Finite, non-negative float64 demand.
 
             **threads** (:obj:`int`, optional): The number of threads to use for computation.
             Default is ``0`` (using all available threads).
 
         """
+        origins, destinations, values = self._demand_entries(demand)
+        self._assign_vertices(self._o_vert_ids[origins], self._d_vert_ids[destinations], values, threads)
 
-        origin_column = np.asarray(origin_column).astype(np.uint32)
-        destination_column = np.asarray(destination_column).astype(np.uint32)
-        demand_column = np.asarray(demand_column).astype(DATATYPE_PY)
-        # check the input demand parameter
-        if check_demand:
-            self._check_demand(origin_column, destination_column, demand_column)
+    def _demand_entries(self, demand):
+        """Return the origin and destination zone positions and the values of the nonzero entries of packed demand.
 
+        Entries go destination by destination, in increasing origin order within each.
+        """
+        zones = len(self._o_vert_ids)
+        if validate_demand(demand, zones) != (zones, zones, 1) or len(self._d_vert_ids) != zones:
+            raise ValueError("Transit assignment requires exactly one demand matrix matching the graph zones")
+
+        # The rows of transposed demand are its destinations
+        destinations, origins, values = packed_entries(demand)
+        return origins, destinations, values
+
+    def _assign_vertices(self, origins, destinations, demand, threads):
+        """Assign demand between vertex IDs, keeping the volumes and the labels of a single destination."""
         volume, labels = self._solve(
-            origin_column.astype(np.int64), destination_column.astype(np.int64), demand_column, threads,
-            skim=self._skimming, labels=True,
+            np.asarray(origins).astype(np.int64),
+            np.asarray(destinations).astype(np.int64),
+            np.asarray(demand).astype(DATATYPE_PY),
+            threads,
+            skim=self._skimming,
+            labels=True,
         )
         self._edges["volume"] = volume
         self.u_i_vec = labels
@@ -500,29 +487,7 @@ class HyperpathGenerating:
             values["transfers"] = difference(values[_WAITING_EDGES], values["pt_probability"])
 
         names = ([self._trav_time_name] if self._is_travel_time else []) + self._skim_cols_names
-        self.skim_matrix = AequilibraeMatrix(index=self._o_vert_ids)
-        self.skim_matrix.update({name: np.ascontiguousarray(values[name]) for name in names})
-
-    def _check_demand(self, origin_column, destination_column, demand_column):
-        for col, col_name in zip(
-                [origin_column, destination_column, demand_column],
-                ["origin", "destination", "demand"]
-        ):
-            if not isinstance(col, (np.ndarray, np.generic)):
-                raise TypeError(f"{col_name} should be a numpy array")
-
-            if np.any(np.isnan(col)):
-                raise ValueError(f"{col_name} should not have any missing value")
-
-        for col, col_name in zip([origin_column, destination_column], ["origin", "destination"]):
-            if not col.dtype == np.uint32:
-                raise TypeError(f"column '{col_name}' should be of np.uint32")
-
-        if not demand_column.dtype == np.float64:
-            raise TypeError("demand column should be of np.float64 type")
-
-        if demand_column.min() < 0.0:
-            raise ValueError("demand column should be nonnegative")
+        self.skim_matrix = DenseMatrix.from_dict({name: values[name] for name in names}, dtype=DATATYPE_PY)
 
     def info(self) -> dict:
         info = {

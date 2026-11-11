@@ -13,12 +13,12 @@ import pandas as pd
 import scipy.sparse
 from numpy.typing import ArrayLike, DTypeLike
 from openmatrix import File as OMXFile
-from scipy.sparse import bsr_array, coo_array, csc_array, csr_array, dia_array, dok_array, lil_array, sparray
+from scipy.sparse import bsr_array, coo_array, csc_array, csr_array, dok_array, lil_array, sparray
 
 OMX_SPECIAL_ATTRS = {"OMX_VERSION", "OMX_CREATED_WITH", "SHAPE", "TITLE"}
 SPARSE_SPECIAL_ATTRS = {"FORMAT"}
 
-SparseArray: TypeAlias = bsr_array | coo_array | csc_array | csr_array | dia_array | dok_array | lil_array
+SparseArray: TypeAlias = bsr_array | coo_array | csc_array | csr_array | dok_array | lil_array
 
 
 def _copy_file_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:

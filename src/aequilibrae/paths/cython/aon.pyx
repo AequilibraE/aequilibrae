@@ -167,8 +167,8 @@ cdef class _AoNWorker:
                 context.link_count, class_count, selection_names,
             )
 
-    cdef CppAoNWorkerView view(self) noexcept nogil:
-        cdef CppAoNWorkerView worker
+    cdef CppAoNWorkerView[double] view(self) noexcept nogil:
+        cdef CppAoNWorkerView[double] worker
 
         worker.search = self.search.view()
         worker.workspace = self.workspace.view()
@@ -209,8 +209,8 @@ cdef class PreparedAoN:
     cdef list workers
     cdef vector[CppAoNOrigin[DenseDemandRow]] dense_origin_queries
     cdef vector[CppAoNOrigin[SparseDemandRow]] sparse_origin_queries
-    cdef vector[CppAoNWorkerView] worker_views
-    cdef CppAoNInputs inputs
+    cdef vector[CppAoNWorkerView[double]] worker_views
+    cdef CppAoNInputs[double] inputs
 
     # The standalone reductions require contiguous tables of component views
     cdef vector[CppLoadingOutputs[double]] loading_outputs
@@ -325,7 +325,7 @@ cdef class PreparedAoN:
     cdef void __prepare_workers(self) except *:
         """Allocate only the scratch and accumulators required by each worker."""
         cdef _AoNWorker worker
-        cdef CppAoNWorkerView view
+        cdef CppAoNWorkerView[double] view
 
         # Label-only skimming reads search labels and needs no state-sum buffer.
         skim_width = None
@@ -439,7 +439,7 @@ cdef class PreparedAoN:
     def run(self, AoNOutputs out not None):
         """Replace this iteration's outputs, reusing all prepared worker storage."""
         cdef size_t worker
-        cdef CppAoNOutputsView output
+        cdef CppAoNOutputsView[double] output
         cdef double turn_cost_total = 0
         cdef double unassigned_demand = 0
         cdef bint node_based = isinstance(self.context, NodeBasedContext)
@@ -514,12 +514,12 @@ cdef class PreparedAoN:
 cdef void assign_origin(
     RoutingContext routing,
     const AoNOriginView &query,
-    const CppAoNInputs &inputs,
-    CppAoNWorkerView &worker,
-    const CppAoNOutputsView &output,
+    const CppAoNInputs[double] &inputs,
+    CppAoNWorkerView[double] &worker,
+    const CppAoNOutputsView[double] &output,
 ) noexcept nogil:
     """Compose operations on one search, without consulting Python owners."""
-    cdef CppSearchResults search = worker.search.read_view()
+    cdef CppSearchResults[double] search = worker.search.read_view()
     cdef CppSelectLinkODOriginView[double] selected_od
     cdef size_t origin = query.search.origin
 
@@ -539,10 +539,10 @@ cdef void assign_origin(
 
 
 cdef void load_origin(
-    const CppSearchResults &search,
+    const CppSearchResults[double] &search,
     const DemandRowView &demand,
-    const CppAoNInputs &inputs,
-    CppAoNWorkerView &worker,
+    const CppAoNInputs[double] &inputs,
+    CppAoNWorkerView[double] &worker,
     const CppSelectLinkODOriginView[double] &selected_od,
 ) noexcept nogil:
     # OD builders and selected link accumulators remain worker-local until
@@ -560,10 +560,10 @@ cdef void assign_origins(
     RoutingContext routing,
     const AoNOriginView *origins,
     size_t origin_count,
-    const CppAoNInputs &inputs,
-    CppAoNWorkerView *workers,
+    const CppAoNInputs[double] &inputs,
+    CppAoNWorkerView[double] *workers,
     int cores,
-    const CppAoNOutputsView &output,
+    const CppAoNOutputsView[double] &output,
 ) noexcept nogil:
     cdef Py_ssize_t index
 

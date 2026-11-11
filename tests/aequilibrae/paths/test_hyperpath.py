@@ -10,6 +10,10 @@ https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import sparse
+
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
 
 
@@ -163,6 +167,26 @@ def network_setup(request):
     return result
 
 
+def pack_demand(centroids, origins, destinations, values, matrix_type=DenseMatrix):
+    """Pack trips between zone vertices into transposed demand, as ``HyperpathGenerating.assign`` takes it."""
+    positions = {node: zone for zone, node in enumerate(centroids)}
+    matrix = np.zeros((len(centroids), len(centroids)))
+    np.add.at(
+        matrix,
+        ([positions[node] for node in origins], [positions[node] for node in destinations]),
+        np.asarray(values, dtype=np.float64),
+    )
+    source = sparse.csr_array(matrix) if matrix_type is SparseMatrix else matrix
+    return matrix_type.from_dict({"demand": source}, transpose=True)
+
+
+@pytest.fixture(params=[DenseMatrix, SparseMatrix])
+def packed_demand(network_setup, request):
+    demand = network_setup["demand"]
+    origin, destination = demand.columns[:2]
+    return pack_demand(network_setup["centroids"], demand[origin], demand[destination], demand["demand"], request.param)
+
+
 def sf_hyperpath(network_setup, skim_cols=None, **kwargs):
     kwargs.setdefault("headway_fraction", 0.5)
     return HyperpathGenerating(
@@ -176,17 +200,18 @@ def sf_hyperpath(network_setup, skim_cols=None, **kwargs):
 
 
 def assign_sf_demand(hp, network_setup, threads=None):
-    hp.assign(
-        network_setup["demand"]["origin_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["destination_vertex_id"].values.astype(np.uint32),
-        network_setup["demand"]["demand"].values.astype(np.float64),
-        check_demand=True,
-        threads=threads,
-    )
+    demand = network_setup["demand"]
+    trips = (demand["origin_vertex_id"], demand["destination_vertex_id"], demand["demand"])
+    hp.assign(pack_demand(network_setup["centroids"], *trips), threads=threads)
+
+
+def skim_results(hp, network_setup):
+    """The skims of the last assignment, by zone ID."""
+    return hp.skim_matrix.to_matrix(network_setup["centroids"])
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
-def test_bell_assign_parallel_agreement(network_setup):
+def test_bell_assign_parallel_agreement(network_setup, packed_demand):
     """Test that Bell's network assigns the same volumes with one, two and four threads."""
     hp = HyperpathGenerating(
         network_setup["edges"],
@@ -197,13 +222,7 @@ def test_bell_assign_parallel_agreement(network_setup):
 
     results = []
     for threads in [1, 2, 4]:
-        hp.assign(
-            network_setup["demand"]["orig_vert_idx"].values.astype(np.uint32),
-            network_setup["demand"]["dest_vert_idx"].values.astype(np.uint32),
-            network_setup["demand"]["demand"].values.astype(np.float64),
-            check_demand=True,
-            threads=threads,
-        )
+        hp.assign(packed_demand, threads=threads)
         results.append(hp._edges.volume.to_numpy(copy=True))
 
     for result in results[1:]:
@@ -211,7 +230,7 @@ def test_bell_assign_parallel_agreement(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
-def test_bell_assign_is_bitwise_repeatable(network_setup):
+def test_bell_assign_is_bitwise_repeatable(network_setup, packed_demand):
     """Test that repeating an assignment with the same thread count gives bitwise-identical volumes and skims."""
     hp = HyperpathGenerating(
         network_setup["edges"],
@@ -220,19 +239,14 @@ def test_bell_assign_is_bitwise_repeatable(network_setup):
         d_vert_ids=network_setup["centroids"],
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
-    demand = network_setup["demand"]
-    args = (
-        demand["orig_vert_idx"].values.astype(np.uint32),
-        demand["dest_vert_idx"].values.astype(np.uint32),
-        demand["demand"].values.astype(np.float64),
-    )
 
-    hp.assign(*args, threads=3)
-    volumes, skims = hp._edges.volume.to_numpy(copy=True), hp.skim_matrix["waiting_time"].copy()
+    hp.assign(packed_demand, threads=3)
+    volumes = hp._edges.volume.to_numpy(copy=True)
+    skims = skim_results(hp, network_setup)["waiting_time"].copy()
     for _ in range(3):
-        hp.assign(*args, threads=3)
+        hp.assign(packed_demand, threads=3)
         np.testing.assert_array_equal(hp._edges.volume.to_numpy(), volumes)
-        np.testing.assert_array_equal(hp.skim_matrix["waiting_time"], skims)
+        np.testing.assert_array_equal(skim_results(hp, network_setup)["waiting_time"], skims)
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
@@ -256,10 +270,22 @@ def test_run_returns_the_destination_labels_when_skimming(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_assign_01(network_setup):
-    """Test that assigning the demand table loads the published strategy."""
+def test_SF_single_destination(network_setup, packed_demand):
+    """Test that packed demand towards a single destination loads the published strategy and keeps its labels."""
     hp = sf_hyperpath(network_setup)
-    assign_sf_demand(hp, network_setup)
+    hp.assign(packed_demand, threads=1)
+
+    np.testing.assert_allclose(
+        network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
+    )
+    np.testing.assert_allclose(hp.u_i_vec, SF_LABELS, rtol=1e-08, atol=1e-06)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_assign_01(network_setup, packed_demand):
+    """Test that assigning the packed demand loads the published strategy."""
+    hp = sf_hyperpath(network_setup)
+    hp.assign(packed_demand)
 
     np.testing.assert_allclose(
         network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
@@ -295,13 +321,14 @@ def test_waiting_time_skimming(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_skimming_01(network_setup):
+def test_SF_skimming_01(network_setup, packed_demand):
     """Test that the strategy from A to B skims as published, and that B cannot reach A."""
     skims = ["trav_time", "boardings", "transfers", "pt_probability", "in_vehicle_trav_time"]
     skims += ["waiting_time", "first_waiting_time", "transfer_waiting_time"]
     hp = sf_hyperpath(network_setup, skim_cols=skims)
-    assign_sf_demand(hp, network_setup)
-    mats = hp.skim_matrix
+    hp.assign(packed_demand)
+    assert isinstance(hp.skim_matrix, DenseMatrix)
+    mats = skim_results(hp, network_setup)
 
     def pair(value):
         return np.array([[0.0, value], [np.inf, 0.0]])
@@ -317,11 +344,11 @@ def test_SF_skimming_01(network_setup):
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_skimming_02(network_setup):
+def test_SF_skimming_02(network_setup, packed_demand):
     """Test that every strategy alights as often as it boards."""
     hp = sf_hyperpath(network_setup, skim_cols=["boardings", "alightings"])
-    assign_sf_demand(hp, network_setup)
-    mats = hp.skim_matrix
+    hp.assign(packed_demand)
+    mats = skim_results(hp, network_setup)
 
     np.testing.assert_allclose(mats["boardings"], mats["alightings"])
 
@@ -331,7 +358,7 @@ def test_wait_weight_changes_labels_but_not_reported_waits(network_setup):
     """Test that the wait weight scales perceived waits in the labels, while reported waits stay physical."""
     hp = sf_hyperpath(network_setup, skim_cols=["trav_time", "waiting_time", "in_vehicle_trav_time"], wait_weight=2.0)
     assign_sf_demand(hp, network_setup)
-    mats = hp.skim_matrix
+    mats = skim_results(hp, network_setup)
 
     # The strategy is the same, since every attractive set still beats the alternatives
     np.testing.assert_allclose(
@@ -350,7 +377,7 @@ def test_costs_and_waits_add_up_to_expected_cost(network_setup):
     volumes = hp._edges.volume.to_numpy()
     costs = np.maximum(network_setup["edges"].trav_time.to_numpy(), hp.cost_floor)
     loaded = costs @ volumes + hp.weighted_waiting_time
-    assert loaded == pytest.approx(hp.skim_matrix["trav_time"][0, 1], rel=1e-12)
+    assert loaded == pytest.approx(skim_results(hp, network_setup)["trav_time"][0, 1], rel=1e-12)
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
@@ -373,11 +400,7 @@ def test_flow_is_conserved_at_every_vertex(network_setup):
 def test_unreachable_demand_is_reported_and_not_loaded(network_setup):
     """Test that demand from B to A, which no strategy serves, is reported as unassigned."""
     hp = sf_hyperpath(network_setup)
-    hp.assign(
-        np.array([STOP_A, STOP_B], dtype=np.uint32),
-        np.array([STOP_B, STOP_A], dtype=np.uint32),
-        np.array([1.0, 3.0]),
-    )
+    hp.assign(pack_demand(network_setup["centroids"], [STOP_A, STOP_B], [STOP_B, STOP_A], [1.0, 3.0]))
 
     assert hp.unassigned_demand == pytest.approx(3.0)
     assert hp.unassigned_od.to_dict("records") == [{"origin": STOP_B, "destination": STOP_A, "demand": 3.0}]
@@ -398,8 +421,9 @@ def test_an_edge_without_a_wait_takes_all_the_flow(network_setup):
     boarding_at_a = ((edges.tail == STOP_A) & (edges.link_type == "boarding")).to_numpy()
     assert np.all(volume[boarding_at_a] == 0.0)
     assert volume[-1] == 1.0
-    assert hp.skim_matrix["trav_time"][0, 1] == pytest.approx(900.0 + 690.0)
-    assert hp.skim_matrix["waiting_time"][0, 1] == pytest.approx(0.5 / (1 / 1800 + 1 / 360))
+    mats = skim_results(hp, network_setup)
+    assert mats["trav_time"][0, 1] == pytest.approx(900.0 + 690.0)
+    assert mats["waiting_time"][0, 1] == pytest.approx(0.5 / (1 / 1800 + 1 / 360))
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
@@ -418,7 +442,9 @@ def test_update_costs_matches_a_new_graph(network_setup):
     fresh = sf_hyperpath(network_setup, skim_cols=["trav_time"], headway_fraction=1.0)
     assign_sf_demand(fresh, network_setup)
     np.testing.assert_array_equal(hp._edges.volume.to_numpy(), fresh._edges.volume.to_numpy())
-    np.testing.assert_array_equal(hp.skim_matrix["trav_time"], fresh.skim_matrix["trav_time"])
+    np.testing.assert_array_equal(
+        skim_results(hp, network_setup)["trav_time"], skim_results(fresh, network_setup)["trav_time"]
+    )
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
@@ -448,3 +474,16 @@ def test_strategy_lists_edges_splits_and_volumes(network_setup):
     assert splits[STOP_Y, 12] == pytest.approx(1 / 6)
     assert splits[STOP_Y, 14] == pytest.approx(5 / 6)
     assert "volume" not in hp._edges.columns
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_assign_rejects_demand_that_does_not_match_the_zones(network_setup):
+    """Test that demand with more than one field or another number of zones raises instead of being assigned."""
+    hp = sf_hyperpath(network_setup)
+    two_fields = DenseMatrix.from_dict({"a": np.ones((2, 2)), "b": np.ones((2, 2))}, transpose=True)
+    three_zones = DenseMatrix.from_dict({"demand": np.ones((3, 3))}, transpose=True)
+    for demand in (two_fields, three_zones):
+        with pytest.raises(ValueError):
+            hp.assign(demand)
+    with pytest.raises(TypeError):
+        hp.assign(np.ones((2, 2)))

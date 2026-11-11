@@ -1,4 +1,4 @@
-"""Packed sparse matrices for native code and shared Python results."""
+"""Packed sparse matrices for native code and Python results."""
 
 from collections.abc import Mapping
 
@@ -39,7 +39,10 @@ cdef class SparseMatrix(_MatrixBase):
 
     @classmethod
     def from_csr(cls, shape: tuple[int, int], row_index, col_index, cores: dict, dtype=None):
-        """Copy CSR indices and named value arrays into one packed buffer"""
+        """Copy CSR indices and named value arrays into one packed buffer.
+
+        With no named fields, retain the supplied CSR pattern.
+        """
         cores = {name: np.asarray(value) for name, value in cores.items()}
 
         if dtype is None:
@@ -70,7 +73,8 @@ cdef class SparseMatrix(_MatrixBase):
         for value in packed_cores.values():
             active |= value != 0
 
-        if not np.all(active):
+        # With no fields, keep the supplied structural pattern.
+        if packed_cores and not np.all(active):
             active_rows = np.searchsorted(
                 np.asarray(_row_index)[1:],
                 np.flatnonzero(active),
@@ -97,6 +101,7 @@ cdef class SparseMatrix(_MatrixBase):
         shape = (self.origin_count, self.destination_count)
         values = np.asarray(self._values)
 
+        # SciPy may still copy the arrays despite copy=False.
         return {
             name: sparse.csr_matrix((values[:, i], self.col_index, self.row_index), shape=shape, copy=False)
             for i, name in enumerate(self.field_names)
@@ -186,8 +191,8 @@ cdef class SparseMatrix(_MatrixBase):
             np.copyto(values[:, i], cores[name], casting="same_kind")
 
     @classmethod
-    def from_matrix(cls, matrix, dtype=None):
-        """Copy all named matrices into one packed buffer, keeping their order"""
+    def from_matrix(cls, matrix, dtype=None, *, transpose=False):
+        """Copy all named matrices into one packed buffer, keeping their order, optionally transposed."""
         if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
             raise TypeError("matrix must be an AequilibraeMatrix or AequilibraeSparseMatrix")
 
@@ -204,11 +209,11 @@ cdef class SparseMatrix(_MatrixBase):
                 dtype=np.float64 if dtype is None else dtype,
                 origin_count=matrix.shape[0],
             )
-        return cls.from_dict(sources, dtype=dtype)
+        return cls.from_dict(sources, dtype=dtype, transpose=transpose)
 
     @classmethod
-    def from_dict(cls, matrices, dtype=None):
-        """Pack named dense or sparse matrices using their canonical shared COO positions."""
+    def from_dict(cls, matrices, dtype=None, *, transpose=False):
+        """Pack named dense or sparse matrices using their canonical shared COO positions, optionally transposed."""
         if not isinstance(matrices, Mapping):
             raise TypeError("matrices must be a mapping of names to arrays")
         if not matrices:
@@ -241,16 +246,25 @@ cdef class SparseMatrix(_MatrixBase):
             ):
                 raise TypeError("Matrix values must be real numbers")
 
+            if sparse.issparse(matrix) and hasattr(matrix, "check_format"):
+                matrix.check_format(full_check=True)
+
             inputs[name] = matrix
 
         dtype = np.dtype(source_dtype if dtype is None else dtype)
         if dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
             raise TypeError("dtype must be float32 or float64")
 
+        if transpose:
+            shape = shape[::-1]
+
         # Canonicalise each field with SciPy before constructing the union of
         # CSR indices.
         coo_matrices = {}
         for name, matrix in inputs.items():
+            if transpose:
+                matrix = matrix.T
+
             if sparse.issparse(matrix):
                 source = matrix.tocoo(copy=False)
                 # Cast values before summing duplicates to avoid source-dtype overflow.
@@ -285,7 +299,7 @@ cdef class SparseMatrix(_MatrixBase):
         return cls.from_csr(shape, row_index, col_index, cores, dtype=dtype)
 
     def to_matrix(self, index, index_name="main_index"):
-        """Return an AequilibraeSparseMatrix sharing this buffer without copying values"""
+        """Return an AequilibraeSparseMatrix built from this buffer."""
         if self.origin_count != self.destination_count:
             raise ValueError("only square buffers can be returned as an AequilibraeSparseMatrix")
 
@@ -297,6 +311,7 @@ cdef class SparseMatrix(_MatrixBase):
         cols = np.asarray(self.col_index)
         shape = (self.origin_count, self.destination_count)
 
+        # SciPy may still copy the arrays despite copy=False.
         arrays = {
             name: sparse.csr_array((values[:, field], cols, rows), shape=shape, copy=False)
             for field, name in enumerate(self.field_names)

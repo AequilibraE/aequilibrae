@@ -75,22 +75,21 @@ def assign(classes, skims=("trav_time",), cores=None, project=None):
     return assignment
 
 
-def test_save_skims_registers_one_matrix_per_class_with_provenance(coquimbo_example, coquimbo_builder):
-    """Test that save_skims registers a matrix per class whose metadata records the graph and costing."""
+def test_save_skims_saves_one_matrix_file_per_class_with_provenance(coquimbo_example, coquimbo_builder):
+    """Test that save_skims saves a matrix file per class whose metadata records the graph and costing."""
     graph = coquimbo_builder.to_transit_graph()
     costing = TransitCosting(wait_weight=2.0)
     pt = TransitClass("pt", graph, demand_matrix(graph), costing=costing)
     assignment = assign([pt], skims=["trav_time", "boardings"], project=coquimbo_example)
 
-    records = assignment.save_skims("am_skims", project=coquimbo_example)
-    assert [record.name for record in records] == ["am_skims_pt"]
+    assert assignment.save_skims("am_skims", project=coquimbo_example) == ["am_skims_pt.omx"]
 
-    saved = coquimbo_example.matrices.get_matrix("am_skims_pt")
-    assert set(saved) == {"trav_time", "boardings"}
-    np.testing.assert_array_equal(saved.index, graph.centroids)
-    np.testing.assert_array_equal(saved["trav_time"], pt.results.skims["trav_time"])
+    with coquimbo_example.matrices.get_matrix("am_skims_pt.omx") as saved:
+        assert set(saved) == {"trav_time", "boardings"}
+        np.testing.assert_array_equal(saved.index, graph.centroids)
+        np.testing.assert_array_equal(saved["trav_time"], pt.results.skims["trav_time"])
+        provenance = json.loads(saved.metadata["provenance"])
 
-    provenance = json.loads(saved.metadata["provenance"])
     assert provenance["scenario"] == "root"
     assert provenance["period_id"] == 1
     assert provenance["graph_config_hash"] == config_hash(coquimbo_builder.config)
@@ -105,7 +104,7 @@ def test_save_skims_skips_classes_without_skims(coquimbo_example, coquimbo_build
     graph = coquimbo_builder.to_transit_graph()
     assignment = assign([TransitClass("pt", graph, demand_matrix(graph))], skims=None, project=coquimbo_example)
     assert assignment.save_skims("no_skims", project=coquimbo_example) == []
-    assert "no_skims_pt" not in coquimbo_example.matrices
+    assert not coquimbo_example.matrices.file_exists("no_skims_pt.omx")
 
 
 def test_save_results_records_provenance_and_period(coquimbo_example, coquimbo_builder):

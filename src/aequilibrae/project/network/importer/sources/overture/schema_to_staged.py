@@ -3,7 +3,8 @@ import json
 import logging
 import numpy as np
 import pandas as pd
-from shapely.geometry import Point
+from collections import Counter
+from itertools import count, pairwise
 from shapely.ops import substring
 from typing import Sequence
 
@@ -14,14 +15,6 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.project.network.importer.utils import NODE_ID_START, compute_lengths, compute_node_modes
 
 logger = logging.getLogger(__name__)
-
-_REQUIRED_CONNECTOR_COLS = ("id", "geometry")
-_REQUIRED_SEGMENT_COLS = ("id", "geometry", "connectors", "class", "subtype")
-_OPTIONAL_SEGMENT_DEFAULTS = {
-    "primary_name": None,
-    "access_restrictions": None,
-    "speed_limits": None,
-}
 
 _NON_ROAD_SUBTYPES = {"rail", "water"}
 
@@ -83,31 +76,28 @@ def build_staged_from_overture(
 
     requested_codes = requested_mode_codes(modes)
 
-    connectors = _normalize_connectors(connectors)
-    connectors["node_id"] = np.arange(
-        NODE_ID_START,
-        NODE_ID_START + len(connectors),
-        dtype=np.int64,
-    )
+    for label, frame, required in (
+        ("connectors", connectors, ("id", "geometry")),
+        ("segments", segments, ("id", "geometry", "connectors", "class", "subtype")),
+    ):
+        missing = [col for col in required if col not in frame.columns]
+        if missing:
+            raise ImporterError(f"Overture {label} missing required columns: {missing}")
+
+    connectors = connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
+    connectors["node_id"] = np.arange(NODE_ID_START, NODE_ID_START + len(connectors), dtype=np.int64)
     connectors["source_id"] = connectors["id"].astype(str)
     gers_to_node = dict(zip(connectors["source_id"], connectors["node_id"], strict=True))
 
-    segments = _normalize_segments(segments)
+    segments = segments.to_crs("EPSG:4326")
     link_rows = []
-    skipped: dict = {}
+    skipped = Counter()
     synthetic_nodes = []
-    next_node_id = int(connectors["node_id"].max()) + 1 if len(connectors) else NODE_ID_START
+    node_ids = count(NODE_ID_START + len(connectors))
     for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry, strict=True):
-        rows, next_node_id = _segment_to_links(
-            seg,
-            geom,
-            gers_to_node,
-            requested_codes,
-            synthetic_nodes,
-            next_node_id,
-            skipped,
+        link_rows.extend(
+            _segment_to_links(seg, geom, gers_to_node, requested_codes, synthetic_nodes, node_ids, skipped)
         )
-        link_rows.extend(rows)
 
     if synthetic_nodes:
         connectors = pd.concat(
@@ -115,7 +105,7 @@ def build_staged_from_overture(
         )
         logger.info(f"Synthesized {len(synthetic_nodes)} Overture connectors from segment geometries")
 
-    logger.info(f"Mode filter removed {skipped.get('mode_filter', 0)} Overture segments")
+    logger.info(f"Mode filter removed {skipped['mode_filter']} Overture segments")
     malformed = {reason: n for reason, n in skipped.items() if reason != "mode_filter"}
     if malformed:
         detail = ", ".join(f"{reason}={n}" for reason, n in sorted(malformed.items()))
@@ -134,15 +124,8 @@ def build_staged_from_overture(
 
     used = set(links_gdf["a_node"]) | set(links_gdf["b_node"])
     nodes_gdf = connectors[connectors["node_id"].isin(used)].reset_index(drop=True)
-    nodes_out = gpd.GeoDataFrame(
-        {
-            "node_id": nodes_gdf["node_id"].astype(np.int64),
-            "geometry": nodes_gdf["geometry"],
-            "modes": compute_node_modes(nodes_gdf["node_id"].to_numpy(), links_gdf, fallback="c"),
-            "source_id": nodes_gdf["source_id"],
-        },
-        geometry="geometry",
-        crs="EPSG:4326",
+    nodes_out = nodes_gdf[["node_id", "geometry"]].assign(
+        modes=compute_node_modes(nodes_gdf["node_id"].to_numpy(), links_gdf), source_id=nodes_gdf["source_id"]
     )
 
     return StagedNetwork(nodes=nodes_out, links=links_gdf, source_meta=source_meta)
@@ -154,55 +137,31 @@ def _segment_to_links(
     gers_to_node: dict,
     requested_codes: set,
     synthetic_nodes: list,
-    next_node_id: int,
-    skipped: dict,
-) -> tuple[list, int]:
-    """Convert one Overture segment into staged link rows.
-
-    A malformed segment is skipped (and counted in ``skipped``) rather than
-    raising: a single bad record in a metro-sized download must not abort the
-    whole import. If *every* segment is unusable the caller still fails, because
-    the resulting network would be empty.
-    """
+    node_ids,
+    skipped: Counter,
+) -> list:
     if geom is None or geom.is_empty:
-        skipped["empty_geometry"] = skipped.get("empty_geometry", 0) + 1
-        return [], next_node_id
+        skipped["empty_geometry"] += 1
+        return []
 
     pairs = _parse_connectors_field(seg["connectors"])
     if len(pairs) < 2:
-        skipped["too_few_connectors"] = skipped.get("too_few_connectors", 0) + 1
-        return [], next_node_id
+        skipped["too_few_connectors"] += 1
+        return []
 
     filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
     if not filtered_modes:
-        skipped["mode_filter"] = skipped.get("mode_filter", 0) + 1
-        return [], next_node_id
+        skipped["mode_filter"] += 1
+        return []
 
-    next_node_id = _ensure_connector_nodes(pairs, geom, gers_to_node, synthetic_nodes, next_node_id)
-    rows = _split_segment_rows(seg, geom, pairs, gers_to_node, filtered_modes)
-    if not rows:
-        # Every consecutive connector pair was degenerate (identical or
-        # decreasing ``at`` offsets, or a zero-length sub-geometry).
-        skipped["no_valid_splits"] = skipped.get("no_valid_splits", 0) + 1
-    return rows, next_node_id
-
-
-def _ensure_connector_nodes(pairs: list, geom, gers_to_node: dict, synthetic_nodes: list, next_node_id: int) -> int:
     for connector_id, at in pairs:
-        if connector_id in gers_to_node:
-            continue
-        point = substring(geom, at, at, normalized=True)
-        if point.is_empty:
-            raise ImporterError(f"Cannot synthesize Overture connector {connector_id!r} from empty geometry point")
-        if not isinstance(point, Point):
-            point = Point(point.coords[0])
-        gers_to_node[connector_id] = next_node_id
-        synthetic_nodes.append({"node_id": next_node_id, "geometry": point, "source_id": connector_id})
-        next_node_id += 1
-    return next_node_id
+        if connector_id not in gers_to_node:
+            node_id = next(node_ids)
+            gers_to_node[connector_id] = node_id
+            synthetic_nodes.append(
+                {"node_id": node_id, "geometry": geom.interpolate(at, normalized=True), "source_id": connector_id}
+            )
 
-
-def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filtered_modes: str) -> list:
     direction = _direction_for_segment(seg)
     speed_ab, speed_ba = _speeds_for_segment(seg, direction)
     link_type = str(seg["class"] or "unknown")
@@ -210,7 +169,7 @@ def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filter
     free_attrs = _free_attrs(seg)
     rows = []
 
-    for (cid_a, at_a), (cid_b, at_b) in zip(pairs[:-1], pairs[1:], strict=True):
+    for (cid_a, at_a), (cid_b, at_b) in pairwise(pairs):
         if at_b <= at_a:
             continue
         sub = substring(geom, at_a, at_b, normalized=True)
@@ -223,7 +182,7 @@ def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filter
                 "direction": direction,
                 "modes": filtered_modes,
                 "link_type": link_type,
-                "name": seg["primary_name"],
+                "name": seg.get("primary_name"),
                 "speed_ab": speed_ab,
                 "speed_ba": speed_ba,
                 "lanes_ab": None,
@@ -233,6 +192,8 @@ def _split_segment_rows(seg: dict, geom, pairs: list, gers_to_node: dict, filter
                 **free_attrs,
             }
         )
+    if not rows:
+        skipped["no_valid_splits"] += 1
     return rows
 
 
@@ -279,7 +240,7 @@ def _modes_for_segment(seg: dict) -> str:
 
 
 def _direction_for_segment(seg: dict) -> int:
-    restrictions = seg["access_restrictions"]
+    restrictions = seg.get("access_restrictions")
     if restrictions is None:
         return 0
     has_forward_deny = False
@@ -288,41 +249,29 @@ def _direction_for_segment(seg: dict) -> int:
         if rule is None or str(rule.get("access_type") or "").lower() != "denied":
             continue
         when = rule.get("when") or {}
-        heading = (when.get("heading") if when else None) or rule.get("heading")
+        heading = when.get("heading") or rule.get("heading")
         if heading == "forward":
             has_forward_deny = True
         elif heading == "backward":
             has_backward_deny = True
-    if has_forward_deny and not has_backward_deny:
-        return -1
-    if has_backward_deny and not has_forward_deny:
-        return 1
-    return 0
+    return int(has_backward_deny) - int(has_forward_deny)
 
 
 def _speeds_for_segment(seg: dict, direction: int) -> tuple:
-    limits = seg["speed_limits"]
+    limits = seg.get("speed_limits")
     if limits is None:
         return (None, None)
     speed = None
     for rule in limits:
-        if rule is None:
+        if rule is None or rule.get("between") is not None or rule.get("when") is not None:
             continue
-        if rule.get("between") is not None or rule.get("when") is not None:
+        ms = rule.get("max_speed") or {}
+        if ms.get("value") is None:
             continue
-        ms = rule.get("max_speed")
-        if ms is None:
-            continue
-        value = ms.get("value")
-        if value is None:
-            continue
-        value = float(value)
-        if "mph" in str(ms.get("unit") or "km/h").lower():
-            value *= 1.609344
-        speed = value
+        speed = float(ms["value"])
+        if "mph" in str(ms.get("unit") or "").lower():
+            speed *= 1.609344
         break
-    if speed is None:
-        return (None, None)
     if direction == 1:
         return (speed, None)
     if direction == -1:
@@ -341,21 +290,3 @@ def _free_attrs(seg: dict) -> dict:
             value = json.dumps(to_jsonable(value), default=str)
         out[key] = value
     return out
-
-
-def _normalize_connectors(connectors: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    missing = [col for col in _REQUIRED_CONNECTOR_COLS if col not in connectors.columns]
-    if missing:
-        raise ImporterError(f"Overture connectors missing required columns: {missing}")
-    return connectors.to_crs("EPSG:4326").dropna(subset=["geometry"]).reset_index(drop=True)
-
-
-def _normalize_segments(segments: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    missing = [col for col in _REQUIRED_SEGMENT_COLS if col not in segments.columns]
-    if missing:
-        raise ImporterError(f"Overture segments missing required columns: {missing}")
-    segments = segments.to_crs("EPSG:4326").copy()
-    for col, default in _OPTIONAL_SEGMENT_DEFAULTS.items():
-        if col not in segments.columns:
-            segments[col] = default
-    return segments

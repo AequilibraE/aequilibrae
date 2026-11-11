@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.paths import HyperpathGenerating, TransitAssignment, TransitClass
 from aequilibrae.utils.create_example import create_example
 
@@ -94,9 +95,7 @@ def bell_grid(n: int, zones: int, seed: int = 124):
         }
     )
     centroids = np.sort(rng.choice(n * n, size=zones, replace=False))
-    o, d = np.meshgrid(centroids, centroids, indexing="ij")
-    keep = (o != d).ravel()
-    demand = (o.ravel()[keep].astype(np.uint32), d.ravel()[keep].astype(np.uint32), np.ones(keep.sum()))
+    demand = DenseMatrix.from_dict({"demand": 1.0 - np.eye(zones)}, transpose=True)
     return edges, centroids, demand
 
 
@@ -111,7 +110,7 @@ def grid(threads: int, repeats: int, n: int = 300, zones: int = 1000) -> list[di
             d_vert_ids=centroids,
             nodes_to_indices=np.arange(n * n, dtype=np.int64),
         )
-        seconds = best_of(repeats, lambda h=hyperpath: h.assign(*demand, threads=threads))
+        seconds = best_of(repeats, lambda h=hyperpath: h.assign(demand, threads=threads))
         step = f"assign {len(edges)} edges to {zones} destinations, {len(skims or [])} skims"
         rows.append({"case": "grid", "step": step, "threads": threads, "seconds": seconds})
     return rows

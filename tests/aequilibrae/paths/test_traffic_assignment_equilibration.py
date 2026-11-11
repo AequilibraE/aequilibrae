@@ -15,7 +15,7 @@ from aequilibrae.utils.logging_utils import basic_config
 @pytest.fixture
 def configuration(sioux_falls_test):
     project = sioux_falls_test
-    demand = project.matrices.get_matrix("omx2", subset=["matrix"])
+    demand = project.matrices.get_matrix("SiouxFalls2.omx", subset=["matrix"])
     return {
         "network": project.network,
         "classes": [

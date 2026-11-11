@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="970" viewBox="0 0 1240 960" role="img" aria-labelledby="title description">
+  <title id="title">Traffic assignment ownership model</title>
+  <desc id="description">Conceptual ownership diagram. Python assignment objects keep a prepared assignment and result objects alive. The prepared assignment holds inputs and independent workers reused across origins and iterations. Result objects retain their own buffers independently of the prepared assignment. C++ views borrow input, worker, and output storage without retaining its owners. C++ kernels use those views. Python array views retain buffer storage through their base chain, not the result object.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", sans-serif; font-size: 15px; fill: #222; }
+      .name { font-size: 19px; font-weight: bold; text-anchor: middle; }
+      .scope { font-size: 13px; text-anchor: middle; }
+      .label { font-size: 13px; }
+      .box { fill: white; stroke: #333; stroke-width: 1.5; }
+      .rule { stroke: #333; stroke-width: 1; }
+      .ref { fill: none; stroke: #333; stroke-width: 1.5; marker-end: url(#reference); }
+      .use { fill: none; stroke: #333; stroke-width: 1.5; stroke-dasharray: 6 4; marker-end: url(#dependency); }
+    </style>
+    <marker id="reference" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#333"/>
+    </marker>
+    <marker id="dependency" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#333" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <rect width="1240" height="860" fill="white"/>
+
+  <!-- Persistent owners. -->
+  <rect x="450" y="40" width="340" height="80" class="box"/>
+  <text x="620" y="65" class="scope">Python · owning references</text>
+  <text x="620" y="96" class="name">Traffic assignment objects</text>
+
+  <path d="M620 120 V200" class="ref"/>
+  <text x="632" y="163" class="label">holds</text>
+  <path d="M790 80 H1030 V200" class="ref"/>
+  <text x="884" y="72" class="label">holds</text>
+
+  <rect x="450" y="200" width="340" height="150" class="box"/>
+  <text x="620" y="225" class="scope">prepared once per execution</text>
+  <text x="620" y="254" class="name">Prepared assignment</text>
+  <path d="M450 270 H790" class="rule"/>
+  <text x="466" y="301">Routing and operation configuration</text>
+  <text x="466" y="328">Reusable workers and cached views</text>
+
+  <path d="M450 250 H380" class="ref"/>
+  <text x="390" y="238" class="label">holds</text>
+  <rect x="40" y="200" width="340" height="150" class="box"/>
+  <text x="210" y="225" class="scope">Python / Cython · owned storage</text>
+  <text x="210" y="254" class="name">Inputs</text>
+  <path d="M40 270 H380" class="rule"/>
+  <text x="56" y="296">Graph topology and packed demand</text>
+  <text x="56" y="319">Costs updated between iterations</text>
+  <text x="56" y="342">Skim fields and selection sets</text>
+
+  <rect x="860" y="200" width="340" height="150" class="box"/>
+  <text x="1030" y="225" class="scope">Python / Cython · caller-owned</text>
+  <text x="1030" y="254" class="name">AoN results</text>
+  <path d="M860 270 H1200" class="rule"/>
+  <text x="876" y="296">Accepted solution and latest AoN</text>
+  <text x="876" y="319">Direction history when required</text>
+  <text x="876" y="342">Independent of the prepared owner</text>
+
+  <!-- Workers and outputs have separate storage and update rules. -->
+  <path d="M620 350 V450" class="ref"/>
+  <text x="632" y="405" class="label">holds</text>
+  <rect x="450" y="450" width="340" height="150" class="box"/>
+  <text x="620" y="475" class="scope">one per thread · reused across origins</text>
+  <text x="620" y="504" class="name">Workers</text>
+  <path d="M450 520 H790" class="rule"/>
+  <text x="466" y="546">Search tree and labels</text>
+  <text x="466" y="569">Scratch buffers and heap</text>
+  <text x="466" y="592">Local load and selected-OD totals</text>
+
+  <path d="M1030 350 V450" class="ref"/>
+  <text x="1042" y="405" class="label">holds</text>
+  <rect x="860" y="450" width="340" height="150" class="box"/>
+  <text x="1030" y="475" class="scope">owned buffers / Python arrays</text>
+  <text x="1030" y="504" class="name">Individual result storage</text>
+  <path d="M860 520 H1200" class="rule"/>
+  <text x="876" y="546">Loads and dense skims: reused buffers</text>
+  <text x="876" y="569">Selected OD: reusable sparse builders</text>
+  <text x="876" y="592">and independent CSR snapshots</text>
+
+  <!-- Non-owning views point towards the storage they borrow. -->
+  <rect x="450" y="700" width="340" height="110" class="box"/>
+  <text x="620" y="725" class="scope">C++ · temporary or cached</text>
+  <text x="620" y="754" class="name">Non-owning views</text>
+  <path d="M450 770 H790" class="rule"/>
+  <text x="466" y="798">Pointers, dimensions, configuration</text>
+
+  <path d="M450 740 H410 V380 H210 V350" class="use"/>
+  <text x="240" y="373" class="label">borrows inputs</text>
+  <path d="M620 700 V600" class="use"/>
+  <text x="632" y="657" class="label">borrows worker storage</text>
+  <path d="M790 740 H830 V540 H860" class="use"/>
+  <text x="842" y="651" class="label">borrows output storage</text>
+
+  <rect x="40" y="700" width="340" height="110" class="box"/>
+  <text x="210" y="725" class="scope">C++ · call scope</text>
+  <text x="210" y="754" class="name">Kernels</text>
+  <path d="M40 770 H380" class="rule"/>
+  <text x="56" y="798">Search · skim · load · reduce</text>
+  <path d="M380 785 H450" class="use"/>
+  <text x="391" y="775" class="label">uses</text>
+
+  <!-- Array views retain the allocation, not the result owner or C++ builders. -->
+  <rect x="860" y="700" width="340" height="110" class="box"/>
+  <text x="1030" y="725" class="scope">Python · shared buffer</text>
+  <text x="1030" y="754" class="name">Array views</text>
+  <path d="M860 770 H1200" class="rule"/>
+  <text x="876" y="798">Live values; copies preserve old values</text>
+  <path d="M1030 700 V600" class="ref"/>
+  <text x="1042" y="670" class="label">holds buffer,</text>
+  <text x="1042" y="690" class="label">not result owner</text>
+
+  <!-- <!-\- Notation and lifetime constraints. -\-> -->
+  <!-- <path d="M40 858 H85" class="ref"/> -->
+  <!-- <text x="98" y="863" class="label">holder → retained object / buffer</text> -->
+  <!-- <path d="M450 858 H495" class="use"/> -->
+  <!-- <text x="508" y="863" class="label">borrower → storage (no retention)</text> -->
+  <!-- <path d="M40 884 H1200" class="rule"/> -->
+  <!-- <text x="40" y="911">Storage lifetime ≥ every C++ use · cached views require retained owners</text> -->
+  <!-- <text x="40" y="940">Execution return ≠ destruction · buffer reuse changes existing views</text> -->
+</svg>

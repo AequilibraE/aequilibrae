@@ -11,8 +11,8 @@ from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array
 
 
-def assignment_demand(matrix, centroids):
-    """Copy named matrices into fixed, packed dense or sparse assignment demand."""
+def assignment_demand(matrix, centroids, *, transpose=False):
+    """Copy named matrices into fixed, packed dense or sparse demand, optionally transposed."""
     if not isinstance(matrix, (AequilibraeMatrix, AequilibraeSparseMatrix)):
         raise TypeError("Demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
     if not np.array_equal(matrix.index, centroids):
@@ -21,19 +21,19 @@ def assignment_demand(matrix, centroids):
         raise ValueError("Demand must have shape (zones, zones, classes)")
 
     if isinstance(matrix, AequilibraeSparseMatrix):
-        packed = SparseMatrix.from_matrix(matrix, dtype=np.float64)
+        packed = SparseMatrix.from_matrix(matrix, dtype=np.float64, transpose=transpose)
     else:
-        packed = DenseMatrix.from_matrix(matrix, dtype=np.float64)
+        packed = DenseMatrix.from_matrix(matrix, dtype=np.float64, transpose=transpose)
     validate_demand(packed, len(centroids))
     return packed
 
 
-def validate_demand(demand, nodes):
-    """Check demand dimensions, dtype and values, and return its shape."""
+def validate_demand(demand, nodes, *, dtype=np.float64):
+    """Check demand dimensions, required dtype and values, and return its shape."""
     if not isinstance(demand, (DenseMatrix, SparseMatrix)):
         raise TypeError("demand must be a DenseMatrix or SparseMatrix")
-    if demand.dtype != np.dtype(np.float64):
-        raise TypeError("demand must have dtype float64")
+    if demand.dtype != np.dtype(dtype):
+        raise TypeError(f"demand must have dtype {np.dtype(dtype).name}")
 
     shape = (demand.origin_count, demand.destination_count, demand.field_count)
     if shape[0] != shape[1] or not 1 <= shape[0] <= nodes or shape[2] < 1:

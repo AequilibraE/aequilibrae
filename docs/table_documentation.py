@@ -23,7 +23,13 @@ class CreateTablesSRC:
         self.proj.new(self.proj_path)
         self.proj.scenario.create_transit_database()
 
-        self.__folder = "network" if component == "project_database" else "transit"
+        self.__folder = {
+            "project_database": "network",
+            "transit_database": "transit",
+            "results_database": "results",
+        }[component]
+        if self.__folder == "results":
+            self.proj.results_connection
         self.stub = "data_model"
         # Get the appropriate data for the database we are documenting
         self.conn = database_connection(db_type=self.__folder, project_path=self.proj_path)
@@ -129,7 +135,11 @@ class CreateTablesSRC:
             return [x.strip() for x in f.readlines()]
 
 
-tables = [("project_database", "project_database"), ("transit_database", "transit_database")]
+tables = [
+    ("project_database", "project_database"),
+    ("transit_database", "transit_database"),
+    ("results_database", "results_database"),
+]
 
 for table, pth in tables:
     s = CreateTablesSRC(table, pth)

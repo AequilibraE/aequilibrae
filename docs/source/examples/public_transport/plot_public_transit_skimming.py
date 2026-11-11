@@ -111,7 +111,6 @@ assig.set_skimming_fields(
     ["trav_time", "boardings", "transfers", "in_vehicle_trav_time", "waiting_time", "first_waiting_time"]
 )
 assig.set_algorithm("os")
-assigclass.set_demand_matrix_core("pt")
 
 # Perform the assignment for the transit classes added
 assig.execute()

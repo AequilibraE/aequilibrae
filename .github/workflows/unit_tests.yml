@@ -9,6 +9,9 @@ jobs:
   linting:
     runs-on: ubuntu-latest
     name: Linting
+    env:
+      UV_NO_PROJECT: "1"
+
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -16,88 +19,25 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Set Python environment
-        uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.13'
-
-      - uses: astral-sh/ruff-action@v4.1.0
-        with:
-          version: 0.16.1
-          args: check --output-format=github
-
-  cython-lint:
-    runs-on: ubuntu-latest
-    name: cython-lint
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-cython-lint
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set UV
         uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: '3.13'
 
-      - name: Run cython-lint
-        run: |
-          set +e  # We want to save the exit code of cython-lint for later
-          uvx cython-lint==0.22.0 ./src/ > cython-lint-errors.txt
-          export CYTHON_LINT_EXIT=$?
-          # Echo cython errors in a format GitHub can understand
-          sed -E 's|^([^:]+):([0-9]+):([0-9]+): (.+)$|::error title=cython-lint,file=\1,line=\2,col=\3,endLine=\2,endColumn=\3::\1:\2:\3: \4|' cython-lint-errors.txt
-          exit $CYTHON_LINT_EXIT
-
-  clang-tidy:
-    runs-on: ubuntu-latest
-    name: clang-tidy
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-clang-tidy
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install clang-tidy
+      - name: Install LLVM tools
         run: |
           sudo apt update
-          sudo apt install -y clang-tidy
+          sudo apt install -y clang-tidy clang-format
 
-      - name: Set Python environment
-        uses: astral-sh/setup-uv@v10.0.1
-        with:
-          python-version: '3.13'
-
-      - name: Install build dependencies
-        run: uv venv --python 3.13 --python-preference only-managed --clear && uv pip install meson ninja cython cysignals
-
-      - name: Configure build (generates compile_commands.json)
+      - name: Install lint and build dependencies
         run: |
-          . .venv/bin/activate
-          meson setup build
+          uv venv --python 3.13 --python-preference only-managed --clear
+          uv pip install --group build --group tests
 
-      - name: Run clang-tidy on src/
-        run: |
-          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
-            | xargs -0 clang-tidy -p build --quiet --warnings-as-errors='*'
+      - name: Configure compilation database
+        run: uv run meson setup build
 
-  clang-format:
-    runs-on: ubuntu-latest
-    name: clang-format
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-clang-format
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install clang-format
-        run: |
-          sudo apt update
-          sudo apt install -y clang-format
-
-      - name: Check formatting of src/
-        run: |
-          find src -type f \( -name '*.cpp' -o -name '*.hpp' \) -print0 \
-            | xargs -0 clang-format --dry-run --Werror
+      - name: Run lint checks
+        run: uv run spin lint
 
   testing:
     needs: linting
@@ -143,10 +83,6 @@ jobs:
         sudo apt install -y libspatialite-dev libsqlite3-mod-spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
-    - name: Download spatialite on Windows
-      if: matrix.os == 'windows-latest'
-      run: uv run tests/setup_windows_spatialite.py
-
     - name: Install Python and create virtual environment
       run: uv venv --python ${{ matrix.python-version }} --python-preference only-managed --clear
 
@@ -162,6 +98,10 @@ jobs:
         .\.venv\Scripts\Activate.ps1
         "$env:PATH" | Out-File -FilePath "$env:GITHUB_PATH" -Append
 
+    - name: Download spatialite on Windows
+      if: matrix.os == 'windows-latest'
+      run: python tests/setup_windows_spatialite.py
+
     - name: Setup environment variables (MacOS)
       if: matrix.os == 'macos-latest'
       run: |
@@ -172,14 +112,15 @@ jobs:
     - name: Compile and test
       if: matrix.sanitisers == false
       run: |
-        uv pip install ".[dev]" -Ccompile-args=-v
-        pytest tests/ --durations=50 --dist=loadscope -n 4 --max-worker-restart 0 --random-order --verbose
+        uv pip install --group tests '.[create]' -Ccompile-args=-v
+        # We use pytest directly rather than spin test here to test the installed wheel rather than the meson build.
+        python -P -m pytest -n 8 -v tests/ --random-order-bucket=global --random-order --durations=50 --max-worker-restart=0
 
     - name: Compile and test (sanitisers)
       if: ${{ matrix.sanitisers == true && matrix.os == 'ubuntu-latest' }}
       run: |
-        uv pip install ".[dev]" -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
+        uv pip install --group tests '.[create]' -Ccompile-args=-v -Csetup-args="-Dbuildtype=debug" -Csetup-args="-Db_sanitize=address,undefined"
         export ASAN_OPTIONS=detect_leaks=1
         export LSAN_OPTIONS=suppressions=$(readlink -f .github/workflows/asan_suppressions.txt)
         # https://github.com/google/sanitizers/issues/934#issuecomment-1800125367
-        LD_PRELOAD="$(realpath "$(gcc -print-file-name=libasan.so)") $(realpath "$(gcc -print-file-name=libstdc++.so)")" pytest -s tests/
+        LD_PRELOAD="$(realpath "$(gcc -print-file-name=libasan.so)") $(realpath "$(gcc -print-file-name=libstdc++.so)")" python -P -m pytest -n 0 -s tests/

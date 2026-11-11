@@ -285,7 +285,7 @@ int main(int argc, char **argv) {
   std::vector<double> keys;
 
   const RunResult four_ary_result =
-      run_queue<FourAryHeap>(initial_keys, updates, order, keys);
+      run_queue<FourAryHeap<double>>(initial_keys, updates, order, keys);
   if (!four_ary_result.ok) {
     std::cerr << "FourAryHeap failed: " << four_ary_result.message << '\n';
     return 1;
@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
   }
 
   const RunResult pairing_result =
-      run_queue<PairingHeap>(initial_keys, updates, order, keys);
+      run_queue<PairingHeap<double>>(initial_keys, updates, order, keys);
   if (!pairing_result.ok) {
     std::cerr << "PairingHeap failed: " << pairing_result.message << '\n';
     return 1;
@@ -312,8 +312,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  const RunResult adapter_result =
-      run_queue<StdPriorityQueueAdapter>(initial_keys, updates, order, keys);
+  const RunResult adapter_result = run_queue<StdPriorityQueueAdapter<double>>(
+      initial_keys, updates, order, keys);
   if (!adapter_result.ok) {
     std::cerr << "StdPriorityQueueAdapter failed: " << adapter_result.message
               << '\n';
