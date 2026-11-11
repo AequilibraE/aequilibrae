@@ -4,739 +4,263 @@ An implementation of Spiess and Florian's hyperpath generating algorithm.
 reference: Spiess, H. and Florian, M. (1989). Optimal strategies: A new
 assignment model for transit networks. Transportation Research Part B 23(2),
 83-102.
+
+The label-setting and loading kernels are in ``paths/cpp/hyperpath.hpp``. This
+file drives them over destinations in parallel.
 """
 
 cimport cython
 import numpy as np
+from libc.math cimport INFINITY
 from libc.stdint cimport int64_t, uint8_t, uint32_t
+from libcpp.vector cimport vector
 
-from cython.parallel import parallel, prange, threadid
-from libc.stdlib cimport malloc, calloc, free
+from cython.parallel import prange, threadid
 
-from aequilibrae.paths.cython.demand cimport DemandMatrix, DemandMatrixView
-from aequilibrae.utils.cython.bridge cimport Bridge, AeqLogClosure
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.sparse_matrix cimport SparseMatrix
+from aequilibrae.utils.cython.bridge cimport Bridge
 from aequilibrae.utils.cython.bar cimport Bar
 
-ctypedef double DATATYPE_t
 DATATYPE_PY = np.float64
 
-cdef DATATYPE_t DATATYPE_INF = <DATATYPE_t>np.finfo(dtype=DATATYPE_PY).max
-DATATYPE_INF_PY = DATATYPE_INF
+# Raises every edge cost to at least this many seconds, so labels strictly increase along attractive edges. It is
+# well above the spacing of doubles around the largest labels in practice (a few days in seconds).
+COST_FLOOR_PY = 1.0e-9
 
-# infinite frequency is defined here numerically
-# this must be a very large number depending on the precision on the computation
-# INF_FREQ << DATATYPE_INF
-cdef DATATYPE_t INF_FREQ = 1.0e+20
-INF_FREQ_PY = INF_FREQ
+cdef extern from "hyperpath.hpp" namespace "aequilibrae::paths::cpp::hyperpath" nogil:
+    cdef enum SkimOperator:
+        SKIM_ADD
+        SKIM_ANY_WAIT
+        SKIM_RESET_AT_WAIT
+        SKIM_COUNT_WAITS
 
-# smallest frequency
-# WARNING: this must be small but not too small
-# 1 / MIN_FREQ << DATATYPE_INF
-cdef DATATYPE_t MIN_FREQ
-MIN_FREQ = 1.0 / INF_FREQ
-MIN_FREQ_PY = MIN_FREQ
+    cdef cppclass CppGraph "aequilibrae::paths::cpp::hyperpath::Graph":
+        size_t vertex_count
+        size_t edge_count
+        const uint32_t *csc_indptr
+        const uint32_t *csc_edges
+        const uint32_t *tail
+        const uint32_t *head
 
-# a very small time interval
-cdef DATATYPE_t A_VERY_SMALL_TIME_INTERVAL
-A_VERY_SMALL_TIME_INTERVAL = 1.0e+08 * MIN_FREQ
-A_VERY_SMALL_TIME_INTERVAL_PY = A_VERY_SMALL_TIME_INTERVAL
+    cdef cppclass CppCosts "aequilibrae::paths::cpp::hyperpath::Costs":
+        const double *cost
+        const double *frequency
+        const double *wait_constant
+        const double *headway_fraction
+        double cost_floor
 
-cdef extern from "stdlib.h":
-    ctypedef void const_void "const void"
-    void qsort(void *base, int nmemb, int size, int(*compar)(const_void *, const_void *)) noexcept nogil
+    cdef cppclass CppSkims "aequilibrae::paths::cpp::hyperpath::Skims":
+        size_t field_count
+        const double *edge_values
+        const uint8_t *operators
+        const uint8_t *waits
 
-cdef struct IndexedElement:
-    size_t index
-    DATATYPE_t value
+    cdef cppclass CppWorkspace "aequilibrae::paths::cpp::hyperpath::Workspace":
+        CppWorkspace(size_t vertex_count, size_t edge_count, size_t field_count) except +
+        vector[double] label
+        vector[double] skims
 
-cdef int _compare(const_void *a, const_void *b) noexcept nogil:
-    cdef DATATYPE_t a_v = (<IndexedElement*> a).value
-    cdef DATATYPE_t b_v = (<IndexedElement*> b).value
-    if a_v == b_v:
-        return 0
-    elif a_v < b_v:
-        return -1
+    void compute_labels(
+        const CppGraph &graph, const CppCosts &costs, const CppSkims &skims, uint32_t destination, CppWorkspace &ws
+    ) noexcept
+    double load(
+        const CppGraph &graph,
+        const CppCosts &costs,
+        const uint32_t *origins,
+        const double *demand,
+        size_t count,
+        double *edge_volume,
+        double *unassigned,
+        CppWorkspace &ws,
+    ) noexcept
+
+SKIM_ADD_PY = SKIM_ADD
+SKIM_ANY_WAIT_PY = SKIM_ANY_WAIT
+SKIM_RESET_AT_WAIT_PY = SKIM_RESET_AT_WAIT
+SKIM_COUNT_WAITS_PY = SKIM_COUNT_WAITS
+
+
+cdef class _Workspaces:
+    """Per-thread kernel scratch, kept between assignments of the same graph."""
+
+    cdef vector[CppWorkspace *] items
+    cdef size_t vertex_count
+    cdef size_t edge_count
+    cdef size_t field_count
+
+    cdef void ensure(self, size_t threads, size_t vertex_count, size_t edge_count, size_t field_count) except *:
+        if (vertex_count, edge_count, field_count) != (self.vertex_count, self.edge_count, self.field_count):
+            self.clear()
+            self.vertex_count, self.edge_count, self.field_count = vertex_count, edge_count, field_count
+        while self.items.size() < threads:
+            self.items.push_back(new CppWorkspace(vertex_count, edge_count, field_count))
+
+    cdef void clear(self) noexcept:
+        cdef CppWorkspace *ws
+        for ws in self.items:
+            del ws
+        self.items.clear()
+
+    def __dealloc__(self):
+        self.clear()
+
+
+def csc_structure(tail: np.ndarray, head: np.ndarray, vertex_count: int):
+    """Return the incoming-edge offsets per vertex and the edges ordered by head, keeping edge order within a head."""
+    counts = np.bincount(head, minlength=vertex_count)
+    indptr = np.zeros(vertex_count + 1, dtype=np.uint32)
+    np.cumsum(counts, out=indptr[1:])
+    return indptr, np.argsort(head, kind="stable").astype(np.uint32)
+
+
+def packed_entries(_MatrixBase matrix not None):
+    """Return the row and column positions and the values of the nonzero entries of a packed matrix with one field.
+
+    Entries go row by row, in increasing column order within each row.
+    """
+    cdef SparseMatrix packed
+    if matrix.field_count != 1:
+        raise ValueError("the packed matrix must have exactly one field")
+
+    values = np.asarray(matrix._values)
+    if isinstance(matrix, SparseMatrix):
+        packed = matrix
+        counts = np.diff(np.asarray(packed.row_index).astype(np.int64))
+        rows = np.repeat(np.arange(matrix.origin_count, dtype=np.int64), counts)
+        columns = np.asarray(packed.col_index).astype(np.int64)
+        data = values[:, 0]
     else:
-        return 1
+        rows, columns = np.nonzero(values[:, :, 0])
+        data = values[rows, columns, 0]
 
-from aequilibrae.paths.cython.pq_heap_types cimport FourAryHeap, ElementState, NOT_IN_HEAP, SCANNED
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.initializedcheck(False)
-cdef void _coo_tocsc_uint32(
-    uint32_t [::1] Ai,
-    uint32_t [::1] Aj,
-    uint32_t [::1] Ax,
-    uint32_t [::1] Bp,
-    uint32_t [::1] Bi,
-    uint32_t [::1] Bx
-) noexcept nogil:
-
-    cdef:
-        size_t i, col, dest
-        size_t n_vert = <size_t>(Bp.shape[0] - 1)
-        size_t n_edge = <size_t>Bi.shape[0]
-        uint32_t temp, cumsum, last
-
-    for i in range(n_edge):
-        Bp[<size_t>Aj[i]] += 1
-
-    cumsum = 0
-    for i in range(n_vert):
-        temp = Bp[i]
-        Bp[i] = cumsum
-        cumsum += temp
-    Bp[<size_t>n_vert] = <uint32_t>n_edge
-
-    for i in range(n_edge):
-        col = <size_t>Aj[i]
-        dest = <size_t>Bp[col]
-        Bi[dest] = Ai[i]
-        Bx[dest] = Ax[i]
-        Bp[col] += 1
-
-    last = 0
-    for i in range(n_vert + 1):
-        temp = Bp[i]
-        Bp[i] = last
-        last = temp
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.initializedcheck(False)
-cdef void argsort(double *data, uint32_t *order, size_t n) noexcept nogil:
-    """
-    Wrapper of the C function qsort
-    source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
-    """
-    cdef size_t i
-
-    # Allocate index tracking array.
-    cdef IndexedElement *order_struct = <IndexedElement *> malloc(n * sizeof(IndexedElement))
-
-    # Copy data into index tracking array.
-    for i in range(n):
-        order_struct[i].index = i
-        order_struct[i].value = data[i]
-
-    # Sort index tracking array.
-    qsort(<void *> order_struct, n, sizeof(IndexedElement), _compare)
-
-    # Copy indices from index tracking array to output array.
-    for i in range(n):
-        order[i] = <uint32_t>order_struct[i].index
-
-    # Free index tracking array.
-    free(order_struct)
-
-
-cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
-    """
-    Convert an edge dataframe in COO format into CSC format.
-
-    The data vector is of uint32 type.
-
-    Parameters
-    ----------
-    edges : pandas.core.frame.DataFrame
-        The edges dataframe.
-    tail : str
-        The column name in the edges dataframe for the tail vertex index.
-    head : str
-        The column name in the edges dataframe for the head vertex index.
-    data : str
-        The column name in the edges dataframe for the int edge attribute.
-    vertex_count : int
-        The vertex count in the given network edges.
-
-    Returns
-    -------
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
-    """
-
-    rs_indptr = np.zeros(
-        vertex_count + 1, dtype=np.uint32
-    )  # make sure it is filled with zeros
-    edge_count = len(edges)
-    rs_indices = np.empty(edge_count, dtype=np.uint32)
-    rs_data = np.empty(edge_count, dtype=np.uint32)
-
-    _coo_tocsc_uint32(
-        edges[tail].values.astype(np.uint32),
-        edges[head].values.astype(np.uint32),
-        edges[data].values.astype(np.uint32),
-        rs_indptr,
-        rs_indices,
-        rs_data,
-    )
-
-    return rs_indptr, rs_indices, rs_data
-
-
-@cython.embedsignature(False)
-def compute_SF_in_parallel(
-    uint32_t[::1] indptr_view,  # column csc format
-    uint32_t[::1] edge_idx_view,
-    double[::1] trav_time_view,
-    double[::1] freq_view,
-    uint32_t[::1] tail_view,
-    uint32_t[::1] head_view,
-    DemandMatrix demand,  # packed [destinations, origins, fields]
-    const size_t[::1] destination_zones,
-    const int64_t[::1] o_vert_ids_view,  # origin vertices in zone order
-    const int64_t[::1] d_vert_ids_view,  # destination vertices in zone order
-    double[::1] edge_volume_view,
-    size_t vertex_count,
-    size_t edge_count,
-    int num_threads,
-    double[:, ::1] skim_col_view,
-    double[::1] u_i_vec_view,
-    double[:, :, ::1] skim_matrix,
-    uint32_t[::1] o_indices,
-    int64_t[::1] od_index_to_taz_index,
-    int64_t[::1] nodes_to_indices,
-    bint skimming,
-    bint is_travel_time,
-    size_t n_skim_cols,
-    Bridge bridge,
-):
-    _compute_SF_in_parallel(
-        indptr_view,
-        edge_idx_view,
-        trav_time_view,
-        freq_view,
-        tail_view,
-        head_view,
-        # Cython can't infer that the DenseMatrix type implies DenseMatrixView
-        # type (same with sparse), so we help it.
-        demand.view[double](),
-        destination_zones,
-        o_vert_ids_view,
-        d_vert_ids_view,
-        edge_volume_view,
-        vertex_count,
-        edge_count,
-        num_threads,
-        skim_col_view,
-        u_i_vec_view,
-        skim_matrix,
-        o_indices,
-        od_index_to_taz_index,
-        nodes_to_indices,
-        skimming,
-        is_travel_time,
-        n_skim_cols,
-        bridge
+    nonzero = data != 0
+    return (
+        rows[nonzero].astype(np.int64),
+        columns[nonzero].astype(np.int64),
+        np.ascontiguousarray(data[nonzero], dtype=DATATYPE_PY),
     )
 
 
-# Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
-# without them the threads appear to enter a deadlock due to the shared edge_volume array. However
-# the indexing on that array and its slices should never collide.
-#
-# Optionally return the u_i_vec, however this is only possible when using a single destination.
-# The caller is responsible for managing that memory.
 @cython.boundscheck(False)
 @cython.wraparound(False)
-@cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void _compute_SF_in_parallel(
-    uint32_t[::1] indptr_view,  # column csc format
-    uint32_t[::1] edge_idx_view,
-    double[::1] trav_time_view,
-    double[::1] freq_view,
-    uint32_t[::1] tail_view,
-    uint32_t[::1] head_view,
-    DemandMatrixView demand,  # packed [destinations, origins, fields]
-    const size_t[::1] destination_zones,
-    const int64_t[::1] o_vert_ids_view,  # origin vertices in zone order
-    const int64_t[::1] d_vert_ids_view,  # destination vertices in zone order
-    double[::1] edge_volume_view,
-    size_t vertex_count,
-    size_t edge_count,
-    int num_threads,
-    double[:, ::1] skim_col_view,
-    double[::1] u_i_vec_view,
+def assign_destinations(
+    const uint32_t[::1] csc_indptr,
+    const uint32_t[::1] csc_edges,
+    const uint32_t[::1] tail,
+    const uint32_t[::1] head,
+    const double[::1] cost,
+    const double[::1] frequency,
+    const double[::1] wait_constant,
+    const double[::1] headway_fraction,
+    double cost_floor,
+    const double[:, ::1] skim_values,
+    const uint8_t[::1] skim_operators,
+    const uint8_t[::1] skim_waits,
+    const uint32_t[::1] destinations,
+    const int64_t[::1] destination_zones,
+    const uint32_t[::1] demand_indptr,
+    const uint32_t[::1] demand_origins,
+    const double[::1] demand_values,
+    double[::1] unassigned,
+    double[:, ::1] block_volumes,
+    double[::1] block_waits,
+    const int64_t[::1] zone_origins,
     double[:, :, ::1] skim_matrix,
-    uint32_t[::1] o_indices,
-    int64_t[::1] od_index_to_taz_index,
-    int64_t[::1] nodes_to_indices,
-    bint skimming,
-    bint is_travel_time,
-    size_t n_skim_cols,
+    bint skim_labels,
+    double[::1] labels,
+    int64_t labels_task,
+    _Workspaces workspaces,
+    int threads,
     Bridge bridge,
 ):
-    if destination_zones.shape[0] == 0:
-        return
+    """Compute the strategy towards each destination, skim it and load its demand.
 
-    num_threads = min(num_threads, destination_zones.shape[0])
-
-    # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
+    Destinations are split into one contiguous block per row of ``block_volumes``, and each block loads into its own
+    row, so results depend on the number of blocks but not on which thread runs which block.
+    """
     cdef:
-        uint32_t *thread_demand_origins = NULL
-        double *thread_demand_values = NULL
-        double *thread_edge_volume = NULL
-        size_t demand_size
+        CppGraph graph
+        CppCosts costs
+        CppSkims skims
+        size_t vertex_count = labels.shape[0]
+        size_t edge_count = tail.shape[0]
+        size_t field_count = skim_operators.shape[0]
+        size_t tasks = destinations.shape[0]
+        size_t zones = zone_origins.shape[0]
+        size_t offset = 1 if skim_labels else 0
+        int blocks = block_volumes.shape[0]
+        int block  # openmp on windows requires iterator variable have signed type
+        size_t task, first, last, z, k, v, start, end
+        int64_t zone, origin
+        double weighted_wait, label
+        CppWorkspace *ws
+        Bar bar
 
-        double *thread_u_i_vec = NULL
-        double *thread_f_i_vec = NULL
-        double *thread_u_j_c_a_vec = NULL
-        double *thread_v_i_vec = NULL
-        uint8_t *thread_h_a_vec = NULL
-        uint32_t *thread_edge_indices = NULL
-        uint32_t *thread_hyperpath_order = NULL
-        uint32_t *thread_hyperpath_ids = NULL
+    graph.vertex_count = vertex_count
+    graph.edge_count = edge_count
+    graph.csc_indptr = &csc_indptr[0]
+    graph.csc_edges = &csc_edges[0] if edge_count else NULL
+    graph.tail = &tail[0] if edge_count else NULL
+    graph.head = &head[0] if edge_count else NULL
 
-        double *thread_skim_i_vec = NULL
-        double *thread_skim_j_vec = NULL
+    costs.cost = &cost[0] if edge_count else NULL
+    costs.frequency = &frequency[0] if edge_count else NULL
+    costs.wait_constant = &wait_constant[0] if vertex_count else NULL
+    costs.headway_fraction = &headway_fraction[0] if vertex_count else NULL
+    costs.cost_floor = cost_floor
 
-        # This is a shared buffer, all threads will write into separate slices depending on their threadid.
-        # When writing all threads must increment!
-        double *edge_volume = <double *> calloc(num_threads, sizeof(double) * edge_count)
+    skims.field_count = field_count
+    skims.edge_values = &skim_values[0, 0] if field_count and edge_count else NULL
+    skims.operators = &skim_operators[0] if field_count else NULL
+    skims.waits = &skim_waits[0] if field_count else NULL
 
-        double *u_i_vec_out = <double *> malloc(num_threads * sizeof(double) * vertex_count)
+    workspaces.ensure(threads, vertex_count, edge_count, field_count)
+    bar = bridge.new_bar("{}/{} destinations processed", total=tasks)
 
-        double *skim_i_vec_out = <double *> calloc(
-            num_threads, sizeof(double) * vertex_count * n_skim_cols)
+    with nogil:
+        for block in prange(blocks, schedule="static", chunksize=1, num_threads=threads):
+            ws = workspaces.items[threadid()]
+            first = <size_t>block * tasks // blocks
+            last = (<size_t>block + 1) * tasks // blocks
+            weighted_wait = 0.0
+            for task in range(first, last):
+                if bridge.should_stop():
+                    break
 
-        int i  # openmp on windows requires iterator variable have signed type
-        size_t k, j, destination_zone, origin_zone
-        int64_t destination_vertex, origin_vertex
-        double demand_value
-        int64_t total = destination_zones.shape[0]
+                compute_labels(graph, costs, skims, destinations[task], ws[0])
 
-    cdef Bar bar = bridge.new_bar("{}/{} destinations processed" + (" (skimming)" if skimming else ""), total=total)
+                zone = destination_zones[task]
+                if zone >= 0:
+                    for z in range(zones):
+                        origin = zone_origins[z]
+                        if origin < 0:
+                            continue  # the matrix starts at inf
+                        label = ws.label[origin]
+                        if not label < INFINITY:
+                            continue  # unreachable, also left at inf
+                        if skim_labels:
+                            skim_matrix[z, zone, 0] = label
+                        for k in range(field_count):
+                            skim_matrix[z, zone, k + offset] = ws.skims[origin * field_count + k]
 
-    with nogil, parallel(num_threads=num_threads):
-        thread_demand_origins = <uint32_t *> malloc(sizeof(uint32_t) * demand.destination_count)
-        thread_demand_values = <double *> malloc(sizeof(double) * demand.destination_count)
-        # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
-        # we can safely read and write without collisions.
-        thread_edge_volume = &edge_volume[threadid() * edge_count]
-        thread_u_i_vec = &u_i_vec_out[threadid() * vertex_count]
+                start = demand_indptr[task]
+                end = demand_indptr[task + 1]
+                if end > start:
+                    weighted_wait = weighted_wait + load(
+                        graph,
+                        costs,
+                        &demand_origins[start],
+                        &demand_values[start],
+                        end - start,
+                        &block_volumes[block, 0],
+                        &unassigned[start],
+                        ws[0],
+                    )
 
-        thread_skim_i_vec = &skim_i_vec_out[threadid() * vertex_count * n_skim_cols]
-
-        thread_f_i_vec = <double *> malloc(sizeof(double) * vertex_count)
-        thread_u_j_c_a_vec = <double *> malloc(sizeof(double) * edge_count)
-        thread_v_i_vec = <double *> malloc(sizeof(double) * vertex_count)
-        thread_h_a_vec = <uint8_t *> malloc(sizeof(uint8_t) * edge_count)
-        thread_edge_indices = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
-        thread_hyperpath_order = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
-        thread_hyperpath_ids = <uint32_t *> malloc(sizeof(uint32_t) * edge_count)
-
-        thread_skim_j_vec = <double *> calloc(edge_count, sizeof(double) * n_skim_cols)
-
-        for i in prange(total):
-            if bridge.should_stop():
-                break
-
-            destination_zone = destination_zones[i]
-            destination_vertex = d_vert_ids_view[destination_zone]
-
-            if nodes_to_indices[destination_vertex] == -1:
+                if <int64_t>task == labels_task:
+                    for v in range(vertex_count):
+                        labels[v] = ws.label[v]
                 bar.inc()
-                continue  # Completely disconnected nodes have an index of -1
-
-            demand_size = 0
-            # Each packed row belongs to this destination. Dense rows visit all
-            # origins, sparse rows visit only their stored positions.
-            for j in range(demand.origin(destination_zone).entry_count()):
-                origin_zone = demand.origin(destination_zone).destination(j)
-                demand_value = demand.origin(destination_zone).values(j)[0]
-                origin_vertex = nodes_to_indices[o_vert_ids_view[origin_zone]]
-                if origin_vertex == -1 or demand_value == 0.0:
-                    continue
-
-                thread_demand_origins[demand_size] = origin_vertex
-                thread_demand_values[demand_size] = demand_value
-                # demand_size += 1 is not allowed as cython believes this is a reduction
-                demand_size = demand_size + 1
-
-            # S&F
-            compute_SF_in(
-                indptr_view,
-                edge_idx_view,
-                trav_time_view,
-                freq_view,
-                tail_view,
-                head_view,
-                thread_demand_origins,
-                thread_demand_values,
-                demand_size,
-                thread_edge_volume,
-                thread_u_i_vec,
-                thread_f_i_vec,
-                thread_u_j_c_a_vec,
-                thread_v_i_vec,
-                thread_h_a_vec,
-                thread_edge_indices,
-                thread_hyperpath_order,
-                thread_hyperpath_ids,
-                vertex_count,
-                nodes_to_indices[destination_vertex],
-                skim_col_view,
-                thread_skim_i_vec,
-                thread_skim_j_vec,
-                n_skim_cols,
-                skim_matrix,
-                o_indices,
-                od_index_to_taz_index,
-                skimming,
-                is_travel_time,
-                bridge.c
-            )
-            bar.inc()
-
-        free(thread_demand_origins)
-        free(thread_demand_values)
-        free(thread_f_i_vec)
-        free(thread_u_j_c_a_vec)
-        free(thread_v_i_vec)
-        free(thread_h_a_vec)
-        free(thread_edge_indices)
-        free(thread_hyperpath_order)
-        free(thread_hyperpath_ids)
-        free(thread_skim_j_vec)
-
-    # Accumulate results into output buffer. This could be parallelised over the output indexes but
-    # the loss of spatial locality may not be worth it.
-    for i in range(num_threads):
-        for j in range(edge_count):
-            edge_volume_view[j] += edge_volume[i * edge_count + j]
-
-    if total == 1:
-        for k in range(vertex_count):
-            u_i_vec_view[k] = u_i_vec_out[k]
-
-    free(u_i_vec_out)
-    free(skim_i_vec_out)
-    free(edge_volume)
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.initializedcheck(False)
-cdef void compute_SF_in(
-    uint32_t[::1] csc_indptr,
-    uint32_t[::1] csc_edge_idx,
-    double[::1] c_a_vec,  # travel time
-    double[::1] f_a_vec,  # freq
-    uint32_t[::1] tail_indices,
-    uint32_t[::1] head_indices,
-    uint32_t *demand_indices,
-    double *demand_values,
-    size_t demand_size,
-    double *v_a_vec,
-    double *u_i_vec,
-    double *f_i_vec,
-    double *u_j_c_a_vec,
-    double *v_i_vec,
-    uint8_t *h_a_vec,
-    uint32_t *edge_indices,
-    uint32_t *hyperpath_order,
-    uint32_t *hyperpath_ids,
-    size_t vertex_count,
-    int dest_vert_index,
-    double[:, ::1] skim_col_vec,
-    double *skim_i_vec,
-    double *skim_j_vec,
-    size_t n_skim_cols,
-    double[:, :, ::1] skim_matrix,
-    uint32_t[::1] o_indices,
-    int64_t[::1] od_index_to_taz_index,
-    bint skimming,
-    bint is_travel_time,
-    AeqLogClosure *closure,
-) noexcept nogil:
-
-    cdef:
-        size_t edge_count = <size_t>tail_indices.shape[0]
-        DATATYPE_t u_r, u_i
-        size_t i, j, h_a_count
-        uint32_t vert_idx
-
-    # initialization
-    for i in range(vertex_count):
-        u_i_vec[i] = DATATYPE_INF
-        f_i_vec[i] = 0.0
-        v_i_vec[i] = 0.0
-    u_i_vec[<size_t>dest_vert_index] = 0.0
-
-    for i in range(vertex_count * n_skim_cols):
-        skim_i_vec[i] = 0.0
-
-    for i in range(edge_count):
-        # v_a_vec[i] = 0.0
-        u_j_c_a_vec[i] = DATATYPE_INF
-        h_a_vec[i] = 0
-
-    # first pass #
-    # ---------- #
-    _SF_in_first_pass_full(
-        csc_indptr,
-        csc_edge_idx,
-        c_a_vec,
-        f_a_vec,
-        tail_indices,
-        u_i_vec,
-        f_i_vec,
-        u_j_c_a_vec,
-        h_a_vec,
-        dest_vert_index,
-        skim_col_vec,
-        skim_i_vec,
-        skim_j_vec,
-        n_skim_cols,
-        vertex_count,
-        closure
-    )
-
-    if skimming:
-        zone_idx = od_index_to_taz_index[dest_vert_index]
-        # store skimming results
-        if is_travel_time:
-            for i in o_indices:
-                skim_matrix[od_index_to_taz_index[i], zone_idx, 0] = u_i_vec[i]
-
-            if n_skim_cols > 0:
-                for j in range(<size_t>n_skim_cols):
-                    for i in o_indices:
-                        skim_matrix[od_index_to_taz_index[i], zone_idx, j+1] = skim_i_vec[i + j * vertex_count]
-
-        else:
-            for j in range(<size_t>n_skim_cols):
-                for i in o_indices:
-                    skim_matrix[od_index_to_taz_index[i], zone_idx, j] = skim_i_vec[i + j * vertex_count]
-
-    # second pass #
-    # ----------- #
-
-    # demand is loaded into all the origin vertices
-    # also we compute the min travel time from all the origin vertices
-    u_r = DATATYPE_INF
-    for i in range(demand_size):
-        vert_idx = demand_indices[i]  # origin vertex id
-        v_i_vec[<size_t>vert_idx] = demand_values[i]
-        u_i = u_i_vec[<size_t>vert_idx]
-        if u_i < u_r:
-            u_r = u_i
-
-    # if the destination can be reached from any of the origins
-    if u_r < DATATYPE_INF:
-
-        # make sure f_i values are not zero
-        for i in range(<size_t>vertex_count):
-            if f_i_vec[i] < MIN_FREQ:
-                f_i_vec[i] = MIN_FREQ
-
-        # Sort only the edges on the hyperpath with decreasing order of u_j + c_a
-        # (the sort function sorts in increasing order, so we sort on the negated
-        # values). Compacting the hyperpath edges first, rather than sorting the
-        # full edge array, avoids sorting the ~O(edge_count) edges that are not on
-        # the hyperpath at all. Those all carried the same placeholder key, and a
-        # quicksort-based qsort (e.g. MSVC's) degrades toward quadratic time on
-        # such tie-heavy input, which dominated the entire assignment runtime.
-        h_a_count = 0
-        for i in range(<size_t>edge_count):
-            if h_a_vec[i] != 0:
-                # in-place compaction is safe: h_a_count <= i on every iteration
-                u_j_c_a_vec[h_a_count] = -u_j_c_a_vec[i]
-                edge_indices[h_a_count] = <uint32_t>i
-                h_a_count = h_a_count + 1
-
-        # hyperpath_order/hyperpath_ids are thread-local scratch buffers sized
-        # edge_count, preallocated once per thread by the caller (h_a_count <= edge_count).
-        argsort(u_j_c_a_vec, hyperpath_order, h_a_count)
-        for i in range(h_a_count):
-            hyperpath_ids[i] = edge_indices[hyperpath_order[i]]
-        for i in range(h_a_count):
-            edge_indices[i] = hyperpath_ids[i]
-
-        _SF_in_second_pass(
-            edge_indices,
-            tail_indices,
-            head_indices,
-            v_i_vec,
-            v_a_vec,
-            f_i_vec,
-            f_a_vec,
-            h_a_count
-        )
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.cdivision(True)
-@cython.initializedcheck(False)
-cdef void _SF_in_first_pass_full(
-    uint32_t[::1] csc_indptr,
-    uint32_t[::1] csc_edge_idx,
-    double[::1] c_a_vec,  # travel time
-    double[::1] f_a_vec,  # freq
-    uint32_t[::1] tail_indices,
-    double *u_i_vec,
-    double *f_i_vec,
-    double *u_j_c_a_vec,
-    uint8_t *h_a_vec,
-    int dest_vert_index,
-    double[:, ::1] skim_col_vec,
-    double *skim_i_vec,
-    double *skim_j_vec,
-    size_t n_skim_cols,
-    size_t vertex_count,
-    AeqLogClosure *closure,
-) noexcept nogil:
-    """All vertices are visited."""
-
-    cdef:
-        int edge_count = tail_indices.shape[0]
-        FourAryHeap[double] queue
-        ElementState edge_state
-        size_t i, j, edge_idx, tail_vert_idx
-        DATATYPE_t u_j_c_a, u_i, f_i, beta, u_i_new, f_a
-        DATATYPE_t skim_i, skim_j, skim_i_new, beta_skim
-
-        double *skim_i_new_vec = <double *> malloc(n_skim_cols * sizeof(double))
-        double *skim_j_new_vec = <double *> malloc(n_skim_cols * sizeof(double))
-
-    # initialization of the heap elements
-    # all nodes have INFINITY key and NOT_IN_HEAP state
-    queue.attach_logger(closure)
-    queue.init_heap(<size_t>edge_count)
-
-    # only the incoming edges of the target vertex are inserted into the
-    # priority queue
-    for i in range(<size_t>csc_indptr[<size_t>dest_vert_index], <size_t>csc_indptr[<size_t>(dest_vert_index + 1)]):
-        edge_idx = csc_edge_idx[i]
-        queue.insert(edge_idx, c_a_vec[edge_idx])
-        u_j_c_a_vec[edge_idx] = c_a_vec[edge_idx]
-        for j in range(<size_t>n_skim_cols):
-            skim_j_vec[edge_idx + j * edge_count] = skim_col_vec[edge_idx][j]
-
-    # first pass
-    while not queue.is_empty():
-
-        edge_idx = queue.extract_min()
-        u_j_c_a = queue.element_key(edge_idx)
-        tail_vert_idx = <size_t>tail_indices[edge_idx]
-        u_i = u_i_vec[tail_vert_idx]
-
-        if u_i >= u_j_c_a:
-
-            f_i = f_i_vec[tail_vert_idx]
-
-            # compute the beta coefficient
-            if (u_i < DATATYPE_INF) | (f_i > 0.0):
-                beta = f_i * u_i
-
-            else:
-                beta = 1.0
-
-            # update u_i
-            f_a = f_a_vec[edge_idx]
-
-            u_i_new = (beta + f_a * u_j_c_a) / (f_i + f_a)
-            u_i_vec[tail_vert_idx] = u_i_new
-
-            for j in range(<size_t>n_skim_cols):
-
-                skim_i = skim_i_vec[tail_vert_idx + j * vertex_count]
-                skim_j = skim_j_vec[edge_idx + j * edge_count]
-
-                if (u_i < DATATYPE_INF) | (f_i > 0.0):
-                    beta_skim = f_i * skim_i
-                else:
-                    beta_skim = 0.0
-
-                skim_i_new = (beta_skim + f_a * skim_j) / (f_i + f_a)
-
-                skim_i_vec[tail_vert_idx + j * vertex_count] = skim_i_new
-                skim_i_new_vec[j] = skim_i_new
-
-            # update f_i
-            f_i_vec[tail_vert_idx] = f_i + f_a
-
-            # add the edge to hyperpath
-            h_a_vec[edge_idx] = 1
-
-        else:
-
-            u_i_new = u_i
-            for j in range(<size_t>n_skim_cols):
-                skim_i_new = skim_i_vec[tail_vert_idx + j * vertex_count]
-                skim_i_new_vec[j] = skim_i_new
-
-        # loop on incoming edges
-        for i in range(<size_t>csc_indptr[tail_vert_idx], <size_t>csc_indptr[tail_vert_idx + 1]):
-
-            edge_idx = csc_edge_idx[i]
-            edge_state = queue.effective_state(edge_idx)
-
-            if edge_state != SCANNED:
-
-                # u_j of current edge = u_i of outgoing edge
-                u_j_c_a = u_i_new + c_a_vec[edge_idx]
-
-                for j in range(<size_t>n_skim_cols):
-                    skim_j_new_vec[j] = skim_i_new_vec[j] + skim_col_vec[edge_idx][j]
-
-                if edge_state == NOT_IN_HEAP:
-
-                    queue.insert(edge_idx, u_j_c_a)
-                    u_j_c_a_vec[edge_idx] = u_j_c_a
-                    for j in range(<size_t>n_skim_cols):
-                        skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
-
-                elif (queue.element_key(edge_idx) > u_j_c_a):
-
-                    queue.decrease_key(edge_idx, u_j_c_a)
-                    u_j_c_a_vec[edge_idx] = u_j_c_a
-                    for j in range(<size_t>n_skim_cols):
-                        skim_j_vec[edge_idx + j * edge_count] = skim_j_new_vec[j]
-
-    queue.free_heap()
-    free(skim_i_new_vec)
-    free(skim_j_new_vec)
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.cdivision(True)
-@cython.initializedcheck(False)
-cdef void _SF_in_second_pass(
-    uint32_t *edge_indices,
-    uint32_t[::1] tail_indices,
-    uint32_t[::1] head_indices,
-    double *v_i_vec,
-    double *v_a_vec,
-    double *f_i_vec,
-    double[::1] f_a_vec,
-    size_t h_a_count
-) noexcept nogil:
-
-    cdef:
-        size_t i, edge_idx, vert_idx
-        DATATYPE_t v_i, f_i, f_a, v_a_new
-
-    for i in range(h_a_count):
-
-        edge_idx = <size_t>edge_indices[i]
-        vert_idx = <size_t>tail_indices[edge_idx]
-
-        v_i = v_i_vec[vert_idx]
-        f_i = f_i_vec[vert_idx]
-        f_a = f_a_vec[edge_idx]
-
-        # update v_a
-        v_a_new = v_i * f_a / f_i
-        v_a_vec[edge_idx] += v_a_new
-        v_i_vec[<size_t>head_indices[edge_idx]] += v_a_new
+            block_waits[block] = weighted_wait

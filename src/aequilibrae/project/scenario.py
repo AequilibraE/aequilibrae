@@ -56,13 +56,8 @@ class Scenario:
 
         self._results: Results | None = None
 
-        # FIXME: Hack for getting transit to work
-        self.__project = project
-
-        if transit_path is not None:
-            self._transit = Transit(self.__project)
-        else:
-            self._transit = None
+        # Transit reads and writes this scenario's databases, whichever scenario is active
+        self._transit = Transit(self) if transit_path is not None else None
 
     @property
     def project_base_path(self) -> pathlib.Path:
@@ -106,7 +101,7 @@ class Scenario:
         """Create and return the transit gateway when explicitly requested."""
         if self._transit is None:
             self.connections.create_transit_connection(self._transit_database_path)
-            self._transit = Transit(self.__project)
+            self._transit = Transit(self)
         return self._transit
 
     @property

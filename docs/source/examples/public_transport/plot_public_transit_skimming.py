@@ -34,7 +34,7 @@ from uuid import uuid4
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.paths import TransitAssignment, TransitClass, TransitCosting
 from aequilibrae.transit import Transit
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.create_example import create_example
@@ -82,7 +82,6 @@ graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.
 transit_graph = graph_db.to_transit_graph()
-transit_graph.set_skimming_fields(["trav_time", "boardings", "freq"])
 
 # %%
 
@@ -94,12 +93,12 @@ mat["pt"] = np.full((zones, zones), 1.0)
 # %%
 # Hyperpath generation/assignment
 # -------------------------------
-# We'll create a ``TransitAssignment`` object as well as a ``TransitClass``.
+# We'll create a ``TransitAssignment`` object as well as a ``TransitClass``, whose costing waits half a headway.
 
 # %%
 
 # Create the assignment class
-assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
+assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat, costing=TransitCosting(headway_fraction=0.5))
 
 assig = TransitAssignment()
 
@@ -108,19 +107,39 @@ assig.add_class(assigclass)
 # Set assignment
 assig.set_time_field("trav_time")
 assig.set_frequency_field("freq")
+assig.set_skimming_fields(
+    ["trav_time", "boardings", "transfers", "in_vehicle_trav_time", "waiting_time", "first_waiting_time"]
+)
 assig.set_algorithm("os")
 
 # Perform the assignment for the transit classes added
 assig.execute()
 
-# We can use the get_skim_results() method to retrieve the skims
-assig.get_skim_results()["pt"]["boardings"].sum()
+# %%
+# We can use the get_skim_results() method to retrieve the skims. Waits are the headway fraction over the combined
+# frequency of the lines boarded at each stop, and transfers are boardings beyond the first.
+skims = assig.get_skim_results()["pt"]
+
+# %%
+# Pairs of zones that no strategy connects skim as infinite, rather than zero. In Coquimbo, every zone connects to
+# a stop, so transit reaches every pair.
+reachable = np.isfinite(skims["trav_time"])
+reachable.mean()
+
+# %%
+# Mean waits and transfers over the pairs that transit connects
+skims["waiting_time"][reachable].mean(), skims["transfers"][reachable].mean()
 
 # %%
 # Saving results
 # --------------
-# We'll be saving the skimming results.
-assig.save_results(table_name='hyperpath example')
+# We'll be saving the skimming results to the project's matrices, which records the period, graph and costing
+# they came from.
+assig.save_skims("hyperpath_example")
+
+# %%
+# The link volumes go to the results database.
+assig.save_results(table_name="hyperpath example")
 
 # %%
 # Wrapping up

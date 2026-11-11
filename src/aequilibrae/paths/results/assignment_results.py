@@ -146,12 +146,20 @@ class AssignmentResults(AssignmentResultsBase):
 
 
 class TransitAssignmentResults(AssignmentResultsBase):
-    """Transit loads are owned by the hyperpath computation."""
+    """Transit loads are owned by the hyperpath computation.
+
+    Besides edge volumes and skims, it reports the demand no strategy could load (``unassigned_demand`` in total,
+    ``unassigned_od`` per zone pair) and ``weighted_waiting_time``, the waits perceived by the loaded demand. Edge
+    costs times volumes plus ``weighted_waiting_time`` equal demand times expected cost.
+    """
 
     def __init__(self):
         super().__init__()
         self.link_loads = np.array([])
         self.skims = None
+        self.unassigned_demand = 0.0
+        self.unassigned_od = pd.DataFrame(columns=["origin", "destination", "demand"])
+        self.weighted_waiting_time = 0.0
 
     def prepare(self, graph, matrix):
         self.reset()

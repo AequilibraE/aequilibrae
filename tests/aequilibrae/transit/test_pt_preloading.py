@@ -60,10 +60,10 @@ def test_building_pt_preload(graph: Network, demand: AequilibraeMatrix, transit:
     """
     preloads = [calc_preload(transit, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
-    # Check preloads increase in size as time period increases
-    assert preloads[0]["preload"].sum() == 12484
-    assert preloads[1]["preload"].sum() == 21264
-    assert preloads[2]["preload"].sum() == 39696
+    # Check preloads increase in size as time period increases. Each window excludes the trip leaving at its end.
+    assert preloads[0]["preload"].sum() == 12288
+    assert preloads[1]["preload"].sum() == 21068
+    assert preloads[2]["preload"].sum() == 39500
 
     # the preload returned should be only for links which have transit routes on them
     assert len(preloads[0]) < len(graph.link_ids)

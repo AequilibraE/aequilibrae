@@ -5,9 +5,11 @@ import pandas as pd
 
 if TYPE_CHECKING:
     from aequilibrae import Project
+    from aequilibrae.project.scenario import Scenario
 
 from aequilibrae.transit.gtfs_exporter import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
+from aequilibrae.transit.service_periods import period_window, trips_in_period_sql
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.get_table import get_geo_table
@@ -31,20 +33,21 @@ class Transit(WorkerThread):
         "other": [30, 60],
     }
     default_pces: dict[int | str, int | float] = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
-    graphs: Dict[int, TransitGraphBuilder] = {}
 
-    def __init__(self, project: "Project"):
+    def __init__(self, project: "Project | Scenario"):
         """
         :Arguments:
-            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
-            active project
+            **project** (:obj:`Project` or :obj:`Scenario`): Where the transit data lives. A project binds to its
+            active scenario when the ``Transit`` is created, and keeps it if another scenario is activated later.
         """
         super().__init__(None)
 
-        self.project: "Project" = project
+        self.project = project
+        self.scenario: "Scenario" = getattr(project, "scenario", project)
+        self.graphs: Dict[int, TransitGraphBuilder] = {}
 
     def get_table(self, table_name: str) -> pd.DataFrame:
-        with self.project.transit_connection as conn:
+        with self.scenario.transit_connection as conn:
             return get_geo_table(table_name, conn)
 
     def new_gtfs_builder(
@@ -65,13 +68,14 @@ class Transit(WorkerThread):
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
-            network=self.project.project_base_path,
+            network=self.scenario.project_base_path,
             agency_identifier=agency,
             file_path=file_path,
             day=day,
             description=description,
             capacities=self.default_capacities,
             pces=self.default_pces,
+            scenario=self.scenario,
         )
 
         gtfs.signal: PythonSignal = self.transit
@@ -92,7 +96,7 @@ class Transit(WorkerThread):
             sharing IDs can be exported together. Agencies imported for several dates also get the date, e.g.
             'Metro_20260105:1'. Defaults to ``False``
         """
-        with self.project.transit_connection as conn:
+        with self.scenario.transit_connection as conn:
             export_gtfs(conn, file_path, agency_url, agency_timezone, prefix_ids)
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
@@ -104,9 +108,9 @@ class Transit(WorkerThread):
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
         'project.network.Periods' for more details.
         """
-        period_id: int = kwargs.pop("period_id", self.project.network.periods.default_period.period_id)
+        period_id: int = kwargs.pop("period_id", self.scenario.network.periods.default_period.period_id)
 
-        graph = TransitGraphBuilder(self.project, period_id, **kwargs)
+        graph = TransitGraphBuilder(self.scenario, period_id, **kwargs)
         graph.create_graph()
         self.graphs[period_id] = graph
         return graph
@@ -142,7 +146,7 @@ class Transit(WorkerThread):
 
         """
         for period_id in period_ids:
-            with self.project.transit_connection as pt_conn, self.project.db_connection as project_conn:
+            with self.scenario.transit_connection as pt_conn, self.scenario.db_connection as project_conn:
                 TransitGraphBuilder.remove(pt_conn, project_conn, period_id)
             if unload:
                 del self.graphs[period_id]
@@ -152,20 +156,30 @@ class Transit(WorkerThread):
         Load the previously saved transit graphs from the 'public_transport.sqlite' database. Loading may be filtered
         by 'period_id'.
 
+        A configuration without saved nodes and links describes a graph that is not built, for example after an
+        upgrade dropped saved graphs, and is skipped when no ``period_ids`` are given.
+
         :Arguments:
             **period_ids** (:obj:`int`): List of periods of to load. Defaults to all available graph configurations.
 
         """
         if period_ids is None:
-            with self.project.db_connection as conn:
+            with self.scenario.db_connection as conn:
                 res = conn.execute("SELECT period_id FROM transit_graph_configs").fetchall()
-            period_ids: list[int] = [x[0] for x in res]
+            with self.scenario.transit_connection as conn:
+                saved = {row[0] for row in conn.execute("SELECT DISTINCT period_id FROM links").fetchall()}
+            period_ids: list[int] = [x[0] for x in res if x[0] in saved]
 
         for period_id in period_ids:
-            self.graphs[period_id] = TransitGraphBuilder.from_db(self.project, period_id)
+            self.graphs[period_id] = TransitGraphBuilder.from_db(self.scenario, period_id)
 
-    def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
+    def build_pt_preload(
+        self, start: int | None = None, end: int | None = None, inclusion_cond: str = "start", *, period_id=None
+    ) -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period
+
+        Trips belong to the period by the same rule transit graphs use, over the half-open window ``[start, end)``.
+        Times count seconds from the start of the service day, so they may exceed ``86400``.
 
         :Arguments:
             **start** (:obj:`int`): The start of the period for which to check pt schedules (seconds from midnight)
@@ -173,7 +187,9 @@ class Transit(WorkerThread):
             **end** (:obj:`int`): The end of the period for which to check pt schedules, (seconds from midnight)
 
             **inclusion_cond** (:obj:`str`): Specifies condition with which to include/exclude pt trips from the
-            preload.
+            preload: ``start``, ``end``, ``midpoint`` or ``any``.
+
+            **period_id** (:obj:`int`, *Optional*): A period to use instead of ``start`` and ``end``.
 
         :Returns:
             **preloads** (:obj:`pd.DataFrame`): A DataFrame of preload from transit vehicles that can be directly used
@@ -192,29 +208,23 @@ class Transit(WorkerThread):
 
             >>> project.close()
         """
-        with self.project.transit_connection as conn:
+        if period_id is not None:
+            if start is not None or end is not None:
+                raise ValueError("give either a period_id or start and end, not both")
+            with self.scenario.db_connection as conn:
+                start, end = period_window(conn, period_id)
+        elif start is None or end is None:
+            raise ValueError("give a period_id, or both start and end")
+
+        with self.scenario.transit_connection as conn:
             return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)
 
     def __build_pt_preload_sql(self, start: int, end: int, inclusion_cond: str) -> str:
-        probe_point_lookup: dict[str, str] = {
-            "start": "MIN(departure)",
-            "end": "MAX(arrival)",
-            "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
-        }
-
-        def select_trip_ids():
-            in_period = f"BETWEEN {start} AND {end}"
-            if inclusion_cond == "any":
-                return f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"
-            return f"""
-                SELECT trip_id FROM trips_schedule GROUP BY trip_id
-                HAVING {probe_point_lookup[inclusion_cond]} {in_period}
-            """
-
         # Convert trip_id's to link/dir's via pattern_id's
         return f"""
             SELECT pm.link as link_id, pm.dir as direction, SUM(r.pce) as preload
-            FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p
+            FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({trips_in_period_sql(start, end, inclusion_cond)}))
+                as p
             INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id
             INNER JOIN routes r ON p.pattern_id = r.pattern_id
             GROUP BY pm.link, pm.dir

@@ -26,10 +26,7 @@ def transit_graph():
         centroids=np.array([10, 30]),
         time_field="trav_time",
         frequency_field="freq",
-        a_node_field="b_node",
-        b_node_field="a_node",
-        od_node_mapping=pd.DataFrame({"zone_id": [10, 30], "node_id": [10, 30]}),
-        skimming_fields=["distance"],
+        od_node_mapping=pd.DataFrame({"taz_id": [10, 30], "node_id": [10, 30]}),
     )
 
 
@@ -49,6 +46,7 @@ def test_transit_assignment_dense_and_sparse_results_match(transit_graph, transi
         configured = TransitClass(name="pt", graph=transit_graph, matrix=matrix)
         assignment = TransitAssignment()
         assignment.set_classes([configured])
+        assignment.set_skimming_fields(["distance"])
         assignment.set_cores(1)
         assignment.set_algorithm("os")
         assignment.execute(log_specification=False)

@@ -51,7 +51,7 @@ The required information is:
 
 It is also possible to set the common assignment parameters during class definition:
 
-* **pce**: passenger-car equivalent for multi-class assignment; default is ``1.0``.
+* **pce**: passenger-car equivalent for multi-class assignment (see [3]_); default is ``1.0``.
 * **vot**: value of time used to convert fixed costs to time units; default is ``1.0``.
 * **fixed_cost_field**: link field providing a time-equivalent fixed cost, if needed.
 * **fixed_cost_multiplier**: scale applied to the fixed cost field.
@@ -94,7 +94,7 @@ current class configuration, then prepares the required routing contexts during 
 
 * **network**: the source network object or project network containing the links and modes
 * **classes**: one or more fully-specified ``TrafficClass`` objects
-* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``,
+* **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR`` [1]_, ``BPR2``, ``CONICAL`` [2]_,
   ``INRETS``, or ``AKCELIK``. Or a custom ``VDF`` object.
 * **name_mapping**: parameter names for the VDF, either as network fields or numeric constants
 * **time_field**: link field representing free-flow travel time

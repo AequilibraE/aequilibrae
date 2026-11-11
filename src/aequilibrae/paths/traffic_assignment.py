@@ -853,7 +853,7 @@ class TransitAssignment(AssignmentBase):
     all_algorithms = ["optimal-strategies", "os"]
 
     def __init__(self, *args, project=None, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, project=project, **kwargs)
 
         self._config["Skimming Fields"] = None
 
@@ -869,6 +869,9 @@ class TransitAssignment(AssignmentBase):
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TransitClass]
+        if "Skimming Fields" in self._config:
+            for transport_class in self.classes:
+                transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def add_class(self, transport_class: TransitClass) -> None:
         """
@@ -883,14 +886,32 @@ class TransitAssignment(AssignmentBase):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
+        if "Skimming Fields" in self._config:
+            transport_class.graph.set_skimming_fields(self._config["Skimming Fields"])
 
     def _check_field(self, field: str, allow_zeros=False) -> None:
         """Throws exception if field is invalid."""
         if not self.classes:
             raise ValueError("You need add at least one transit class first")
 
-        # Validation is performed when preparing classes in execute()
-        # as graphs are built at that time
+        for c in self.classes:
+            if field not in c.graph.graph.columns:
+                raise ValueError(f"'{field}' not in graph for '{c._id}'")
+
+            try:
+                c.graph.graph[field] = pd.to_numeric(c.graph.graph[field], errors="raise").astype(np.float64)
+                values = c.graph.graph[field].to_numpy(dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Field {field} must contain numeric values for '{c._id}'") from exc
+
+            if np.any(pd.isna(values)):
+                raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
+
+            if values.min() < 0:
+                raise ValueError(f"There is at least one link with negative {field} for '{c._id}'")
+
+            if values.min() == 0 and not allow_zeros:
+                raise ValueError(f"There is at least one link with zero {field} for '{c._id}'")
 
     def set_algorithm(self, algorithm: str):
         """
@@ -956,7 +977,8 @@ class TransitAssignment(AssignmentBase):
             uclass = {}
 
             uclass["matrix_totals"] = cls.matrix.totals()
-            uclass["network mode"] = getattr(cls.matrix.index, "name", None) or f"transit_{cls._id}"
+            uclass["network mode"] = cls.graph.mode
+            uclass["provenance"] = cls.provenance
 
             classes[cls._id] = uclass
 
@@ -979,7 +1001,8 @@ class TransitAssignment(AssignmentBase):
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
 
-        Method fails if table exists
+        Method fails if table exists. The procedure report records each class's period, graph configuration,
+        scenario and costing.
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
@@ -992,20 +1015,22 @@ class TransitAssignment(AssignmentBase):
 
         df = self.results()
         if not keep_zero_flows:
-            df = df[df.volume > 0]
+            volumes = df[[f"{cls._id}_volume" for cls in self.classes]]
+            df = df[(volumes > 0).any(axis=1)]
 
         if not project:
-            project = project or get_active_project()
+            project = self.project or get_active_project()
 
-        report = {"setup": self.info()}
+        scenarios = {cls.provenance.get("scenario") for cls in self.classes}
         project.results.create(
             table_name=table_name,
             data=df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report={"setup": self.info()},
             timestamp=self.procedure_date,
             description=self.description,
+            scenario=scenarios.pop() if len(scenarios) == 1 else None,
         )
 
     def results(self) -> pd.DataFrame:
@@ -1019,17 +1044,84 @@ class TransitAssignment(AssignmentBase):
             for cls in self.classes
         ]
 
-        return pd.concat(assig_results, axis=1)
+        results = pd.concat(assig_results, axis=1)
+        # Transit link IDs are unique within a period only
+        periods = {cls.graph.provenance.get("period_id") for cls in self.classes}
+        if len(periods) == 1 and None not in periods:
+            results.insert(0, "period_id", periods.pop())
+        return results
+
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> list[str]:
+        """Saves the skims of each class to the project's matrix folder
+
+        Each class gets a ``{matrix_name}_{class}.omx`` file, whose metadata records the class's period, graph
+        configuration, scenario and costing.
+
+        :Arguments:
+            **matrix_name** (:obj:`str`): Base file name for the matrices, suffixed with each transit class ID
+
+            **which_ones** (:obj:`str`, *Optional*): Only 'final' is available, since transit assignment has a single
+            iteration. 'all' is accepted as a synonym
+
+            **format** (:obj:`str`, *Optional*): File format ('omx'). Default is 'omx'
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+                Defaults to the active project
+
+        :Returns:
+            **file_names** (:obj:`list`): OMX file names saved for classes with skims to save.
+        """
+        if which_ones not in ("final", "all"):
+            raise ValueError("which_ones must be final or all for transit assignment")
+        mat_format = format.lower()
+        if mat_format != "omx":
+            raise ValueError("Only OMX matrix files are supported")
+
+        if not project:
+            project = self.project or get_active_project()
+        mats = project.matrices
+
+        file_names = []
+        for cls in self.classes:
+            if cls.results.skims is None:
+                continue
+
+            file_name = f"{matrix_name}_{cls._id}.{mat_format}"
+            if path.isfile(mats.folder / file_name):
+                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+
+            skims = AequilibraeMatrix(index=cls.graph.centroids)
+            skims.update(dict(cls.results.skims.items()))
+            description = f"Skimming for transit assignment procedure. Class {cls._id}"
+            skims.metadata["description"] = description
+            skims.metadata["provenance"] = json.dumps(cls.provenance)
+
+            mats.save_matrix(
+                file_name=file_name,
+                matrix=skims,
+                procedure_id=self.procedure_id,
+                timestamp=self.procedure_date,
+                procedure="Transit Assignment",
+                description=description,
+            )
+            file_names.append(file_name)
+        return file_names
 
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'trav_time'
 
+        Costs may be zero but not negative. On graphs from ``TransitGraphBuilder``, each class writes its costs to
+        'trav_time'.
+
         :Arguments:
             **time_field** (:obj:`str`): Field name
         """
-        if not isinstance(time_field, str) or not time_field:
-            raise ValueError("time_field must be a nonempty string")
+        self._check_field(time_field, allow_zeros=True)
+        c = self.classes[0]
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], "float64")
+        self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
+        self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
         self._config["Time field"] = time_field
 
@@ -1048,9 +1140,16 @@ class TransitAssignment(AssignmentBase):
         Sets the skimming fields for the transit assignment.
 
         Also accepts predefined skimming fields:
-            - discrete: 'boardings', 'alightings', 'inner_transfers', 'outer_transfers', and 'transfers'.
+            - discrete: 'boardings', 'alightings', 'inner_transfers', 'outer_transfers', 'transfers' and
+              'pt_probability'.
             - continuous: 'trav_time', 'on_board_trav_time', 'dwelling_time', 'egress_trav_time', 'access_trav_time',
-              'walking_trav_time', 'transfer_time', 'in_vehicle_trav_time', and 'waiting_time'.
+              'walking_trav_time', 'transfer_time', 'in_vehicle_trav_time', 'waiting_time', 'first_waiting_time' and
+              'transfer_waiting_time'.
+
+        'trav_time' is the expected perceived cost of the strategy. Times on edges are physical, waits are the
+        headway fraction over the combined frequency of the lines boarded, without the class's wait weight, and
+        'transfers' is the expected number of boardings minus 'pt_probability', the probability of boarding at all.
+        Pairs that no strategy connects skim as ``inf``.
 
         Provide no argument to disable.
 
@@ -1067,3 +1166,5 @@ class TransitAssignment(AssignmentBase):
 
         fields = list(skimming_fields or [])
         self._config["Skimming Fields"] = fields
+        for transport_class in self.classes:
+            transport_class.graph.set_skimming_fields(fields)

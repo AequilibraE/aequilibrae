@@ -15,4 +15,5 @@ migrations: list[pathlib.Path] = [
     path / "009_add_turn_restrictions.py",
     path / "010_refresh_network_triggers.py",
     path / "011_move_results_table_to_results_database.py",
+    path / "012_default_period_whole_service_day.py",
 ]

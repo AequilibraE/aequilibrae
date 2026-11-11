@@ -52,8 +52,18 @@ class Network(WorkerThread):
         self.nodes = Nodes(self.__connections.db_connection)
         self.periods = Periods(self.__connections.db_connection)
         self.zones = Zones(self.__connections.db_connection)
-        self.turn_restrictions = TurnRestrictions(self.__connections.db_connection)
+        self.__turn_restrictions: TurnRestrictions | None = None
         self.importer = Importer(self)
+
+    @property
+    def turn_restrictions(self) -> TurnRestrictions:
+        """The turn restrictions table, opened on first use.
+
+        Projects older than the table can then still be opened, and upgraded to add it.
+        """
+        if self.__turn_restrictions is None:
+            self.__turn_restrictions = TurnRestrictions(self.__connections.db_connection)
+        return self.__turn_restrictions
 
     @property
     def project(self) -> "Project":

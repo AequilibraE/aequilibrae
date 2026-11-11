@@ -51,312 +51,62 @@ def create_edges(n, seed):
     return edges
 
 
-def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
+# Stop vertices of the Spiess & Florian network
+STOP_A, STOP_X, STOP_Y, STOP_B = 0, 1, 2, 3
+
+
+def create_SF_network(dwell_time=0.0):
     """
     Example network from Spiess, H. and Florian, M. (1989).
     Optimal strategies: A new assignment model for transit networks.
     Transportation Research Part B 23(2), 83-102.
 
-    This network has 13 vertices and 24 edges.
+    Transfers alight to the stop vertex and board again, as ``TransitGraphBuilder`` builds them. This network has 16
+    vertices and 20 edges. Frequencies are the lines' own, so the paper's waits of half a headway need a headway
+    fraction of 0.5.
     """
+    freq = {line: 1.0 / (60.0 * headway) for line, headway in {1: 12, 2: 12, 3: 30, 4: 6}.items()}
 
-    boarding_time = board_alight_ratio * dwell_time
-    alighting_time = board_alight_ratio * dwell_time
-
-    # When referencing the paper, the delta times below are halved, they are
-    # doubled before the function returns.
-    line1_freq = 1.0 / (60.0 * 12.0)
-    line2_freq = 1.0 / (60.0 * 12.0)
-    line3_freq = 1.0 / (60.0 * 30.0)
-    line4_freq = 1.0 / (60.0 * 6.0)
-
-    # stop A
-    # 0 stop vertex
-    # 1 boarding vertex
-    # 2 boarding vertex
-
-    # stop X
-    # 3 stop vertex
-    # 4 boarding vertex
-    # 5 alighting vertex
-    # 6 boarding vertex
-
-    # stop Y
-    # 7  stop vertex
-    # 8  boarding vertex
-    # 9  alighting vertex
-    # 10 boarding vertex
-    # 11 alighting vertex
-
-    # stop B
-    # 12 stop vertex
-    # 13 alighting vertex
-    # 14 alighting vertex
-    # 15 alighting vertex
-
-    tail = []
-    head = []
-    trav_time = []
-    freq = []
-    vol = []
-    link_type = []
-
-    # edge 0
-    # stop A : to line 1
-    # boarding edge
-    tail.append(0)
-    head.append(2)
-    freq.append(line1_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.5)
-    link_type.append("boarding")
-
-    # edge 1
-    # stop A : to line 2
-    # boarding edge
-    tail.append(0)
-    head.append(1)
-    freq.append(line2_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.5)
-    link_type.append("boarding")
-
-    # edge 2
-    # line 1 : first segment
-    # on-board edge
-    tail.append(2)
-    head.append(15)
-    freq.append(np.inf)
-    trav_time.append(25.0 * 60.0)
-    vol.append(0.5)
-    link_type.append("on-board")
-
-    # edge 3
-    # line 2 : first segment
-    # on-board edge
-    tail.append(1)
-    head.append(5)
-    freq.append(np.inf)
-    trav_time.append(7.0 * 60.0)
-    vol.append(0.5)
-    link_type.append("on-board")
-
-    # edge 4
-    # stop X : from line 2
-    # alighting edge
-    tail.append(5)
-    head.append(3)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.0)
-    link_type.append("alighting")
-
-    # edge 5
-    # stop X : in line 2
-    # dwell edge
-    tail.append(5)
-    head.append(6)
-    freq.append(np.inf)
-    trav_time.append(dwell_time)
-    vol.append(0.5)
-    link_type.append("dwell")
-
-    # edge 6
-    # stop X : from line 2 to line 3
-    # transfer edge
-    tail.append(5)
-    head.append(4)
-    freq.append(line3_freq)
-    trav_time.append(dwell_time)
-    vol.append(0.0)
-    link_type.append("inner_transfer")
-
-    # edge 7
-    # stop X : to line 2
-    # boarding edge
-    tail.append(3)
-    head.append(6)
-    freq.append(line2_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.0)
-    link_type.append("boarding")
-
-    # edge 8
-    # stop X : to line 3
-    # boarding edge
-    tail.append(3)
-    head.append(4)
-    freq.append(line3_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.0)
-    link_type.append("boarding")
-
-    # edge 9
-    # line 2 : second segment
-    # on-board edge
-    tail.append(6)
-    head.append(11)
-    freq.append(np.inf)
-    trav_time.append(6.0 * 60.0)
-    vol.append(0.5)
-    link_type.append("on-board")
-
-    # edge 10
-    # line 3 : first segment
-    # on-board edge
-    tail.append(4)
-    head.append(9)
-    freq.append(np.inf)
-    trav_time.append(4.0 * 60.0)
-    vol.append(0.0)
-    link_type.append("on-board")
-
-    # edge 11
-    # stop Y : from line 3
-    # alighting edge
-    tail.append(9)
-    head.append(7)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.0)
-    link_type.append("alighting")
-
-    # edge 12
-    # stop Y : from line 2
-    # alighting edge
-    tail.append(11)
-    head.append(7)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.0)
-    link_type.append("alighting")
-
-    # edge 13
-    # stop Y : from line 2 to line 3
-    # transfer edge
-    tail.append(11)
-    head.append(10)
-    freq.append(line3_freq)
-    trav_time.append(dwell_time)
-    vol.append(0.0833333333333)
-    link_type.append("inner_transfer")
-
-    # edge 14
-    # stop Y : from line 2 to line 4
-    # transfer edge
-    tail.append(11)
-    head.append(8)
-    freq.append(line4_freq)
-    trav_time.append(dwell_time)
-    vol.append(0.4166666666666)
-    link_type.append("inner_transfer")
-
-    # edge 15
-    # stop Y : from line 3 to line 4
-    # transfer edge
-    tail.append(9)
-    head.append(8)
-    freq.append(line4_freq)
-    trav_time.append(dwell_time)
-    vol.append(0.0)
-    link_type.append("inner_transfer")
-
-    # edge 16
-    # stop Y : in line 3
-    # dwell edge
-    tail.append(9)
-    head.append(10)
-    freq.append(np.inf)
-    trav_time.append(dwell_time)
-    vol.append(0.0)
-    link_type.append("dwell")
-
-    # edge 17
-    # stop Y : to line 3
-    # boarding edge
-    tail.append(7)
-    head.append(10)
-    freq.append(line3_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.0)
-    link_type.append("boarding")
-
-    # edge 18
-    # stop Y : to line 4
-    # boarding edge
-    tail.append(7)
-    head.append(8)
-    freq.append(line4_freq)
-    trav_time.append(boarding_time)
-    vol.append(0.0)
-    link_type.append("boarding")
-
-    # edge 19
-    # line 3 : second segment
-    # on-board edge
-    tail.append(10)
-    head.append(14)
-    freq.append(np.inf)
-    trav_time.append(4.0 * 60.0)
-    vol.append(0.0833333333333)
-    link_type.append("on-board")
-
-    # edge 20
-    # line 4 : first segment
-    # on-board edge
-    tail.append(8)
-    head.append(13)
-    freq.append(np.inf)
-    trav_time.append(10.0 * 60.0)
-    vol.append(0.4166666666666)
-    link_type.append("on-board")
-
-    # edge 21
-    # stop B : from line 1
-    # alighting edge
-    tail.append(15)
-    head.append(12)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.5)
-    link_type.append("alighting")
-
-    # edge 22
-    # stop B : from line 3
-    # alighting edge
-    tail.append(14)
-    head.append(12)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.0833333333333)
-    link_type.append("alighting")
-
-    # edge 23
-    # stop B : from line 4
-    # alighting edge (paper has this edge in the wrong direction)
-    tail.append(13)
-    head.append(12)
-    freq.append(np.inf)
-    trav_time.append(alighting_time)
-    vol.append(0.4166666666666)
-    link_type.append("alighting")
-
-    edges = pd.DataFrame(
-        data={
-            "tail": tail,
-            "head": head,
-            "link_type": link_type,
-            "trav_time": trav_time,
-            "freq": freq,
-            "volume_ref": vol,
-        }
-    )
-    # waiting time is in average half of the period
-    edges["freq"] *= 2.0
-
-    demand = pd.DataFrame({"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
+    # Vertices 0 to 3 are stops A, X, Y and B. Then, per line, a boarding vertex for each segment and an alighting
+    # vertex where it ends:
+    # line 1: boarding A 4, alighting B 5
+    # line 2: boarding A 6, alighting X 7, boarding X 8, alighting Y 9
+    # line 3: boarding X 10, alighting Y 11, boarding Y 12, alighting B 13
+    # line 4: boarding Y 14, alighting B 15
+    rows = [
+        # tail, head, link type, travel time, frequency, volume of the published strategy
+        (STOP_A, 4, "boarding", 0.0, freq[1], 1 / 2),
+        (STOP_A, 6, "boarding", 0.0, freq[2], 1 / 2),
+        (STOP_X, 8, "boarding", 0.0, freq[2], 0.0),
+        (STOP_X, 10, "boarding", 0.0, freq[3], 0.0),
+        (STOP_Y, 12, "boarding", 0.0, freq[3], 1 / 12),
+        (STOP_Y, 14, "boarding", 0.0, freq[4], 5 / 12),
+        (4, 5, "on-board", 25.0 * 60.0, np.inf, 1 / 2),
+        (6, 7, "on-board", 7.0 * 60.0, np.inf, 1 / 2),
+        (8, 9, "on-board", 6.0 * 60.0, np.inf, 1 / 2),
+        (10, 11, "on-board", 4.0 * 60.0, np.inf, 0.0),
+        (12, 13, "on-board", 4.0 * 60.0, np.inf, 1 / 12),
+        (14, 15, "on-board", 10.0 * 60.0, np.inf, 5 / 12),
+        (7, 8, "dwell", dwell_time, np.inf, 1 / 2),
+        (11, 12, "dwell", dwell_time, np.inf, 0.0),
+        (5, STOP_B, "alighting", 0.0, np.inf, 1 / 2),
+        (7, STOP_X, "alighting", 0.0, np.inf, 0.0),
+        (9, STOP_Y, "alighting", 0.0, np.inf, 1 / 2),
+        (11, STOP_Y, "alighting", 0.0, np.inf, 0.0),
+        (13, STOP_B, "alighting", 0.0, np.inf, 1 / 12),
+        (15, STOP_B, "alighting", 0.0, np.inf, 5 / 12),
+    ]
+    edges = pd.DataFrame(rows, columns=["tail", "head", "link_type", "trav_time", "freq", "volume_ref"])
+    demand = pd.DataFrame({"origin_vertex_id": [STOP_A], "destination_vertex_id": [STOP_B], "demand": [1.0]})
 
     return edges, demand
+
+
+# Labels towards B, with half-headway waits
+SF_LABELS = np.array(
+    [1665.0, 1144.2857142857142, 690.0, 0.0, 1500.0, 0.0, 1470.0, 1050.0]
+    + [1050.0, 690.0, 480.0, 240.0, 240.0, 0.0, 600.0, 0.0]
+)
 
 
 @pytest.fixture(scope="function")
@@ -406,7 +156,7 @@ def network_setup(request):
 
     elif network_type == "SF":
         result["edges"], result["demand"] = create_SF_network(dwell_time=dwell_time)
-        result["centroids"] = np.array([0, 12])
+        result["centroids"] = np.array([STOP_A, STOP_B])
         result["all_nodes"] = np.unique(np.hstack((result["edges"]["head"].values, result["edges"]["tail"].values)))
     else:
         raise KeyError(f'Unknown network type "{network_type}"')
@@ -417,24 +167,52 @@ def network_setup(request):
     return result
 
 
+def pack_demand(centroids, origins, destinations, values, matrix_type=DenseMatrix):
+    """Pack trips between zone vertices into transposed demand, as ``HyperpathGenerating.assign`` takes it."""
+    positions = {node: zone for zone, node in enumerate(centroids)}
+    matrix = np.zeros((len(centroids), len(centroids)))
+    np.add.at(
+        matrix,
+        ([positions[node] for node in origins], [positions[node] for node in destinations]),
+        np.asarray(values, dtype=np.float64),
+    )
+    source = sparse.csr_array(matrix) if matrix_type is SparseMatrix else matrix
+    return matrix_type.from_dict({"demand": source}, transpose=True)
+
+
 @pytest.fixture(params=[DenseMatrix, SparseMatrix])
 def packed_demand(network_setup, request):
-    centroids = network_setup["centroids"]
-    positions = {node: zone for zone, node in enumerate(centroids)}
     demand = network_setup["demand"]
     origin, destination = demand.columns[:2]
-    values = np.zeros((len(centroids), len(centroids)))
-    np.add.at(
-        values,
-        ([positions[node] for node in demand[origin]], [positions[node] for node in demand[destination]]),
-        demand["demand"].to_numpy(),
+    return pack_demand(network_setup["centroids"], demand[origin], demand[destination], demand["demand"], request.param)
+
+
+def sf_hyperpath(network_setup, skim_cols=None, **kwargs):
+    kwargs.setdefault("headway_fraction", 0.5)
+    return HyperpathGenerating(
+        network_setup["edges"],
+        skim_cols=skim_cols,
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+        **kwargs,
     )
-    source = sparse.csr_array(values) if request.param is SparseMatrix else values
-    return request.param.from_dict({"demand": source}, transpose=True)
+
+
+def assign_sf_demand(hp, network_setup, threads=None):
+    demand = network_setup["demand"]
+    trips = (demand["origin_vertex_id"], demand["destination_vertex_id"], demand["demand"])
+    hp.assign(pack_demand(network_setup["centroids"], *trips), threads=threads)
+
+
+def skim_results(hp, network_setup):
+    """The skims of the last assignment, by zone ID."""
+    return hp.skim_matrix.to_matrix(network_setup["centroids"])
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
 def test_bell_assign_parallel_agreement(network_setup, packed_demand):
+    """Test that Bell's network assigns the same volumes with one, two and four threads."""
     hp = HyperpathGenerating(
         network_setup["edges"],
         o_vert_ids=network_setup["centroids"],
@@ -445,59 +223,68 @@ def test_bell_assign_parallel_agreement(network_setup, packed_demand):
     results = []
     for threads in [1, 2, 4]:
         hp.assign(packed_demand, threads=threads)
-        results.append(hp._edges.copy(deep=True))
+        results.append(hp._edges.volume.to_numpy(copy=True))
 
     for result in results[1:]:
-        pd.testing.assert_frame_equal(results[0], result)
+        np.testing.assert_allclose(result, results[0], rtol=1e-12, atol=1e-15)
 
 
-@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
-def test_SF_single_destination(network_setup, packed_demand):
+@pytest.mark.parametrize("network_setup", [{"network": "bell", "n": 10, "alpha": 10.0}], indirect=True)
+def test_bell_assign_is_bitwise_repeatable(network_setup, packed_demand):
+    """Test that repeating an assignment with the same thread count gives bitwise-identical volumes and skims."""
     hp = HyperpathGenerating(
         network_setup["edges"],
+        skim_cols=["trav_time", "waiting_time"],
         o_vert_ids=network_setup["centroids"],
         d_vert_ids=network_setup["centroids"],
         nodes_to_indices=network_setup["nodes_to_indices"],
     )
+
+    hp.assign(packed_demand, threads=3)
+    volumes = hp._edges.volume.to_numpy(copy=True)
+    skims = skim_results(hp, network_setup)["waiting_time"].copy()
+    for _ in range(3):
+        hp.assign(packed_demand, threads=3)
+        np.testing.assert_array_equal(hp._edges.volume.to_numpy(), volumes)
+        np.testing.assert_array_equal(skim_results(hp, network_setup)["waiting_time"], skims)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_run_01(network_setup):
+    """Test that one trip from A to B loads the published strategy and labels every vertex."""
+    hp = sf_hyperpath(network_setup)
+    hp.run(origin=STOP_A, destination=STOP_B, volume=1.0)
+
+    np.testing.assert_allclose(
+        network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
+    )
+    np.testing.assert_allclose(hp.u_i_vec, SF_LABELS, rtol=1e-08, atol=1e-06)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_run_returns_the_destination_labels_when_skimming(network_setup):
+    """Test that run keeps the labels towards its own destination, not those of the other skimmed zones."""
+    hp = sf_hyperpath(network_setup, skim_cols=["trav_time"])
+    hp.run(origin=STOP_A, destination=STOP_B, volume=1.0)
+    np.testing.assert_allclose(hp.u_i_vec, SF_LABELS, rtol=1e-08, atol=1e-06)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_SF_single_destination(network_setup, packed_demand):
+    """Test that packed demand towards a single destination loads the published strategy and keeps its labels."""
+    hp = sf_hyperpath(network_setup)
     hp.assign(packed_demand, threads=1)
 
     np.testing.assert_allclose(
         network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
     )
-
-    u_i_vec_ref = np.array(
-        [
-            1.66500000e03,
-            1.47000000e03,
-            1.50000000e03,
-            1.14428572e03,
-            4.80000000e02,
-            1.05000000e03,
-            1.05000000e03,
-            6.90000000e02,
-            6.00000000e02,
-            2.40000000e02,
-            2.40000000e02,
-            6.90000000e02,
-            0.00000000e00,
-            0.00000000e00,
-            0.00000000e00,
-            0.00000000e00,
-        ]
-    )
-
-    np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
+    np.testing.assert_allclose(hp.u_i_vec, SF_LABELS, rtol=1e-08, atol=1e-06)
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
 def test_SF_assign_01(network_setup, packed_demand):
-    hp = HyperpathGenerating(
-        network_setup["edges"],
-        o_vert_ids=network_setup["centroids"],
-        d_vert_ids=network_setup["centroids"],
-        nodes_to_indices=network_setup["nodes_to_indices"],
-    )
-
+    """Test that assigning the packed demand loads the published strategy."""
+    hp = sf_hyperpath(network_setup)
     hp.assign(packed_demand)
 
     np.testing.assert_allclose(
@@ -516,83 +303,187 @@ def test_SF_assign_01(network_setup, packed_demand):
     indirect=["network_setup"],
 )
 def test_skimming_cols(network_setup, skim_col):
-    hp = HyperpathGenerating(
-        network_setup["edges"],
-        skim_cols=[skim_col],
-        o_vert_ids=network_setup["centroids"],
-        d_vert_ids=network_setup["centroids"],
-        nodes_to_indices=network_setup["nodes_to_indices"],
-    )
-
+    """Test that a predefined skim derived from link types becomes an edge column."""
+    hp = sf_hyperpath(network_setup, skim_cols=[skim_col])
     assert skim_col in hp._edges.columns, "requested column missing from edges"
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF", "dwell_time": 10.0}], indirect=True)
 def test_waiting_time_skimming(network_setup):
-    hp = HyperpathGenerating(
-        network_setup["edges"],
-        skim_cols=["waiting_time"],
-        o_vert_ids=network_setup["centroids"],
-        d_vert_ids=network_setup["centroids"],
-        nodes_to_indices=network_setup["nodes_to_indices"],
-    )
+    """Test that waiting time comes from the kernel, without derived edge columns or changes to the user's edges."""
+    columns = list(network_setup["edges"].columns)
+    hp = sf_hyperpath(network_setup, skim_cols=["waiting_time"])
 
     assert "waiting_time" not in hp._edges.columns, "waiting time isn't a real column"
-    assert "boardings" not in hp._edges.columns, "boardings isn't required for waiting time skims"
-
-    for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
-        assert col in hp._edges.columns, "waiting time requires all other skimming columns"
-
-    for col in ["in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
-        assert col not in network_setup["edges"].columns, "don't modify the users dataframe"
+    for col in ["boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]:
+        assert col not in hp._edges.columns, "waiting time needs no other skimming columns"
+    assert list(network_setup["edges"].columns) == columns, "don't modify the users dataframe"
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
 def test_SF_skimming_01(network_setup, packed_demand):
-    hp = HyperpathGenerating(
-        network_setup["edges"],
-        skim_cols=["boardings", "transfers", "waiting_time"],
-        o_vert_ids=network_setup["centroids"],
-        d_vert_ids=network_setup["centroids"],
-        nodes_to_indices=network_setup["nodes_to_indices"],
-    )
-
+    """Test that the strategy from A to B skims as published, and that B cannot reach A."""
+    skims = ["trav_time", "boardings", "transfers", "pt_probability", "in_vehicle_trav_time"]
+    skims += ["waiting_time", "first_waiting_time", "transfer_waiting_time"]
+    hp = sf_hyperpath(network_setup, skim_cols=skims)
     hp.assign(packed_demand)
     assert isinstance(hp.skim_matrix, DenseMatrix)
-    mats = hp.skim_matrix.to_matrix(network_setup["centroids"])
+    mats = skim_results(hp, network_setup)
 
-    np.testing.assert_allclose(mats["trav_time"], np.array([[0, 27.75 * 60.0], [0, 0]]))  # travel time from paper
+    def pair(value):
+        return np.array([[0.0, value], [np.inf, 0.0]])
 
-    # No access or egress links in the network
-    np.testing.assert_allclose(mats["access_trav_time"], np.array([[0, 0], [0, 0]]))
-    np.testing.assert_allclose(mats["egress_trav_time"], np.array([[0, 0], [0, 0]]))
-
-    # Only board once
-    np.testing.assert_allclose(mats["boardings"], np.array([[0, 1], [0, 0]]))
-
-    # Some routes transfer
-    np.testing.assert_allclose(mats["transfers"], np.array([[0, 0.5], [0, 0]]))  # Why is this 0.5 not 0.66?
-
-    np.testing.assert_allclose(
-        mats["in_vehicle_trav_time"], np.array([[0, 27.75 * 60.0 - mats["waiting_time"][0, 1]], [0, 0]])
-    )
-    np.testing.assert_allclose(
-        mats["waiting_time"], np.array([[0, 27.75 * 60.0 - mats["in_vehicle_trav_time"][0, 1]], [0, 0]])
-    )
+    np.testing.assert_allclose(mats["trav_time"], pair(27.75 * 60.0), atol=1e-6)  # travel time from paper
+    np.testing.assert_allclose(mats["boardings"], pair(1.5))
+    np.testing.assert_allclose(mats["transfers"], pair(0.5))
+    np.testing.assert_allclose(mats["pt_probability"], pair(1.0))
+    np.testing.assert_allclose(mats["in_vehicle_trav_time"], pair(23.5 * 60.0), atol=1e-6)
+    np.testing.assert_allclose(mats["waiting_time"], pair(4.25 * 60.0))
+    np.testing.assert_allclose(mats["first_waiting_time"], pair(3.0 * 60.0))
+    np.testing.assert_allclose(mats["transfer_waiting_time"], pair(1.25 * 60.0))
 
 
 @pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
 def test_SF_skimming_02(network_setup, packed_demand):
-    hp = HyperpathGenerating(
-        network_setup["edges"],
-        skim_cols=["boardings", "alightings"],
-        o_vert_ids=network_setup["centroids"],
-        d_vert_ids=network_setup["centroids"],
-        nodes_to_indices=network_setup["nodes_to_indices"],
+    """Test that every strategy alights as often as it boards."""
+    hp = sf_hyperpath(network_setup, skim_cols=["boardings", "alightings"])
+    hp.assign(packed_demand)
+    mats = skim_results(hp, network_setup)
+
+    np.testing.assert_allclose(mats["boardings"], mats["alightings"])
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_wait_weight_changes_labels_but_not_reported_waits(network_setup):
+    """Test that the wait weight scales perceived waits in the labels, while reported waits stay physical."""
+    hp = sf_hyperpath(network_setup, skim_cols=["trav_time", "waiting_time", "in_vehicle_trav_time"], wait_weight=2.0)
+    assign_sf_demand(hp, network_setup)
+    mats = skim_results(hp, network_setup)
+
+    # The strategy is the same, since every attractive set still beats the alternatives
+    np.testing.assert_allclose(
+        network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08
+    )
+    assert mats["waiting_time"][0, 1] == pytest.approx(4.25 * 60.0)
+    assert mats["trav_time"][0, 1] == pytest.approx(23.5 * 60.0 + 2 * 4.25 * 60.0)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_costs_and_waits_add_up_to_expected_cost(network_setup):
+    """Test that edge costs times volumes plus kappa-weighted waits equal demand times origin labels."""
+    hp = sf_hyperpath(network_setup, skim_cols=["trav_time"], wait_weight=1.7)
+    assign_sf_demand(hp, network_setup)
+
+    volumes = hp._edges.volume.to_numpy()
+    costs = np.maximum(network_setup["edges"].trav_time.to_numpy(), hp.cost_floor)
+    loaded = costs @ volumes + hp.weighted_waiting_time
+    assert loaded == pytest.approx(skim_results(hp, network_setup)["trav_time"][0, 1], rel=1e-12)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_flow_is_conserved_at_every_vertex(network_setup):
+    """Test that flow into every vertex other than the origin and destination equals the flow out."""
+    hp = sf_hyperpath(network_setup)
+    assign_sf_demand(hp, network_setup)
+
+    edges = network_setup["edges"]
+    volume = hp._edges.volume.to_numpy()
+    inflow = np.bincount(edges["head"], weights=volume, minlength=16)
+    outflow = np.bincount(edges["tail"], weights=volume, minlength=16)
+    inner = np.setdiff1d(np.arange(16), [STOP_A, STOP_B])
+    np.testing.assert_allclose(inflow[inner], outflow[inner], atol=1e-12)
+    assert outflow[STOP_A] == pytest.approx(1.0)
+    assert inflow[STOP_B] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_unreachable_demand_is_reported_and_not_loaded(network_setup):
+    """Test that demand from B to A, which no strategy serves, is reported as unassigned."""
+    hp = sf_hyperpath(network_setup)
+    hp.assign(pack_demand(network_setup["centroids"], [STOP_A, STOP_B], [STOP_B, STOP_A], [1.0, 3.0]))
+
+    assert hp.unassigned_demand == pytest.approx(3.0)
+    assert hp.unassigned_od.to_dict("records") == [{"origin": STOP_B, "destination": STOP_A, "demand": 3.0}]
+    np.testing.assert_allclose(network_setup["edges"]["volume_ref"].values, hp._edges["volume"].values, atol=1e-12)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_an_edge_without_a_wait_takes_all_the_flow(network_setup):
+    """Test that a walk from A to Y that beats waiting at A leaves the lines boarded at A with exactly zero flow."""
+    # Boarding at A expects 1665 s, and walking to Y takes 900 s plus the 690 s expected from there
+    walk = pd.DataFrame([(STOP_A, STOP_Y, "walking", 900.0, np.inf, 1.0)], columns=network_setup["edges"].columns)
+    network_setup["edges"] = pd.concat([network_setup["edges"], walk], ignore_index=True)
+    hp = sf_hyperpath(network_setup, skim_cols=["trav_time", "waiting_time"])
+    assign_sf_demand(hp, network_setup)
+
+    edges = network_setup["edges"]
+    volume = hp._edges.volume.to_numpy()
+    boarding_at_a = ((edges.tail == STOP_A) & (edges.link_type == "boarding")).to_numpy()
+    assert np.all(volume[boarding_at_a] == 0.0)
+    assert volume[-1] == 1.0
+    mats = skim_results(hp, network_setup)
+    assert mats["trav_time"][0, 1] == pytest.approx(900.0 + 690.0)
+    assert mats["waiting_time"][0, 1] == pytest.approx(0.5 / (1 / 1800 + 1 / 360))
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_update_costs_matches_a_new_graph(network_setup):
+    """Test that new costs, frequencies and waits given to an existing graph assign as a graph built with them."""
+    hp = sf_hyperpath(network_setup, skim_cols=["trav_time"])
+    assign_sf_demand(hp, network_setup)
+
+    edges = network_setup["edges"].assign(
+        trav_time=network_setup["edges"].trav_time * 1.5, freq=network_setup["edges"].freq * 2
+    )
+    hp.update_costs(edges.trav_time.to_numpy(), edges.freq.to_numpy(), headway_fraction=1.0)
+    assign_sf_demand(hp, network_setup)
+
+    network_setup["edges"] = edges
+    fresh = sf_hyperpath(network_setup, skim_cols=["trav_time"], headway_fraction=1.0)
+    assign_sf_demand(fresh, network_setup)
+    np.testing.assert_array_equal(hp._edges.volume.to_numpy(), fresh._edges.volume.to_numpy())
+    np.testing.assert_array_equal(
+        skim_results(hp, network_setup)["trav_time"], skim_results(fresh, network_setup)["trav_time"]
     )
 
-    hp.assign(packed_demand)
-    mats = hp.skim_matrix.to_matrix(network_setup["centroids"])
 
-    # Only board once
-    np.testing.assert_allclose(mats["boardings"], mats["alightings"])
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_negative_costs_are_rejected(network_setup):
+    """Test that a negative edge cost raises instead of breaking label setting."""
+    hp = sf_hyperpath(network_setup)
+    costs = network_setup["edges"].trav_time.to_numpy(copy=True)
+    costs[6] = -1.0
+    with pytest.raises(ValueError, match="nonnegative"):
+        hp.update_costs(costs)
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_strategy_lists_edges_splits_and_volumes(network_setup):
+    """Test that the strategy of one trip lists the edges it may use with their splits, leaving volumes alone."""
+    hp = sf_hyperpath(network_setup)
+    strategy = hp.strategy(STOP_A, STOP_B)
+
+    reference = network_setup["edges"]
+    used = reference.index[reference.volume_ref > 0]
+    assert list(strategy.index) == list(used)
+    np.testing.assert_allclose(strategy.volume, reference.volume_ref[used])
+
+    # Half board each line at A, and at Y one in six of the line 2 riders take line 3
+    splits = strategy.set_index(["tail", "head"]).split
+    assert splits[STOP_A, 4] == pytest.approx(0.5)
+    assert splits[STOP_Y, 12] == pytest.approx(1 / 6)
+    assert splits[STOP_Y, 14] == pytest.approx(5 / 6)
+    assert "volume" not in hp._edges.columns
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_assign_rejects_demand_that_does_not_match_the_zones(network_setup):
+    """Test that demand with more than one field or another number of zones raises instead of being assigned."""
+    hp = sf_hyperpath(network_setup)
+    two_fields = DenseMatrix.from_dict({"a": np.ones((2, 2)), "b": np.ones((2, 2))}, transpose=True)
+    three_zones = DenseMatrix.from_dict({"demand": np.ones((3, 3))}, transpose=True)
+    for demand in (two_fields, three_zones):
+        with pytest.raises(ValueError):
+            hp.assign(demand)
+    with pytest.raises(TypeError):
+        hp.assign(np.ones((2, 2)))

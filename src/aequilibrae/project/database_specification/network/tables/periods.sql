@@ -1,4 +1,6 @@
---@ The periods table holds the time periods and their period_id. Default entry with id 1 is the entire day.
+--@ The periods table holds the time periods and their period_id. Times count seconds from the start
+--@ of the GTFS service day, so they may exceed 86400, and periods never wrap around midnight. The
+--@ default entry with id 1 is the whole service day, from 00:00:00 to 48:00:00.
 --#
 CREATE TABLE if not exists periods (period_id               INTEGER UNIQUE NOT NULL,
                                     period_start            INTEGER NOT NULL,
@@ -9,7 +11,7 @@ CREATE TABLE if not exists periods (period_id               INTEGER UNIQUE NOT N
                                     CHECK(TYPEOF(period_end) == 'integer'));
 
 --#
-INSERT INTO periods (period_id, period_start, period_end, period_description) VALUES(1, 0, 86400, 'Default time period, whole day');
+INSERT INTO periods (period_id, period_start, period_end, period_description) VALUES(1, 0, 172800, 'Default time period, whole service day');
 
 --@ Attributes follow
 --#

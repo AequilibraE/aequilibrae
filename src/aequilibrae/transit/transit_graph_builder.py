@@ -1,7 +1,7 @@
 """Create the graph used by public transport assignment algorithms.
 
 Naming Conventions:
-- a_node/b_node is head/tail vertex
+- a_node/b_node is the tail/head vertex of an edge, as for road links
 
 TransitGraphBuilder Assumptions:
 - opposite directions are not supported. In the GTFS files, this corresponds to direction_id
@@ -9,10 +9,14 @@ TransitGraphBuilder Assumptions:
 - all times are expressed in seconds [s], all frequencies in [1/s], and
 - headways are uniform for trips of the same pattern.
 
+The graph only holds physical attributes: run, dwell and walking times, walking distances, headways, trip counts,
+frequencies and capacities. Each ``TransitClass`` turns them into the costs it assigns with (see ``TransitCosting``).
 """
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
 import logging
 import sqlite3
@@ -22,13 +26,19 @@ import numpy as np
 import pandas as pd
 import pyproj
 import shapely
-import shapely.ops
 from pandas.api.types import is_integer_dtype
 from pandas.core.frame import DataFrame
 from scipy.spatial import KDTree
 
 from aequilibrae.paths import PathResults
 from aequilibrae.paths.graph import TransitGraph
+from aequilibrae.paths.transit_costing import TransitCosting
+from aequilibrae.transit.service_periods import (
+    TRIP_INCLUSION_RULES,
+    period_duration,
+    period_window,
+    trips_in_period_sql,
+)
 from aequilibrae.utils.geo_utils import haversine
 
 logger = logging.getLogger(__name__)
@@ -40,22 +50,94 @@ SF_EDGE_COLS = [
     "line_id",
     "stop_id",
     "line_seg_idx",
-    "b_node",
+    "segment_id",
     "a_node",
-    "trav_time",
-    "freq",
-    "o_line_id",
-    "d_line_id",
+    "b_node",
+    "run_time",
+    "dwell_time",
+    "walk_distance",
+    "walk_time",
+    "headway",
+    "trip_count",
+    "line_freq",
+    "capacity",
     "direction",
 ]
+
+# Value of each physical attribute on edges it does not apply to
+EDGE_DEFAULTS = {
+    "line_id": "",
+    "stop_id": "",
+    "line_seg_idx": -1,
+    "run_time": 0.0,
+    "dwell_time": 0.0,
+    "walk_distance": 0.0,
+    "walk_time": 0.0,
+    "headway": 0.0,
+    "trip_count": 0,
+    "line_freq": np.inf,
+    "capacity": 0.0,
+    "direction": 1,
+}
+
+
+class _LegacyCostingAttribute:
+    """A builder attribute that moved to ``TransitCosting``.
+
+    Setting it warns, and changes the costing that classes on this builder's graphs default to.
+    """
+
+    def __init__(self, costing_field: str):
+        self.costing_field = costing_field
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, builder, owner=None):
+        if builder is None:
+            return self
+        return getattr(builder._legacy_costing or TransitCosting(), self.costing_field)
+
+    def __set__(self, builder, value):
+        warnings.warn(
+            f"TransitGraphBuilder.{self.name} is deprecated and will be removed in 2.1. Pass "
+            f"TransitCosting({self.costing_field}=...) to TransitClass instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        costing = builder._legacy_costing or TransitCosting()
+        builder._legacy_costing = dataclasses.replace(costing, **{self.costing_field: float(value)})
+
+
+class _RetiredAttribute:
+    """A builder attribute that no longer has any effect."""
+
+    def __init__(self, value, reason: str):
+        self.value = value
+        self.reason = reason
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, builder, owner=None):
+        return self if builder is None else self.value
+
+    def __set__(self, builder, value):
+        warnings.warn(
+            f"TransitGraphBuilder.{self.name} is deprecated, has no effect and will be removed in 2.1: {self.reason}",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
 
 class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
+    The graph holds the physical supply of one period. ``TransitClass`` costs it for assignment.
+
     :Arguments:
-        **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the
-        ``public_transport.sqlite`` database.
+        **project** (:obj:`Project` or :obj:`Scenario`): Project or scenario to build from. A project's active
+        scenario is used, and the builder keeps using it if another scenario is activated later.
 
         **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start
         and end.
@@ -64,47 +146,55 @@ class TransitGraphBuilder:
         `time_margin` ([start, end] becomes [start - time_margin, end + time_margin]), in order
         to include more trips when computing mean values. Defaults to ``0``.
 
-        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more
-        accurate distance calculations. Defaults to ``EPSG:3857``, Spherical Mercator.
+        **projected_crs** (:obj:`str`): Projected CRS used to find connector candidates. Defaults to the UTM zone
+        of the stops' centroid. Reported distances are always geodesic.
 
         **num_threads** (:obj:`int`): Number of threads to be used where possible.
         Defaults to ``-1`` (using all available threads).
 
-        **seed** (:obj:`int`): Deprecated. No longer in use.
+        **with_inner_stop_transfers** (:obj:`bool`): Deprecated. Transfers at a stop alight to the stop and board
+        again, so no separate edges are needed. Defaults to ``False``.
 
-        **geometry_noise** (:obj:`bool`): Deprecated. No longer in use.
-
-        **noise_coef** (:obj:`float`): Deprecated. No longer in use.
-
-        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within
-        parent stations. Defaults to ``False``.
-
-        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between
-        parent stations. Defaults to ``False``.
+        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between the distinct stops of
+        each parent station. Defaults to ``False``.
 
         **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct
-        stops of each station. Defaults to ``True``.
+        stops of each station. Defaults to ``True``. Station stop pairs get one edge, an outer transfer when
+        ``with_outer_stop_transfers`` is set.
 
-        **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to
+        **distance_upper_bound** (:obj:`float`): Upper bound on connector distance, in metres. Defaults to
         ``np.inf``.
 
         **blocking_centroid_flows** (:obj:`bool`): Whether to prevent OD connector-through traversal
         by splitting OD nodes into origin/destination roles. Defaults to ``True``.
 
+        **connector_method** (:obj:`str`): Either ``nearest_neighbour`` or ``overlapping_regions``.
+
         **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1``
         for unlimited.
+
+        **walking_speed** (:obj:`float`): Walking speed in metres per second. Defaults to ``1.0``.
+
+        **trip_inclusion** (:obj:`str`): Rule assigning trips to the period: ``start``, ``end``, ``midpoint`` or
+        ``any``, as for ``Transit.build_pt_preload``. Defaults to ``start``.
     """
+
+    alighting_penalty = _LegacyCostingAttribute("alighting_penalty")
+    wait_time_factor = _LegacyCostingAttribute("headway_fraction")
+    walk_time_factor = _LegacyCostingAttribute("walk_weight")
+    access_time_factor = _LegacyCostingAttribute("access_weight")
+    egress_time_factor = _LegacyCostingAttribute("egress_weight")
+    uniform_dwell_time = _RetiredAttribute(0.0, "dwell edges use the scheduled dwell at each stop")
+    a_tiny_time_duration = _RetiredAttribute(0.0, "the assignment floors zero edge costs itself")
 
     def __init__(
         self,
         project,
         period_id: int = 1,
         time_margin: int = 0,
-        projected_crs: str = "EPSG:3857",
+        projected_crs: str | None = None,
         num_threads: int = -1,
-        seed: int | None = None,
-        geometry_noise: bool | None = None,
-        noise_coef: float | None = None,
+        *,
         with_inner_stop_transfers: bool = False,
         with_outer_stop_transfers: bool = False,
         with_walking_edges: bool = True,
@@ -112,17 +202,24 @@ class TransitGraphBuilder:
         blocking_centroid_flows: bool = True,
         connector_method: str = "nearest_neighbour",
         max_connectors_per_zone: int = -1,
+        walking_speed: float = 1.0,
+        trip_inclusion: str = "start",
     ):
         self.project = project
+        # Bind to the scenario now, so activating another one later does not change where this graph lives
+        self.scenario = getattr(project, "scenario", project)
 
         self.period_id = period_id
-        with self.project.db_connection as conn:
-            start, end = conn.execute(
-                "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
-            ).fetchall()[0]
+        with self.scenario.db_connection as conn:
+            start, end = period_window(conn, period_id)
 
+        if trip_inclusion not in TRIP_INCLUSION_RULES:
+            raise ValueError(f"trip_inclusion must be one of {TRIP_INCLUSION_RULES}")
+
+        self.time_margin = time_margin
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
+        self.period_duration = period_duration(self.start, self.end)
         self.num_threads = num_threads
 
         # graph components
@@ -144,41 +241,26 @@ class TransitGraphBuilder:
         self.__alighting_edges: pd.DataFrame | None = None
         self.__boarding_edges: pd.DataFrame | None = None
         self.__connector_edges: pd.DataFrame | None = None
-        self.__inner_stop_transfer_edges: pd.DataFrame | None = None
-        self.__outer_stop_transfer_edges: pd.DataFrame | None = None
-        self.__walking_edges: pd.DataFrame | None = None
+        self.__station_edges: pd.DataFrame | None = None
 
         self.global_crs = "EPSG:4326"
         self.__global_crs = pyproj.CRS(self.global_crs)
         self.projected_crs = projected_crs
-        self.__projected_crs = pyproj.CRS(self.projected_crs)
 
-        # longlat to projected CRS transformer
-        self.transformer_g_to_p = pyproj.Transformer.from_crs(
-            self.__global_crs, self.__projected_crs, always_xy=True
-        ).transform
-
-        self.transformer_p_to_g = pyproj.Transformer.from_crs(
-            self.__projected_crs, self.__global_crs, always_xy=True
-        ).transform
-
-        if seed is not None or geometry_noise is not None or noise_coef is not None:
+        if with_inner_stop_transfers:
             warnings.warn(
-                "the 'seed', 'geometry_noise', and 'noise_coef' arguments are depreciated and no longer in use. "
-                "Duplicate geometries are allowed within the public transport database.",
+                "'with_inner_stop_transfers' is deprecated and has no effect: transfers at a stop alight to the stop "
+                "and board again.",
                 DeprecationWarning,
                 stacklevel=2,
             )
 
+        # Costing that classes on this builder's graphs default to, set only through the deprecated attributes
+        self._legacy_costing: TransitCosting | None = None
+
         # graph parameters
-        self.uniform_dwell_time = 30
-        self.alighting_penalty = 480
-        self.a_tiny_time_duration = 1.0e-06
-        self.wait_time_factor = 1.0
-        self.walk_time_factor = 1.0
-        self.walking_speed = 1.0
-        self.access_time_factor = 1.0
-        self.egress_time_factor = 1.0
+        self.walking_speed = walking_speed
+        self.trip_inclusion = trip_inclusion
         self.with_inner_stop_transfers = with_inner_stop_transfers
         self.with_outer_stop_transfers = with_outer_stop_transfers
         self.with_walking_edges = with_walking_edges
@@ -187,17 +269,11 @@ class TransitGraphBuilder:
         self.connector_method = connector_method
         self.max_connectors_per_zone = max_connectors_per_zone
 
+        # Every argument that shapes the graph, so a saved configuration rebuilds it
         self.__config_attrs = [
             "period_id",
+            "time_margin",
             "projected_crs",
-            # "uniform_dwell_time",
-            # "alighting_penalty",
-            # "a_tiny_time_duration",
-            # "wait_time_factor",
-            # "walk_time_factor",
-            # "walking_speed",
-            # "access_time_factor",
-            # "egress_time_factor",
             "with_inner_stop_transfers",
             "with_outer_stop_transfers",
             "with_walking_edges",
@@ -205,7 +281,39 @@ class TransitGraphBuilder:
             "blocking_centroid_flows",
             "connector_method",
             "max_connectors_per_zone",
+            "walking_speed",
+            "trip_inclusion",
         ]
+
+    @property
+    def projected_crs(self) -> str:
+        """Projected CRS used to find connector candidates, resolved from the stops when not given."""
+        if self.__projected_crs_name is None:
+            self.__set_projected_crs(self._local_utm_crs())
+        return self.__projected_crs_name
+
+    @projected_crs.setter
+    def projected_crs(self, value: str | None):
+        self.__projected_crs_name = None
+        if value is not None:
+            self.__set_projected_crs(value)
+
+    def __set_projected_crs(self, name: str):
+        crs = pyproj.CRS(name)
+        self.__projected_crs_name = name
+        self.__projected_crs = crs
+        # longlat to projected CRS transformer
+        self.transformer_g_to_p = pyproj.Transformer.from_crs(self.__global_crs, crs, always_xy=True).transform
+        self.transformer_p_to_g = pyproj.Transformer.from_crs(crs, self.__global_crs, always_xy=True).transform
+
+    def _local_utm_crs(self) -> str:
+        """Return the UTM zone of the centroid of all stops."""
+        with self.scenario.transit_connection as conn:
+            lon, lat = conn.execute("SELECT AVG(ST_X(geometry)), AVG(ST_Y(geometry)) FROM stops").fetchone()
+        if lon is None:
+            raise ValueError("cannot choose a projected CRS without stops; pass 'projected_crs'")
+        zone = min(int((lon + 180.0) // 6.0) + 1, 60)
+        return f"EPSG:{(32600 if lat >= 0 else 32700) + zone}"
 
     def add_zones(self, zones, from_crs: str | None = None):
         """Add zones as ODs.
@@ -214,14 +322,15 @@ class TransitGraphBuilder:
             **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information.
             Columns must include `zone_id` and `geometry`.
 
-            **from_crs** (:obj:`str`, optional): The CRS of the `geometry` column of `zones`. If not provided
-            it's assumed that the geometry is already in ``self.projected_crs``. If provided, the
-            geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
+            **from_crs** (:obj:`str`, optional): The CRS of the `geometry` column of `zones`. Defaults to
+            ``EPSG:4326``.
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
         elif not (is_integer_dtype(zones.zone_id.dtype) and zones.zone_id.min() > 0):
             raise ValueError("'zone_id' must consist of integers greater than 0")
+        elif not zones.zone_id.is_unique:
+            raise ValueError("'zone_id' must be unique")
 
         geo_values = zones.geometry.values
         if all(isinstance(x, str) for x in geo_values):
@@ -239,27 +348,43 @@ class TransitGraphBuilder:
 
         if from_crs:
             transformer = pyproj.Transformer.from_crs(
-                pyproj.CRS(from_crs), self.__projected_crs, always_xy=True
+                pyproj.CRS(from_crs), self.__projected_crs_for_zones(), always_xy=True
             ).transform
         else:
-            transformer = self.transformer_g_to_p
+            transformer = self.__to_projected()
         geometry = [shapely.transform(p, transformer, include_z=None, interleaved=False) for p in geometry]
         centroids = shapely.centroid(geometry)
 
+        # Zones in zone_id order, which is the centroid order of the graph and its skims
+        order = np.argsort(zones.zone_id.to_numpy(), kind="stable")
         self.zones = pd.DataFrame(
             {
-                "zone_id": zones.zone_id.copy(deep=True).astype(int),
+                "zone_id": zones.zone_id.to_numpy()[order].astype(int),
                 "geometry": shapely.to_wkb(
-                    [shapely.transform(p, self.transformer_p_to_g, include_z=None, interleaved=False) for p in geometry]
+                    [
+                        shapely.transform(geometry[i], self.transformer_p_to_g, include_z=None, interleaved=False)
+                        for i in order
+                    ]
                 ),
                 "centroids": shapely.to_wkb(
                     [
-                        shapely.transform(p, self.transformer_p_to_g, include_z=None, interleaved=False)
-                        for p in centroids
+                        shapely.transform(centroids[i], self.transformer_p_to_g, include_z=None, interleaved=False)
+                        for i in order
                     ]
                 ),
             }
         )
+
+    def __projected_crs_for_zones(self):
+        self.projected_crs  # noqa: B018 resolves the CRS and its transformers
+        return self.__projected_crs
+
+    def __to_projected(self):
+        self.projected_crs  # noqa: B018 resolves the CRS and its transformers
+        return self.transformer_g_to_p
+
+    def _period_trips_sql(self) -> str:
+        return trips_in_period_sql(self.start, self.end, self.trip_inclusion)
 
     def _create_line_segments(self):
         """Line segments correspond to segments between two successive stops for each line.
@@ -268,206 +393,95 @@ class TransitGraphBuilder:
         - L1_AB
         - L2_AB
 
+        Every attribute comes from the complete trips the period includes: mean run times between stops, mean dwell
+        at each stop, the number of trips and the period rate of distinct departures, which is the frequency the
+        assignment waits with.
+
         line_segments table format:
-            pattern_id  seq    from_stop      to_stop shortname         line_id  trav_time  headway      freq
-        0  10001006000    0  10000000464  10000000462        T2  T2_10001006000      150.0    240.0  0.004167
-        1  10001006000    1  10000000462  10000000459        T2  T2_10001006000      110.0    240.0  0.004167
-        2  10001006000    2  10000000459  10000000160        T2  T2_10001006000      100.0    240.0  0.004167
+            pattern_id  seq    from_stop      to_stop shortname         line_id  run_time  headway  line_freq ...
+        0  10001006000    0  10000000464  10000000462        T2  T2_10001006000     150.0    240.0   0.004167
+        1  10001006000    1  10000000462  10000000459        T2  T2_10001006000     110.0    240.0   0.004167
         """
+        schedule_sql = f"""
+            SELECT trips_schedule.trip_id, trips.pattern_id, trips_schedule.seq, trips_schedule.arrival,
+                   trips_schedule.departure
+            FROM trips_schedule INNER JOIN trips ON trips_schedule.trip_id = trips.trip_id
+            WHERE trips_schedule.trip_id IN ({self._period_trips_sql()})"""
+        route_links_sql = """SELECT pattern_id, seq, CAST(from_stop AS TEXT) from_stop, CAST(to_stop AS TEXT) to_stop
+            FROM route_links"""
+        routes_sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname, total_capacity FROM routes"
 
-        # we select route links for the pattern_ids in the given time range
-        route_links_sql = f"""SELECT distinct
-            trips.pattern_id,
-            route_links.seq,
-            CAST(from_stop AS TEXT) from_stop,
-            CAST(to_stop AS TEXT) to_stop
-        FROM
-            route_links
-        INNER JOIN trips ON route_links.pattern_id = trips.pattern_id
-        INNER JOIN trips_schedule ON trips.trip_id = trips_schedule.trip_id
-        WHERE
-            departure>={self.start}
-            AND arrival<={self.end}"""
+        with self.scenario.transit_connection as conn:
+            schedule = pd.read_sql(sql=schedule_sql, con=conn)
+            route_links = pd.read_sql(sql=route_links_sql, con=conn)
+            routes = pd.read_sql(sql=routes_sql, con=conn)
 
-        routes_sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
-
-        with self.project.transit_connection as conn:
-            route_links = pd.read_sql(
-                sql=route_links_sql,
-                con=conn,
-            )
-
-            # create a routes table
-            routes = pd.read_sql(
-                sql=routes_sql,
-                con=conn,
-            )
-
-        # we create a line id by concatenating the route short name with the pattern_id
-        routes["line_id"] = routes["shortname"] + "_" + routes["pattern_id"].astype(str)
-
-        # we create the line segments by merging the route links with the routes
-        # in order to have a route name on each segment
-        self.__line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
-
-        # we add the travel time and headway to each line segment
-        self._add_mean_travel_time_to_segments()
-        self._add_mean_headway_to_segments()
-
-        # we compute the frequency from the headway
-        self.__line_segments["freq"] = np.inf
-        self.__line_segments.loc[self.__line_segments.headway > 0.0, "freq"] = (
-            1.0 / self.__line_segments.loc[self.__line_segments.headway > 0.0, "headway"]
+        schedule = schedule.sort_values(["pattern_id", "trip_id", "seq"]).reset_index(drop=True)
+        schedule["dwell"] = self.__guard_negative(
+            schedule.departure - schedule.arrival, "departure before arrival at a stop", schedule
+        )
+        # Run time of the segment starting at each stop, from departure there to arrival at the next stop
+        next_arrival = schedule.groupby("trip_id").arrival.shift(-1)
+        schedule["run_time"] = self.__guard_negative(
+            next_arrival - schedule.departure, "arrival before departure from the previous stop", schedule
         )
 
-    def _compute_segment_travel_time(self, time_filter=True):
-        """Compute the mean travel time for each line segment.
+        run_times = schedule.dropna(subset="run_time").groupby(["pattern_id", "seq"]).run_time.mean()
+        dwell_times = schedule.groupby(["pattern_id", "seq"]).dwell.mean()
 
-        tt table format:
-            pattern_id  seq     trav_time
-        0   10001006000     1   114.545455
-        1   10001006000     2   100.000000
-        2   10001006000     3   180.000000
+        # Duplicate trips (same pattern and departure) add capacity, but not frequency
+        departures = schedule.groupby("trip_id", sort=False).agg(
+            pattern_id=("pattern_id", "first"), departure=("departure", "first")
+        )
+        patterns = departures.groupby("pattern_id").agg(
+            trip_count=("departure", "size"),
+            services=("departure", "nunique"),
+            first_departure=("departure", "min"),
+            last_departure=("departure", "max"),
+        )
+        patterns["headway"] = (patterns.last_departure - patterns.first_departure) / (patterns.services - 1)
+        # A single departure has no headway, and is taken to run once in the period
+        patterns.loc[patterns.services < 2, "headway"] = self.period_duration
+        patterns["line_freq"] = patterns.services / self.period_duration
+        patterns = patterns[["trip_count", "headway", "line_freq"]].reset_index()
 
-        :Arguments:
-           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the
-           [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day).
-           Defaults to ``True``.
+        segments = route_links.merge(patterns, on="pattern_id", how="inner")
+        segments = segments.merge(routes, on="pattern_id", how="left")
+        segments = segments.merge(
+            run_times.rename("run_time"), left_on=["pattern_id", "seq"], right_index=True, how="left"
+        )
+        segments = segments.merge(
+            dwell_times.rename("from_dwell"), left_on=["pattern_id", "seq"], right_index=True, how="left"
+        )
+        to_dwell = dwell_times.rename("to_dwell").reset_index()
+        to_dwell["seq"] -= 1
+        segments = segments.merge(to_dwell, on=["pattern_id", "seq"], how="left")
 
-        :Returns:
-           **tt** (:obj:`pd.DataFrame`): DataFrame containing the travel item for line segments.
-        """
+        missing = segments.run_time.isna()
+        if missing.any():
+            logger.warning(f"{int(missing.sum())} route link(s) have no scheduled run time and take zero time")
+        segments[["run_time", "from_dwell", "to_dwell"]] = segments[["run_time", "from_dwell", "to_dwell"]].fillna(0.0)
 
-        if time_filter:
-            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
-                trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
-                ON trips_schedule.trip_id = trips.trip_id
-                WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
-        else:
-            sql = """SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
-                trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
-                ON trips_schedule.trip_id = trips.trip_id"""
+        # we create a line id by concatenating the route short name with the pattern_id
+        segments["line_id"] = segments["shortname"] + "_" + segments["pattern_id"].astype(str)
+        segments["segment_id"] = segments["pattern_id"].astype(str) + ":" + segments["seq"].astype(str)
+        segments["capacity"] = segments.trip_count * segments.total_capacity.fillna(0.0)
 
-        with self.project.transit_connection as conn:
-            tt = pd.read_sql(sql=sql, con=conn)
+        self.__line_segments = segments.sort_values(["pattern_id", "seq"]).reset_index(drop=True)
 
-        # compute the travel time on the segments
-        tt = tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True)
-        tt["last_departure"] = tt["departure"].shift(+1)
-        tt["last_trip_id"] = tt["trip_id"].shift(+1)
-        tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
-        tt["trav_time"] = tt["arrival"] - tt["last_departure"]
-        tt = tt.dropna(how="any")
-        tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
-            ["last_departure", "last_trip_id", "last_pattern_id"]
-        ].astype(np.uint64)
-
-        tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
-        tt = tt.dropna(subset="trav_time")
-        tt = tt.copy(deep=True)
-
-        # tt.seq refers to the stop sequence index.
-        # Because we computed the travel time between two stops, we are now dealing
-        # with a segment sequence index.
-        tt = tt.loc[tt.seq > 0]
-        tt.seq -= 1
-
-        # take the mean of the travel times computed among the trips of a pattern segment
-        tt = tt[["pattern_id", "seq", "trav_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
-
-        return tt
-
-    def _add_mean_travel_time_to_segments(self):
-        """Add a column to the line segment table with a mean travel time.
-
-        Because there might be missing values when computing the travel time on a small time range,
-        we also compute the mean travel time over all the available data in order to fill these potential
-        missing values.
-        """
-        tt = self._compute_segment_travel_time(time_filter=True)
-        tt_full = self._compute_segment_travel_time(time_filter=False)
-        tt_full = tt_full.rename(columns={"trav_time": "trav_time_full"})
-
-        # Compute the mean travel time from the different trips corresponding to
-        assert self.__line_segments is not None
-        self.__line_segments = pd.merge(self.__line_segments, tt, on=["pattern_id", "seq"], how="left")
-        self.__line_segments = pd.merge(self.__line_segments, tt_full, on=["pattern_id", "seq"], how="left")
-        self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.__line_segments.trav_time_full)
-        self.__line_segments = self.__line_segments.drop("trav_time_full", axis=1)
-        self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.end - self.start)
-
-    def _add_mean_headway_to_segments(self):
-        """Compute the mean headway for each pattern and add it to the line segment table, as headway.
-
-        When there is not enough information to compute the mean headway (e.g. a single trip), the headway is
-        given the value of the time range length.
-        """
-        # start from the trip_schedule table
-        sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
-            WHERE departure>={self.start} AND arrival<={self.end}"""
-
-        with self.project.transit_connection as conn:
-            mh = pd.read_sql(sql=sql, con=conn)
-            trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=conn)
-
-        # merge the trips schedules with pattern ids
-        mh = pd.merge(mh, trips, on="trip_id", how="left")
-        mh = mh.sort_values(by=["pattern_id", "seq", "trip_id", "arrival"])
-        mh["headway"] = mh["arrival"].diff()
-
-        # count the number of trips per stop
-        trip_count = mh.groupby(["pattern_id", "seq"]).size().to_frame("trip_count")
-        mh = pd.merge(mh, trip_count, on=["pattern_id", "seq"], how="left")
-
-        # compute the trip index for a given couple pattern & stop
-        trip_id_last = -1
-        seq_last = -1
-        pattern_id_last = -1
-        trip_idx_values = np.zeros(len(mh), dtype=int)
-        trip_idx = 0
-        i = 0
-        for row in mh.itertuples():
-            trip_id = row.trip_id
-            seq = row.seq
-            pattern_id = row.seq
-            assert (trip_id != trip_id_last) | (seq == seq_last + 1)
-
-            if seq != seq_last:
-                trip_idx = 0
-            if pattern_id != pattern_id_last:
-                trip_idx = 0
-
-            trip_id_last = trip_id
-            seq_last = seq
-            pattern_id_last = pattern_id
-
-            trip_idx_values[i] = trip_idx
-            i += 1
-            trip_idx += 1
-        mh["trip_idx"] = trip_idx_values
-
-        # deal with single trip case for a given stop
-        largest_headway = self.end - self.start
-        mh.loc[mh["trip_count"] == 1, "headway"] = largest_headway
-
-        # deal with first trip for a stop & pattern
-        mh.loc[(mh["trip_count"] > 1) & (mh["trip_idx"] == 0), "headway"] = np.nan
-        mh["headway"] = mh["headway"].bfill()
-
-        # take the min of the headways computed among the stops of a given trip
-        mh = mh[["pattern_id", "trip_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
-
-        # compute the mean headway computed among the trips of a given pattern
-        mh = mh[["pattern_id", "headway"]].groupby("pattern_id").mean().reset_index(drop=False)
-
-        assert self.__line_segments is not None
-        self.__line_segments = pd.merge(self.__line_segments, mh, on=["pattern_id"], how="left")
+    @staticmethod
+    def __guard_negative(values: pd.Series, problem: str, schedule: pd.DataFrame) -> pd.Series:
+        negative = values < 0
+        if negative.any():
+            trips = schedule.loc[negative, "trip_id"].unique()
+            logger.warning(f"{int(negative.sum())} stop event(s) have {problem}, taken as zero, on trips {trips[:10]}")
+        return values.mask(negative, 0.0)
 
     def _create_stop_vertices(self):
         """Create stop vertices."""
         # select all stops
         sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
-        with self.project.transit_connection as conn:
+        with self.scenario.transit_connection as conn:
             stop_vertices = pd.read_sql(sql=sql, con=conn)
 
         # filter stops that are used on the given time range
@@ -524,7 +538,7 @@ class TransitGraphBuilder:
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(zone.zone_id, zone.geometry) for zone in self.project.network.zones],
+                    [(zone.zone_id, zone.geometry) for zone in self.scenario.network.zones],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -559,7 +573,7 @@ class TransitGraphBuilder:
 
     def create_od_node_mapping(self):
         """Build a dataframe mapping the centroid node ids with to transport assignment zone
-        ids."""
+        ids, in zone order."""
         assert self.vertices is not None
         if self.blocking_centroid_flows:
             origin_nodes = self.vertices.loc[
@@ -580,7 +594,7 @@ class TransitGraphBuilder:
                 self.vertices.node_type == "od",
                 ["node_id", "taz_id"],
             ]
-        self.od_node_mapping = od_node_mapping
+        self.od_node_mapping = od_node_mapping.sort_values("taz_id").reset_index(drop=True)
 
     def _create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -640,151 +654,70 @@ class TransitGraphBuilder:
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1).astype("int64")
         self.vertices.taz_id = self.vertices.taz_id.astype("int64")
 
-    def _create_on_board_edges(self):
-        """Create on board edges."""
-        assert self.__line_segments is not None
-        on_board_edges = self.__line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
-        on_board_edges = on_board_edges.rename(columns={"seq": "line_seg_idx"})
-
-        # get tail vertex index
+    def __line_vertices(self, node_type: str) -> pd.DataFrame:
         assert self.vertices is not None
-        on_board_edges = pd.merge(
-            on_board_edges,
-            self.vertices[self.vertices.node_type == "boarding"][["line_id", "line_seg_idx", "node_id"]],
-            on=["line_id", "line_seg_idx"],
-            how="left",
+        return self.vertices.loc[self.vertices.node_type == node_type, ["line_id", "line_seg_idx", "node_id"]]
+
+    def __stop_nodes(self) -> pd.DataFrame:
+        assert self.vertices is not None
+        return self.vertices.loc[self.vertices.node_type == "stop", ["stop_id", "node_id"]]
+
+    def _create_on_board_edges(self):
+        """Create on board edges, from a segment's boarding vertex to its alighting vertex."""
+        assert self.__line_segments is not None
+        on_board_edges = self.__line_segments[["line_id", "seq", "segment_id", "run_time", "capacity"]].rename(
+            columns={"seq": "line_seg_idx"}
         )
+        on_board_edges = on_board_edges.merge(self.__line_vertices("boarding"), on=["line_id", "line_seg_idx"])
+        on_board_edges = on_board_edges.rename(columns={"node_id": "a_node"})
+        on_board_edges = on_board_edges.merge(self.__line_vertices("alighting"), on=["line_id", "line_seg_idx"])
         on_board_edges = on_board_edges.rename(columns={"node_id": "b_node"})
 
-        # get head vertex index
-        on_board_edges = pd.merge(
-            on_board_edges,
-            self.vertices[self.vertices.node_type == "alighting"][["line_id", "line_seg_idx", "node_id"]],
-            on=["line_id", "line_seg_idx"],
-            how="left",
-        )
-        on_board_edges = on_board_edges.rename(columns={"node_id": "a_node"})
-
-        # uniform attributes
         on_board_edges["link_type"] = "on-board"
-        on_board_edges["freq"] = np.inf
-        on_board_edges["direction"] = 1
-
         self.__on_board_edges = on_board_edges
 
     def _create_boarding_edges(self):
-        """Create boarding edges."""
+        """Create boarding edges, from a stop to the boarding vertex of each segment leaving it."""
         assert self.__line_segments is not None
-        boarding_edges = self.__line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
-        boarding_edges = boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"})
-
-        # get tail vertex index (stop vertex)
-        assert self.vertices is not None
-        boarding_edges = pd.merge(
-            boarding_edges,
-            self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id"]],
-            on="stop_id",
-            how="left",
+        columns = ["line_id", "seq", "segment_id", "from_stop", "from_dwell", "headway", "trip_count", "line_freq"]
+        boarding_edges = self.__line_segments[columns].rename(
+            columns={"seq": "line_seg_idx", "from_stop": "stop_id", "from_dwell": "dwell_time"}
         )
+        boarding_edges = boarding_edges.merge(self.__stop_nodes(), on="stop_id").rename(columns={"node_id": "a_node"})
+        boarding_edges = boarding_edges.merge(self.__line_vertices("boarding"), on=["line_id", "line_seg_idx"])
         boarding_edges = boarding_edges.rename(columns={"node_id": "b_node"})
 
-        # get head vertex index (boarding vertex)
-        boarding_edges = pd.merge(
-            boarding_edges,
-            self.vertices[self.vertices.node_type == "boarding"][["line_id", "line_seg_idx", "node_id"]],
-            on=["line_id", "line_seg_idx"],
-            how="left",
-        )
-        boarding_edges = boarding_edges.rename(columns={"node_id": "a_node"})
-
-        # frequency update : line_freq / wait_time_factor
-        wait_time_factor_inv = 1.0 / self.wait_time_factor
-        boarding_edges["freq"] *= wait_time_factor_inv
-
-        # uniform attributes
         boarding_edges["link_type"] = "boarding"
-        boarding_edges["trav_time"] = 0.5 * self.uniform_dwell_time + self.a_tiny_time_duration
-        boarding_edges["direction"] = 1
-
         self.__boarding_edges = boarding_edges
 
     def _create_alighting_edges(self):
-        """Create alighting edges."""
+        """Create alighting edges, from the alighting vertex of each segment to the stop it reaches."""
         assert self.__line_segments is not None
-        alighting_edges = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        alighting_edges = alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"})
-
-        # get tail vertex index (alighting vertex)
-        assert self.vertices is not None
-        alighting_edges = pd.merge(
-            alighting_edges,
-            self.vertices[self.vertices.node_type == "alighting"][["line_id", "line_seg_idx", "node_id"]],
-            on=["line_id", "line_seg_idx"],
-            how="left",
+        alighting_edges = self.__line_segments[["line_id", "seq", "segment_id", "to_stop", "to_dwell"]].rename(
+            columns={"seq": "line_seg_idx", "to_stop": "stop_id", "to_dwell": "dwell_time"}
         )
-        alighting_edges = alighting_edges.rename(columns={"node_id": "b_node"})
-
-        # get head vertex index (stop vertex)
-        alighting_edges = pd.merge(
-            alighting_edges,
-            self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id"]],
-            on="stop_id",
-            how="left",
-        )
+        alighting_edges = alighting_edges.merge(self.__line_vertices("alighting"), on=["line_id", "line_seg_idx"])
         alighting_edges = alighting_edges.rename(columns={"node_id": "a_node"})
+        alighting_edges = alighting_edges.merge(self.__stop_nodes(), on="stop_id").rename(columns={"node_id": "b_node"})
 
-        # uniform attributes
         alighting_edges["link_type"] = "alighting"
-        alighting_edges["freq"] = np.inf
-        alighting_edges["trav_time"] = (
-            0.5 * self.uniform_dwell_time + self.alighting_penalty + self.a_tiny_time_duration
-        )
-        alighting_edges["direction"] = 1
-
         self.__alighting_edges = alighting_edges
 
     def _create_dwell_edges(self):
-        """Create dwell edges."""
+        """Create dwell edges, for riders staying on board at a stop, with the scheduled dwell there."""
         # we start by removing the first segment of each line
         assert self.__line_segments is not None
-        dwell_edges = self.__line_segments.loc[self.__line_segments.seq != 0][["line_id", "from_stop", "seq"]]
-        dwell_edges = dwell_edges.rename(columns={"seq": "line_seg_idx"})
+        dwell_edges = self.__line_segments.loc[
+            self.__line_segments.seq != 0, ["line_id", "seq", "segment_id", "from_stop", "from_dwell"]
+        ].rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id", "from_dwell": "dwell_time"})
 
-        # we take the first stop of the segment
-        dwell_edges["stop_id"] = dwell_edges.from_stop
-
-        # head vertex index (boarding vertex)
-        # boarding vertices of line segments [1:segment_count+1]
-        assert self.vertices is not None
-        dwell_edges = pd.merge(
-            dwell_edges,
-            self.vertices[self.vertices.node_type == "boarding"][["line_id", "stop_id", "node_id", "line_seg_idx"]],
-            on=["line_id", "stop_id", "line_seg_idx"],
-            how="left",
-        )
-        dwell_edges = dwell_edges.rename(columns={"node_id": "a_node"})
-
-        # tail vertex index (alighting vertex)
-        # aligthing vertices of line segments [0:segment_count]
-        dwell_edges.line_seg_idx -= 1
-        dwell_edges = pd.merge(
-            dwell_edges,
-            self.vertices[self.vertices.node_type == "alighting"][["line_id", "stop_id", "node_id", "line_seg_idx"]],
-            on=["line_id", "stop_id", "line_seg_idx"],
-            how="left",
-        )
+        # tail: alighting vertex of the previous segment, head: boarding vertex of this one
+        previous = self.__line_vertices("alighting").assign(line_seg_idx=lambda df: df.line_seg_idx + 1)
+        dwell_edges = dwell_edges.merge(previous, on=["line_id", "line_seg_idx"]).rename(columns={"node_id": "a_node"})
+        dwell_edges = dwell_edges.merge(self.__line_vertices("boarding"), on=["line_id", "line_seg_idx"])
         dwell_edges = dwell_edges.rename(columns={"node_id": "b_node"})
 
-        # clean-up
-        dwell_edges = dwell_edges.drop("from_stop", axis=1)
-
-        # uniform values
-        dwell_edges["line_seg_idx"] = -1
         dwell_edges["link_type"] = "dwell"
-        dwell_edges["freq"] = np.inf
-        dwell_edges["trav_time"] = self.uniform_dwell_time
-        dwell_edges["direction"] = 1
-
         self.__dwell_edges = dwell_edges
 
     def _create_connector_edges(self, method=None, allow_missing_connections=True):
@@ -796,12 +729,16 @@ class TransitGraphBuilder:
         Overlapping regions: Creates edges between all stops that lying within the circle
         centred on each OD whose radius is the distance to the next nearest OD.
 
+        With either method every zone also connects to its nearest stop, so no zone is left without a connector
+        unless ``distance_upper_bound`` excludes it. Candidates are searched in ``projected_crs``, while distances
+        are geodesic.
+
         :Arguments:
            **method** (:obj:`str`): Must either be `overlapping_regions`, or `nearest_neighbour`.
            Defaults to `overlapping_regions`.
 
-           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not.
-           Defaults to ``True``.
+           **allow_missing_connections** (:obj:`bool`): Whether to allow stops without connectors under
+           `overlapping_regions`, or to connect each to its nearest OD. Defaults to ``True``.
         """
         if method is None:
             method = self.connector_method
@@ -811,380 +748,152 @@ class TransitGraphBuilder:
         if method not in ["overlapping_regions", "nearest_neighbour"]:
             raise ValueError("method must be either 'overlapping_regions' or 'nearest_neighbour'")
 
-        # Create access connectors
-        # ========================
-
-        # Select/copy the od vertices and project their geometry
-        if self.blocking_centroid_flows:
-            node_type = "origin"
-        else:
-            node_type = "od"
         assert self.vertices is not None
-        od_vertices = self.vertices[self.vertices.node_type == node_type][["node_id", "taz_id", "geometry"]].copy(
-            deep=True
-        )
+        node_type = "origin" if self.blocking_centroid_flows else "od"
+        zones = self.vertices[self.vertices.node_type == node_type][["node_id", "geometry"]].reset_index(drop=True)
+        stops = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]]
+        stops = stops.reset_index(drop=True)
 
-        od_vertices = od_vertices.reset_index(drop=True)
-        od_geometries = od_vertices["geometry"].apply(
-            lambda geometry: shapely.transform(
-                shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
-            )
-        )
-        od_geometries = np.array(list(od_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
+        zone_lonlat = shapely.get_coordinates(shapely.from_wkb(zones.geometry.to_numpy()))
+        stop_lonlat = shapely.get_coordinates(shapely.from_wkb(stops.geometry.to_numpy()))
+        project = pyproj.Transformer.from_crs(self.__global_crs, self.projected_crs, always_xy=True)
+        zone_xy = np.column_stack(project.transform(zone_lonlat[:, 0], zone_lonlat[:, 1]))
+        stop_xy = np.column_stack(project.transform(stop_lonlat[:, 0], stop_lonlat[:, 1]))
 
-        # Select/copy the stop vertices and project their geometryinates
-        stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(
-            deep=True
-        )
-        stop_vertices = stop_vertices.reset_index(drop=True)
-        stop_geometries = stop_vertices["geometry"].apply(
-            lambda geometry: shapely.transform(
-                shapely.from_wkb(geometry), self.transformer_g_to_p, include_z=None, interleaved=False
-            )
-        )
-        stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
-
-        kdTree = KDTree(od_geometries)
+        zone_tree = KDTree(zone_xy)
+        stop_tree = KDTree(stop_xy)
+        pairs = []  # (stop index, zone index)
 
         if method == "nearest_neighbour":
-            # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
-            distance, index = kdTree.query(
-                stop_geometries,
-                k=1,
-                distance_upper_bound=self.distance_upper_bound,
-                workers=self.num_threads,
-            )
-            nearest_od = od_vertices.iloc[index][["node_id", "taz_id"]].reset_index(drop=True)
-            trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
-
-            # access connectors
-            access_connector_edges = pd.concat(
-                [
-                    stop_vertices[["stop_id", "node_id"]].reset_index(drop=True).rename(columns={"node_id": "a_node"}),
-                    nearest_od.rename(columns={"node_id": "b_node"}),
-                    trav_time,
-                ],
-                axis=1,
-            )
+            # the closest OD of each stop
+            _, nearest_zone = zone_tree.query(stop_xy, k=1, workers=self.num_threads)
+            pairs.append(np.column_stack((np.arange(len(stops)), nearest_zone)))
 
         elif method == "overlapping_regions":
-            # Construct a kdtree so we can lookup the 2nd closest OD to each OD (the first being itself)
-            distance, _ = kdTree.query(
-                od_geometries,
-                k=[2],
-                distance_upper_bound=self.distance_upper_bound,
-                workers=self.num_threads,
-            )
-            distance = distance.reshape(-1)
-
-            # Construct a kdtree so we can query all the stops within the radius around each OD
-            stop_kdTree = KDTree(stop_geometries)
-            results = stop_kdTree.query_ball_point(od_geometries, distance, workers=self.num_threads)
-
-            # access connectors
-
-            # Build up a list of dataframes to concat, each dataframe corresponds to all connectors for a given OD
-            connectors = []
-            for i, verts in enumerate(results):
-                distance = np.linalg.norm(od_geometries[i] - stop_geometries[verts], axis=1)
-                df = stop_vertices["node_id"].iloc[verts].to_frame()
-                df["b_node"] = od_vertices.iloc[i]["node_id"]  # OD is tail node of access connector
-                df["trav_time"] = distance / self.walking_speed
-                connectors.append(df)
-            access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "a_node"}).reset_index(drop=True)
+            # Each OD reaches the stops closer than its nearest neighbouring OD, within the distance bound
+            if len(zones) > 1:
+                radius = zone_tree.query(zone_xy, k=[2], workers=self.num_threads)[0].reshape(-1)
+            else:
+                radius = np.full(len(zones), np.inf)
+            radius = np.minimum(radius, self.distance_upper_bound)
+            # scipy's ball query needs a finite radius, and twice the extent of all points reaches every stop
+            extent = 2.0 * np.ptp(np.vstack((zone_xy, stop_xy)), axis=0).max() + 1.0
+            radius = np.where(np.isfinite(radius), radius, extent)
+            members = stop_tree.query_ball_point(zone_xy, radius, workers=self.num_threads)
+            for zone, stop_indices in enumerate(members):
+                pairs.append(
+                    np.column_stack((np.asarray(stop_indices, dtype=np.int64), np.full(len(stop_indices), zone)))
+                )
 
             if not allow_missing_connections:
-                # Now we need to build up the edges for the stops without connectors
-                missing = stop_vertices["node_id"].isin(access_connector_edges["a_node"])
-                missing = missing[~missing].index
+                connected = np.unique(np.concatenate([p[:, 0] for p in pairs])) if pairs else np.array([], int)
+                missing = np.setdiff1d(np.arange(len(stops)), connected)
+                if len(missing):
+                    _, nearest_zone = zone_tree.query(stop_xy[missing], k=1, workers=self.num_threads)
+                    pairs.append(np.column_stack((missing, nearest_zone)))
 
-                distance, index = kdTree.query(
-                    stop_geometries[missing],
-                    k=1,
-                    distance_upper_bound=np.inf,
-                    workers=self.num_threads,
-                )
-                nearest_od = od_vertices["node_id"].iloc[index].reset_index(drop=True)
-                trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
-                missing_edges = pd.concat(
-                    [
-                        stop_vertices["node_id"].iloc[missing].reset_index(drop=True).rename("a_node"),
-                        nearest_od.rename("b_node"),
-                        trav_time,
-                    ],
-                    axis=1,
-                )
+        # Every zone connects to at least its nearest stop
+        _, nearest_stop = stop_tree.query(zone_xy, k=1, workers=self.num_threads)
+        pairs.append(np.column_stack((nearest_stop, np.arange(len(zones)))))
 
-                access_connector_edges = pd.concat([access_connector_edges, missing_edges], axis=0)
+        pairs = np.unique(np.vstack(pairs).astype(np.int64), axis=0)
+        stop_idx, zone_idx = pairs[:, 0], pairs[:, 1]
+        distance = haversine(
+            stop_lonlat[stop_idx, 0], stop_lonlat[stop_idx, 1], zone_lonlat[zone_idx, 0], zone_lonlat[zone_idx, 1]
+        )
 
-        # uniform values
-        access_connector_edges["link_type"] = "access_connector"
-        access_connector_edges["line_seg_idx"] = -1
-        access_connector_edges["freq"] = np.inf
-        access_connector_edges["direction"] = 1
+        access_connector_edges = pd.DataFrame(
+            {
+                "a_node": zones.node_id.to_numpy()[zone_idx],
+                "b_node": stops.node_id.to_numpy()[stop_idx],
+                "stop_id": stops.stop_id.to_numpy()[stop_idx],
+                "walk_distance": distance,
+            }
+        )
+        access_connector_edges = access_connector_edges[
+            access_connector_edges.walk_distance <= self.distance_upper_bound
+        ]
+        access_connector_edges = access_connector_edges.sort_values(["a_node", "walk_distance", "b_node"])
 
         if self.max_connectors_per_zone > 0:
             # max_connectors_per_zone connectors per zone with smallest travel time are selected
-            access_connector_edges = access_connector_edges.sort_values(["b_node", "trav_time"])
-            access_connector_edges = access_connector_edges.groupby("b_node").apply(
-                lambda df: df.head(self.max_connectors_per_zone)
-            )
+            access_connector_edges = access_connector_edges.groupby("a_node").head(self.max_connectors_per_zone)
 
-        # Create egress connectors
-        # ========================
-        egress_connector_edges = access_connector_edges.copy(deep=True)
-        egress_connector_edges = egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"})
+        unconnected = np.setdiff1d(zones.node_id.to_numpy(), access_connector_edges.a_node.to_numpy())
+        if len(unconnected):
+            logger.warning(f"{len(unconnected)} zone(s) have no stop within the distance bound: {unconnected[:10]}")
 
+        access_connector_edges = access_connector_edges.reset_index(drop=True)
+        access_connector_edges["walk_time"] = access_connector_edges.walk_distance / self.walking_speed
+        access_connector_edges["segment_id"] = access_connector_edges.stop_id
+        access_connector_edges["link_type"] = "access_connector"
+
+        # Egress connectors run from the stop to the destination node of the zone
+        egress_connector_edges = access_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"})
         assert self.od_node_mapping is not None
         if self.blocking_centroid_flows:
-            # we need to switch the head node to a destination node instead of an origin node
-            egress_connector_edges = pd.merge(
-                egress_connector_edges,
-                self.od_node_mapping[["o_node_id", "d_node_id"]],
-                left_on="a_node",
-                right_on="o_node_id",
-                how="left",
-            )
-            egress_connector_edges = egress_connector_edges.drop(["a_node", "o_node_id"], axis=1)
-            egress_connector_edges = egress_connector_edges.rename(columns={"d_node_id": "a_node"})
-
-        # uniform values
+            destinations = self.od_node_mapping.set_index("o_node_id").d_node_id
+            egress_connector_edges["b_node"] = destinations.loc[egress_connector_edges.b_node].to_numpy()
         egress_connector_edges["link_type"] = "egress_connector"
-        egress_connector_edges["line_seg_idx"] = -1
-        egress_connector_edges["freq"] = np.inf
-        egress_connector_edges["direction"] = 1
-
-        # travel time update
-        access_connector_edges.trav_time *= self.access_time_factor
-        egress_connector_edges.trav_time *= self.egress_time_factor
 
         self.__connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
-    def _create_inner_stop_transfer_edges(self):
-        """Create transfer edges between distinct lines of each stop."""
-        assert self.vertices is not None
-        alighting = self.vertices[self.vertices.node_type == "alighting"][["stop_id", "line_id", "node_id"]].rename(
-            columns={"line_id": "o_line_id", "node_id": "b_node"}
-        )
-        boarding = self.vertices[self.vertices.node_type == "boarding"][["stop_id", "line_id", "node_id"]].rename(
-            columns={"line_id": "d_line_id", "node_id": "a_node"}
-        )
-        inner_stop_transfer_edges = pd.merge(alighting, boarding, on="stop_id", how="inner")
-
-        # remove entries that have the same line as origin and destination
-        inner_stop_transfer_edges = inner_stop_transfer_edges.loc[
-            inner_stop_transfer_edges["o_line_id"] != inner_stop_transfer_edges["d_line_id"]
-        ]
-
-        # update the transfer edge frequency
-        assert self.__line_segments is not None
-        inner_stop_transfer_edges = pd.merge(
-            inner_stop_transfer_edges,
-            self.__line_segments[["from_stop", "line_id", "freq"]],
-            left_on=["stop_id", "d_line_id"],
-            right_on=["from_stop", "line_id"],
-            how="left",
-        )
-        inner_stop_transfer_edges = inner_stop_transfer_edges.drop(["from_stop", "line_id"], axis=1)
-
-        # uniform attributes
-        inner_stop_transfer_edges["line_seg_idx"] = -1
-        inner_stop_transfer_edges["link_type"] = "inner_transfer"
-        inner_stop_transfer_edges["direction"] = 1
-
-        # frequency update : line_freq / wait_time_factor
-        wait_time_factor_inv = 1.0 / self.wait_time_factor
-        inner_stop_transfer_edges["freq"] *= wait_time_factor_inv
-
-        # travel time update : dwell_time + alighting_penalty
-        inner_stop_transfer_edges["trav_time"] = self.uniform_dwell_time + self.alighting_penalty
-
-        # remove duplicates
-        inner_stop_transfer_edges = inner_stop_transfer_edges.drop_duplicates()
-
-        self.__inner_stop_transfer_edges = inner_stop_transfer_edges
-
-    def _create_outer_stop_transfer_edges(self):
-        """Create transfer edges between distinct lines/stops of each station."""
+    def _create_station_edges(self, link_type: str):
+        """Create edges between the distinct stops of each parent station, walking from one stop to the other."""
         sql = (
-            "SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) "
-            "parent_station FROM stops "
+            "SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops "
             "WHERE parent_station IS NOT NULL AND parent_station <> ''"
         )
-        with self.project.transit_connection as conn:
-            stops = pd.read_sql(sql=sql, con=conn)
+        with self.scenario.transit_connection as conn:
+            stations = pd.read_sql(sql=sql, con=conn).drop_duplicates()
 
-        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
-
-        # we only keep the stations which contain at least 2 stops
-        stations = stations[stations["stop_count"] > 1]
-        station_list = stations["parent_station"].values
-        stops = stops[stops.parent_station.isin(station_list)]
-
-        # load the aligthing vertices (tail of transfer edges)
         assert self.vertices is not None
-        alighting = self.vertices[self.vertices.node_type == "alighting"][
-            ["stop_id", "line_id", "node_id", "geometry"]
-        ].rename(columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"})
-        # add the station id
-        alighting = pd.merge(alighting, stops, on="stop_id", how="inner")
-        alighting = alighting.rename(columns={"stop_id": "o_stop_id"})
+        stops = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]]
+        stops = stops.merge(stations, on="stop_id", how="inner")
 
-        # load the boarding vertices (head of transfer edges)
-        boarding = self.vertices[self.vertices.node_type == "boarding"][
-            ["stop_id", "line_id", "node_id", "geometry"]
-        ].rename(columns={"line_id": "d_line_id", "geometry": "d_geometry", "node_id": "a_node"})
-        # add the station id
-        boarding = pd.merge(boarding, stops, on="stop_id", how="inner")
-        boarding = boarding.rename(columns={"stop_id": "d_stop_id"})
+        edges = stops.merge(stops, on="parent_station", suffixes=("_o", "_d"))
+        edges = edges[edges.stop_id_o != edges.stop_id_d]
 
-        outer_stop_transfer_edges = pd.merge(alighting, boarding, on="parent_station", how="inner")
-        outer_stop_transfer_edges = outer_stop_transfer_edges.drop("parent_station", axis=1)
+        o_lonlat = shapely.get_coordinates(shapely.from_wkb(edges.geometry_o.to_numpy()))
+        d_lonlat = shapely.get_coordinates(shapely.from_wkb(edges.geometry_d.to_numpy()))
+        distance = haversine(o_lonlat[:, 0], o_lonlat[:, 1], d_lonlat[:, 0], d_lonlat[:, 1])
 
-        outer_stop_transfer_edges = outer_stop_transfer_edges.dropna(how="any")
-
-        # remove entries that share the same stop
-        outer_stop_transfer_edges = outer_stop_transfer_edges.loc[
-            outer_stop_transfer_edges["o_stop_id"] != outer_stop_transfer_edges["d_stop_id"]
-        ]
-
-        # remove entries that have the same line as origin and destination
-        outer_stop_transfer_edges = outer_stop_transfer_edges.loc[
-            outer_stop_transfer_edges["o_line_id"] != outer_stop_transfer_edges["d_line_id"]
-        ]
-
-        # update the transfer edge frequency
-        assert self.__line_segments is not None
-        outer_stop_transfer_edges = pd.merge(
-            outer_stop_transfer_edges,
-            self.__line_segments[["from_stop", "line_id", "freq"]],
-            left_on=["d_stop_id", "d_line_id"],
-            right_on=["from_stop", "line_id"],
-            how="left",
+        self.__station_edges = pd.DataFrame(
+            {
+                "a_node": edges.node_id_o.to_numpy(),
+                "b_node": edges.node_id_d.to_numpy(),
+                "segment_id": (edges.stop_id_o + ":" + edges.stop_id_d).to_numpy(),
+                "walk_distance": distance,
+                "walk_time": distance / self.walking_speed,
+                "link_type": link_type,
+            }
         )
-        outer_stop_transfer_edges = outer_stop_transfer_edges.drop(
-            ["o_stop_id", "d_stop_id", "from_stop", "line_id"], axis=1
-        )
-
-        # uniform attributes
-        outer_stop_transfer_edges["line_seg_idx"] = -1
-        outer_stop_transfer_edges["link_type"] = "outer_transfer"
-
-        # frequency update : line_freq / wait_time_factor
-        wait_time_factor_inv = 1.0 / self.wait_time_factor
-        outer_stop_transfer_edges["freq"] *= wait_time_factor_inv
-
-        # compute the walking time
-        o_geometry = shapely.from_wkb(outer_stop_transfer_edges.o_geometry.values)
-        d_geometry = shapely.from_wkb(outer_stop_transfer_edges.d_geometry.values)
-        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
-        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
-
-        distance = haversine(o_lon, o_lat, d_lon, d_lat)
-
-        outer_stop_transfer_edges["trav_time"] = distance / self.walking_speed
-        outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
-        outer_stop_transfer_edges["trav_time"] += self.alighting_penalty
-        outer_stop_transfer_edges["direction"] = 1
-
-        # cleanup
-        outer_stop_transfer_edges = outer_stop_transfer_edges.drop(["o_geometry", "d_geometry"], axis=1)
-
-        # remove duplicates
-        outer_stop_transfer_edges = outer_stop_transfer_edges.drop_duplicates()
-
-        self.__outer_stop_transfer_edges = outer_stop_transfer_edges
-
-    def _create_walking_edges(self):
-        """Create walking edges between distinct stops of each station."""
-
-        parent_station_sql = "SELECT COUNT(*) FROM stops WHERE parent_station IS NOT NULL AND parent_station <> ''"
-        stops_sql = (
-            "SELECT CAST(stop_id AS TEXT) stop_id, "
-            "CAST(parent_station AS TEXT) parent_station FROM stops "
-            "WHERE parent_station IS NOT NULL AND parent_station <> ''"
-        )
-
-        with self.project.transit_connection as conn:
-            station_count = conn.execute(parent_station_sql).fetchone()[0]
-            if not station_count > 0:
-                return
-
-            stops = pd.read_sql(sql=stops_sql, con=conn)
-
-        stops = stops.drop_duplicates()
-        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
-
-        # we only keep the stations which contain at least 2 stops
-        stations = stations[stations["stop_count"] > 1]
-        station_list = stations["parent_station"].values
-        stops = stops[stops.parent_station.isin(station_list)]
-
-        # tail vertex
-        assert self.vertices is not None
-        o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-            columns={"geometry": "o_geometry", "node_id": "b_node"}
-        )
-        o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
-        o_walking = o_walking.rename(columns={"stop_id": "o_stop_id"})
-
-        # head vertex
-        d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-            columns={"geometry": "d_geometry", "node_id": "a_node"}
-        )
-        d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
-        d_walking = d_walking.rename(columns={"stop_id": "d_stop_id"})
-
-        walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
-
-        # remove entries that share the same stop
-        walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
-        walking_edges = walking_edges.drop("parent_station", axis=1)
-
-        # uniform attributes
-        walking_edges["line_seg_idx"] = -1
-        walking_edges["link_type"] = "walking"
-        walking_edges["freq"] = np.inf
-        walking_edges["direction"] = 1
-
-        # compute the walking time
-        o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
-        d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
-        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
-        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
-
-        distance = haversine(o_lon, o_lat, d_lon, d_lat)
-
-        walking_edges["trav_time"] = distance / self.walking_speed
-        walking_edges["trav_time"] *= self.walk_time_factor
-        walking_edges.loc[walking_edges["trav_time"] < self.a_tiny_time_duration, "trav_time"] = (
-            self.a_tiny_time_duration
-        )
-
-        # cleanup
-        walking_edges = walking_edges.drop(["o_geometry", "d_geometry"], axis=1)
-
-        self.__walking_edges = walking_edges
 
     def _create_edges(self):
         """Graph edges creation as a Dataframe.
 
         Edges have the following attributes:
-            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell',
-              'inner_transfer', 'outer_transfer', 'access_connector', "egress_connector" or
-              'walking',
+            - link_type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell',
+              'outer_transfer', 'access_connector', "egress_connector" or 'walking',
             - line_id (:obj:`str`): Only applies to 'on-board', 'boarding', 'alighting' and
               'dwell' edges,
-            - stop_id (:obj:`str`),
-            - line_seg_idx (:obj:`int`): Only applies to 'on-board', 'boarding' and 'alighting'
+            - stop_id (:obj:`str`): The stop of boarding, alighting, dwell and connector edges,
+            - line_seg_idx (:obj:`int`): Segment of 'on-board', 'boarding', 'alighting' and 'dwell' edges,
+            - segment_id (:obj:`str`): Physical element the edge belongs to: ``pattern_id:seq`` for line edges,
+              the stop for connectors and ``from_stop:to_stop`` for walks between stops,
+            - a_node (:obj:`int`): Tail vertex,
+            - b_node (:obj:`int`): Head vertex,
+            - run_time (:obj:`float`): Mean scheduled run time of 'on-board' edges,
+            - dwell_time (:obj:`float`): Mean scheduled dwell at the stop of 'dwell', 'boarding' and 'alighting'
               edges,
-            - b_node (:obj:`int`),
-            - a_node (:obj:`int`),
-            - trav_time (:obj:`float`): Edge travel time,
-            - freq (:obj:`float`),
-            - o_line_id (:obj:`str`),
-            - d_line_id (:obj:`str`),
-            - transfer_id (:obj:`str`)
+            - walk_distance (:obj:`float`): Geodesic walking distance, in metres,
+            - walk_time (:obj:`float`): Walking distance over walking speed,
+            - headway (:obj:`float`): Scheduled headway between departures at the line's first stop, on 'boarding'
+              edges,
+            - trip_count (:obj:`int`): Trips of the line in the period, on 'boarding' edges,
+            - line_freq (:obj:`float`): Distinct departures over the period length on 'boarding' edges, infinite
+              elsewhere,
+            - capacity (:obj:`float`): Capacity of all the period's trips on 'on-board' edges.
         """
         # create the graph edges
         self._create_on_board_edges()
@@ -1207,19 +916,11 @@ class TransitGraphBuilder:
             self.__connector_edges,
         ]
 
-        # add optional edges
-        if self.with_inner_stop_transfers:
-            self._create_inner_stop_transfer_edges()
-            assert self.__inner_stop_transfer_edges is not None
-            edges.append(self.__inner_stop_transfer_edges)
-        if self.with_outer_stop_transfers:
-            self._create_outer_stop_transfer_edges()
-            assert self.__outer_stop_transfer_edges is not None
-            edges.append(self.__outer_stop_transfer_edges)
-        if self.with_walking_edges:
-            self._create_walking_edges()
-            assert self.__walking_edges is not None
-            edges.append(self.__walking_edges)
+        # Stop pairs of a station get one edge, an outer transfer when both kinds are requested
+        if self.with_outer_stop_transfers or self.with_walking_edges:
+            self._create_station_edges("outer_transfer" if self.with_outer_stop_transfers else "walking")
+            assert self.__station_edges is not None
+            edges.append(self.__station_edges)
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(edges, axis=0)
@@ -1227,29 +928,31 @@ class TransitGraphBuilder:
         # reset index and copy it to column
         self.edges = self.edges.reset_index(drop=True)
         self.edges["link_id"] = self.edges.index + 1
-        for col in SF_EDGE_COLS:
-            if col not in self.edges:
-                self.edges[col] = np.nan
+        for col, default in EDGE_DEFAULTS.items():
+            self.edges[col] = self.edges[col].fillna(default) if col in self.edges else default
         self.edges = self.edges[SF_EDGE_COLS]
+        self._set_edge_dtypes(self.edges)
 
-        # data types
-        self.edges.line_id = self.edges.line_id.astype("string").fillna("").astype(str)
-        self.edges.stop_id = self.edges.stop_id.astype("string").fillna("").astype(str)
-        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1).astype("int64")
-        self.edges.b_node = self.edges.b_node.astype("int64")
-        self.edges.a_node = self.edges.a_node.astype("int64")
-        self.edges.trav_time = self.edges.trav_time.astype(float)
-        self.edges.freq = self.edges.freq.astype(float)
-        self.edges.o_line_id = self.edges.o_line_id.astype("string").fillna("").astype(str)
-        self.edges.d_line_id = self.edges.d_line_id.astype("string").fillna("").astype(str)
-        self.edges.direction = self.edges.direction.astype("int8")
+    @staticmethod
+    def _set_edge_dtypes(edges: pd.DataFrame):
+        edges["line_id"] = edges.line_id.astype("string").fillna("").astype(str)
+        edges["stop_id"] = edges.stop_id.astype("string").fillna("").astype(str)
+        edges["segment_id"] = edges.segment_id.astype("string").fillna("").astype(str)
+        edges["line_seg_idx"] = edges.line_seg_idx.fillna(-1).astype("int64")
+        edges["a_node"] = edges.a_node.astype("int64")
+        edges["b_node"] = edges.b_node.astype("int64")
+        edges["trip_count"] = edges.trip_count.fillna(0).astype("int64")
+        edges["direction"] = edges.direction.astype("int8")
+        for col in ["run_time", "dwell_time", "walk_distance", "walk_time", "headway", "line_freq", "capacity"]:
+            edges[col] = edges[col].astype(float)
+        edges["line_freq"] = edges.line_freq.fillna(np.inf)
 
     def create_graph(self):
         """Create the SF transit graph (vertices and edges)."""
 
         all_present = True
         tables = ["stops", "routes", "route_links", "trips", "trips_schedule"]
-        with self.project.transit_connection as conn:
+        with self.scenario.transit_connection as conn:
             for table in tables:
                 sql = f"SELECT COUNT(*) FROM {table}"
                 all_present &= conn.execute(sql).fetchone()[0] > 0
@@ -1262,16 +965,21 @@ class TransitGraphBuilder:
         self._create_vertices()
         self._create_edges()
 
+    def _vertex_points(self) -> pd.Series:
+        """Vertex geometries by node_id."""
+        assert self.vertices is not None
+        return pd.Series(shapely.from_wkb(self.vertices.geometry.to_numpy()), index=self.vertices.node_id.to_numpy())
+
     def create_line_geometry(self, method="direct", graph="w"):
         """
-        Create the LineString for each edge.
+        Create the LineString for each edge, drawn from its tail to its head.
 
         The direct method creates a straight line between all points.
 
         The connect project match method uses the existing line geometry within the project to
         create more accurate line strings. It creates a line string that matches the path
         between the shortest path between the project nodes closest to either end of the access
-        and egress connectors.
+        and egress connectors. Their walking distance and time become the geodesic length of that line.
 
         The "connector project match" method prepares its graph from the project network.
 
@@ -1286,18 +994,15 @@ class TransitGraphBuilder:
 
         assert self.edges is not None
         assert self.vertices is not None
-        self.edges["geometry"] = None
+        points = self._vertex_points()
+
+        def direct(rows):
+            tails = shapely.get_coordinates(points.loc[self.edges.a_node[rows]].to_numpy())
+            heads = shapely.get_coordinates(points.loc[self.edges.b_node[rows]].to_numpy())
+            return shapely.to_wkb(shapely.linestrings(np.stack((tails, heads), axis=1)))
 
         if method == "direct":
-            self.edges["geometry"] = [
-                shapely.LineString(
-                    (
-                        shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                        shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
-                    )
-                ).wkb
-                for row in self.edges.itertuples()
-            ]
+            self.edges["geometry"] = direct(np.ones(len(self.edges), dtype=bool))
         elif method == "connector project match":
             # Check validity of project and nodes database
             logger.warning(
@@ -1305,8 +1010,8 @@ class TransitGraphBuilder:
                 "a while for large networks."
             )
 
-            nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
-            links = self.project.network.links.data[["link_id", "geometry"]].set_index("link_id")
+            nodes = self.scenario.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = self.scenario.network.links.data[["link_id", "geometry"]].set_index("link_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1318,22 +1023,17 @@ class TransitGraphBuilder:
             connector_rows = (self.edges.link_type == "access_connector") | (self.edges.link_type == "egress_connector")
             other_rows = ~connector_rows
 
-            # Create line strings for non-access and egress connectors
-            self.edges.loc[other_rows, "geometry"] = [
-                shapely.LineString(
-                    (
-                        shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                        shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
-                    )
-                ).wkb
-                for row in self.edges[other_rows].itertuples()
-            ]
+            self.edges["geometry"] = None
+            self.edges.loc[other_rows, "geometry"] = direct(other_rows.to_numpy())
 
-            lines = self.__connector_project_match(connector_rows, self.project, nodes, links, graph)
+            lines = self.__connector_project_match(connector_rows, points, nodes, links, graph)
+            distance = np.array([length for length, _ in lines])
 
-            self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
+            self.edges.loc[connector_rows, "geometry"] = [line for _, line in lines]
+            self.edges.loc[connector_rows, "walk_distance"] = distance
+            self.edges.loc[connector_rows, "walk_time"] = distance / self.walking_speed
 
-    def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
+    def __connector_project_match(self, connector_rows, points, nodes, links, graph_key):
         """Create line string geometry for `connector_rows` that matches the line strings in
         the graph for ``graph_key``.
 
@@ -1341,8 +1041,7 @@ class TransitGraphBuilder:
            **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges``
            to create line strings for.
 
-           **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull
-           the graph from.
+           **points** (:obj:`pd.Series`): Vertex geometries by node_id.
 
            **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes.
            Must have columns `geometry`, and an index of `node_id`\'s.
@@ -1352,38 +1051,30 @@ class TransitGraphBuilder:
 
            **graph_key** (:obj:`str`): The network mode to use
            for path finding.
+
+        :Returns:
+            **lines** (:obj:`list`): Geodesic length and WKB line string of each connector.
         """
+        to_projected = self.__to_projected()
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
         nodes["geometry"] = nodes["geometry"].apply(
-            lambda geometry: shapely.transform(geometry, self.transformer_g_to_p, include_z=None, interleaved=False)
+            lambda geometry: shapely.transform(geometry, to_projected, include_z=None, interleaved=False)
         )
         links["geometry"] = links["geometry"].apply(
-            lambda geometry: shapely.transform(geometry, self.transformer_g_to_p, include_z=None, interleaved=False)
+            lambda geometry: shapely.transform(geometry, to_projected, include_z=None, interleaved=False)
         )
         nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.network.build_graph(mode=graph_key, cost="distance")
+        graph = self.scenario.network.build_graph(mode=graph_key, cost="distance")
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []
         assert self.edges is not None
-        assert self.vertices is not None
         for row in self.edges[connector_rows].itertuples():
-            # row.a_node - 1 because the node_ids are the index + 1
-            start = shapely.transform(
-                shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                self.transformer_g_to_p,
-                include_z=None,
-                interleaved=False,
-            )
-            end = shapely.transform(
-                shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
-                self.transformer_g_to_p,
-                include_z=None,
-                interleaved=False,
-            )
+            start = shapely.transform(points.loc[row.a_node], to_projected, include_z=None, interleaved=False)
+            end = shapely.transform(points.loc[row.b_node], to_projected, include_z=None, interleaved=False)
 
             _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
 
@@ -1397,24 +1088,14 @@ class TransitGraphBuilder:
                 res = PathResults(graph, *nodes.iloc[ids].index.values)
 
                 if res.path_nodes is not None:
-                    line = shapely.ops.linemerge(
-                        (
-                            shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
-                            *links.loc[res.path].geometry,
-                            shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
-                        )
-                    )
+                    # The path holds graph link indices; the project links are indexed by link_id
+                    path_link_ids, _ = res.get_network_links()
+                    line = chain_line(start, links.loc[path_link_ids].geometry, end)
                 else:
                     line = shapely.LineString((start, end))
 
-            trav_time = line.length / self.walking_speed
-            if row.link_type == "access_connector":
-                trav_time *= self.access_time_factor
-            else:  # row.link_type == "egress_connector"
-                trav_time *= self.egress_time_factor
-
-            geometry = shapely.transform(line, self.transformer_p_to_g, include_z=None, interleaved=False)
-            lines.append((trav_time, geometry.wkb))
+            line = shapely.transform(line, self.transformer_p_to_g, include_z=None, interleaved=False)
+            lines.append((geodesic_length(line), line.wkb))
         return lines
 
     def create_additional_db_fields(self, conn: sqlite3.Connection | None = None):
@@ -1427,7 +1108,7 @@ class TransitGraphBuilder:
         # This graph requires some additional tables and fields in order to store all our
         # information. Currently it mimics what we are storing in the df
 
-        with conn or self.project.transit_connection as conn:
+        with conn or self.scenario.transit_connection as conn:
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO link_types (link_type, link_type_id, description)
@@ -1448,7 +1129,7 @@ class TransitGraphBuilder:
                     (
                         "outer_transfer",
                         "T",
-                        "Transfer edge outside of a station, from alighting to boarding",
+                        "Transfer edge between the stops of a station, from stop to stop",
                     ),
                     ("walking", "w", "Walking, from stop or walking to stop or walking"),
                 ],
@@ -1474,7 +1155,7 @@ class TransitGraphBuilder:
                 stacklevel=2,
             )
 
-        with conn or self.project.transit_connection as conn:
+        with conn or self.scenario.transit_connection as conn:
             if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError(
                     f"cannot save nodes into a database with existing nodes in the same period ({self.period_id})"
@@ -1525,11 +1206,12 @@ class TransitGraphBuilder:
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        with conn or self.project.transit_connection as conn:
+        with conn or self.scenario.transit_connection as conn:
             if conn.execute("SELECT link_id FROM links WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError("cannot save links into a database with existing links in the same period")
 
             df = self.edges[SF_EDGE_COLS + ["geometry"]].copy()
+            df["stop_id"] = df.stop_id.astype(object)
             df.loc[df.stop_id == "", "stop_id"] = None
             conn.executemany(
                 f"""\
@@ -1557,7 +1239,7 @@ class TransitGraphBuilder:
             conn.execute("DELETE FROM links WHERE period_id=?", (period_id,))
 
     def save_config(self, conn: sqlite3.Connection | None = None):
-        with conn or self.project.db_connection as conn:
+        with conn or self.scenario.db_connection as conn:
             sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
             conn.execute(sql, [self.period_id, json.dumps(self.config)])
 
@@ -1616,20 +1298,18 @@ class TransitGraphBuilder:
         cls.remove_vertices(pt_conn, period_id)
         cls.remove_config(project_conn, period_id)
 
+    @property
+    def provenance(self) -> dict:
+        """What a result needs to record to trace it back to this graph."""
+        return {
+            "scenario": getattr(self.scenario, "name", None),
+            "period_id": self.period_id,
+            "graph_config": self.config,
+            "graph_config_hash": config_hash(self.config),
+        }
+
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
-
-        # TODO: Better required link type detections
-        # link_type_diff = set(self.edges.link_type.unique()) ^ {
-        #   'access_connector', 'alighting', 'boarding', 'dwell', 'egress_connector',
-        #   'inner_transfer', 'on-board'
-        # }
-        # if link_type_diff:
-        #     raise ValueError(
-        #         f"Not all required links have been created. Link types {link_type_diff} "
-        #         f"are missing."
-        #     )
-
         assert self.od_node_mapping is not None
         assert self.vertices is not None
         assert self.edges is not None
@@ -1642,12 +1322,12 @@ class TransitGraphBuilder:
                     else (self.vertices.node_type == "od")
                 )
             ].node_id.values,
-            time_field="trav_time",
-            frequency_field="freq",
             od_node_mapping=self.od_node_mapping,
             a_node_field="a_node",
             b_node_field="b_node",
             config=self.config,
+            provenance=self.provenance,
+            costing=self._legacy_costing,
         )
 
         return g
@@ -1664,11 +1344,12 @@ class TransitGraphBuilder:
         All arguments are forwarded to the constructor.
 
         :Arguments:
-           **project** (:obj:`Project`): AequilbraE project to use.
+           **project** (:obj:`Project` or :obj:`Scenario`): AequilbraE project or scenario to use.
 
            **period_id** (:obj:`int`): Period ID to use.
         """
-        with project.db_connection as project_conn:
+        scenario = getattr(project, "scenario", project)
+        with scenario.db_connection as project_conn:
             config = project_conn.execute(
                 "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;",
                 [period_id],
@@ -1680,9 +1361,12 @@ class TransitGraphBuilder:
         config = json.loads(config[0])
         config.update(kwargs)
 
-        graph = cls(project, **config)
+        with warnings.catch_warnings():
+            # The saved configuration repeats deprecated arguments, which warned when the graph was built
+            warnings.simplefilter("ignore", DeprecationWarning)
+            graph = cls(project, **config)
 
-        with project.transit_connection as public_transport_conn:
+        with scenario.transit_connection as public_transport_conn:
             graph.vertices = pd.read_sql_query(
                 sql=(
                     f"SELECT {','.join(SF_VERTEX_COLS[:-1])}, "
@@ -1703,13 +1387,10 @@ class TransitGraphBuilder:
 
         graph.vertices.node_id = graph.vertices.node_id.astype("int64")
         graph.vertices.line_seg_idx = graph.vertices.line_seg_idx.astype("int64")
+        graph.vertices.stop_id = graph.vertices.stop_id.astype("string").fillna("").astype(str)
+        graph.vertices.line_id = graph.vertices.line_id.astype("string").fillna("").astype(str)
 
-        graph.edges.line_id = graph.edges.line_id.fillna("").astype(str)
-        graph.edges.stop_id = graph.edges.stop_id.fillna("").astype(str)
-        graph.edges.line_seg_idx = graph.edges.line_seg_idx.astype("int64")
-        graph.edges.b_node = graph.edges.b_node.astype("int64")
-        graph.edges.a_node = graph.edges.a_node.astype("int64")
-        graph.edges.direction = graph.edges.direction.astype("int8")
+        cls._set_edge_dtypes(graph.edges)
 
         graph.create_od_node_mapping()
 
@@ -1757,4 +1438,29 @@ class TransitGraphBuilder:
 
     @property
     def config(self):
-        return {k: self.__dict__[k] for k in self.__config_attrs}
+        return {k: getattr(self, k) for k in self.__config_attrs}
+
+
+def config_hash(config: dict) -> str:
+    """Hash of a graph configuration, identifying the settings a saved graph was built with."""
+    return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+
+
+def chain_line(start, lines, end) -> shapely.LineString:
+    """Join lines in path order into one line from ``start`` to ``end``, reversing any drawn the other way."""
+    coords = [shapely.get_coordinates(start)[0]]
+    for line in lines:
+        points = shapely.get_coordinates(line)
+        if np.hypot(*(points[-1] - coords[-1])) < np.hypot(*(points[0] - coords[-1])):
+            points = points[::-1]
+        coords.extend(points)
+    coords.append(shapely.get_coordinates(end)[0])
+    return shapely.LineString(coords)
+
+
+def geodesic_length(line_lonlat) -> float:
+    """Length in metres of a line in longitude and latitude, measured as the walking edges are."""
+    coords = shapely.get_coordinates(line_lonlat)
+    if len(coords) < 2:
+        return 0.0
+    return float(haversine(coords[:-1, 0], coords[:-1, 1], coords[1:, 0], coords[1:, 1]).sum())

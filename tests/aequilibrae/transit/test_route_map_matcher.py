@@ -126,7 +126,10 @@ def route_system_builder(build_gtfs_project):
     gtfs_file = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
     with database_connection("transit") as transit_conn:
         yield GTFSRouteSystemBuilder(
-            network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
+            network=transit_conn,
+            agency_identifier="LISERCO, LISANCO, LINCOSUR",
+            file_path=gtfs_file,
+            scenario=build_gtfs_project.scenario,
         )
 
 

@@ -1,124 +1,141 @@
-from os.path import join
-import os
+"""Time transit graph building and Spiess & Florian assignment.
 
-from aequilibrae.transit import Transit
-from aequilibrae.project.project import Project
+Two cases, neither needing an external model:
+
+- ``coquimbo``: the whole pipeline on the Coquimbo example (graph build, save and reload, then assignment of one trip
+  between every pair of zones with an increasing number of skims).
+- ``grid``: ``HyperpathGenerating.assign`` on Bell's random grid, large enough that kernel time dominates. Every
+  assignment waits for the progress bridge, which polls every 500 ms, so small cases only measure that floor.
+
+Usage::
+
+    python benchmarking/transit_performance.py --case coquimbo grid --threads 1 0 --output transit_performance.csv
+
+``--threads 0`` uses every available thread.
+"""
+
+import argparse
+import tempfile
+import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.paths import HyperpathGenerating, TransitAssignment, TransitClass
+from aequilibrae.utils.create_example import create_example
 
-import time
+SKIMS = ["trav_time", "boardings", "in_vehicle_trav_time", "waiting_time", "transfers", "access_trav_time"]
 
 
-def run_example(from_model, zones):
-    examples_dir = "temp_examples"
-    time_results = []
+def best_of(repeats, function):
+    times = []
+    for _ in range(repeats):
+        start = time.perf_counter()
+        function()
+        times.append(time.perf_counter() - start)
+    return min(times)
 
-    for n_zones in zones:
-        path = join(examples_dir, f"{from_model}_{n_zones}")
 
-        if os.path.isdir(path):
-            project = Project.from_path(path)
+def coquimbo(threads: int, repeats: int) -> list[dict]:
+    rows = []
+    project = create_example(str(Path(tempfile.mkdtemp()) / "coquimbo"), "coquimbo")
+    transit = project.scenario.transit
 
-        else:
-            print("example not created.")
-            continue
+    start = time.perf_counter()
+    builder = transit.create_graph(with_walking_edges=False, connector_method="overlapping_regions")
+    rows.append({"case": "coquimbo", "step": "build graph", "seconds": time.perf_counter() - start})
 
-        print(path)
+    start = time.perf_counter()
+    builder.create_line_geometry(method="direct")
+    transit.save_graphs()
+    transit.load()
+    rows.append({"case": "coquimbo", "step": "geometry, save and load", "seconds": time.perf_counter() - start})
 
-        data = Transit(project)
+    graph = transit.graphs[1].to_transit_graph()
+    zones = len(graph.centroids)
+    matrix = AequilibraeMatrix(index=graph.centroids)
+    matrix["pt"] = np.ones((zones, zones)) - np.eye(zones)
+    transit_class = TransitClass(name="pt", graph=graph, matrix=matrix)
 
-        graph = data.create_graph(
-            with_outer_stop_transfers=False,
-            with_walking_edges=False,
-            blocking_centroid_flows=False,
-            connector_method="overlapping_regions",
+    for count in range(len(SKIMS) + 1):
+        assignment = TransitAssignment()
+        assignment.add_class(transit_class)
+        assignment.set_time_field("trav_time")
+        assignment.set_frequency_field("freq")
+        assignment.set_skimming_fields(SKIMS[:count])
+        assignment.set_algorithm("os")
+        assignment.set_cores(threads)
+
+        seconds = best_of(repeats, assignment.execute)
+        if count:
+            assert len(assignment.get_skim_results()["pt"]) == count
+        rows.append({"case": "coquimbo", "step": f"assign, {count} skims", "threads": threads, "seconds": seconds})
+
+    project.close()
+    return rows
+
+
+def bell_grid(n: int, zones: int, seed: int = 124):
+    """Bell's grid with random costs and frequencies, and one trip between every pair of random zones."""
+    i, j = (values.ravel() for values in np.meshgrid(np.arange(n - 1), np.arange(n), indexing="ij"))
+    # Rightward edges along each row, then upward edges along each column
+    tail = np.concatenate((i + j * n, j + i * n))
+    head = np.concatenate((i + 1 + j * n, j + (i + 1) * n))
+    rng = np.random.default_rng(seed)
+    edges = pd.DataFrame(
+        {
+            "tail": tail.astype(np.uint32),
+            "head": head.astype(np.uint32),
+            "trav_time": rng.uniform(0.0, 1.0, len(tail)),
+            "freq": 0.1 / rng.uniform(0.01, 1.0, len(tail)),
+            "length": rng.uniform(0.0, 5.0, len(tail)),
+        }
+    )
+    centroids = np.sort(rng.choice(n * n, size=zones, replace=False))
+    demand = DenseMatrix.from_dict({"demand": 1.0 - np.eye(zones)}, transpose=True)
+    return edges, centroids, demand
+
+
+def grid(threads: int, repeats: int, n: int = 300, zones: int = 1000) -> list[dict]:
+    rows = []
+    edges, centroids, demand = bell_grid(n, zones)
+    for skims in (None, ["trav_time", "length"]):
+        hyperpath = HyperpathGenerating(
+            edges,
+            skim_cols=skims,
+            o_vert_ids=centroids,
+            d_vert_ids=centroids,
+            nodes_to_indices=np.arange(n * n, dtype=np.int64),
         )
-
-        project.network.build_graphs()
-
-        # c for All motorized vehicles
-        graph.create_line_geometry(method="direct", graph="c")
-
-        try:
-            data.save_graphs()
-        except Exception as e:
-            print(f"graphs data already saved. {e.args}")
-
-        data.load()
-
-        data = Transit(project)
-
-        # pt_con = database_connection("transit")
-        # graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period.period_id)
-        # graph_db.vertices.drop(columns="geometry")
-
-        transit_graph = graph.to_transit_graph()
-
-        zones_in_the_model = len(transit_graph.centroids)
-
-        names_list = ["pt"]
-
-        mat = AequilibraeMatrix()
-        mat.create_empty(zones=zones_in_the_model, matrix_names=names_list, memory_only=True)
-        mat.index = transit_graph.centroids[:]
-        mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
-        mat.computational_view()
-        # mat.get_matrix('pt')
-
-        transit_graph.graph["boardings"] = transit_graph.graph["link_type"].apply(lambda x: 1 if x == "boarding" else 0)
-        transit_graph.graph["in_vehicle_trav_time"] = np.where(
-            transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
-        )
-        transit_graph.graph["egress_trav_time"] = np.where(
-            transit_graph.graph["link_type"] != "egress_connector", 0, transit_graph.graph["trav_time"]
-        )
-        transit_graph.graph["access_trav_time"] = np.where(
-            transit_graph.graph["link_type"] != "access_connector", 0, transit_graph.graph["trav_time"]
-        )
-
-        skim_cols = ["trav_time", "boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
-
-        assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
-
-        print(f"centroids: {transit_graph.centroids.shape[0]}")
-        for i in range(0, len(skim_cols)):
-            assig = TransitAssignment()
-            assig.add_class(assigclass)
-            assig.set_time_field("trav_time")
-            assig.set_frequency_field("freq")
-
-            assig.set_skimming_fields(skim_cols[:i])
-
-            assig.set_algorithm("os")
-            assigclass.set_demand_matrix_core("pt")
-
-            start_time = time.perf_counter()
-            # start_time = time.process_time()
-            assig.execute()
-            end_time = time.perf_counter()
-            # end_time = time.process_time()
-
-            elapsed_time = end_time - start_time
-
-            time_results.append([n_zones, i, elapsed_time])
-
-            print(f"{i} Skimming Cols Elapsed time: {elapsed_time} seconds")
-
-            if i != 0:
-                assert len(assig.get_skim_results()[0].matrix) == i
-
-            print(f"{len(assig.results())}")
-
-            del assig
-
-        project.close()
-
-    return {from_model: pd.DataFrame(time_results, columns=["zones", "skim_cols", "elapsed_time"])}
+        seconds = best_of(repeats, lambda h=hyperpath: h.assign(demand, threads=threads))
+        step = f"assign {len(edges)} edges to {zones} destinations, {len(skims or [])} skims"
+        rows.append({"case": "grid", "step": step, "threads": threads, "seconds": seconds})
+    return rows
 
 
-from_model = "lyon"
-results = run_example(from_model, [2000])
-results = pd.read_csv(f"{from_model}_performance_results.csv", index_col=0)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--case", nargs="+", choices=["coquimbo", "grid"], default=["coquimbo", "grid"])
+    parser.add_argument("--threads", nargs="+", type=int, default=[1, 0])
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--output", type=Path, default=Path("transit_performance.csv"))
+    args = parser.parse_args()
+
+    cases = {"coquimbo": coquimbo, "grid": grid}
+    rows = []
+    for name in args.case:
+        for threads in args.threads:
+            for row in cases[name](threads, args.repeats):
+                row.setdefault("threads", threads)
+                print(row, flush=True)
+                rows.append(row)
+
+    pd.DataFrame(rows).to_csv(args.output, index=False)
+    print(f"Results written to {args.output}")
+
+
+if __name__ == "__main__":
+    main()
