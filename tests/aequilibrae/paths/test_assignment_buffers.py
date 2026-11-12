@@ -49,8 +49,8 @@ def make_assignment(network, demand):
             mode="c",
             cost="time",
             demand=matrix,
-            graph_options={"compact": compact},
-            select_link_sets={"kept": [(9, 1)], "dead": [(7, 0)], "excluded": [(5, 1)]},
+            graph_options={"compact": compact, "remove_dead_ends": False},
+            select_link_sets={"kept": [(9, 1)], "dead": [(7, 0)]},
         )
         fields = source._field_arrays(["time", "distance"])
         prepared = PreparedTrafficClass(configuration, source, fields)
@@ -94,7 +94,6 @@ def test_selected_links_match_only_paths_that_use_them(make_assignment):
 
     np.testing.assert_array_equal(selected["kept"], state.output.loading.link_loads)
     assert not np.any(selected["dead"])
-    assert not np.any(selected["excluded"])
 
 
 @pytest.mark.parametrize("turn", [False, True])

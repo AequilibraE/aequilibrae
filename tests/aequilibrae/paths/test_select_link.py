@@ -240,12 +240,13 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
 
     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
     sl_links = []
+    network = graph.mapping.network
     for link_id, direction in sl:
-        mask = graph.full_link_ids == link_id
+        mask = network.link_ids == link_id
         if direction:
-            mask &= graph.full_directions == direction
+            mask &= network.directions == direction
         sl_links.extend(
-            zip(graph.full_node_ids[graph.full_tails[mask]], graph.full_node_ids[graph.full_heads[mask]], strict=True)
+            zip(network.node_ids[network.link_tails[mask]], network.node_ids[network.link_heads[mask]], strict=True)
         )
     mask = {}
     for origin, val in enumerate(a):
@@ -266,10 +267,10 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     for orig, dest in mask.keys():
         path = a[orig][dest]
         for i in range(len(path) - 1):
-            mask = (graph.full_node_ids[graph.full_tails] == path[i]) & (
-                graph.full_node_ids[graph.full_heads] == path[i + 1]
+            mask = (network.node_ids[network.link_tails] == path[i]) & (
+                network.node_ids[network.link_heads] == path[i + 1]
             )
-            link = graph.full_link_ids[mask][0] - 1
+            link = network.link_ids[mask][0] - 1
             loading[link] += demand[orig, dest]
     return sl_od, loading
 
