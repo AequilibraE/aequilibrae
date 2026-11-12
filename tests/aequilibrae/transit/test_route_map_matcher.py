@@ -69,7 +69,10 @@ def test_reverse_graph_reverses_one_way_links(map_matcher, broken_links, directi
     reverse = map_matcher.reverse_graph.compute_path(destination, origin)
     assert forward.path is not None
     assert reverse.path is not None
-    np.testing.assert_array_equal(reverse.path, forward.path[::-1])
+    forward_links, forward_directions = forward.get_network_links()
+    reverse_links, reverse_directions = reverse.get_network_links()
+    np.testing.assert_array_equal(reverse_links, forward_links[::-1])
+    np.testing.assert_array_equal(reverse_directions, forward_directions[::-1])
     np.testing.assert_array_equal(reverse.path_nodes, forward.path_nodes[::-1])
     assert reverse.milepost[-1] == pytest.approx(forward.milepost[-1])
     assert map_matcher.graph.compute_path(destination, origin).path is None
@@ -110,15 +113,33 @@ def test_graphs_retain_prefiltered_links_and_source_metadata(map_matcher, broken
         (map_matcher.graph, origin, destination),
         (map_matcher.reverse_graph, destination, origin),
     ):
-        assert set(graph.full_link_ids) == set(original.link_id)
+        assert set(graph.mapping.network.link_ids) == set(original.link_id)
         result = graph.compute_path(start, end)
         assert result.path is not None
-        assert set(result.path) == set(original.link_id)
+        link_ids, _ = result.get_network_links()
+        assert set(link_ids) == set(original.link_id)
 
     pd.testing.assert_frame_equal(broken_links, original)
     pd.testing.assert_frame_equal(map_matcher._network_links, original)
     assert "modes" not in map_matcher._routing_network.links
     assert "modes" not in map_matcher._reverse_network.links
+
+
+@pytest.mark.parametrize("direction", [-1, 1])
+def test_map_match_reports_original_road_links(map_matcher, broken_links, direction):
+    broken_links["link_id"] = [71, 12, 55, 24]
+    broken_links["original_id"] = [1, 2, np.nan, np.nan]
+    broken_links.loc[broken_links.is_connector == 0, "direction"] = direction
+    map_matcher._RouteMapMatcher__graph_from_broken_net(broken_links)
+    stops = map_matcher.stops[["real_stop_id", "geometry"]].rename(columns={"real_stop_id": "stop_id"})
+    if direction == -1:
+        stops = stops.iloc[::-1]
+
+    matched = map_matcher.map_match_route(stops)
+    assert matched.link_id.tolist() == ([1, 2] if direction == 1 else [2, 1])
+    assert matched.dir.tolist() == [direction, direction]
+    assert not map_matcher.assemble_shape(matched).is_empty
+    assert map_matcher.map_match_route(stops.iloc[::-1]).empty
 
 
 @pytest.fixture(scope="function")

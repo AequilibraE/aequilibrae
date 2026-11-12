@@ -176,14 +176,14 @@ class RouteMapMatcher(WorkerThread):
         current_stop = int(route_stops.stop_id.iat[0])
 
         res: PathResults = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
-        assert res.path is not None
-        assert res.path_link_directions is not None
+        network_path = res.get_network_links()
+        if network_path is None:
+            return [], []
 
         if route_stops.shape[0] == 2:
-            if res.milepost is None:
-                return [], []
-            plnks = list(res.path[1:-1])
-            pdirecs = list(res.path_link_directions[1:-1])
+            link_ids, directions = network_path
+            plnks = list(link_ids[1:-1])
+            pdirecs = list(directions[1:-1])
             return pdirecs, plnks
 
         access_links = self._network_links[self._network_links.a_node.isin(route_stops.stop_id.values)]
@@ -206,8 +206,12 @@ class RouteMapMatcher(WorkerThread):
             # If this is the last stop, then we just compute the path directly
             if not is_not_last:
                 res.compute_path(current_stop, next_stop, early_exit=True)
-                path_links.extend(list(res.path[idx_:-1]))
-                path_directions.extend(list(res.path_link_directions[idx_:-1]))
+                network_path = res.get_network_links()
+                if network_path is None:
+                    return [], []
+                link_ids, directions = network_path
+                path_links.extend(list(link_ids[idx_:-1]))
+                path_directions.extend(list(directions[idx_:-1]))
                 continue
 
             # Let's see if we can reach the following stop while going through the next one
@@ -248,8 +252,12 @@ class RouteMapMatcher(WorkerThread):
 
             # Determine how many links to include
             # Skip connectors at start and (if not last stop) at end
-            path_links.extend(list(res.path[idx_:]))
-            path_directions.extend(list(res.path_link_directions[idx_:]))
+            network_path = res.get_network_links()
+            if network_path is None:
+                return [], []
+            link_ids, directions = network_path
+            path_links.extend(list(link_ids[idx_:]))
+            path_directions.extend(list(directions[idx_:]))
 
             current_stop = best_access_node
 
@@ -262,9 +270,8 @@ class RouteMapMatcher(WorkerThread):
         - Filter out short back-and-forth movements
 
         Args:
-            graph: AequilibraE graph with network correspondence
             path_directions: List of link traversal directions
-            path_links: List of internal link IDs
+            path_links: List of broken-network road link IDs, with stop connectors already removed
 
         Returns:
             DataFrame with columns ['link_id', 'dir']
@@ -275,12 +282,12 @@ class RouteMapMatcher(WorkerThread):
 
         corresp = pd.DataFrame(self._network_links[["link_id", "original_id", "distance"]])
 
-        # Build initial result, skipping the first (connector) link
+        # Stop connectors were already removed while collecting the path legs.
         result = pd.DataFrame(
             {
-                "link_id": path_links[1:],
-                "direction": path_directions[1:],
-                "sequence": np.arange(len(path_links) - 1),
+                "link_id": path_links,
+                "direction": path_directions,
+                "sequence": np.arange(len(path_links)),
             }
         )
 

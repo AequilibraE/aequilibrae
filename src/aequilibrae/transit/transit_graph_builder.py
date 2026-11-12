@@ -1396,11 +1396,13 @@ class TransitGraphBuilder:
             else:
                 res = PathResults(graph, *nodes.iloc[ids].index.values)
 
-                if res.path_nodes is not None:
+                network_path = res.get_network_links()
+                if network_path is not None:
+                    link_ids, _ = network_path
                     line = shapely.ops.linemerge(
                         (
                             shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
-                            *links.loc[res.path].geometry,
+                            *links.loc[link_ids].geometry,
                             shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
                         )
                     )

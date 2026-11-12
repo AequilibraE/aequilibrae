@@ -35,7 +35,7 @@ class SubAreaAnalysis:
         Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
 
         :Arguments:
-            **graph** (:obj:`Graph`): The caller's graph. Prepared graphs must use compact topology.
+            **graph** (:obj:`Graph`): Graph object.
 
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
@@ -50,19 +50,22 @@ class SubAreaAnalysis:
         self.sub_area_demand = None
 
         links = gpd.GeoDataFrame(project.network.links.data)
-        self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
-
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
+        if subarea.crs != links.crs or nodes.crs != links.crs:
+            raise ValueError("Sub-area, project links and project nodes must use the same CRS")
+        self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        self.node_ids = graph.full_node_ids
-        retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+        mapping = graph.mapping
+        network = mapping.network
+        retained = mapping.network_link_to_graph >= 0
+        # Boundary endpoints belong to source links, including those inside contracted chains.
         edges = pd.DataFrame(
             {
-                "link_id": graph.full_link_ids[retained],
-                "direction": graph.full_directions[retained],
-                "a_node": graph.full_tails[retained],
-                "b_node": graph.full_heads[retained],
+                "link_id": network.link_ids[retained],
+                "direction": network.directions[retained],
+                "a_node": network.node_ids[network.link_tails[retained]],
+                "b_node": network.node_ids[network.link_heads[retained]],
             }
         )
         self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
@@ -72,14 +75,12 @@ class SubAreaAnalysis:
         entering = [
             edge
             for edge, link in self.interior_graph.iterrows()
-            if self.node_ids[link.a_node] not in self.interior_nodes.index
-            and self.node_ids[link.b_node] in self.interior_nodes.index
+            if link.a_node not in self.interior_nodes.index and link.b_node in self.interior_nodes.index
         ]
         exiting = [
             edge
             for edge, link in self.interior_graph.iterrows()
-            if self.node_ids[link.a_node] in self.interior_nodes.index
-            and self.node_ids[link.b_node] not in self.interior_nodes.index
+            if link.a_node in self.interior_nodes.index and link.b_node not in self.interior_nodes.index
         ]
         self.edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
         self.single_edges = {x: ((x,),) for x in self.interior_graph.index}
@@ -129,9 +130,9 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if o_inside and not d_inside:
-                        exited[(o, self.node_ids[link.b_node]) + original_ods] += load
+                        exited[(o, link.b_node) + original_ods] += load
                     elif not o_inside and d_inside:
-                        entered[(self.node_ids[link.a_node], d) + original_ods] += load
+                        entered[(link.a_node, d) + original_ods] += load
                     elif not o_inside and not d_inside:
                         pass
 
@@ -148,7 +149,7 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
-                        through[(self.node_ids[link1.a_node], self.node_ids[link2.b_node]) + original_ods] += load
+                        through[(link1.a_node, link2.b_node) + original_ods] += load
 
             subarea_od_keys = list(entered) + list(exited) + list(through)
             subarea_od_values = list(entered.values()) + list(exited.values()) + list(through.values())
@@ -164,6 +165,7 @@ class SubAreaAnalysis:
                     subarea_od_values,
                     index=pd.MultiIndex.from_arrays(id_columns, names=id_names),
                     columns=[col],
+                    dtype=np.float64,
                 )
             )
 
@@ -203,7 +205,7 @@ class SubAreaAnalysis:
         # Boundary nodes and demand centroids can have different integer dtypes.
         self.sub_area_demand.index = pd.MultiIndex.from_arrays(
             [
-                self.sub_area_demand.index.get_level_values(name).to_numpy(dtype="int64")
+                self.sub_area_demand.index.get_level_values(name).to_numpy(dtype="uint64")
                 for name in self.sub_area_demand.index.names
             ],
             names=self.sub_area_demand.index.names,
