@@ -81,6 +81,7 @@ class NetworkMapping:
     """
 
     links: InitVar[pd.DataFrame]
+    nodes: InitVar[np.ndarray | None] = field(default=None, kw_only=True)
     physical_link_ids: np.ndarray = field(init=False, repr=False)
     node_ids: np.ndarray = field(init=False, repr=False)
     link_ids: np.ndarray = field(init=False, repr=False)
@@ -91,7 +92,7 @@ class NetworkMapping:
     _link_indices: ArrayHashMap = field(init=False, repr=False)
     _node_indices: ArrayHashMap = field(init=False, repr=False)
 
-    def __post_init__(self, links):
+    def __post_init__(self, links, nodes):
         required = {"link_id", "a_node", "b_node", "direction"}
         if missing := required - set(links.columns):
             raise ValueError(f"Network is missing required columns: {sorted(missing)}")
@@ -107,14 +108,20 @@ class NetworkMapping:
             raise ValueError("Network directions must be -1, 0 or +1")
 
         endpoints = np.column_stack((a_nodes, b_nodes))
-        node_ids = pd.unique(endpoints.reshape(-1))
+        node_ids = endpoints.reshape(-1)
+        if nodes is not None:
+            node_ids = np.concatenate((node_ids, _ids(nodes, "node_ids", scalar=False)))
+
+        node_ids = pd.unique(node_ids)
         node_indices = ArrayHashMap(node_ids, np.arange(len(node_ids), dtype=np.uint64))
         link_indices = ArrayHashMap(physical_ids, np.arange(len(physical_ids), dtype=np.uint64))
+
         physical, slots = np.nonzero(np.column_stack((direction != -1, direction != 1)))
         directed = np.full((len(physical_ids), 2), -1, dtype=np.intp)
         directed[physical, slots] = np.arange(len(physical), dtype=np.intp)
         tails = _lookup(node_indices, endpoints[physical, slots])
         heads = _lookup(node_indices, endpoints[physical, 1 - slots])
+
         _snapshot(
             self,
             physical_link_ids=physical_ids,

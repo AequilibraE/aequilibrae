@@ -274,7 +274,7 @@ def create_od_mask(demand: AequilibraeMatrix, graph: Graph, sl):
     return sl_od, loading
 
 
-def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_class):
+def test_select_link_export_preserves_shared_centroid_order(sioux_falls_single_class):
     project = sioux_falls_single_class
     network = Network(
         pd.DataFrame(
@@ -290,7 +290,8 @@ def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_cl
         )
     )
     classes = []
-    for name, centroids in (("first", [3, 1, 2]), ("second", [4, 2])):
+    for name in ("first", "second"):
+        centroids = [3, 1, 4, 2]
         demand = AequilibraeMatrix(index=np.array(centroids))
         demand["flow"] = np.ones((len(centroids), len(centroids)), dtype=np.float64)
         classes.append(
@@ -314,13 +315,10 @@ def test_select_link_export_aligns_different_centroid_sets(sioux_falls_single_cl
         project=project,
     )
     assignment.execute(max_iterations=1, cores=1)
-    assignment.save_select_link_matrices("different_centroids", project=project)
-    exported = from_file(project.matrices.folder / "different_centroids.omx")
-    np.testing.assert_array_equal(exported.index, [1, 2, 3, 4])
+    assignment.save_select_link_matrices("shared_centroids", project=project)
+    exported = from_file(project.matrices.folder / "shared_centroids.omx")
+    np.testing.assert_array_equal(exported.index, [3, 1, 4, 2])
     for traffic in classes:
         source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"]["flow"].toarray()
         assert source.sum() > 0
-        expected = np.zeros((4, 4))
-        positions = np.searchsorted(exported.index, traffic.demand.index)
-        expected[np.ix_(positions, positions)] = source
-        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"].toarray(), expected)
+        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"].toarray(), source)

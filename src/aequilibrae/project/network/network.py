@@ -171,13 +171,17 @@ class Network(WorkerThread):
 
         if isinstance(modes, str):
             modes = [modes]
+
         available = self.list_modes()
         if modes is not None and (missing := set(modes) - set(available)):
             raise ValueError(f"Modes are not available in this network: {sorted(missing)}")
+
+        modes = available if modes is None else modes
         links, centroids, restrictions, allow_uturns = self._load_graph_data(fields, limit_to_area)
+
         return Network(
             links,
-            modes=available if modes is None else modes,
+            modes=modes,
             centroids=centroids,
             turn_restrictions=restrictions,
             allow_uturns=allow_uturns,

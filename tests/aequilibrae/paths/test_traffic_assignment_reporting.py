@@ -26,10 +26,14 @@ def make_assignment():
             }
         )
     )
-    cars = from_dict(
-        {"work": np.array([[0.0, 2.0], [8.0, 0.0]]), "other": np.array([[0.0, 3.0], [12.0, 0.0]])}, [30, 10]
-    )
-    walk = from_dict({"walk": np.array([[0.0, 3.0], [0.0, 0.0]])}, [100, 101])
+    centroids = [30, 10, 100, 101]
+    work, other, walk_values = [np.zeros((4, 4)) for _ in range(3)]
+    work[0, 1], work[1, 0] = 2.0, 8.0
+    other[0, 1], other[1, 0] = 3.0, 12.0
+    walk_values[2, 3] = 3.0
+
+    cars = from_dict({"work": work, "other": other}, centroids)
+    walk = from_dict({"walk": walk_values}, centroids)
     classes = [
         TrafficClass(mode="c", cost="time", demand=cars, pce=2.0),
         TrafficClass(mode="w", cost="time", demand=walk),

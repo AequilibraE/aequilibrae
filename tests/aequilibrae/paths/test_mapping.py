@@ -62,6 +62,12 @@ def test_directed_link_indices_mark_missing_directions(links):
     np.testing.assert_array_equal(network.directed_link_indices, [[0, 1], [-1, 2], [3, -1], [-1, 4]])
 
 
+def test_network_mapping_retains_nodes_without_links(links):
+    network = NetworkMapping(links, nodes=np.array([BASE + 99, BASE + 10, BASE + 98]))
+    np.testing.assert_array_equal(network.node_ids - BASE, [10, 20, 30, 40, 50, 99, 98])
+    np.testing.assert_array_equal(network.node_index([BASE + 99, BASE + 98]), [5, 6])
+
+
 def test_node_order_is_first_appearance(links):
     network = NetworkMapping(links.iloc[[2, 0, 3, 1]])
     np.testing.assert_array_equal(network.node_ids - BASE, [30, 40, 10, 20, 50])

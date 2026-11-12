@@ -1,7 +1,11 @@
+from dataclasses import replace
+
 import numpy as np
+import pandas as pd
 import pytest
 
 from aequilibrae import Network, TrafficAssignment, TrafficClass
+from aequilibrae.matrix import from_dict
 from aequilibrae.paths.vdf import bpr
 
 
@@ -50,6 +54,68 @@ def test_duplicate_class_names(configuration):
     configuration["classes"] *= 2
     with pytest.raises(ValueError, match="unique"):
         TrafficAssignment(**configuration)
+
+
+@pytest.mark.parametrize("change", ["order", "membership"])
+def test_classes_require_common_centroids(configuration, change):
+    first = configuration["classes"][0]
+    centroids = first.demand.index[::-1] if change == "order" else first.demand.index[:-1]
+
+    demand = from_dict({"flow": np.zeros((len(centroids), len(centroids)))}, centroids)
+
+    other = replace(first, name="other", demand=demand)
+    source = configuration["network"].build()
+    configuration["network"] = Network(source.links)
+
+    with pytest.raises(ValueError, match="same centroid order"):
+        TrafficAssignment(**(configuration | {"classes": [first, other]}))
+
+
+def test_demand_must_match_declared_network_centroids(configuration):
+    first = configuration["classes"][0]
+    centroids = first.demand.index[:-1]
+    demand = from_dict({"flow": np.zeros((len(centroids), len(centroids)))}, centroids)
+
+    with pytest.raises(ValueError, match="same centroid order"):
+        TrafficAssignment(**(configuration | {"classes": [replace(first, demand=demand)]}))
+
+
+def test_empty_mode_reports_all_nonintrazonal_demand_as_unassigned():
+    network = Network(
+        pd.DataFrame(
+            {
+                "link_id": [1],
+                "a_node": [10],
+                "b_node": [20],
+                "direction": [0],
+                "modes": ["c"],
+                "time": [1.0],
+                "capacity": [10.0],
+            }
+        ),
+        modes=["c", "w"],
+        centroids=[20, 10],
+    )
+
+    demand = from_dict({"flow": np.array([[100.0, 5.0], [3.0, 0.0]])}, [20, 10])
+    traffic = TrafficClass(mode="w", cost="time", demand=demand, skimming=("time",))
+    assignment = TrafficAssignment(
+        network=network,
+        classes=[traffic],
+        time_field="time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="all-or-nothing",
+    )
+
+    assignment.execute(cores=1, elementwise_cores=1)
+
+    results = assignment.class_results["w"]
+
+    assert results.unassigned_demand == 8.0
+    assert not np.any(results.link_loads)
+    assert np.isinf(results.skims.matrices["time"][0, 1])
+    assert np.isinf(results.skims.matrices["time"][1, 0])
 
 
 def test_old_assignment_interface_is_removed(configuration):

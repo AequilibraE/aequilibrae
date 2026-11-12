@@ -10,7 +10,6 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from numpy import nan_to_num
-from scipy.sparse import coo_array
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
@@ -232,8 +231,6 @@ class TrafficAssignment(AssignmentBase):
         }
         self.network = self._load_network()
         self._validate_network_configuration(self.network)
-        for cls in self.classes:
-            validate_assignment_demand(cls.demand, cls.demand.index)
 
     @property
     def class_results(self):
@@ -246,6 +243,7 @@ class TrafficAssignment(AssignmentBase):
         return {name: results.skims for name, results in self.class_results.items()}
 
     def _validate_network_configuration(self, network):
+        centroids = network.centroids if network.centroids is not None else self.classes[0].demand.index
         fields = [self.time_field, self.capacity_field]
         for cls in self.classes:
             fields.extend([cls.cost, *cls.skimming])
@@ -260,9 +258,8 @@ class TrafficAssignment(AssignmentBase):
                 raise ValueError(f"Field {field} must contain positive finite values")
         for cls in self.classes:
             network.validate_mode(cls.mode)
-            if not network.mode_mask(cls.mode).any():
-                raise ValueError(f"No links are available for mode '{cls.mode}'")
             network.validate_centroids(cls.demand.index)
+            validate_assignment_demand(cls.demand, centroids)
             network._validate_turns(cls.mode)
             for field in [cls.cost, *cls.skimming]:
                 values = field_values(field)
@@ -738,23 +735,18 @@ class TrafficAssignment(AssignmentBase):
         selected_classes = [cls for cls in self._class_states if cls.results.select_link_od is not None]
         if not selected_classes:
             return
-        centroids = np.unique(np.concatenate([cls.configuration.demand.index for cls in selected_classes]))
+        centroids = selected_classes[0].configuration.demand.index
         matrices = {}
         for cls in selected_classes:
             selected = cls.results.select_link_od
-            positions = np.searchsorted(centroids, cls.configuration.demand.index)
             for name, values in selected.matrices.items():
                 for class_name, matrix in values.items():
                     key = f"{name}_{cls._id}_{class_name}"
                     if key in matrices:
                         raise ValueError(f"Duplicate selected OD export name: {key}")
-                    # Each class may have a different zone order and subset.
-                    # Remap sparse coordinates into the shared export index.
-                    entries = matrix.tocoo()
-                    matrices[key] = coo_array(
-                        (entries.data, (positions[entries.row], positions[entries.col])),
-                        shape=(len(centroids), len(centroids)),
-                    ).tocsr()
+                    # Classes share the export's centroid order, so sparse
+                    # coordinates do not need remapping.
+                    matrices[key] = matrix.copy()
         if not matrices:
             return
         out_skims = AequilibraeSparseMatrix(index=centroids)

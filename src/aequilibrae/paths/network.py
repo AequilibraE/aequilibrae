@@ -49,14 +49,15 @@ class Network:
             raise ValueError("allow_uturns must be a boolean")
 
         selected_links = self._modes_mask(self.links, modes)
-        if not selected_links.any():
+        if not selected_links.any() and self.centroids is None:
             raise ValueError("No links are available for the requested modes")
 
         links = self.links.loc[selected_links]
         node_ids = np.union1d(links["a_node"], links["b_node"])
 
         if self.centroids is not None:
-            self._validate_centroid_nodes(self.centroids, node_ids)
+            self._validate_centroid_nodes(self.centroids)
+            node_ids = np.union1d(node_ids.astype(np.uint64), np.asarray(self.centroids, dtype=np.uint64))
 
         if self.turn_restrictions is not None:
             self._validate_turn_table(self.turn_restrictions, links, modes=modes)
@@ -77,7 +78,7 @@ class Network:
         centroids = None if self.centroids is None else np.array(self.centroids, copy=True)
         lonlat = None if self.lonlat is None else self.lonlat.copy(deep=True)
 
-        mapping = NetworkMapping(links)
+        mapping = NetworkMapping(links, nodes=centroids)
 
         # We map each directed entry to its positional row in links (not its
         # index label). NetworkMapping follows physical row order, emitting +1
@@ -154,7 +155,7 @@ class Network:
         return values.str.contains(pattern, regex=len(modes) > 1).to_numpy(dtype=bool)
 
     @staticmethod
-    def _validate_centroid_nodes(centroids: ArrayLike, nodes: ArrayLike) -> None:
+    def _validate_centroid_nodes(centroids: ArrayLike, nodes: ArrayLike | None = None) -> None:
         values = np.asarray(centroids)
         if values.ndim != 1 or not np.issubdtype(values.dtype, np.integer):
             raise ValueError("Centroids must be a one-dimensional array of integers")
@@ -162,7 +163,7 @@ class Network:
         if not len(values) or np.any(values <= 0) or len(np.unique(values)) != len(values):
             raise ValueError("Centroids must be nonempty, unique and positive")
 
-        if not np.isin(values, nodes).all():
+        if nodes is not None and not np.isin(values, nodes).all():
             raise ValueError("Demand centroids are not present in the network")
 
     @staticmethod
@@ -342,13 +343,7 @@ class Network:
             raise ValueError("skimming must contain nonempty field names")
 
         selected_links = self.mode_mask(mode)
-        if not selected_links.any():
-            raise ValueError(f"No links are available for mode '{mode}'")
-
         links = self.links.loc[selected_links]
-        if centroids is not None:
-            nodes = np.union1d(links["a_node"], links["b_node"])
-            self._validate_centroid_nodes(centroids, nodes)
 
         turns = self.turn_restrictions if turn_restrictions is None else turn_restrictions
         if turns is not None:
