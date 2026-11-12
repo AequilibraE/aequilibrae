@@ -5,20 +5,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import estimate_heuristic_scale
-from aequilibrae.paths.graph import GraphBase, freeze_graph
-from .routing_helpers import build_graph_tables
+from aequilibrae.paths import Network, estimate_heuristic_scale
 from aequilibrae.paths.results import PathResults
 from aequilibrae.transit import Transit
 
 
-@pytest.fixture(scope="function")
-def test_graph(test_data_path):
-    return test_data_path / "test_graph.aeg"
-
-
-def graph_for_project(project):
-    return build_graph_tables(project)
+def build_graph(links, centroids=None, **options):
+    """Build a graph from source tables, preserving any isolated centroids."""
+    return Network(pd.DataFrame(links), centroids=centroids).build_graph("c", **options)
 
 
 def sample_turn_from_path(graph, origin, destination):
