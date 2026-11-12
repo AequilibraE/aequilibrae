@@ -28,41 +28,44 @@ cdef struct RouteChoiceHeuristic:
 cdef class RouteChoiceSet:
     cdef:
         const double [::1] cost_view
-        const double [::1] full_cost_view
         object routing
         object coordinates
-        object lonlat
         object node_ids
         bint turn_based
         bint has_turn_costs
         object graph
-        dict full_link_indices
-        const int64_t[::1] full_link_ids
-        const int8_t[::1] full_directions
         readonly object centroids
+        readonly object mapping
         readonly object network_mapping
-        readonly object network_link_ids
-        long long [::1] nodes_to_indices_view
-        const long long [::1] graph_compressed_id_view
+        const Py_ssize_t[::1] network_link_to_graph
         long long num_nodes
         long long num_links
 
-        const unsigned int [:] mapping_idx
-        const int64_t [::] mapping_data
-        const int64_t [::] link_id_direction
+        const Py_ssize_t[::1] mapping_idx
+        const Py_ssize_t[::1] mapping_data
 
         readonly RouteChoiceSetResults results
         readonly LinkLoadingResults ll_results
 
-    cdef object import_dataframe(self, object df, bint log_warnings, RouteVec_t &routes, vector[bint] &mask)
+    cdef object import_dataframe(
+        self,
+        object df,
+        RouteVec_t &routes,
+        vector[bint] &mask,
+    )
+    cdef void map_routes(
+        self,
+        object table,
+        const RouteVec_t &routes,
+        RouteVec_t &graph_routes,
+    )
     cdef void recost_routes(
         self,
         object table,
         const RouteVec_t &routes,
+        const RouteVec_t &graph_routes,
         vector[vector[double]] &turns,
         vector[double] &costs,
-        vector[bint] &mask,
-        bint log_warnings
     )
 
     cdef RouteCandidate *trace_route(

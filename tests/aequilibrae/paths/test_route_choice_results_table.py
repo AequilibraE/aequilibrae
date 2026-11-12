@@ -23,16 +23,17 @@ def test_rebuild_results_table(turn, bfsle, path_size_logit):
             bridge=bridge,
         )
     results = choice.get_results(rebuild=True)
-    assert results["origin id"].dtype == np.uint32
-    assert results["destination id"].dtype == np.uint32
+    assert results["origin id"].dtype == np.uint64
+    assert results["destination id"].dtype == np.uint64
     assert {tuple(route) for route in results["route set"]} == {(71, 72, 12), (55, 56, 24)}
-    assert all(route.dtype == np.int64 for route in results["route set"])
+    assert all(route.dtype == np.uint64 for route in results["route set"])
+    assert all(directions.dtype == np.int8 and (directions == 1).all() for directions in results["route directions"])
 
     if path_size_logit:
         assert results["mask"].dtype == bool
         assert (results[["cost", "path overlap", "probability"]].dtypes == np.float64).all()
     else:
-        assert list(results.columns) == ["origin id", "destination id", "route set"]
+        assert list(results.columns) == ["origin id", "destination id", "route set", "route directions"]
 
 
 def test_rebuild_requires_results():

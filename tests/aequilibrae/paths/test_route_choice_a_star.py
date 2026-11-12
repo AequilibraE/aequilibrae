@@ -14,9 +14,10 @@ from aequilibrae.paths import Network, RouteChoice, estimate_heuristic_scale
 from .test_route_choice_routing_context import diamond, junction
 
 
-def coordinates_for(graph):
+def coordinates_for(graph, heuristic="euclidean"):
+    x, y = ("x", "y") if heuristic == "euclidean" else ("lon", "lat")
     coordinates = pd.DataFrame(
-        {"x": np.arange(graph.num_nodes, dtype=float), "y": np.zeros(graph.num_nodes)},
+        {x: np.arange(graph.num_nodes, dtype=float), y: np.zeros(graph.num_nodes)},
         index=graph.all_nodes,
     )
     # External IDs, not row order, determine the compact coordinate mapping.
@@ -26,6 +27,7 @@ def coordinates_for(graph):
 def sorted_results(choice):
     result = choice.get_results().copy()
     result["route set"] = result["route set"].map(tuple)
+    result["route directions"] = result["route directions"].map(tuple)
     return result.sort_values(["origin id", "destination id", "route set"]).reset_index(drop=True)
 
 
@@ -36,7 +38,7 @@ def sorted_results(choice):
 def test_batched_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, cores):
     lonlat = pd.DataFrame({"lon": np.arange(4) * 0.01, "lat": np.zeros(4)}, index=[10, 20, 30, 40])
     graph = junction(turn_penalty, lonlat=lonlat)
-    coordinates = coordinates_for(graph)
+    coordinates = coordinates_for(graph, heuristic)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
     assert scale > 0
     choices = []
@@ -90,7 +92,7 @@ def compressed_graph(turn):
     graph = Network(links, centroids=np.array([10, 60]), turn_restrictions=turns, lonlat=lonlat).build_graph(
         "c", cost="time", compact=True, block_centroid_flows=False
     )
-    assert graph.num_nodes < len(graph.full_node_ids)
+    assert graph.num_nodes < graph.mapping.network.node_count
     return graph
 
 
@@ -99,7 +101,7 @@ def compressed_graph(turn):
 @pytest.mark.parametrize("turn", [False, True])
 def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
     graph = compressed_graph(turn)
-    coordinates = coordinates_for(graph)
+    coordinates = coordinates_for(graph, heuristic)
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
     coordinates = coordinates.loc[graph.all_nodes].iloc[::-1]
     choice = RouteChoice(graph, coordinates=coordinates)
@@ -116,7 +118,10 @@ def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
             algorithm, **options, a_star=True, heuristic=heuristic, heuristic_scale=scale_value
         )
         routes = choice.execute_single(10, 60, demand=1.0)
-        assert set(routes) == {(71, 72, 12), (55, 56, 24)}
+        assert {(tuple(ids), tuple(directions)) for ids, directions in routes} == {
+            ((71, 72, 12), (1, 1, 1)),
+            ((55, 56, 24), (1, 1, 1)),
+        }
         pd.testing.assert_frame_equal(sorted_results(choice), reference)
         json.dumps(choice.parameters)
 
@@ -132,14 +137,23 @@ def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
 def test_explicit_scale_controls_search(algorithm, heuristic, turn):
     coordinates = pd.DataFrame({"x": [0.0, 1.0, 0.0, 0.0], "y": [0.0] * 4}, index=[10, 20, 30, 40])
     graph = diamond(0.5 if turn else None, lonlat=coordinates.rename(columns={"x": "lon", "y": "lat"}))
-    choice = RouteChoice(graph, coordinates=coordinates if heuristic == "euclidean" else None)
+    choice = RouteChoice(
+        graph,
+        coordinates=coordinates if heuristic == "euclidean" else coordinates.rename(columns={"x": "lon", "y": "lat"}),
+    )
     choice.set_cores(1)
     choice.set_choice_set_generation(algorithm, max_routes=1)
-    assert choice.execute_single(10, 40) == [(71, 12)]
+    routes = choice.execute_single(10, 40)
+    assert len(routes) == 1
+    np.testing.assert_array_equal(routes[0][0], [71, 12])
+    np.testing.assert_array_equal(routes[0][1], [1, 1])
     # This deliberately unsafe scale favours the more expensive branch. It also
     # checks that A* is actually dispatched, rather than silently using Dijkstra.
     choice.set_choice_set_generation(algorithm, max_routes=1, a_star=True, heuristic=heuristic, heuristic_scale=100.0)
-    assert choice.execute_single(10, 40) == [(55, 24)]
+    routes = choice.execute_single(10, 40)
+    assert len(routes) == 1
+    np.testing.assert_array_equal(routes[0][0], [55, 24])
+    np.testing.assert_array_equal(routes[0][1], [1, 1])
 
 
 @pytest.mark.parametrize("a_star", [False, True])

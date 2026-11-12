@@ -160,8 +160,8 @@ def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost)
         # Recomputing PSL and changing the cost field means the link loads will be different (cost change), and path
         # overlap, cost, and mask will be different (recompute PSL)
         pd.testing.assert_frame_equal(
-            results[["origin id", "destination id", "route set"]],
-            results_new[["origin id", "destination id", "route set"]],
+            results[["origin id", "destination id", "route set", "route directions"]],
+            results_new[["origin id", "destination id", "route set", "route directions"]],
         )
     elif recompute_psl and not change_cost:
         # All generated fields must match after PSL recomputation.
@@ -205,6 +205,9 @@ def test_saving(route_choice_setup):
             df2 = pd.read_sql(f"select * from {table}", conn).set_index("link_id")
             df3 = project.results.get_results(table).set_index("link_id")
 
+            # SQLite reports integer IDs as signed, unlike the shared network identity.
+            df2.index = df2.index.astype(np.uint64)
+            df3.index = df3.index.astype(np.uint64)
             pd.testing.assert_frame_equal(df2, df)
             pd.testing.assert_frame_equal(df3, df)
 
@@ -329,6 +332,7 @@ def test_assign_from_df(route_choice_setup):
                 "destination id": [graph.centroids[1]],
                 "probability": [1.0],
                 "route set": [[999999999]],
+                "route directions": [[1]],
             }
         )
         rc.assign_from_df(df=df, **args)
@@ -340,7 +344,8 @@ def test_assign_from_df(route_choice_setup):
                 "origin id": [graph.centroids[0]],
                 "destination id": [graph.centroids[1]],
                 "probability": [1.0],
-                "route set": [[-graph.full_link_ids[0]]],
+                "route set": [[graph.mapping.network.link_ids[0]]],
+                "route directions": [[-graph.mapping.network.directions[0]]],
             }
         )
         rc.assign_from_df(df=df, **args)
@@ -353,6 +358,7 @@ def test_assign_from_df(route_choice_setup):
                 "destination id": [graph.centroids[1]],
                 "probability": [1.0],
                 "route set": [1],
+                "route directions": [[1]],
             }
         )
         rc.assign_from_df(df=df, **args)
@@ -370,6 +376,7 @@ def test_assign_from_df(route_choice_setup):
             "destination id": links.b_node.to_numpy(),
             "probability": values,
             "route set": [[x] for x in link_ids],
+            "route directions": [[1] for _ in link_ids],
         }
     )
 
@@ -385,7 +392,7 @@ def test_assign_from_df(route_choice_setup):
     values2 = np.zeros_like(values)
     values2[: len(df) // 2] = values[: len(df) // 2]
     np.testing.assert_array_equal(
-        ll_res[links.index],
+        ll_res[graph.mapping.network.link_index(links.link_id.to_numpy(), 1)],
         values2,
         "Link loading results don't match the expected values",
     )
@@ -408,7 +415,7 @@ def test_assign_from_df(route_choice_setup):
     values2 = np.zeros(len(links.index))
     values2[: len(df) // 2] = 1.0
     np.testing.assert_array_equal(
-        ll_res[links.index],
+        ll_res[graph.mapping.network.link_index(links.link_id.to_numpy(), 1)],
         values2,
         "Link loading results don't match the expected values",
     )
@@ -446,14 +453,13 @@ def test_known_results(route_choice_setup, cost):
 
     # Test single one matrix
     u = link_loads["single one"]
-    mask = (graph.full_node_ids[graph.full_tails] == nodes[0][0]) & (
-        graph.full_node_ids[graph.full_heads] == nodes[0][1]
-    )
-    lid = graph.full_link_ids[mask][0]
+    mapping = graph.mapping.network
+    mask = (mapping.node_ids[mapping.link_tails] == nodes[0][0]) & (mapping.node_ids[mapping.link_heads] == nodes[0][1])
+    lid = mapping.link_ids[mask][0]
     t = table[table["route set"].apply(lambda x, lid=lid: lid in set(x))]
     v = t.probability.sum()
 
-    assert abs(u[lid - 1] - v) < 1e-6
+    assert (u[mapping.link_index(lid, 1)] - v) < 1e-6
 
 
 @pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
@@ -500,8 +506,8 @@ def test_select_link(route_choice_setup, cost):
     sl1_link_union = np.unique(np.hstack(t1["route set"].values))
     sl2_link_union = np.unique(np.hstack(t2["route set"].values))
 
-    np.testing.assert_equal(u.nonzero()[0] + 1, sl1_link_union)
-    np.testing.assert_equal(u2.nonzero()[0] + 1, sl2_link_union)
+    np.testing.assert_equal(np.sort(graph.mapping.network.link_ids[u.nonzero()]), sl1_link_union)
+    np.testing.assert_equal(np.sort(graph.mapping.network.link_ids[u2.nonzero()]), sl2_link_union)
 
     assert abs(u.sum() - (t1["route set"].apply(len) * t1.probability).sum()) < 1e-6
     assert abs(u2.sum() - (t2["route set"].apply(len) * t2.probability).sum()) < 1e-6

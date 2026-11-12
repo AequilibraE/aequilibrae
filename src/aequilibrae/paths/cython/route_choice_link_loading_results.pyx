@@ -2,7 +2,6 @@ from cython.operator cimport dereference as d
 from cython.operator cimport predecrement as pre_dec
 
 from aequilibrae.paths.cython.network_loading cimport cpp_reduce_loading_outputs
-from aequilibrae.paths.cython.parallel_numpy cimport assign_link_loads
 from aequilibrae.paths.cython.select_link_loading cimport cpp_reduce_select_link_loading
 from aequilibrae.paths.cython.workspaces cimport SelectLinkODWorkspace
 
@@ -25,8 +24,8 @@ cdef class LinkLoadingResults:
     ):
         if threads <= 0:
             raise ValueError(f"threads must be positive ({threads})")
-        if num_links <= 0:
-            raise ValueError(f"num_links must be positive ({num_links})")
+        if num_links < 0:
+            raise ValueError(f"num_links must be nonnegative ({num_links})")
 
         self.field_names = tuple(field_names)
         field_count, zone_count = len(self.field_names), len(index)
@@ -83,26 +82,24 @@ cdef class LinkLoadingResults:
             self.selected_views.push_back(selected_loading.view())
             self.od_views.push_back(selected_od.view())
 
-    cdef object project_loads(self, object loads, const long long[::1] compressed_id_view, int cores):
-        # The extra zero row handles links absent from the compressed graph.
-        cdef double[:, ::1] compact = np.vstack((loads, np.zeros((1, len(self.field_names)))))
-        cdef double[:, ::1] actual = np.zeros((compressed_id_view.shape[0], len(self.field_names)))
+    cdef object project_loads(self, object loads, object mapping):
+        # Copy graph loads into directed network rows.
+        # A network_link_to_graph entry of -1 produces a zero-filled load row.
+        actual = mapping.project_loads(loads)
+        return {name: actual[:, field].copy() for field, name in enumerate(self.field_names)}
 
-        assign_link_loads(actual, compact, compressed_id_view, cores)
-        return {name: np.asarray(actual)[:, field].copy() for field, name in enumerate(self.field_names)}
-
-    cdef object link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores):
+    cdef object link_loading_to_objects(self, object mapping):
         if self.link_loading_objects is None:
-            self.link_loading_objects = self.project_loads(self.loading.link_loads, compressed_id_view, cores)
+            self.link_loading_objects = self.project_loads(self.loading.link_loads, mapping)
         return self.link_loading_objects
 
-    cdef object sl_link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores):
+    cdef object sl_link_loading_to_objects(self, object mapping):
         if not self.sl_link_loading:
             return {}
 
         if self.sl_link_loading_objects is None:
             self.sl_link_loading_objects = {
-                name: self.project_loads(self.selected_loading.link_loads[index], compressed_id_view, cores)
+                name: self.project_loads(self.selected_loading.link_loads[index], mapping)
                 for index, name in enumerate(self.select_link_set_names)
             }
         return self.sl_link_loading_objects

@@ -1333,19 +1333,24 @@ class Graph:
         self.routing.update_costs(values)
 
     def selected_links(self, selections: Mapping[str, Iterable[tuple[int, int]]]) -> dict[str, npt.NDArray[np.intp]]:
-        """Resolve named source-link selections, ignoring links absent from this graph."""
-        network = self.mapping.network
+        """Resolve named source-link selections, raising for links absent from this graph."""
         result = {}
         for name, members in selections.items():
             indices: set[int] = set()
             for link, direction in members:
+                if isinstance(direction, (bool, np.bool_)) or not isinstance(direction, (int, np.integer)):
+                    raise ValueError("Selected link directions must be integers: -1, 0 or +1")
                 if direction not in (-1, 0, 1):
                     raise ValueError("Selected link directions must be -1, 0 or +1")
-                mask = network.link_ids == link
-                if direction:
-                    mask &= network.directions == direction
-                indices.update(self.mapping.network_link_to_graph[mask])
-            indices.discard(-1)
+                matches = set()
+                for sign in (1, -1) if direction == 0 else (direction,):
+                    try:
+                        matches.add(self.mapping.graph_link(link, sign))
+                    except KeyError:
+                        pass
+                if not matches:
+                    raise ValueError(f"Selected link {link} and direction {direction} is absent from the graph")
+                indices.update(matches)
             result[name] = np.array(sorted(indices), dtype=np.intp)
         return result
 

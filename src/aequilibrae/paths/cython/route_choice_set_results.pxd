@@ -14,19 +14,17 @@ from libc.stdint cimport *
 
 cdef class RouteChoiceSetResults:
     cdef:
-        vector[pair[long long, long long]] ods
+        vector[pair[uint64_t, uint64_t]] ods
         bint store_results
         bint perform_assignment
         double disutility_cutoff_constant
         double disutility_cutoff_coefficient
         double beta
         const double[:] cost_view
-        const unsigned int [:] mapping_idx
-        const int64_t [::] mapping_data
-        const int64_t [::] link_id_direction
-        const int64_t[::1] full_link_ids
-        const int8_t[::1] full_directions
-
+        const Py_ssize_t[::1] mapping_idx
+        const Py_ssize_t[::1] mapping_data
+        const uint64_t[::1] network_link_ids
+        const int8_t[::1] network_directions
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set
         vector[shared_ptr[vector[double]]] __cost_set

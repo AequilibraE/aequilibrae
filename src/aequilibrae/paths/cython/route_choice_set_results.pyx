@@ -13,6 +13,8 @@ import numpy as np
 import cython
 import logging
 
+from aequilibrae.paths.mapping import _integers
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +29,11 @@ def check_disutility_cutoff_values(disutility_cutoff_constant: float, disutility
             "`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
             "Both must be set or unset"
         )
+
+
+cdef bint _has_turn_steps(const RouteTurnView_t &turns) noexcept nogil:
+    # Routes are nonempty and share a uniform turn-saving policy.
+    return turns.size() != 0 and d(turns[0]).size() != 0
 
 
 @cython.embedsignature(True)
@@ -44,13 +51,9 @@ cdef class RouteChoiceSetResults:
             beta: float,
             num_links: int,
             const double[:] cost_view,
-            const unsigned int [:] mapping_idx,
-            const int64_t [::] mapping_data,
-            const int64_t [::] link_id_direction,
+            mapping,
             store_results: bool = True,
             perform_assignment: bool = True,
-            const int64_t[::1] full_link_ids = None,
-            const int8_t[::1] full_directions = None,
     ):
         """
         :Arguments:
@@ -91,13 +94,10 @@ cdef class RouteChoiceSetResults:
         self.store_results = store_results
         self.perform_assignment = perform_assignment
         self.cost_view = cost_view
-        self.mapping_idx = mapping_idx
-        self.mapping_data = mapping_data
-        self.link_id_direction = link_id_direction
-        # Imported routes keep full-link indices, including invalid sequences that cannot be expanded from compact
-        # links.
-        self.full_link_ids = full_link_ids
-        self.full_directions = full_directions
+        self.mapping_idx = mapping.expansion_offsets
+        self.mapping_data = mapping.expansion_links
+        self.network_link_ids = mapping.network.link_ids
+        self.network_directions = mapping.network.directions
         self.table = None
 
         self.ods = ods
@@ -166,7 +166,10 @@ cdef class RouteChoiceSetResults:
             )
             # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
             # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
-            table = table.assign(**{"route set": table["route set"].map(lambda x: x.tolist())})
+            table = table.assign(**{
+                column: table[column].map(lambda x: x.tolist())
+                for column in ("route set", "route directions")
+            })
         else:
             raise RuntimeError(
                 "encountered unknown Pandas parquet engine, please report this as a bug to the AequilibraE issues page"
@@ -182,19 +185,25 @@ cdef class RouteChoiceSetResults:
         df = df.assign(**{"origin id": df["origin id"].astype(df["destination id"].dtype)})
 
         # FastParquet is stupid and encodes Parquet list objects as json strings!!!
-        is_json_encoded = df["route set"].map(lambda x: isinstance(x, (str, bytes)))
-        if is_json_encoded.any():
-            logger.warning("Found JSON encoded route sets. Parsing into a NumPy array...")
-            if not is_json_encoded.all():
-                raise TypeError(
-                    "route sets must either be encoded properly as list[int64], or json lists (by FastParquet). "
-                    "The two cannot be mixed"
-                )
+        for column in ("route set", "route directions"):
+            is_json_encoded = df[column].map(lambda x: isinstance(x, (str, bytes)))
+            if is_json_encoded.any():
+                logger.warning("Found JSON encoded %s. Parsing into a NumPy array...", column)
+                if not is_json_encoded.all():
+                    raise TypeError(
+                        "routes and directions must either be encoded properly as lists, or json lists "
+                        "(by FastParquet). The two cannot be mixed within a column"
+                    )
 
-            import json
-            # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
-            # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
-            df = df.assign(**{"route set": df["route set"].map(lambda x: np.array(json.loads(x), dtype="int64"))})
+                import json
+                # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
+                # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
+                if column == "route set":
+                    df = df.assign(**{column: df[column].map(lambda x: np.asarray(json.loads(x), dtype=np.uint64))})
+                else:
+                    df = df.assign(**{
+                        column: df[column].map(lambda x: _integers(json.loads(x), column, scalar=False))
+                    })
 
         return df
 
@@ -266,7 +275,7 @@ cdef class RouteChoiceSetResults:
         const vector[double] &probabilities,
         const vector[size_t] &positions
     ) noexcept nogil:
-        """Move imported paths into the result owner and store their matching numeric results."""
+        """Move validated imported graph-link paths into the result owner with their numeric results."""
         cdef size_t position, j
         if not self.store_results:
             return
@@ -324,7 +333,8 @@ cdef class RouteChoiceSetResults:
             turns.push_back(&route_turns[j])
 
         RouteChoiceSetResults.compute_psl(
-            paths, turns,
+            paths,
+            turns,
             d(cost_vec),
             d(route_mask),
             d(path_overlap_vec),
@@ -358,10 +368,14 @@ cdef class RouteChoiceSetResults:
         cdef long long previous, link
 
         RouteChoiceSetResults.compute_mask(
-            route_mask, cost_vec, disutility_cutoff_constant, disutility_cutoff_coefficient)
+            route_mask,
+            cost_vec,
+            disutility_cutoff_constant,
+            disutility_cutoff_coefficient,
+        )
         RouteChoiceSetResults.compute_frequency(keys, counts, route_set, route_mask)
 
-        if route_turns.size() and d(route_turns[0]).size():
+        if _has_turn_steps(route_turns):
             for j in range(route_set.size()):
                 if not route_mask[j]:
                     continue
@@ -408,6 +422,7 @@ cdef class RouteChoiceSetResults:
             double cost
             size_t i, j
 
+        # Generated routes are nonempty and share the same turn-saving policy.
         cdef bint has_turn_steps = route_turns.size() and route_turns[0].size()
         cost_vec.resize(route_set.size())
 
@@ -448,7 +463,7 @@ cdef class RouteChoiceSetResults:
             double cutoff_cost
 
         route_mask.resize(total_cost.size(), True)
-        # An excluded route or infinite ban must not become the fallback minimum; also skip NaN costs.
+        # Skip excluded routes, infinite bans and NaN costs when finding the fallback minimum.
         for i in range(total_cost.size()):
             if route_mask[i] and isfinite(total_cost[i]) and total_cost[i] < min_cost:
                 min_cost = total_cost[i]
@@ -567,7 +582,7 @@ cdef class RouteChoiceSetResults:
             long long link, previous
             size_t i, j
 
-        cdef bint has_turn_steps = route_turns.size() and d(route_turns[0]).size()
+        cdef bint has_turn_steps = _has_turn_steps(route_turns)
         path_overlap_vec.resize(route_set.size())
 
         for i in range(route_set.size()):
@@ -650,11 +665,11 @@ cdef class RouteChoiceSetResults:
         """
         Construct an pd.DataFrame from the C++ stdlib structures.
 
-        Generated compact link IDs are expanded to full network link IDs.
-        Imported full-link indices are mapped directly to their original signed IDs.
+        Stored graph link indices are expanded to network link IDs and directions for
+        both generated and imported routes.
 
         Each column is sized in one pass over the stored routes and filled in a second, so no Python object is
-        created per link. Route sets are slices of one array of signed link IDs.
+        created per link. Route sets and directions are slices of their respective flat arrays.
         """
 
         if self.table is not None:
@@ -663,46 +678,36 @@ cdef class RouteChoiceSetResults:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
-            size_t i, j, k, n_routes, size
+            size_t i, j, n_routes, size
+            Py_ssize_t k
             size_t route_count = 0, link_count = 0, row = 0, position = 0
-            long long link, origin, destination
+            long long link
+            Py_ssize_t network_link
             bint have_assignment_results = self.perform_assignment and self.store_results
-            bint imported = self.full_link_ids is not None
             RouteVec_t *routes
             vector[long long] *route
             uint8_t[::1] mask_view
 
         for i in range(self.ods.size()):
-            origin = self.ods[i].first
-            destination = self.ods[i].second
-            # The ID columns are uint32, as before; refuse IDs that would wrap.
-
-            if origin < 0 or origin > UINT32_MAX:
-                raise OverflowError(f"Python integer {origin} out of bounds for uint32")
-            if destination < 0 or destination > UINT32_MAX:
-                raise OverflowError(f"Python integer {destination} out of bounds for uint32")
-
             routes = self.__route_vecs[i].get()
             route_count += d(routes).size()
             for j in range(d(routes).size()):
                 route = d(routes)[j].get()
 
-                if imported:
-                    link_count += d(route).size()
-                    continue
-
                 for link in d(route):
                     link_count += self.mapping_idx[link + 1] - self.mapping_idx[link]
 
-        origin_ids = np.empty(route_count, dtype="uint32")
-        destination_ids = np.empty(route_count, dtype="uint32")
-        link_ids = np.empty(link_count, dtype="int64")
+        origin_ids = np.empty(route_count, dtype="uint64")
+        destination_ids = np.empty(route_count, dtype="uint64")
+        link_ids = np.empty(link_count, dtype="uint64")
+        directions = np.empty(link_count, dtype="int8")
         offsets = np.empty(route_count + 1, dtype=np.intp)
 
         cdef:
-            uint32_t[::1] origin_view = origin_ids
-            uint32_t[::1] destination_view = destination_ids
-            int64_t[::1] link_view = link_ids
+            uint64_t[::1] origin_view = origin_ids
+            uint64_t[::1] destination_view = destination_ids
+            uint64_t[::1] link_view = link_ids
+            int8_t[::1] direction_view = directions
             Py_ssize_t[::1] offset_view = offsets
 
         for i in range(self.ods.size()):
@@ -710,20 +715,17 @@ cdef class RouteChoiceSetResults:
 
             for j in range(d(routes).size()):
                 route = d(routes)[j].get()
-                origin_view[row] = <uint32_t>self.ods[i].first
-                destination_view[row] = <uint32_t>self.ods[i].second
+                origin_view[row] = self.ods[i].first
+                destination_view[row] = self.ods[i].second
                 offset_view[row] = position
                 row += 1
 
                 for link in d(route):
-                    if imported:
-                        link_view[position] = self.full_link_ids[link] * self.full_directions[link]
-                        position += 1
-                        continue
-
-                    # Each compact link stands for a run of supernetwork links, signed by direction.
+                    # Each graph link stands for an ordered run of directed network links.
                     for k in range(self.mapping_idx[link], self.mapping_idx[link + 1]):
-                        link_view[position] = self.link_id_direction[self.mapping_data[k]]
+                        network_link = self.mapping_data[k]
+                        link_view[position] = self.network_link_ids[network_link]
+                        direction_view[position] = self.network_directions[network_link]
                         position += 1
 
         offset_view[row] = position
@@ -759,9 +761,12 @@ cdef class RouteChoiceSetResults:
 
         # An object array keeps each route a separate entry, whatever the route lengths.
         route_sets = np.empty(route_count, dtype=object)
+        route_directions = np.empty(route_count, dtype=object)
         for j in range(route_count):
             route_sets[j] = link_ids[offset_view[j]:offset_view[j + 1]]
+            route_directions[j] = directions[offset_view[j]:offset_view[j + 1]]
         columns["route set"] = route_sets
+        columns["route directions"] = route_directions
 
         self.table = pd.DataFrame(columns)
         return self.table
@@ -792,10 +797,17 @@ cdef class RouteChoiceSetResults:
 
 
 cdef void recompute_route_probabilities(
-    object df, const RouteVec_t &routes, const vector[vector[double]] &turn_steps,
-    const vector[double] &costs, vector[bint] &route_mask, vector[double] &path_overlap,
-    vector[double] &probabilities, const double[:] link_costs, double beta,
-    double disutility_cutoff_constant, double disutility_cutoff_coefficient
+    object df,
+    const RouteVec_t &routes,
+    const vector[vector[double]] &turn_steps,
+    const vector[double] &costs,
+    vector[bint] &route_mask,
+    vector[double] &path_overlap,
+    vector[double] &probabilities,
+    const double[:] link_costs,
+    double beta,
+    double disutility_cutoff_constant,
+    double disutility_cutoff_coefficient,
 ):
     """Apply the shared PSL kernel to borrowed native routes and turn steps, without demand."""
     cdef RouteView_t paths
@@ -845,8 +857,11 @@ cdef void recompute_route_probabilities(
 
 
 cdef object imported_route_dataframe(
-    object df, const vector[double] &costs, const vector[bint] &mask,
-    const vector[double] &overlap, const vector[double] &probabilities
+    object df,
+    const vector[double] &costs,
+    const vector[bint] &mask,
+    const vector[double] &overlap,
+    const vector[double] &probabilities,
 ):
     """Copy numeric results to public columns without exposing temporary native storage."""
     cdef size_t size = costs.size()

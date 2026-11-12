@@ -74,6 +74,33 @@ def test_node_order_is_first_appearance(links):
     np.testing.assert_array_equal(network.physical_link_ids - BASE, [7, 9, 4, 2])
 
 
+def test_full_uint64_integer_array_queries():
+    maximum = 2**64 - 1
+    network = NetworkMapping(
+        pd.DataFrame(
+            {
+                "link_id": np.array([0, maximum], dtype=np.uint64),
+                "a_node": np.array([0, 2**63], dtype=np.uint64),
+                "b_node": np.array([2**63, maximum], dtype=np.uint64),
+                "direction": [0, 0],
+            }
+        )
+    )
+    np.testing.assert_array_equal(network.node_index(np.array([0, maximum, 2**63], dtype=np.uint64)), [0, 2, 1])
+    np.testing.assert_array_equal(network.link_index(np.array([0, maximum], dtype=np.uint64), [1, -1]), [0, 3])
+    assert network.node_index(maximum) == 2
+    assert type(network.node_index(maximum)) is int
+
+
+@pytest.mark.parametrize("value", [0, 2**64 - 1, True, 1.0, -1, 2**64, "1", None])
+def test_object_array_ids_are_rejected(network, value):
+    for values in (np.array(value, dtype=object), np.array([0, value], dtype=object)):
+        with pytest.raises(ValueError):
+            network.node_index(values)
+        with pytest.raises(ValueError):
+            network.link_index(values, 1)
+
+
 @pytest.mark.parametrize("scalar", [int, np.int64, np.uint64, np.asarray])
 def test_scalar_queries(mapping, scalar):
     assert mapping.graph_link(scalar(BASE + 9), 1) == 0
