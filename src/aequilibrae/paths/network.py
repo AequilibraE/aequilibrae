@@ -39,7 +39,6 @@ class Network:
 
     mapping: NetworkMapping = field(init=False, repr=False)
     _link_rows: NDArray[np.intp] = field(init=False, repr=False)
-    _graphs: dict[str, Graph] = field(init=False, default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self._validate_links(self.links)
@@ -402,13 +401,9 @@ class Network:
         )
 
     def _assignment_graph(self, configuration: TrafficClass) -> Graph:
-        """Share assignment topology for classes with the same mode."""
-        mode = configuration.mode
-        if mode not in self._graphs:
-            self._graphs[mode] = self.build_graph(
-                configuration.mode,
-                centroids=configuration.demand.index,
-                **configuration.graph_options,
-            )
-
-        return self._graphs[mode]
+        """Build assignment topology for a traffic class without caching it."""
+        return self.build_graph(
+            configuration.mode,
+            centroids=configuration.demand.index,
+            **configuration.graph_options,
+        )

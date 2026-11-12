@@ -130,14 +130,13 @@ def test_build_preserves_centroids_across_modes(network_with_mode_excluded_centr
         assert source.build_graph(mode, "distance").centroids.tolist() == list(range(1, 25))
 
 
-def test_build_empty_mode_retains_all_centroids(sioux_falls_example):
+def test_build_graph_remove_dead_ends_option(sioux_falls_example):
     network = sioux_falls_example.network
     empty_mode = next(mode for mode in network.list_modes() if mode != "c")
     with sioux_falls_example.db_connection as conn:
         conn.execute("UPDATE links SET modes = ?", ("c",))
 
-    source = network.build(modes=[empty_mode])
-    graph = source.build_graph(empty_mode, "distance", compact=True, remove_dead_ends=True)
+    graph = network.build_graph(empty_mode, "distance", compact=False, remove_dead_ends=True)
 
     assert graph.centroids.tolist() == list(range(1, 25))
     assert graph.num_links == 0

@@ -514,7 +514,10 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # FIXME: Add turn-state path saving.
             if c.results.save_path_file or c._aon_results.save_path_file:
-                raise NotImplementedError("Path file saving is not supported by the prepared assignment driver")
+                raise NotImplementedError(
+                    "Path file saving is not yet supported by the prepared assignment driver. "
+                    "If this feature may be of use for you please file an issue or contact us."
+                )
             inputs = AssignmentInputs(
                 c.graph,
                 c.configuration.demand,

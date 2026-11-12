@@ -1,9 +1,11 @@
 import logging
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
+from numpy.typing import ArrayLike
 from shapely import union_all
 from shapely.geometry import Polygon
 
@@ -193,14 +195,15 @@ class Network(WorkerThread):
         mode: str,
         cost: str,
         *,
-        fields=None,
-        centroids=None,
-        skimming=None,
-        block_centroid_flows=True,
-        limit_to_area=None,
-        compact=False,
-        turn_restrictions=None,
-        allow_uturns=None,
+        fields: list[str] | None = None,
+        centroids: ArrayLike | None = None,
+        skimming: str | Iterable[str] | None = None,
+        block_centroid_flows: bool = True,
+        limit_to_area: Polygon | None = None,
+        compact: bool = False,
+        remove_dead_ends: bool = False,
+        turn_restrictions: pd.DataFrame | None = None,
+        allow_uturns: bool | None = None,
     ) -> "Graph":
         """Build a standalone graph without retaining project connections."""
         if isinstance(skimming, str):
@@ -213,6 +216,7 @@ class Network(WorkerThread):
             centroids=centroids,
             skimming=skimming or (),
             compact=compact,
+            remove_dead_ends=remove_dead_ends,
             block_centroid_flows=block_centroid_flows,
             turn_restrictions=turn_restrictions,
             allow_uturns=allow_uturns,

@@ -177,7 +177,7 @@ class TrafficAssignment(AssignmentBase):
 
         ``name_mapping`` maps VDF parameter names to network fields or constants.
         Without a mapping, VDF defaults supply values.
-        Preload arrays use directed links in ascending link-ID and direction order.
+        Preload arrays use directed links in network mapping order.
         """
         if not isinstance(network, (Network, ProjectNetwork)):
             raise TypeError("network must be a Network or a project network")

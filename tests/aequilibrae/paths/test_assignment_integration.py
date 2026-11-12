@@ -292,7 +292,7 @@ def test_repeated_execution_clears_history_and_preserves_old_output_views():
     assert len(assignment.assignment.convergence_report["iteration"]) == first_report_length
 
 
-def test_shared_graph_classes_have_independent_cost_buffers():
+def test_assignment_classes_build_independent_graphs_and_cost_buffers():
     graph = diamond()
     network = Network(graph.network.assign(modes="c"))
     configuration = TrafficClass(
@@ -302,10 +302,12 @@ def test_shared_graph_classes_have_independent_cost_buffers():
         graph_options={"block_centroid_flows": False},
     )
     prepared = network._assignment_graph(configuration)
-    assert network._assignment_graph(replace(configuration, name="trucks")) is prepared
+    second_graph = network._assignment_graph(replace(configuration, name="trucks"))
+    assert second_graph is not prepared
+    assert second_graph.mapping is not prepared.mapping
     first, second = [
         AssignmentInputs(
-            prepared,
+            prepared if index == 0 else second_graph,
             configuration.demand,
             "time",
             {},
@@ -313,11 +315,12 @@ def test_shared_graph_classes_have_independent_cost_buffers():
             field_values=network.field_values,
             skim_fields=graph.skim_fields,
         )
-        for _ in range(2)
+        for index in range(2)
     ]
-    assert first.mapping is second.mapping is prepared.mapping
-    assert np.shares_memory(first.routing.fs, second.routing.fs)
-    assert np.shares_memory(first.routing.heads, second.routing.heads)
+    assert first.mapping is prepared.mapping
+    assert second.mapping is second_graph.mapping
+    assert not np.shares_memory(first.routing.fs, second.routing.fs)
+    assert not np.shares_memory(first.routing.heads, second.routing.heads)
     first.update_costs(np.ones(network.mapping.link_count), np.zeros(network.mapping.link_count))
     second.update_costs(np.full(network.mapping.link_count, 3.0), np.zeros(network.mapping.link_count))
     assert not np.shares_memory(first.costs, second.costs)
