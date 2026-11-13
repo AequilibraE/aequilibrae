@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import pickle
 import uuid
 import warnings
 from abc import ABC
@@ -1042,102 +1041,6 @@ class GraphBase(ABC):  # noqa: B024
             self._turn_penalties_master = np.array(self.turn_penalties, copy=True)
         if self.compact_turn_penalties.size > 0:
             self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)
-
-    # Procedure to pickle graph and save to disk
-    def save_to_disk(self, filename: str) -> None:
-        """
-        Saves graph to disk
-
-        :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is ``aeg``.
-        """
-        mygraph = {}
-        mygraph["network"] = self.network
-        mygraph["graph"] = self.graph
-        mygraph["compact_graph"] = self.compact_graph
-        mygraph["description"] = self.description
-        mygraph["num_links"] = self.num_links
-        mygraph["turn_penalty_dimension"] = self.turn_penalty_dimension
-        mygraph["turn_skim_fields"] = self.turn_skim_fields
-        mygraph["all_nodes"] = self.all_nodes
-        mygraph["nodes_to_indices"] = self.nodes_to_indices
-        mygraph["num_nodes"] = self.num_nodes
-        mygraph["fs"] = self.fs
-        mygraph["cost"] = self.cost
-        mygraph["cost_field"] = self.cost_field
-        mygraph["skims"] = self.skims
-        mygraph["skim_fields"] = self.skim_fields
-        mygraph["block_centroid_flows"] = self.block_centroid_flows
-        mygraph["centroids"] = self.centroids
-        mygraph["graph_id"] = self._id
-        mygraph["mode"] = self.mode
-
-        # Turn restrictions data
-        mygraph["turn_restrictions"] = self._turn_restrictions
-        mygraph["allow_uturns_everywhere"] = self._allow_uturns_everywhere
-        mygraph["allow_path_uturns"] = self._allow_path_uturns
-        mygraph["has_turn_restrictions"] = self._has_turn_restrictions
-        mygraph["turn_fs"] = self.turn_fs
-        mygraph["turn_to_arcs"] = self.turn_to_arcs
-        mygraph["turn_penalties"] = (
-            self._turn_penalties_master if self._turn_penalties_master is not None else self.turn_penalties
-        )
-        mygraph["compact_turn_fs"] = self.compact_turn_fs
-        mygraph["compact_turn_to_arcs"] = self.compact_turn_to_arcs
-        mygraph["compact_turn_penalties"] = (
-            self._compact_turn_penalties_master
-            if self._compact_turn_penalties_master is not None
-            else self.compact_turn_penalties
-        )
-
-        with open(filename, "wb") as f:
-            pickle.dump(mygraph, f)
-
-    def load_from_disk(self, filename: str) -> None:
-        """
-        Loads graph from disk
-
-        :Arguments:
-            **filename** (:obj:`str`): Path to file
-        """
-        with open(filename, "rb") as f:
-            mygraph = pickle.load(f)
-            self.description = mygraph["description"]
-            self.num_links = mygraph["num_links"]
-            self.num_nodes = mygraph["num_nodes"]
-            self.network = mygraph["network"]
-            self.graph = mygraph["graph"]
-            self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
-            self.turn_skim_fields = mygraph.get("turn_skim_fields", [])
-
-            self.all_nodes = mygraph["all_nodes"]
-            self.nodes_to_indices = mygraph["nodes_to_indices"]
-            self.num_nodes = mygraph["num_nodes"]
-            self.fs = mygraph["fs"]
-            self.cost = mygraph["cost"]
-            self.cost_field = mygraph["cost_field"]
-            self.skims = mygraph["skims"]
-            self.skim_fields = mygraph["skim_fields"]
-            self.block_centroid_flows = mygraph["block_centroid_flows"]
-            self.centroids = mygraph["centroids"]
-            self._id = mygraph["graph_id"]
-            self.mode = mygraph["mode"]
-
-            # Load turn restrictions data (if present in saved file)
-            self._turn_restrictions = mygraph.get("turn_restrictions", None)
-            # Support loading graphs saved with old field name "allow_uturns"
-            self._allow_uturns_everywhere = mygraph.get("allow_uturns_everywhere", mygraph.get("allow_uturns", False))
-            self._allow_path_uturns = mygraph.get("allow_path_uturns", False)
-            self._has_turn_restrictions = mygraph.get("has_turn_restrictions", False)
-            self.turn_fs = mygraph.get("turn_fs", np.array([]))
-            self.turn_to_arcs = mygraph.get("turn_to_arcs", np.array([]))
-            self.turn_penalties = mygraph.get("turn_penalties", np.array([]))
-            self.compact_turn_fs = mygraph.get("compact_turn_fs", np.array([]))
-            self.compact_turn_to_arcs = mygraph.get("compact_turn_to_arcs", np.array([]))
-            self.compact_turn_penalties = mygraph.get("compact_turn_penalties", np.array([]))
-        self._backup_penalties()
-
-        self.__build_derived_properties()
 
     def __build_derived_properties(self):
         if self.centroids is None:
