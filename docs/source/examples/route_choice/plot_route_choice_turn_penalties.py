@@ -71,6 +71,7 @@ imported_routes = pd.DataFrame(
         "origin id": [10, 10],
         "destination id": [40, 40],
         "route set": [[71, 12], [55, 24]],
+        "route directions": [[1, 1], [1, 1]],
     }
 )
 
