@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class GraphBase(ABC):  # noqa: B024
+class _GraphBase(ABC):  # noqa: B024
     """
     Internal DataFrame-based builder for road and transit topology.
 
@@ -1298,7 +1298,7 @@ class Graph:
         )
 
 
-class TransitGraph(GraphBase):
+class TransitGraph(_GraphBase):
     def __init__(
         self,
         network: pd.DataFrame,
