@@ -57,6 +57,19 @@ class Network(WorkerThread):
         self.turn_restrictions = TurnRestrictions(self.__connections.db_connection)
         self.importer = Importer(self)
 
+    def refresh_schemas(self):
+        """Refresh the schemas of ProjectTable objects."""
+        for obj in [
+            self.modes,
+            self.link_types,
+            self.links,
+            self.nodes,
+            self.periods,
+            self.zones,
+            self.turn_restrictions,
+        ]:
+            obj._refresh_record_type()
+
     @property
     def project(self) -> "Project":
         """The project this network belongs to."""

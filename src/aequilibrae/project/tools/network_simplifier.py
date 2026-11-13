@@ -51,15 +51,18 @@ class NetworkSimplifier(WorkerThread):
 
         if not graph.compact:
             raise ValueError("Network simplification requires a compact graph")
-        compressed_idx, compressed_link_data = graph.expansion_indices, graph.expansion_links
+        mapping = graph.mapping
+        compressed_idx, compressed_link_data = mapping.expansion_offsets, mapping.expansion_links
         correspondence = pd.DataFrame(
             {
-                "link_id": graph.full_link_ids,
-                "__compressed_id__": graph.mapping.crosswalk[graph.full_to_network],
+                "link_id": mapping.network.link_ids,
+                "__compressed_id__": mapping.network_link_to_graph,
             }
         )
+        # Links removed from the graph no longer have a compressed ID
+        correspondence = correspondence[correspondence.__compressed_id__ >= 0]
         link_set_df = self.link_layer.merge(correspondence, on="link_id")
-        graph_link_ids = graph.full_link_ids
+        graph_link_ids = mapping.network.link_ids
         centroid_connectors = graph_link_ids[~np.isin(graph_link_ids, self.link_layer.link_id)]
 
         # compressed_ids that appear for more than one link
@@ -82,17 +85,16 @@ class NetworkSimplifier(WorkerThread):
             self.signal.emit(["update", counter, "Simplifying links"])
             compressed_id = rec.__compressed_id__
 
-            # We got to the group of links where AequilibraE can no longer compress
-            if compressed_id + 1 == compressed_idx.shape[0]:
-                continue
-
             link_sequence = compressed_link_data[compressed_idx[compressed_id] : compressed_idx[compressed_id + 1]]
             if len(link_sequence) < 2:
                 continue
 
-            # Resolve the graph indices in the expansion mapping to link IDs
-            link_sequence = graph_link_ids[link_sequence].tolist()
-            self.link_sequence = np.array([x for x in link_sequence if x not in centroid_connectors])
+            # Resolve the directed network indices in the expansion mapping to link IDs
+            link_directions = mapping.network.directions[link_sequence]
+            link_sequence = graph_link_ids[link_sequence]
+            retained_links = ~np.isin(link_sequence, centroid_connectors)
+            self.link_sequence = link_sequence[retained_links]
+            link_directions = link_directions[retained_links]
             self.candidates = self.link_layer.query("link_id in @link_sequence").set_index("link_id")
 
             if self.candidates.shape[0] <= 1:
@@ -105,7 +107,7 @@ class NetworkSimplifier(WorkerThread):
 
             # We build the geometry sequence, speeds, and capacities
             candidates, geos, long_dir, long_lnk = self.__process_link_fields(
-                self.candidates, self.link_sequence, max_speed_ratio
+                self.candidates, self.link_sequence, link_directions, max_speed_ratio
             )
 
             if candidates.empty:
@@ -120,15 +122,15 @@ class NetworkSimplifier(WorkerThread):
 
             # Now we build the template for the links we will build
             main_data = long_lnk.to_dict() if long_lnk is not None else {}
+            # The merged geometry follows traversal, any one-way link makes the whole chain one-way
+            main_data["direction"] = int((candidates["direction"] != 0).any())
 
-            # Some values we will bring from the weighted average
+            # Some values we will bring from the direction-aligned weighted average
+            ordered_candidates = candidates.loc[self.link_sequence]
             for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
-                metric = (candidates[field] * candidates["distance"]).sum() / candidates["distance"].sum()
-                if long_dir == 1:
-                    main_data[field] = metric
-                else:
-                    field2 = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
-                    main_data[field2] = metric
+                reverse_field = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
+                values = np.where(link_directions == 1, ordered_candidates[field], ordered_candidates[reverse_field])
+                main_data[field] = (values * ordered_candidates["distance"]).sum() / candidates["distance"].sum()
 
             # If that link is in the opposite direction, we need to swap lanes,
             # as we would have swapped the geometry as well
@@ -160,7 +162,8 @@ class NetworkSimplifier(WorkerThread):
     def __process_link_fields(
         self,
         candidates: pd.DataFrame,
-        link_sequence: npt.NDArray[np.int_],
+        link_sequence: npt.NDArray[np.integer],
+        link_directions: npt.NDArray[np.int8],
         max_speed_ratio: float = 1.1,
     ) -> tuple[
         pd.DataFrame,
@@ -168,13 +171,12 @@ class NetworkSimplifier(WorkerThread):
         Literal[1, -1] | None,
         pd.Series | None,
     ]:
-        start_node = candidates.loc[link_sequence[0]]["a_node"]
         longest_link_id = candidates.sort_values("distance", ascending=False).index[0]
         speed_ab, speed_ba, geos, lanes_ab, lanes_ba = [], [], [], [], []
         longest_link, longest_direction = None, None
-        for link_id in link_sequence:
+        for link_id, link_direction in zip(link_sequence, link_directions, strict=True):
             link = candidates.loc[link_id]
-            direction = "AB" if start_node == link.a_node else "BA"
+            direction = "AB" if link_direction == 1 else "BA"
             geos.append(link.geometry if direction == "AB" else link.geometry.reverse())
             speed_ab.append(link.speed_ab if direction == "AB" else link.speed_ba)
             speed_ba.append(link.speed_ba if direction == "AB" else link.speed_ab)
@@ -184,7 +186,6 @@ class NetworkSimplifier(WorkerThread):
                 # We use the longest link as a template
                 longest_direction = 1 if direction == "AB" else -1
                 longest_link = link
-            start_node = link.b_node if direction == "AB" else link.a_node
 
         constraints_broken = int(np.unique(lanes_ab).shape[0] > 1)
         constraints_broken += np.unique(lanes_ba).shape[0] > 1
@@ -223,7 +224,7 @@ class NetworkSimplifier(WorkerThread):
 
     def collapse_links_into_nodes(self, links: List[int]):
         """
-        Collapses links into nodes, adjusting the network in the neighborhood.
+        Collapses links into nodes, adjusting the network in the neighbourhood.
 
         :Arguments:
             **links** (:obj:`List[int]`): List containing link IDs to be collapsed.
