@@ -2,7 +2,7 @@ Traffic Assignment Procedure
 ============================
 
 Along with a network data model, traffic assignment is the most technically challenging portion to 
-develop in a modeling platform, especially if you want it to be *fast*. In AequilibraE, we aim to 
+develop in a modelling platform, especially if you want it to be *fast*. In AequilibraE, we aim to 
 make it as fast as possible, without making it overly complex to use, develop and maintain, although
 we know that *complex* is subjective.
 
@@ -18,7 +18,7 @@ mode, cost field, demand matrix, optional skimming fields, and any fixed-cost or
 The required information is:
 
 * **mode**: the network mode identifier (for example ``"c"`` for cars)
-* **cost**: the free-flow generalized cost field used for route choice
+* **cost**: the free-flow generalised cost field used for route choice
 * **demand**: the ``AequilibraeMatrix`` or ``AequilibraeSparseMatrix`` containing OD demand for that class
 * **name**: an optional class label; when omitted, it defaults to the mode
 
@@ -44,10 +44,13 @@ The required information is:
     # Create the traffic classes
     >>> tc_car = TrafficClass(mode="c", cost="free_flow_time", demand=matrix_car,
     ...                     name="car", skimming=("free_flow_time", "distance"),
-    ...                     block_centroid_flows=False)
+    ...                     graph_options={"block_centroid_flows": False})
     >>> tc_truck = TrafficClass(mode="T", cost="free_flow_time", demand=matrix_truck,
     ...                      name="truck", skimming=("free_flow_time", "distance"),
-    ...                      block_centroid_flows=False)
+    ...                      graph_options={"block_centroid_flows": False})
+
+Routing policies such as ``block_centroid_flows`` are supplied through ``graph_options``.
+The assignment builds the required graphs internally from the network.
 
 It is also possible to set the common assignment parameters during class definition:
 
@@ -68,7 +71,7 @@ It is also possible to set the common assignment parameters during class definit
     ...     fixed_cost_field="distance",
     ...     fixed_cost_multiplier=1.0,
     ...     skimming=("free_flow_time", "distance"),
-    ...     block_centroid_flows=False,
+    ...     graph_options={"block_centroid_flows": False},
     ... )
 
 ``TrafficAssignment``
@@ -79,8 +82,10 @@ It is also possible to set the common assignment parameters during class definit
     >>> from aequilibrae.paths import TrafficAssignment
     >>> from aequilibrae.paths.vdf import bpr
 
+    >>> network = project.network.build()
     >>> assignment = TrafficAssignment(
-    ...     network=project.network,
+    ...     network=network,
+    ...     project=project,
     ...     classes=[tc_car, tc_truck],
     ...     time_field="free_flow_time",
     ...     capacity_field="capacity",
@@ -89,10 +94,11 @@ It is also possible to set the common assignment parameters during class definit
     ...     name_mapping={"alpha": "b", "beta": "power"},
     ... )
 
-AequilibraE's traffic assignment is organized around a single constructor that snapshots the network and
+AequilibraE's traffic assignment is organised around a single constructor that snapshots the network and
 current class configuration, then prepares the required routing contexts during execution.
 
 * **network**: the source network object or project network containing the links and modes
+* **project**: the project used when saving results or skims from an independent network
 * **classes**: one or more fully-specified ``TrafficClass`` objects
 * **vdf**: the volume-delay function (VDF) to be used, being one of ``BPR``, ``BPR2``, ``CONICAL``,
   ``INRETS``, or ``AKCELIK``. Or a custom ``VDF`` object.
@@ -104,7 +110,8 @@ current class configuration, then prepares the required routing contexts during 
 .. doctest::
 
     >>> assignment = TrafficAssignment(
-    ...     network=project.network,
+    ...     network=network,
+    ...     project=project,
     ...     classes=[tc_car, tc_truck],
     ...     time_field="free_flow_time",
     ...     capacity_field="capacity",
@@ -178,14 +185,14 @@ Volume-delay function
 ~~~~~~~~~~~~~~~~~~~~~
 
 AequilibraE supports five Volume Delay Functions (VDFs): BPR, BPR2, Conical, INRETS, and Akcelik.
-Each VDF has distinct characteristics that make it suitable for different modeling scenarios.
+Each VDF has distinct characteristics that make it suitable for different modelling scenarios.
 
 For detailed information on VDF formulations, parameter guidance, and usage recommendations, 
 see the dedicated :ref:`volume_delay_functions` page, which includes:
 
 * Mathematical formulas and technical descriptions
 * Default parameter values and calibration guidance
-* Behavioral charts showing V/C ratios from 0 to 3
+* Behavioural charts showing V/C ratios from 0 to 3
 * Origin and background for each function
 * Recommendations for choosing the right VDF
 
@@ -195,7 +202,7 @@ see the dedicated :ref:`volume_delay_functions` page, which includes:
 * **BPR2**: Enhanced over-capacity penalty (α=0.15, β=4.0)
 * **Conical**: Smooth theoretical function (α=0.15, β=4.0)
 * **INRETS**: Urban arterials (α=1.0)
-* **Akcelik**: Signalized intersections (α=0.25, τ=0.8)
+* **Akcelik**: Signalised intersections (α=0.25, τ=0.8)
 
 Setting Preloads
 ----------------

@@ -15,7 +15,7 @@ from aequilibrae.paths.results import TransitAssignmentResults
 class TrafficClass:
     """Define a traffic class independently of a network or prepared graph.
 
-    ``cost`` is the free-flow generalized cost in time units. Congestion adds
+    ``cost`` is the free-flow generalised cost in time units. Congestion adds
     the change in travel time. Fixed costs are multiplied by
     ``fixed_cost_multiplier`` and divided by ``vot``.
 
@@ -33,7 +33,7 @@ class TrafficClass:
 
         >>> tc = TrafficClass(
         ...     name="car", mode="c", cost='free_flow_time', demand=demand, pce=1.3,
-        ...     skimming=['free_flow_time', 'distance'], block_centroid_flows=False,
+        ...     skimming=['free_flow_time', 'distance'], graph_options={'block_centroid_flows': False},
         ... )
 
         >>> project.close()

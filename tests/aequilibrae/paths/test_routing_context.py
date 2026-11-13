@@ -3,10 +3,9 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
 from aequilibrae.paths import Network
-from aequilibrae.paths.routing_context import GraphMapping, make_routing_context
+from aequilibrae.paths.routing_context import GraphMapping
 
 from .routing_helpers import diamond_graph, make_context, search
 

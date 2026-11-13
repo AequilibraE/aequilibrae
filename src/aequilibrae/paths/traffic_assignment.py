@@ -120,7 +120,7 @@ class TrafficAssignment(AssignmentBase):
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
         >>> from aequilibrae.paths.vdf import bpr
         >>> project = create_example(project_path)
-        >>> network = project.network
+        >>> network = project.network.build()
         >>> proj_matrices = project.matrices
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
@@ -129,10 +129,10 @@ class TrafficAssignment(AssignmentBase):
         # Creates the assignment class
         >>> assigclass = TrafficClass(
         ...     name="car", mode="c", cost="free_flow_time", demand=demand,
-        ...     skimming=['free_flow_time', 'distance'], block_centroid_flows=False,
+        ...     skimming=['free_flow_time', 'distance'], graph_options={'block_centroid_flows': False},
         ... )
         >>> assig = TrafficAssignment(
-        ...     network=network, classes=[assigclass], time_field='free_flow_time',
+        ...     network=network, project=project, classes=[assigclass], time_field='free_flow_time',
         ...     capacity_field='capacity', vdf=bpr,
         ...     name_mapping={"alpha": "b", "beta": "power"}, algorithm='bfw',
         ... )
