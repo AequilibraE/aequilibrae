@@ -28,24 +28,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass(frozen=True)
-class NetworkGraphIndices:
-    network_ab_idx: np.ndarray
-    network_ba_idx: np.ndarray
-    graph_ab_idx: np.ndarray
-    graph_ba_idx: np.ndarray
-
-
-def _get_graph_to_network_mapping(link_ids, directions):
-    # Dense link-ID lookup arrays waste memory when external IDs are sparse.
-    _, inverse = np.unique(link_ids, return_inverse=True)
-    ab, ba = directions > 0, directions < 0
-    values = (inverse[ab], inverse[ba], ab, ba)
-    for value in values:
-        value.flags.writeable = False
-    return NetworkGraphIndices(*values)
-
-
 class GraphBase(ABC):  # noqa: B024
     """
     Internal DataFrame-based builder for road and transit topology.
