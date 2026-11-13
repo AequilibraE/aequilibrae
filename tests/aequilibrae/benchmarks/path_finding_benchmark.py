@@ -6,13 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 from aequilibrae.paths.cython.a_star import EuclideanContext, a_star
-from aequilibrae.paths.cython.context import GraphContext
 from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 
-from aequilibrae.paths.routing_context import make_routing_context
 from aequilibrae.utils.list_all_turns import list_left_turns
 
 TURN_PENALTY_MODELS = {"Anaheim", "ChicagoRegional", "SiouxFalls"}
@@ -64,14 +62,18 @@ def real_nodes(graph):
     return graph.all_nodes[first_real_node:]
 
 
-def left_turn_restrictions(graph, nodes):
+def left_turn_restrictions(network, nodes, *, block_centroid_flows):
     """Convert left-turn link pairs on real nodes to prohibited movements."""
-    real_node_ids = real_nodes(graph)
-    links = graph.network[["link_id", "a_node", "b_node", "direction"]].copy()
-    if graph.block_centroid_flows:
-        links = links.loc[links["a_node"].isin(real_node_ids) & links["b_node"].isin(real_node_ids)]
-        nodes = nodes.loc[nodes["node_id"].isin(real_node_ids)]
-    links["modes"] = "c"
+    links = network.links[["link_id", "a_node", "b_node", "direction"]].copy()
+    if block_centroid_flows:
+        links = links.loc[~links.a_node.isin(network.centroids) & ~links.b_node.isin(network.centroids)]
+        nodes = nodes.loc[~nodes.node_id.isin(network.centroids)]
+    return left_turn_restrictions_from_tables(links, nodes)
+
+
+def left_turn_restrictions_from_tables(links, nodes):
+    """Convert left-turn link pairs in source tables to prohibited movements."""
+    links = links.assign(modes="c")
     turns = list_left_turns(links, nodes, mode="c")
     turns = turns.loc[turns["turn_type"] == "left"]
     link_data = links.set_index("link_id")
@@ -123,18 +125,22 @@ def estimate_real_node_scale(context, graph, coordinates):
     return float(np.min(ratios)) if ratios.size else 0.0
 
 
-def run_path_finding_search(benchmark, graph, model_stub, model_folder, algorithm, turn_penalties=False):
-    graph.clear_turn_restrictions()
+def run_path_finding_search(
+    benchmark, network, model_stub, model_folder, algorithm, turn_penalties=False, *, block_centroid_flows
+):
     node_table = load_node_coordinates(model_folder, model_stub)
+    restrictions = None
     if turn_penalties:
         if model_stub not in TURN_PENALTY_MODELS:
             pytest.skip(f"No node coordinates available to classify left turns for {model_stub}")
 
-        restrictions = left_turn_restrictions(graph, node_table)
+        restrictions = left_turn_restrictions(network, node_table, block_centroid_flows=block_centroid_flows)
         assert not restrictions.empty, f"No left turns found for {model_stub}"
-        graph.set_turn_restrictions(restrictions)
 
-    context: GraphContext = make_routing_context(graph)
+    graph = network.build_graph(
+        "c", "free_flow_time", block_centroid_flows=block_centroid_flows, turn_restrictions=restrictions
+    )
+    context = graph.routing
     coordinates = make_coordinates(graph, node_table)
 
     heuristic = EuclideanContext(coordinates[:, 0], coordinates[:, 1], 1.0)

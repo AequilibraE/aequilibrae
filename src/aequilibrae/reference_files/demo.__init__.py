@@ -17,6 +17,7 @@ State within this module should be avoided as this file may be run multiple time
 import numpy as np
 
 from aequilibrae.context import get_active_project
+from aequilibrae.paths.graph import Graph
 
 
 def matrix_summary():
@@ -45,24 +46,18 @@ def matrix_summary():
     return res
 
 
-def graph_summary():
-    """
-    Compute summary statistics about the graphs built within the active project.
-
-    If no graphs have been built an empty dictionary will be returned.
-    """
-    project = get_active_project()
-    graphs = project.network.graphs
-
+def graph_summary(graph=None):
+    """Return the full and compact graph counts, or an empty dictionary without a supplied graph."""
+    if graph is None:
+        return {}
     return {
-        k: {
-            "num_links": v.num_links,
-            "num_nodes": v.num_nodes,
-            "num_zones": v.num_zones,
-            "compact_num_links": v.compact_num_links,
-            "compact_num_nodes": v.compact_num_nodes,
+        graph.mode: {
+            "num_links": len(graph.full_link_ids) if isinstance(graph, Graph) else graph.num_links,
+            "num_nodes": len(graph.full_node_ids) if isinstance(graph, Graph) else graph.num_nodes,
+            "num_zones": graph.num_zones,
+            "compact_num_links": graph.compact_num_links,
+            "compact_num_nodes": graph.compact_num_nodes,
         }
-        for k, v in graphs.items()
     }
 
 

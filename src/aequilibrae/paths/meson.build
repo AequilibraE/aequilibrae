@@ -8,6 +8,8 @@ pyfiles = [
     'graph.py',
     'graph_building.py',
     'linear_approximation.py',
+    'mapping.py',
+    'network.py',
     'network_skimming.py',
     'optimal_strategies.py',
     'path_heuristics.py',

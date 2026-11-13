@@ -49,7 +49,7 @@ cdef class LinkLoadingResults:
         size_t thread_id,
     ) noexcept nogil
     cdef void reduce_link_loading(self)
-    cdef object project_loads(self, object loads, const long long[::1] compressed_id_view, int cores)
+    cdef object project_loads(self, object loads, object mapping)
 
     @staticmethod
     cdef bool is_in_select_link_set(
@@ -71,6 +71,6 @@ cdef class LinkLoadingResults:
 
     cdef void reduce_sl_link_loading(self)
     cdef void reduce_sl_od_matrix(self)
-    cdef object link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores)
-    cdef object sl_link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores)
+    cdef object link_loading_to_objects(self, object mapping)
+    cdef object sl_link_loading_to_objects(self, object mapping)
     cdef object sl_od_matrices_structs_to_objects(self)

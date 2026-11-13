@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import pickle
 import uuid
 import warnings
 from abc import ABC
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from datetime import datetime
 from os.path import join
@@ -16,38 +16,21 @@ import numpy.typing as npt
 import pandas as pd
 
 from aequilibrae.paths.connectivity_analysis import disconnected_analysis
+from aequilibrae.paths.cython.context import GraphContext, SkimmingContext, TurnBasedContext
 from aequilibrae.paths.cython.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+from aequilibrae.paths.mapping import GraphMapping
 
 if TYPE_CHECKING:
     from aequilibrae.paths import PathResults
+    from aequilibrae.paths.network_skimming import NetworkSkimming
 
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
-class NetworkGraphIndices:
-    network_ab_idx: np.ndarray
-    network_ba_idx: np.ndarray
-    graph_ab_idx: np.ndarray
-    graph_ba_idx: np.ndarray
-
-
-def _get_graph_to_network_mapping(lids, direcs):
-    num_uncompressed_links = int(np.unique(lids).shape[0])
-    indexing = np.zeros(int(lids.max()) + 1, np.uint64)
-    indexing[np.unique(lids)[:]] = np.arange(num_uncompressed_links)
-
-    graph_ab_idx = direcs > 0
-    graph_ba_idx = direcs < 0
-    network_ab_idx = indexing[lids[graph_ab_idx]]
-    network_ba_idx = indexing[lids[graph_ba_idx]]
-    return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
-
-
-class GraphBase(ABC):  # noqa: B024
+class _GraphBase(ABC):  # noqa: B024
     """
-    Graph class.
+    Internal DataFrame-based builder for road and transit topology.
 
     AequilibraE graphs implement two forms of compression.
         - link contraction, and
@@ -433,13 +416,11 @@ class GraphBase(ABC):  # noqa: B024
         self._id = uuid.uuid4().hex
 
     def disconnected_nodes(self) -> np.ndarray:
-        """
-        Executes strongly connected components analysis on the directed graph
+        """Identify disconnected nodes using strongly connected components analysis.
 
-        :Returns:
-            **array** (:obj:`np.ndarray`): All nodes disconnected from the main portion of the network
+        This method is not available for builder graphs. Use a prepared Graph instead.
         """
-        return disconnected_analysis(self)
+        raise NotImplementedError("Call .disconnected_nodes() on a Graph prepared via Network.build_graph()")
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = list(self.required_fields)
@@ -1043,102 +1024,6 @@ class GraphBase(ABC):  # noqa: B024
         if self.compact_turn_penalties.size > 0:
             self._compact_turn_penalties_master = np.array(self.compact_turn_penalties, copy=True)
 
-    # Procedure to pickle graph and save to disk
-    def save_to_disk(self, filename: str) -> None:
-        """
-        Saves graph to disk
-
-        :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is ``aeg``.
-        """
-        mygraph = {}
-        mygraph["network"] = self.network
-        mygraph["graph"] = self.graph
-        mygraph["compact_graph"] = self.compact_graph
-        mygraph["description"] = self.description
-        mygraph["num_links"] = self.num_links
-        mygraph["turn_penalty_dimension"] = self.turn_penalty_dimension
-        mygraph["turn_skim_fields"] = self.turn_skim_fields
-        mygraph["all_nodes"] = self.all_nodes
-        mygraph["nodes_to_indices"] = self.nodes_to_indices
-        mygraph["num_nodes"] = self.num_nodes
-        mygraph["fs"] = self.fs
-        mygraph["cost"] = self.cost
-        mygraph["cost_field"] = self.cost_field
-        mygraph["skims"] = self.skims
-        mygraph["skim_fields"] = self.skim_fields
-        mygraph["block_centroid_flows"] = self.block_centroid_flows
-        mygraph["centroids"] = self.centroids
-        mygraph["graph_id"] = self._id
-        mygraph["mode"] = self.mode
-
-        # Turn restrictions data
-        mygraph["turn_restrictions"] = self._turn_restrictions
-        mygraph["allow_uturns_everywhere"] = self._allow_uturns_everywhere
-        mygraph["allow_path_uturns"] = self._allow_path_uturns
-        mygraph["has_turn_restrictions"] = self._has_turn_restrictions
-        mygraph["turn_fs"] = self.turn_fs
-        mygraph["turn_to_arcs"] = self.turn_to_arcs
-        mygraph["turn_penalties"] = (
-            self._turn_penalties_master if self._turn_penalties_master is not None else self.turn_penalties
-        )
-        mygraph["compact_turn_fs"] = self.compact_turn_fs
-        mygraph["compact_turn_to_arcs"] = self.compact_turn_to_arcs
-        mygraph["compact_turn_penalties"] = (
-            self._compact_turn_penalties_master
-            if self._compact_turn_penalties_master is not None
-            else self.compact_turn_penalties
-        )
-
-        with open(filename, "wb") as f:
-            pickle.dump(mygraph, f)
-
-    def load_from_disk(self, filename: str) -> None:
-        """
-        Loads graph from disk
-
-        :Arguments:
-            **filename** (:obj:`str`): Path to file
-        """
-        with open(filename, "rb") as f:
-            mygraph = pickle.load(f)
-            self.description = mygraph["description"]
-            self.num_links = mygraph["num_links"]
-            self.num_nodes = mygraph["num_nodes"]
-            self.network = mygraph["network"]
-            self.graph = mygraph["graph"]
-            self.turn_penalty_dimension = mygraph.get("turn_penalty_dimension", "time")
-            self.turn_skim_fields = mygraph.get("turn_skim_fields", [])
-
-            self.all_nodes = mygraph["all_nodes"]
-            self.nodes_to_indices = mygraph["nodes_to_indices"]
-            self.num_nodes = mygraph["num_nodes"]
-            self.fs = mygraph["fs"]
-            self.cost = mygraph["cost"]
-            self.cost_field = mygraph["cost_field"]
-            self.skims = mygraph["skims"]
-            self.skim_fields = mygraph["skim_fields"]
-            self.block_centroid_flows = mygraph["block_centroid_flows"]
-            self.centroids = mygraph["centroids"]
-            self._id = mygraph["graph_id"]
-            self.mode = mygraph["mode"]
-
-            # Load turn restrictions data (if present in saved file)
-            self._turn_restrictions = mygraph.get("turn_restrictions", None)
-            # Support loading graphs saved with old field name "allow_uturns"
-            self._allow_uturns_everywhere = mygraph.get("allow_uturns_everywhere", mygraph.get("allow_uturns", False))
-            self._allow_path_uturns = mygraph.get("allow_path_uturns", False)
-            self._has_turn_restrictions = mygraph.get("has_turn_restrictions", False)
-            self.turn_fs = mygraph.get("turn_fs", np.array([]))
-            self.turn_to_arcs = mygraph.get("turn_to_arcs", np.array([]))
-            self.turn_penalties = mygraph.get("turn_penalties", np.array([]))
-            self.compact_turn_fs = mygraph.get("compact_turn_fs", np.array([]))
-            self.compact_turn_to_arcs = mygraph.get("compact_turn_to_arcs", np.array([]))
-            self.compact_turn_penalties = mygraph.get("compact_turn_penalties", np.array([]))
-        self._backup_penalties()
-
-        self.__build_derived_properties()
-
     def __build_derived_properties(self):
         if self.centroids is None:
             return
@@ -1220,16 +1105,20 @@ class GraphBase(ABC):  # noqa: B024
         value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
         greater than or equal to 0, then that value is the compressed node index.
 
+        Road graphs expose the corresponding arrays through ``graph.mapping``. These
+        use directed network link indices and dense network node indices, rather than
+        the legacy graph IDs and external node IDs used by this method.
+
         .. code-block:: python
 
             >>> project = create_example(project_path)
 
-            >>> project.network.build_graphs()
+            >>> network = project.network.build()
+            >>> graph = network.build_graph("c", centroids=np.arange(1, 25), compact=True, remove_dead_ends=True)
 
-            >>> graph = project.network.graphs['c']
-            >>> graph.prepare_graph(np.arange(1,25))
-
-            >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
+            >>> idx = graph.mapping.expansion_offsets
+            >>> data = graph.mapping.expansion_links
+            >>> node_mapping = graph.mapping.network_node_to_graph
 
             >>> project.close()
 
@@ -1249,17 +1138,246 @@ class GraphBase(ABC):  # noqa: B024
         super().__setattr__(key, value)
 
 
-class Graph(GraphBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@dataclasses.dataclass(frozen=True, eq=False)
+class Graph:
+    """One routing context with fixed topology and mappings to source links.
+
+    Create graphs with ``Network.build_graph()``.
+    Network tables and construction intermediates are not retained. Routing,
+    correspondence and skim fields belong to their respective sub-objects.
+    Reconstruct the graph to change its configuration; routing costs can still
+    be rebound independently of the fixed topology.
+    """
+
+    routing: GraphContext
+    mapping: GraphMapping
+    skimming: SkimmingContext
+    mode: str
+    cost_field: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.routing, GraphContext) or not isinstance(self.mapping, GraphMapping):
+            raise ValueError("Graph requires a routing context and a GraphMapping")
+        if not isinstance(self.skimming, SkimmingContext):
+            raise ValueError("skimming must be a SkimmingContext")
+        if self.routing.node_count != self.mapping.node_count or self.routing.link_count != self.mapping.link_count:
+            raise ValueError("Routing context and mapping dimensions must agree")
+        if self.skimming.link_count != self.routing.link_count:
+            raise ValueError("Skimming and routing contexts must have the same link count")
+        if not isinstance(self.mode, str) or not self.mode:
+            raise ValueError("mode must be a nonempty string")
+        if self.cost_field is not None and (not isinstance(self.cost_field, str) or not self.cost_field):
+            raise ValueError("cost_field must be a nonempty string")
+
+    @property
+    def compact(self) -> bool:
+        """Whether link contraction was requested when building the mapping."""
+        return self.mapping.compact
+
+    @property
+    def remove_dead_ends(self) -> bool:
+        """Whether dead-end removal was requested when building the mapping."""
+        return self.mapping.remove_dead_ends
+
+    @property
+    def allow_uturns(self) -> bool:
+        """Whether U-turns were allowed when building the routing context."""
+        return self.routing.allow_uturns
+
+    @property
+    def centroid_count(self) -> int:
+        """Number of centroids supplied when building the routing context."""
+        return self.routing.centroid_count
+
+    @property
+    def block_centroid_flows(self) -> bool:
+        """Whether the build requested blocking travel through centroids."""
+        return self.routing.block_centroid_flows
+
+    @property
+    def centroids(self) -> npt.NDArray[np.uint64]:
+        return self.mapping.network_node(np.arange(self.centroid_count, dtype=np.intp))
+
+    @property
+    def all_nodes(self) -> npt.NDArray[np.uint64]:
+        return self.mapping.network_node(np.arange(self.mapping.node_count, dtype=np.intp))
+
+    @property
+    def num_nodes(self) -> int:
+        return self.routing.node_count
+
+    @property
+    def num_links(self) -> int:
+        return self.routing.link_count
+
+    @property
+    def num_zones(self) -> int:
+        return self.centroid_count
+
+    @property
+    def cost(self) -> npt.NDArray[np.float64]:
+        return self.routing.costs
+
+    @property
+    def has_turn_restrictions(self) -> bool:
+        return isinstance(self.routing, TurnBasedContext)
+
+    @property
+    def skim_fields(self) -> list[str]:
+        return list(self.skimming.field_names)
+
+    def set_costs(self, costs: npt.ArrayLike) -> None:
+        """Replace directed network costs. Positive infinity closes a link."""
+        costs = np.asarray(costs)
+        if costs.shape != (self.mapping.network.link_count,):
+            raise ValueError("Costs must have one value per directed network link")
+        if costs.dtype.kind not in "iuf" or np.isnan(costs).any() or np.any(costs < 0):
+            raise ValueError("Graph costs must be numeric, nonnegative and cannot contain NaN")
+
+        values = self.mapping.aggregate_costs(costs.astype(np.float64, copy=False))
+        values.flags.writeable = False
+        self.routing.update_costs(values)
+
+    def selected_links(self, selections: Mapping[str, Iterable[tuple[int, int]]]) -> dict[str, npt.NDArray[np.intp]]:
+        """Resolve named source-link selections, raising for links absent from this graph."""
+        result = {}
+        for name, members in selections.items():
+            indices: set[int] = set()
+            for link, direction in members:
+                if isinstance(direction, (bool, np.bool_)) or not isinstance(direction, (int, np.integer)):
+                    raise ValueError("Selected link directions must be integers: -1, 0 or +1")
+                if direction not in (-1, 0, 1):
+                    raise ValueError("Selected link directions must be -1, 0 or +1")
+                matches = set()
+                for sign in (1, -1) if direction == 0 else (direction,):
+                    try:
+                        matches.add(self.mapping.graph_link(link, sign))
+                    except KeyError:
+                        pass
+                if not matches:
+                    raise ValueError(f"Selected link {link} and direction {direction} is absent from the graph")
+                indices.update(matches)
+            result[name] = np.array(sorted(indices), dtype=np.intp)
+        return result
+
+    def compute_path(self, origin: int, destination: int, **kwargs: object) -> PathResults:
+        """Compute a path with nodes and mileposts on this built graph.
+
+        Additional arguments are passed to :class:`PathResults`, including
+        explicit coordinates and a heuristic scale when using A*.
+        """
+        from aequilibrae.paths.results.path_results import PathResults
+
+        return PathResults(self, origin, destination, **kwargs)
+
+    def compute_skims(self, cores: int | None = None) -> NetworkSkimming:
+        """Compute centroid skims using this graph's routing and skim contexts."""
+        from aequilibrae.paths.network_skimming import NetworkSkimming
+
+        skimmer = NetworkSkimming(self)
+        if cores is not None:
+            skimmer.set_cores(cores)
+        skimmer.execute()
+        return skimmer
+
+    def disconnected_nodes(self) -> np.ndarray:
+        """Identify all disconnected nodes using strongly connected components analysis.
+
+        Returns:
+            All nodes that are disconnected from the main portion of the network.
+        """
+        # Extract active directed links from the routing context
+        active = np.isfinite(self.cost)
+        tails = np.repeat(np.arange(self.num_nodes), np.diff(self.routing.fs).astype(np.int64))
+        return disconnected_analysis(
+            tails[active],
+            self.routing.heads[active].astype(np.int64),
+            self.all_nodes,
+            self.block_centroid_flows,
+            self.centroids,
+        )
 
 
-class TransitGraph(GraphBase):
-    def __init__(self, config: Optional[dict] = None, od_node_mapping: Optional[pd.DataFrame] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._config = config
-        self.od_node_mapping = od_node_mapping
+class TransitGraph(_GraphBase):
+    def __init__(
+        self,
+        network: pd.DataFrame,
+        centroids: np.ndarray,
+        time_field: str,
+        frequency_field: str,
+        od_node_mapping: pd.DataFrame,
+        a_node_field: str = "a_node",
+        b_node_field: str = "b_node",
+        skimming_fields: list[str] | None = None,
+        config: dict | None = None,
+    ):
+        super().__init__()
+        self.network = sanitise_network(network)
+        self.centroids = sanitise_centroids(centroids)
+        self.skimming_fields = skimming_fields if skimming_fields is not None else []
+        self.time_field = time_field
+        self.frequency_field = frequency_field
+        self.a_node_field = a_node_field
+        self.b_node_field = b_node_field
+        self.od_node_mapping = od_node_mapping.copy() if od_node_mapping is not None else None
+
+        # Build graph structure
+        self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
+            self.network, self.centroids, build_fs=False
+        )
+        self.num_nodes = len(self.all_nodes)
+        self.num_links = len(self.graph)
+        self.num_zones = len(self.centroids)
+
+        # Create hyperpath context for transit assignment
+        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),
+            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
+
+        # Setup config
+        self._config = {
+            "time_field": time_field,
+            "frequency_field": frequency_field,
+            "a_node_field": self.a_node_field,
+            "b_node_field": self.b_node_field,
+            "num_links": self.num_links,
+            "num_nodes": self.num_nodes,
+            "num_zones": self.num_zones,
+            "skimming_fields": self.skimming_fields,
+        }
+        if config is not None:
+            self._config.update(config)
+
         self.mode = "t"
+
+    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
+        """Set the fields to skim and rebuild the hyperpath context if needed."""
+        self.skimming_fields = list(skimming_fields or [])
+        if self._config:
+            self._config["skimming_fields"] = self.skimming_fields
+
+        # Rebuild context
+        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
+        self.context = HyperpathGenerating(
+            self.graph,
+            head=self.a_node_field,
+            tail=self.b_node_field,
+            trav_time=self.time_field,
+            freq=self.frequency_field,
+            skim_cols=self.skimming_fields,
+            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),
+            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),
+            nodes_to_indices=self.nodes_to_indices,
+        )
 
     @property
     def config(self):
@@ -1428,97 +1546,19 @@ def _build_directed_graph(
     return all_nodes, nodes_to_indices, fs, graph
 
 
-class NewTransitGraph:
-    def __init__(
-        self,
-        network: pd.DataFrame,
-        centroids: np.ndarray,  # FIXME: Centroids used to be optional?
-        time_field: str,
-        frequency_field: str,
-        od_node_mapping: pd.DataFrame,
-        a_node_field: str = "a_node",
-        b_node_field: str = "b_node",
-        skimming_fields: list[str] | None = None,
-        config: dict | None = None,
-    ):
-        self.network = sanitise_network(network)
-        self.centroids = sanitise_centroids(centroids)
-        # FIXME: Old graphs make a distinction between free_flow_time and cost? Not sure why
-
-        self.skimming_fields = skimming_fields if skimming_fields is not None else []
-        self.time_field = time_field
-        self.frequency_field = frequency_field
-        self.a_node_field = a_node_field
-        self.b_node_field = b_node_field
-
-        self.od_node_mapping = od_node_mapping.copy()
-        o_key, d_key = ("node_id", "node_id") if len(self.od_node_mapping.columns) == 2 else ("o_node_id", "d_node_id")
-
-        self.all_nodes, self.nodes_to_indices, _, self.graph = _build_directed_graph(
-            self.network, self.centroids, build_fs=False
-        )
-
-        self.context = HyperpathGenerating(
-            self.graph,
-            head=self.a_node_field,
-            tail=self.b_node_field,
-            trav_time=self.time_field,
-            freq=self.frequency_field,
-            skim_cols=self.skimming_fields,
-            o_vert_ids=self.od_node_mapping[o_key].to_numpy(),  # taz_id
-            d_vert_ids=self.od_node_mapping[d_key].to_numpy(),  # node_id for destination in the above taz_id
-            nodes_to_indices=self.nodes_to_indices,
-        )
-
-        self._config = {
-            "time_field": time_field,
-            "frequency_field": frequency_field,
-            "a_node_field": self.a_node_field,
-            "b_node_field": self.b_node_field,
-            "num_links": self.num_links,
-            "num_nodes": self.num_nodes,
-            "num_zones": self.num_zones,
-            "skimming_fields": self.skimming_fields,
-        }
-        if config is not None:
-            self._config.update(config)
-
-    def set_skimming_fields(self, skimming_fields: list[str] | None = None) -> None:
-        """Set the fields to skim and rebuild the hyperpath context."""
-        self.skimming_fields = list(skimming_fields or [])
-        self.context = HyperpathGenerating(
-            self.graph,
-            head=self.a_node_field,
-            tail=self.b_node_field,
-            trav_time=self.time_field,
-            freq=self.frequency_field,
-            skim_cols=self.skimming_fields,
-            o_vert_ids=self.od_node_mapping[
-                "node_id" if len(self.od_node_mapping.columns) == 2 else "o_node_id"
-            ].to_numpy(),
-            d_vert_ids=self.od_node_mapping[
-                "node_id" if len(self.od_node_mapping.columns) == 2 else "d_node_id"
-            ].to_numpy(),
-            nodes_to_indices=self.nodes_to_indices,
-        )
-        self._config["skimming_fields"] = self.skimming_fields
-
-    @property
-    def num_links(self) -> int:
-        return len(self.graph)
-
-    @property
-    def num_nodes(self) -> int:
-        return len(self.all_nodes)
-
-    @property
-    def num_zones(self) -> int:
-        return len(self.centroids)
-
-    @property
-    def mode(self) -> str:
-        return "t"
-
-    @property
-    def block_centroid_flows(self) -> bool:
-        return False
+def _prepare_network_graph(graph, mode, centroids, restrictions, block_centroid_flows, allow_uturns):
+    """Apply network routing policy before preparing full and compact topology."""
+    graph.mode = mode
+    forbidden = ~graph.network.modes.fillna("").astype(str).str.contains(mode, regex=False)
+    graph.network.loc[forbidden, "b_node"] = graph.network.loc[forbidden, "a_node"]
+    graph.block_centroid_flows = block_centroid_flows
+    graph._allow_path_uturns = allow_uturns
+    if restrictions is not None:
+        required = {"from_node", "via_node", "to_node", "penalty"}
+        if missing := required - set(restrictions.columns):
+            raise ValueError(f"Turn restrictions DataFrame missing required columns: {missing}")
+        if "modes" in restrictions:
+            restrictions = restrictions[restrictions.modes.fillna("").astype(str).str.contains(mode, regex=False)]
+        graph._turn_restrictions = restrictions.copy()
+        graph._turn_restrictions["penalty"] = restrictions.penalty.apply(graph._normalise_turn_penalty)
+    graph.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)

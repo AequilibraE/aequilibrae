@@ -15,18 +15,15 @@ cpdef object array(shape, bint fill=True, ArrayElement fill_value=0):
     """
     cdef cython_view_array buffer
     format_char = {
-        "char": "c",
-        "signed char": "b",
-        "unsigned char": "B",
+        "int8_t": "b",
+        "int16_t": "h",
+        "int32_t": "i",
+        "int64_t": "q",
+        "uint8_t": "B",
+        "uint16_t": "H",
+        "uint32_t": "I",
+        "uint64_t": "Q",
         "bool": "?",
-        "short": "h",
-        "unsigned short": "H",
-        "int": "i",
-        "unsigned int": "I",
-        "long": "l",
-        "unsigned long": "L",
-        "long long": "q",
-        "unsigned long long": "Q",
         "ssize_t": "q",  # HACK: should be "n" but cython doesn't support it for some reason
         "size_t": "Q",  # HACK: should be "N" but cython doesn't support it for some reason
         "float": "f",

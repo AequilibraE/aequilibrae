@@ -1,506 +1,296 @@
-import os
-import pathlib
-from os.path import join
+"""Route generation, turn controls and A* dispatch."""
 
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, from_dict
-from aequilibrae.paths.route_choice import RouteChoice
-
-
-@pytest.fixture(scope="function")
-def route_choice_setup(sioux_falls_single_class):
-    sioux_falls_single_class.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
-    graph = sioux_falls_single_class.network.graphs["c"]
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
-
-    mat = sioux_falls_single_class.matrices.get_matrix("demand.omx", subset=["matrix"])
-
-    yield {"project": sioux_falls_single_class, "graph": graph, "mat": mat, "rc": RouteChoice(graph)}
-
-
-def test_prepare(route_choice_setup):
-    rc = route_choice_setup["rc"]
-
-    with pytest.raises(ValueError):
-        rc.prepare([])
-
-    with pytest.raises(ValueError):
-        rc.prepare(["1", "2"])
-
-    with pytest.raises(ValueError):
-        rc.prepare([("1", "2")])
-
-    with pytest.raises(ValueError):
-        rc.prepare([1])
-
-    rc.set_choice_set_generation("bfsle", max_routes=1)
-    rc.prepare([1, 2])
-    rc.execute(perform_assignment=False)
-    pairs = list(rc.get_results()[["origin id", "destination id"]].itertuples(index=False, name=None))
-    assert pairs == [(1, 2), (2, 1)]
-
-    rc.prepare([(1, 2)])
-    rc.execute(perform_assignment=False)
-    assert list(rc.get_results()[["origin id", "destination id"]].itertuples(index=False, name=None)) == [(1, 2)]
-
-
-def test_set_save_routes(route_choice_setup):
-    rc = route_choice_setup["rc"]
-
-    with pytest.raises(ValueError):
-        rc.set_save_routes("/non-existent-path")
-
-
-def test_set_choice_set_generation(route_choice_setup):
-    rc = route_choice_setup["rc"]
-
-    rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-    assert rc.parameters == {
-        "seed": 0,
-        "max_routes": 20,
-        "max_depth": 0,
-        "max_misses": 100,
-        "penalty": 1.1,
-        "disutility_cutoff_constant": float("inf"),
-        "disutility_cutoff_coefficient": float("inf"),
-        "beta": 1.0,
-        "store_results": True,
-        "a_star": False,
-        "heuristic": "euclidean",
-        "heuristic_scale": None,
-    }
-
-    rc.set_choice_set_generation("bfsle", max_routes=20)
-    assert rc.parameters == {
-        "seed": 0,
-        "max_routes": 20,
-        "max_depth": 0,
-        "max_misses": 100,
-        "penalty": 1.0,
-        "disutility_cutoff_constant": float("inf"),
-        "disutility_cutoff_coefficient": float("inf"),
-        "beta": 1.0,
-        "store_results": True,
-        "a_star": False,
-        "heuristic": "euclidean",
-        "heuristic_scale": None,
-    }
-
-    with pytest.raises(AttributeError):
-        rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
-
-    with pytest.raises(
-        ValueError,
-        match="`disutility_cutoff_constant` is set while `disutility_cutoff_coefficient` is defaulting to infinity. "
-        "Both must be set or unset",
-    ):
-        rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1, disutility_cutoff_constant=0)
-
-
-def test_link_results(route_choice_setup):
-    rc = route_choice_setup["rc"]
-    mat = route_choice_setup["mat"]
-
-    rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-    rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
-    rc.set_demand(mat)
-    rc.prepare()
-    rc.execute(perform_assignment=True)
-
-    df = rc.get_load_results()
-    u_sl = rc.get_select_link_loading_results()
-
-    assert list(df.columns) == [f"{mat_name}_{dir}" for dir in ["ab", "ba", "tot"] for mat_name in mat]
-
-    assert list(u_sl.columns) == [
-        f"{mat_name}_{sl_name}_{dir}" for sl_name in ["sl1", "sl2"] for dir in ["ab", "ba"] for mat_name in mat
-    ] + [f"{mat_name}_{sl_name}_tot" for sl_name in ["sl1", "sl2"] for mat_name in mat]
-
-
-@pytest.mark.parametrize("recompute_psl,change_cost", [(False, False), (True, False), (True, True)])
-def test_execute_from_path_files(route_choice_setup, recompute_psl, change_cost):
-    project = route_choice_setup["project"]
-    graph = route_choice_setup["graph"]
-    mat = route_choice_setup["mat"]
-    rc = route_choice_setup["rc"]
-
-    tmp_path = pathlib.Path(project.project_base_path) / "rc"
-    tmp_path.mkdir()
-
-    rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
-    rc.set_demand(mat)
-    rc.prepare()
-    rc.execute(perform_assignment=True)
-
-    results = rc.get_results()
-    ll_res = rc.get_load_results()
-    rc.save_path_files(tmp_path)
-
-    if change_cost:
-        graph.set_graph("free_flow_time")
-
-    rc2 = RouteChoice(graph)
-    rc2.set_demand(mat)
-    rc2.set_choice_set_generation(store_results=True)
-
-    rc2.execute_from_path_files(tmp_path, recompute_psl=recompute_psl)
-    results_new = rc2.get_results()
-    ll_res_new = rc2.get_load_results()
-
-    if recompute_psl and change_cost:
-        # Recomputing PSL and changing the cost field means the link loads will be different (cost change), and path
-        # overlap, cost, and mask will be different (recompute PSL)
-        pd.testing.assert_frame_equal(
-            results[["origin id", "destination id", "route set"]],
-            results_new[["origin id", "destination id", "route set"]],
-        )
-    elif recompute_psl and not change_cost:
-        # All generated fields must match after PSL recomputation.
-        pd.testing.assert_frame_equal(results, results_new[results.columns])
-        pd.testing.assert_frame_equal(ll_res, ll_res_new)
-    elif not recompute_psl and change_cost:
-        raise RuntimeError("branch should be unreachable, cannot change cost field without recomputing PSL")
-    elif not recompute_psl and not change_cost:
-        # Without recomputation, supplied costs, masks and probabilities are kept.
-        pd.testing.assert_frame_equal(results, results_new[results.columns])
-        # Not recomputing PSL means the assignment results are the same
-        pd.testing.assert_frame_equal(ll_res, ll_res_new)
-    else:
-        raise  # Unreachable
-
-
-def test_saving(route_choice_setup):
-    project = route_choice_setup["project"]
-    mat = route_choice_setup["mat"]
-    rc = route_choice_setup["rc"]
-
-    rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-    rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
-    rc.set_demand(mat)
-    rc.prepare()
-    rc.execute(perform_assignment=True)
-    lloads = rc.get_load_results()
-    u_sl = rc.get_select_link_loading_results()
-
-    rc.save_link_flows("ll")
-    rc.save_select_link("sl")
-    metadata = project.matrices.get_available_matrices_and_metadata()["sl.omx"]
-    assert metadata["procedure"] == "Route choice OD select link"
-    assert metadata["procedure_id"] == rc.procedure_id
-
-    with project.results_connection as conn:
-        for table, df in [
-            ("ll_uncompressed", lloads),
-            ("sl_uncompressed", u_sl),
-        ]:
-            df2 = pd.read_sql(f"select * from {table}", conn).set_index("link_id")
-            df3 = project.results.get_results(table).set_index("link_id")
-
-            pd.testing.assert_frame_equal(df2, df)
-            pd.testing.assert_frame_equal(df3, df)
-
-    matrices = AequilibraeSparseMatrix.from_omx(
-        (pathlib.Path(project.project_base_path) / "matrices" / "sl").with_suffix(".omx"),
-        index_name="route_choice_sl_index",
-    )
-
-    for sl_name, v in rc.get_select_link_od_matrix_results().items():
-        for demand_name, matrix in v.items():
-            np.testing.assert_allclose(matrix.toarray(), matrices[sl_name + "_" + demand_name].toarray())
-
-
-def test_round_trip(route_choice_setup):
-    project = route_choice_setup["project"]
-    mat = route_choice_setup["mat"]
-    rc = route_choice_setup["rc"]
-
-    rc.set_demand(mat)
-    rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-    rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
-    rc.prepare()
-
-    path = join(project.project_base_path, "batched results")
-    os.mkdir(path)
-
-    rc.set_save_routes(None)
-    rc.execute(perform_assignment=True)
-    table = rc.get_results()
-
-    rc.set_save_routes(path)
-    rc.execute(perform_assignment=True)
-    table2 = rc.get_results()
-
-    table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
-    table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
-
-    pd.testing.assert_frame_equal(table, table2)
-
-
-def test_to_parquet_kwargs(route_choice_setup):
-    pq = pytest.importorskip("pyarrow.parquet")
-    project = route_choice_setup["project"]
-    mat = route_choice_setup["mat"]
-    rc = route_choice_setup["rc"]
-
-    rc.set_demand(mat)
-    rc.set_choice_set_generation("link-penalization", max_routes=5, penalty=1.1)
-    rc.prepare()
-
-    def compressions(where):
-        files = list(pathlib.Path(where).rglob("*.parquet"))
-        assert files, f"no parquet files written to `{where}`"
-        codecs = set()
-        for f in files:
-            metadata = pq.ParquetFile(f).metadata
-            for i in range(metadata.num_row_groups):
-                for j in range(metadata.num_columns):
-                    codecs.add(metadata.row_group(i).column(j).compression)
-        return codecs
-
-    # Without to_parquet_kwargs the default compression applies
-    default_path = pathlib.Path(project.project_base_path) / "default kwargs"
-    default_path.mkdir()
-    rc.set_save_routes(default_path)
-    rc.execute(perform_assignment=True)
-    assert compressions(default_path) == {"ZSTD"}
-
-    # to_parquet_kwargs provided to set_save_routes override the defaults of the underlying to_parquet call
-    snappy_path = pathlib.Path(project.project_base_path) / "snappy kwargs"
-    snappy_path.mkdir()
-    rc.set_save_routes(snappy_path, to_parquet_kwargs={"compression": "snappy"})
-    rc.execute(perform_assignment=True)
-    assert compressions(snappy_path) == {"SNAPPY"}
-
-    # Non-overridden defaults still apply, the dataset remains hive partitioned by origin
-    assert all(d.name.startswith("origin id=") for d in snappy_path.iterdir())
-    pd.testing.assert_frame_equal(
-        pd.read_parquet(default_path).sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True),
-        pd.read_parquet(snappy_path).sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True),
-    )
-
-    # save_path_files forwards to_parquet_kwargs in the same manner
-    path_files = pathlib.Path(project.project_base_path) / "path files kwargs"
-    path_files.mkdir()
-    rc.save_path_files(path_files, compression="gzip")
-    assert compressions(path_files) == {"GZIP"}
-
-
-def test_assign_from_df(route_choice_setup):
-    graph = route_choice_setup["graph"]
-    rc = RouteChoiceSet(graph)
-
-    mat2 = AequilibraeMatrix(index=graph.centroids)
-    mat2["all ones"] = np.ones((graph.num_zones, graph.num_zones))
-    demand = from_dict({"all ones": np.ones((graph.num_zones, graph.num_zones))}, index=graph.centroids)
-
-    args = {
-        "demand": demand,
-        "select_links": {},
-        "recompute_psl": False,
-        "sl_link_loading": False,
-        "store_results": True,
-    }
-
-    # Test missing route column
-    with pytest.raises(ValueError, match="missing required column 'route set'"):
-        df = pd.DataFrame(
-            {
-                "origin id": [graph.centroids[0]],
-                "destination id": [999999999],
-                "probability": [1.0],
-            }
-        )
-        rc.assign_from_df(df=df, **args)
-
-    # Test link missing from graph
-    with pytest.raises(ValueError, match="absent from the graph"):
-        df = pd.DataFrame(
-            {
-                "origin id": [graph.centroids[0]],
-                "destination id": [graph.centroids[1]],
-                "probability": [1.0],
-                "route set": [[999999999]],
-            }
-        )
-        rc.assign_from_df(df=df, **args)
-
-    # Test wrong direction
-    with pytest.raises(ValueError, match="absent from the graph"):
-        df = pd.DataFrame(
-            {
-                "origin id": [graph.centroids[0]],
-                "destination id": [graph.centroids[1]],
-                "probability": [1.0],
-                "route set": [[-graph.graph.iloc[0].link_id]],
-            }
-        )
-        rc.assign_from_df(df=df, **args)
-
-    # Test route sets should be a list
-    with pytest.raises(TypeError):
-        df = pd.DataFrame(
-            {
-                "origin id": [graph.centroids[0]],
-                "destination id": [graph.centroids[1]],
-                "probability": [1.0],
-                "route set": [1],
-            }
-        )
-        rc.assign_from_df(df=df, **args)
-
-    # Tests that should not raise errors
-    link_ids = graph.network.sample(10).link_id.to_numpy()
-    links = graph.network[graph.network.link_id.isin(link_ids)]
-    links = links.loc[links.link_id.replace({x: i for i, x in enumerate(link_ids)}).sort_values().index]
-
-    values = np.random.random(len(links))
-    df = pd.DataFrame(
+from aequilibrae.matrix import from_df
+from aequilibrae.paths import Network, RouteChoice, estimate_heuristic_scale
+
+from .route_choice_helpers import (
+    batched_junction_routes,
+    compressed_graph,
+    coordinates_for,
+    diamond,
+    junction,
+    single_od_demand,
+    sorted_results,
+)
+
+
+@pytest.mark.parametrize("nodes,expected", [([1, 2], [(1, 2), (2, 1)]), ([(1, 2)], [(1, 2)])])
+def test_prepare(route_choice_setup, nodes, expected):
+    choice = route_choice_setup["rc"]
+    choice.set_choice_set_generation("bfsle", max_routes=1)
+    choice.prepare(nodes)
+    choice.execute(perform_assignment=False)
+    assert list(choice.get_results()[["origin id", "destination id"]].itertuples(index=False, name=None)) == expected
+
+
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation", "link-penalization", "lp"])
+def test_algorithm_aliases_and_parameter_reset(route_choice_setup, algorithm):
+    choice = route_choice_setup["rc"]
+    choice.set_choice_set_generation(algorithm, max_routes=20, penalty=3.0)
+    assert choice.parameters["penalty"] == 3.0
+    choice.set_choice_set_generation(algorithm, max_routes=2)
+    assert choice.algorithm == ("bfsle" if algorithm == "bfsle" else "link-penalisation")
+    assert choice.parameters["max_routes"] == 2
+    assert choice.parameters["penalty"] == (1.0 if algorithm == "bfsle" else 1.01)
+
+
+@pytest.mark.parametrize(
+    "compact,turn,algorithm,a_star",
+    [
+        (False, False, "bfsle", False),
+        (True, False, "link-penalisation", False),
+        (True, True, "bfsle", True),
+        (True, True, "link-penalisation", True),
+    ],
+)
+def test_search_uses_routing_node_order(compact, turn, algorithm, a_star):
+    links = pd.DataFrame(
         {
-            "origin id": links.a_node.to_numpy(),
-            "destination id": links.b_node.to_numpy(),
-            "probability": values,
-            "route set": [[x] for x in link_ids],
+            "link_id": np.arange(1, 9),
+            "a_node": [1, 2, 3, 3, 4, 4, 5, 6],
+            "b_node": [2, 3, 4, 5, 5, 6, 6, 7],
+            "direction": 0,
+            "time": 1.0,
         }
     )
-
-    # Reduce demand matrix to half the route sets
-    demand.imat["all ones", :, :] = 0
-    demand.mat["all ones", df["origin id"].head(len(df) // 2), df["destination id"].head(len(df) // 2)] = 1
-
-    # Test with recompute_psl=False
-    rc.assign_from_df(df=df, **args)
-    results = rc.get_results()
-    ll_res = rc.get_link_loading()["all ones"]
-
-    values2 = np.zeros_like(values)
-    values2[: len(df) // 2] = values[: len(df) // 2]
-    np.testing.assert_array_equal(
-        ll_res[links.index],
-        values2,
-        "Link loading results don't match the expected values",
+    turns = pd.DataFrame({"from_node": [2], "via_node": [3], "to_node": [4], "penalty": [0.5]}) if turn else None
+    graph = Network(links, centroids=[1, 7], turn_restrictions=turns).build_graph(
+        "c", cost="time", compact=compact, block_centroid_flows=False
     )
-
-    np.testing.assert_array_equal(results["cost"].to_numpy(), 0.0)
-    np.testing.assert_array_equal(results["mask"].to_numpy(), True)
-    np.testing.assert_array_equal(results["path overlap"].to_numpy(), 0.0)
-
-    pd.testing.assert_series_equal(
-        results["probability"],
-        df.head(len(df) // 2).sort_values(["origin id", "destination id"])["probability"],
-        check_index=False,
+    if compact:
+        # Contracting node 2 shifts retained non-centroid indices, unlike centroid indices.
+        np.testing.assert_array_equal(graph.mapping.network.node_ids, [1, 2, 3, 4, 5, 6, 7])
+        np.testing.assert_array_equal(graph.all_nodes, [1, 7, 3, 4, 5, 6])
+    coordinates = pd.DataFrame({"x": graph.all_nodes.astype(float), "y": 0.0}, index=graph.all_nodes).iloc[::-1]
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_cores(1)
+    choice.set_choice_set_generation(
+        algorithm, max_routes=1, max_depth=1, a_star=a_star, heuristic_scale=0.5 if a_star else None
     )
+    # Node 3 has an in-range but wrong full index; node 6's full index is out of routing bounds.
+    expected = {
+        (1, 3): ((1, 2), (1, 1)),
+        (3, 1): ((2, 1), (-1, -1)),
+        (6, 7): ((8,), (1,)),
+        (7, 6): ((8,), (-1,)),
+    }
+    for (origin, destination), (ids, directions) in expected.items():
+        routes = choice.execute_single(origin, destination)
+        assert len(routes) == 1
+        np.testing.assert_array_equal(routes[0][0], ids)
+        np.testing.assert_array_equal(routes[0][1], directions)
 
-    # Test with recompute_psl=True
-    rc.assign_from_df(df=df, **(args | {"recompute_psl": True}))
-    results = rc.get_results()
-    ll_res = rc.get_link_loading()["all ones"]
+    # Batch routing shares the lookup across workers and must map both endpoints correctly.
+    choice.set_cores(2)
+    choice.prepare(list(expected))
+    choice.execute(perform_assignment=False)
+    rows = choice.get_results()
+    actual = {
+        (row["origin id"], row["destination id"]): (tuple(row["route set"]), tuple(row["route directions"]))
+        for _, row in rows.iterrows()
+    }
+    assert actual == expected
 
-    values2 = np.zeros(len(links.index))
-    values2[: len(df) // 2] = 1.0
-    np.testing.assert_array_equal(
-        ll_res[links.index],
-        values2,
-        "Link loading results don't match the expected values",
-    )
-
-    links2 = links.head(len(df) // 2).sort_values(["a_node", "b_node"])
-    np.testing.assert_array_equal(results["cost"].to_numpy(), links2["distance"].to_numpy())
-    np.testing.assert_array_equal(results["mask"].to_numpy(), True)
-    np.testing.assert_array_equal(results["path overlap"].to_numpy(), 1.0)
-    np.testing.assert_array_equal(results["probability"].to_numpy(), 1.0)
-
-
-@pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
-def test_known_results(route_choice_setup, cost):
-    graph = route_choice_setup["graph"]
-    rc = RouteChoiceSet(graph)
-
-    graph.set_graph(cost)
-
-    np.random.seed(0)
-    nodes = [tuple(x) for x in np.random.choice(graph.centroids, size=(10, 2), replace=False)]
-
-    mat = AequilibraeMatrix(index=graph.centroids)
-    mat["all zeros"] = np.zeros((graph.num_zones, graph.num_zones))
-    mat["single one"] = np.zeros((graph.num_zones, graph.num_zones))
-    mat.mat["single one", *nodes[0]] = 1
-
-    with Bridge() as b:
-        rc.batched(mat, max_routes=20, max_depth=10, path_size_logit=True, bridge=b)
-
-    link_loads = rc.get_link_loading()
-    table = rc.get_results()
-
-    # Test all zeros matrix
-    u = link_loads["all zeros"]
-    np.testing.assert_allclose(u, 0.0)
-
-    # Test single one matrix
-    u = link_loads["single one"]
-    link = graph.graph[(graph.graph.a_node == nodes[0][0] - 1) & (graph.graph.b_node == nodes[0][1] - 1)]
-
-    lid = link.link_id.values[0]
-    t = table[table["route set"].apply(lambda x, lid=lid: lid in set(x))]
-    v = t.probability.sum()
-
-    assert abs(u[lid - 1] - v) < 1e-6
+    # Imported routes use network-node indices when validating expanded links.
+    recosted = choice.recompute_psl(rows)
+    assert recosted["mask"].all()
+    np.testing.assert_allclose(recosted["cost"], rows["route set"].map(len))
 
 
-@pytest.mark.parametrize("cost", ["distance", "free_flow_time"])
-def test_select_link(route_choice_setup, cost):
-    graph = route_choice_setup["graph"]
-    rc = RouteChoiceSet(graph)
+@pytest.mark.parametrize("bfsle", [True, False])
+def test_batched_with_prohibited_turn(bfsle):
+    # The direct arrival at 20 is cheaper, but it cannot continue to 40.
+    rows = batched_junction_routes(junction(np.inf), bfsle, max_routes=2)
+    assert set(rows) == {(10, 40, (12, 13, 14)), (20, 40, (14,))}
+    assert rows[10, 40, (12, 13, 14)]["cost"] == pytest.approx(4.0)
+    assert rows[20, 40, (14,)]["cost"] == pytest.approx(1.0)
 
-    graph.set_graph(cost)
 
-    np.random.seed(0)
-    nodes = tuple(np.random.choice(graph.centroids, size=(10, 2), replace=False).T)
-    demand = from_dict({"all ones": np.zeros((graph.num_zones, graph.num_zones))}, index=graph.centroids)
-    demand.mat["all ones", *nodes] = 1
+@pytest.mark.parametrize("bfsle", [True, False])
+def test_batched_finite_turn_penalty_changes_route_and_cost(bfsle):
+    graph = junction(5.0)
+    # The direct arrival at 20 costs 1, but its continuation costs 1 + 5.
+    shortest = batched_junction_routes(graph, bfsle, max_routes=1)
+    assert set(shortest) == {(10, 40, (12, 13, 14)), (20, 40, (14,))}
+    assert shortest[10, 40, (12, 13, 14)]["cost"] == pytest.approx(4.0)
+    assert shortest[20, 40, (14,)]["cost"] == pytest.approx(1.0)
 
-    with Bridge() as b:
-        rc.batched(
-            demand,
-            {
-                "sl1": frozenset(
-                    frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__
-                ),
-                "sl2": frozenset(frozenset((x,)) for x in graph.graph.set_index("link_id").loc[[11]].__compressed_id__),
-            },
-            max_routes=20,
-            max_depth=10,
-            path_size_logit=True,
-            bridge=b,
+    # The direct route may be found later. Its reported cost must use the
+    # original link costs and include the turn penalty exactly once.
+    rows = batched_junction_routes(graph, bfsle, max_routes=2)
+    assert set(rows) == {(10, 40, (12, 13, 14)), (10, 40, (11, 14)), (20, 40, (14,))}
+    assert rows[10, 40, (12, 13, 14)]["cost"] == pytest.approx(4.0)
+    assert rows[10, 40, (11, 14)]["cost"] == pytest.approx(7.0)
+    assert rows[20, 40, (14,)]["cost"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+def test_psl_uses_unpenalised_link_costs_and_turn_costs(algorithm):
+    graph = diamond()
+    choice = RouteChoice(graph)
+    choice.set_choice_set_generation(algorithm, max_routes=2, max_depth=5, penalty=3.0)
+
+    # Search multiplies link costs by penalty=3.0 to find alternatives. PSL must use
+    # unpenalised link costs and include the 0.5 turn cost exactly once.
+    routes = choice.execute_single(10, 40, demand=1.0)
+    table = {tuple(row["route set"]): row for _, row in choice.get_results().iterrows()}
+    assert {(tuple(ids), tuple(directions)) for ids, directions in routes} == {
+        ((71, 12), (1, 1)),
+        ((55, 24), (1, 1)),
+    }
+    assert table[71, 12]["cost"] == pytest.approx(2.5)
+    assert table[55, 24]["cost"] == pytest.approx(4.0)
+    assert table[71, 12]["path overlap"] == pytest.approx(1.0)
+    assert table[55, 24]["path overlap"] == pytest.approx(1.0)
+    assert table[71, 12]["probability"] == pytest.approx(1.0 / (1.0 + np.exp(-1.5)))
+
+
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+def test_generation_without_psl_returns_routes_only(algorithm):
+    choice = RouteChoice(diamond())
+    choice.set_choice_set_generation(algorithm, max_routes=2, max_depth=5, penalty=3.0)
+    routes = choice.execute_single(10, 40)
+    assert {(tuple(ids), tuple(directions)) for ids, directions in routes} == {
+        ((71, 12), (1, 1)),
+        ((55, 24), (1, 1)),
+    }
+    assert "cost" not in choice.get_results()
+
+
+@pytest.mark.parametrize(
+    "algorithm,penalty,heuristic,turn_penalty,cores",
+    [
+        ("bfsle", 1.0, "euclidean", None, 1),
+        ("bfsle", 4.0, "haversine", 5.0, 2),
+        ("bfsle", 1.0, "euclidean", np.inf, 2),
+        ("link-penalisation", 4.0, "haversine", None, 2),
+        ("link-penalisation", 4.0, "euclidean", 5.0, 1),
+        ("link-penalisation", 4.0, "haversine", np.inf, 1),
+    ],
+)
+def test_batched_a_star_matches_dijkstra(algorithm, penalty, heuristic, turn_penalty, cores):
+    lonlat = pd.DataFrame({"lon": np.arange(4) * 0.01, "lat": np.zeros(4)}, index=[10, 20, 30, 40])
+    graph = junction(turn_penalty, lonlat=lonlat)
+    coordinates = coordinates_for(graph, heuristic)
+    scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
+    assert scale > 0
+    choices = []
+    for a_star in [False, True]:
+        choice = RouteChoice(graph, coordinates=coordinates)
+        choice.set_cores(cores)
+        choice.set_choice_set_generation(
+            algorithm,
+            max_routes=2,
+            max_depth=6,
+            penalty=penalty,
+            a_star=a_star,
+            heuristic=heuristic,
+            heuristic_scale=scale,
         )
-    table = rc.get_results()
+        choice.set_demand(
+            from_df(
+                pd.DataFrame(
+                    {
+                        "origin": [10, 20, 40, 10],
+                        "destination": [40, 40, 10, 10],
+                        "flow": [2.0, 3.0, 4.0, 5.0],
+                    }
+                ),
+                "origin",
+                "destination",
+                sparse=True,
+            )
+        )
+        choice.set_select_links({"selected": [(14, 1)]})
+        choice.execute()
+        choices.append(choice)
+    reference, actual = choices
+    pd.testing.assert_frame_equal(sorted_results(actual), sorted_results(reference), check_like=True)
+    pd.testing.assert_frame_equal(actual.get_load_results(), reference.get_load_results(), check_like=True)
+    pd.testing.assert_frame_equal(
+        actual.get_select_link_loading_results(), reference.get_select_link_loading_results(), check_like=True
+    )
 
-    # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and
-    # 17-9 20-4 also shares 11 with 5-3
-    ods = [(20, 4), (21, 2), (10, 8), (17, 9)]
-    sl_link_loads = rc.get_sl_link_loading()
-    sl_od_matrices = rc.get_sl_od_matrices()
 
-    m = sl_od_matrices["sl1"]["all ones"]
-    m2 = sl_od_matrices["sl2"]["all ones"]
-    assert set(zip(*(m.toarray() > 0.0001).nonzero(), strict=True)) == {(o - 1, d - 1) for o, d in ods}
-    assert set(zip(*(m2.toarray() > 0.0001).nonzero(), strict=True)) == {(20 - 1, 4 - 1), (5 - 1, 3 - 1)}
+@pytest.mark.parametrize(
+    "algorithm,heuristic,turn", [("bfsle", "euclidean", False), ("link-penalisation", "haversine", True)]
+)
+def test_compact_coordinates_and_expanded_routes(algorithm, heuristic, turn):
+    graph = compressed_graph(turn)
+    coordinates = coordinates_for(graph, heuristic)
+    scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
+    coordinates = coordinates.loc[graph.all_nodes].iloc[::-1]
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_cores(1)
+    options = {"max_routes": 2, "max_depth": 6, "penalty": 4.0}
+    choice.set_choice_set_generation(algorithm, **options)
+    choice.execute_single(10, 60, demand=1.0)
+    reference = sorted_results(choice)
 
-    u = sl_link_loads["sl1"]["all ones"]
-    u2 = sl_link_loads["sl2"]["all ones"]
+    # Coordinate changes after construction must not change this snapshot.
+    coordinates.loc[:, :] = np.nan
+    for scale_value in [scale, 0.0]:
+        choice.set_choice_set_generation(
+            algorithm, **options, a_star=True, heuristic=heuristic, heuristic_scale=scale_value
+        )
+        routes = choice.execute_single(10, 60, demand=1.0)
+        assert {(tuple(ids), tuple(directions)) for ids, directions in routes} == {
+            ((71, 72, 12), (1, 1, 1)),
+            ((55, 56, 24), (1, 1, 1)),
+        }
+        pd.testing.assert_frame_equal(sorted_results(choice), reference, check_like=True)
 
-    t1 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: bool(set(x) & {23, 26}))]
-    t2 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: 11 in set(x))]
-    sl1_link_union = np.unique(np.hstack(t1["route set"].values))
-    sl2_link_union = np.unique(np.hstack(t2["route set"].values))
+    # A later Dijkstra execution must not retain the A* selection.
+    choice.set_choice_set_generation(algorithm, **options)
+    choice.execute_single(10, 60, demand=1.0)
+    pd.testing.assert_frame_equal(sorted_results(choice), reference, check_like=True)
 
-    np.testing.assert_equal(u.nonzero()[0] + 1, sl1_link_union)
-    np.testing.assert_equal(u2.nonzero()[0] + 1, sl2_link_union)
 
-    assert abs(u.sum() - (t1["route set"].apply(len) * t1.probability).sum()) < 1e-6
-    assert abs(u2.sum() - (t2["route set"].apply(len) * t2.probability).sum()) < 1e-6
+@pytest.mark.parametrize("algorithm", ["bfsle", "link-penalisation"])
+@pytest.mark.parametrize("heuristic,turn", [("euclidean", False), ("haversine", True)])
+def test_explicit_scale_controls_a_star_search(algorithm, heuristic, turn):
+    coordinates = pd.DataFrame({"x": [0.0, 1.0, 0.0, 0.0], "y": [0.0] * 4}, index=[10, 20, 30, 40])
+    graph = diamond(0.5 if turn else None, lonlat=coordinates.rename(columns={"x": "lon", "y": "lat"}))
+    choice = RouteChoice(
+        graph,
+        coordinates=coordinates if heuristic == "euclidean" else coordinates.rename(columns={"x": "lon", "y": "lat"}),
+    )
+    choice.set_cores(1)
+    choice.set_choice_set_generation(algorithm, max_routes=1)
+    routes = choice.execute_single(10, 40)
+    assert len(routes) == 1
+    np.testing.assert_array_equal(routes[0][0], [71, 12])
+    np.testing.assert_array_equal(routes[0][1], [1, 1])
+    # This deliberately unsafe scale favours the more expensive branch. It also
+    # checks that A* is actually dispatched, rather than silently using Dijkstra.
+    choice.set_choice_set_generation(algorithm, max_routes=1, a_star=True, heuristic=heuristic, heuristic_scale=100.0)
+    routes = choice.execute_single(10, 40)
+    assert len(routes) == 1
+    np.testing.assert_array_equal(routes[0][0], [55, 24])
+    np.testing.assert_array_equal(routes[0][1], [1, 1])
+
+
+@pytest.mark.parametrize("algorithm,a_star", [("bfsle", False), ("link-penalisation", True)])
+def test_empty_graph_returns_no_routes_or_flows(algorithm, a_star):
+    network = Network(
+        pd.DataFrame({"link_id": [9], "a_node": [20], "b_node": [30], "direction": [1], "time": [1.0]}),
+        centroids=[10, 40],
+    )
+    graph = network.build_graph("c", "time", remove_dead_ends=True)
+    assert graph.num_links == 0
+    coordinates = pd.DataFrame({"x": [0.0, 1.0], "y": 0.0}, index=[10, 40])
+    choice = RouteChoice(graph, coordinates=coordinates)
+    choice.set_cores(1)
+    choice.set_choice_set_generation(algorithm, max_routes=1, a_star=a_star, heuristic_scale=0.0)
+    assert choice.execute_single(10, 40, demand=1.0) == []
+    choice.set_demand(single_od_demand(10, 40, flow=2.0))
+    choice.execute()
+    assert choice.get_results().empty
+    assert choice.get_load_results()["flow_tot"].tolist() == [0.0]
+    choice.execute_from_pandas(choice.get_results(), recompute_psl=True)
+    assert choice.get_results().empty
+    assert choice.get_load_results()["flow_tot"].tolist() == [0.0]

@@ -6,6 +6,7 @@ pyfiles = [
 
 exts = [
   'array_allocations',
+  'array_hash_map',
   'bar',
   'bridge',
   'openmp_helper',

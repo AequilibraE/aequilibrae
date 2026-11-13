@@ -1,21 +1,21 @@
 cimport cython
 from cython.view cimport array as cython_view_array
+from libc.stdint cimport int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t
 from libcpp cimport bool
 
 
+# Preserve external typedefs in pointer return types. Mixing fixed-width and
+# native integer types lets Cython resolve typedefs to incompatible C++ types.
 ctypedef fused ArrayElement:
-    char
-    signed char
-    unsigned char
+    int8_t
+    int16_t
+    int32_t
+    int64_t
+    uint8_t
+    uint16_t
+    uint32_t
+    uint64_t
     bool
-    short
-    unsigned short
-    int
-    unsigned int
-    long
-    unsigned long
-    long long
-    unsigned long long
     ssize_t
     size_t
     float

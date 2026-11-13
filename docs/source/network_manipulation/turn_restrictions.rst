@@ -139,28 +139,29 @@ The U-turn setting is managed through the project's ``about`` table:
 
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
-    # Rebuild graphs to apply the change
-    >>> project.network.build_graphs()
+    # Rebuild network and build graphs to apply the change
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you call ``build_graphs()``, turn restrictions are automatically loaded
-from the database and applied to all generated graphs:
+When you build a network snapshot, turn restrictions are loaded from the database.
 
 .. code-block:: python
 
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='distance')
 
     # Check if a graph has turn restrictions
-    >>> graph = project.network.graphs['c']
     >>> print(graph.has_turn_restrictions)
     True
 
 Manual Turn Restriction Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also manually set turn restrictions on a graph:
+You can also supply turn restrictions when building a new graph.
+An existing graph's topology and turn configuration cannot be changed in place:
 
 .. code-block:: python
 
@@ -174,39 +175,48 @@ You can also manually set turn restrictions on a graph:
     ...     "penalty": [20.0],
     ... })
 
-    # Apply turn restrictions
-    >>> graph.set_turn_restrictions(turn_df, allow_path_uturns=False)
+    # Build a new graph with these turn restrictions
+    >>> graph = network.build_graph('c', cost='distance', turn_restrictions=turn_df, allow_uturns=False)
 
-    # Clear turn restrictions
-    >>> graph.clear_turn_restrictions()
+    # Build a new graph without turn restrictions, overriding the snapshot's turns with an empty table
+    >>> graph = network.build_graph('c', cost='distance', turn_restrictions=turn_df.iloc[:0])
+
+To change the source network's turn configuration for subsequent graphs or assignments,
+use ``dataclasses.replace(network, turn_restrictions=turn_df)``. Network configuration
+fields cannot be assigned in place.
 
 Traffic Assignment with Turn Restrictions
 -----------------------------------------
 
 Turn restrictions are automatically considered during traffic assignment when
-they are present in the graph. The turn penalties are applied as additional
-time costs during the equilibration process.
+they are present in the source network. The assignment builds its graphs internally.
+The turn penalties are applied as additional time costs during the equilibration process.
 
 .. code-block:: python
 
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> project.network.build_graphs()
-    >>> graph = project.network.graphs['c']
-    >>> graph.set_graph('free_flow_time')
-
-    # Turn restrictions are automatically included
+    >>> network = project.network.build()
     >>> demand_matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
-    >>> traffic_class = TrafficClass('car', graph, demand_matrix)
+    >>> traffic_class = TrafficClass(
+    ...     mode='c',
+    ...     cost='distance',
+    ...     demand=demand_matrix,
+    ...     name='car',
+    ...     skimming=('distance',),
+    ... )
 
-    >>> assignment = TrafficAssignment()
-    >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
-    >>> assignment.set_capacity_field('capacity')
-    >>> assignment.set_time_field('free_flow_time')
-    >>> assignment.set_algorithm('bfw')
-    >>> assignment.execute()
+    >>> assignment = TrafficAssignment(
+    ...     network=network,
+    ...     classes=[traffic_class],
+    ...     time_field='distance',
+    ...     capacity_field='capacity',
+    ...     vdf=bpr,
+    ...     algorithm='bfw',
+    ...     name_mapping={'alpha': 0.15, 'beta': 4.0},
+    ... )
+    >>> _ = assignment.execute()
 
 Route Choice with Turn Restrictions
 -----------------------------------

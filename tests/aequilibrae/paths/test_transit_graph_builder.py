@@ -15,7 +15,6 @@ from aequilibrae.transit import Transit
 )
 def test_create_line_geometry(coquimbo_example, connector_method, method):
     data = Transit(coquimbo_example)
-    coquimbo_example.network.build_graphs()
     graph = data.create_graph(
         with_outer_stop_transfers=False,
         with_walking_edges=False,

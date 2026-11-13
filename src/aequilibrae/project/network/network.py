@@ -1,9 +1,11 @@
 import logging
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
+from numpy.typing import ArrayLike
 from shapely import union_all
 from shapely.geometry import Polygon
 
@@ -23,6 +25,7 @@ from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.spatialite_utils import load_spatialite_extension
 
 if TYPE_CHECKING:
+    from aequilibrae.paths.graph import Graph
     from aequilibrae.project import Project
 
 logger = logging.getLogger(__name__)
@@ -42,7 +45,6 @@ class Network(WorkerThread):
     def __init__(self, connections: ConnectionClosure, project=None) -> None:
         WorkerThread.__init__(self, None)
 
-        self.graphs: dict = {}
         self.__connections = connections
         self.__project = project  # HACK
 
@@ -54,6 +56,19 @@ class Network(WorkerThread):
         self.zones = Zones(self.__connections.db_connection)
         self.turn_restrictions = TurnRestrictions(self.__connections.db_connection)
         self.importer = Importer(self)
+
+    def refresh_schemas(self):
+        """Refresh the schemas of ProjectTable objects."""
+        for obj in [
+            self.modes,
+            self.link_types,
+            self.links,
+            self.nodes,
+            self.periods,
+            self.zones,
+            self.turn_restrictions,
+        ]:
+            obj._refresh_record_type()
 
     @property
     def project(self) -> "Project":
@@ -140,20 +155,16 @@ class Network(WorkerThread):
 
         logger.info("Network exported successfully")
 
-    def build_graphs(
+    def build(
         self, fields: Optional[list] = None, modes: Optional[list] = None, limit_to_area: Optional[Polygon] = None
-    ) -> None:
-        """Builds graphs for all modes currently available in the model
-
-        When called, it overwrites all graphs previously created and stored in the networks'
-        dictionary of graphs
+    ):
+        """Copy project tables into an independent routing Network.
 
         :Arguments:
             **fields** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
             database, it may be useful to specify which fields to use
 
-            **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
-            database, it may be useful to generate only those we need
+            **modes** (:obj:`list`, *Optional*): Network modes to include in the source data
 
             **limit_to_area** (:obj:`Polygon`, *Optional*): When working with a very large model area, you may want to
             filter your database to a small area for your computation, which you can do by providing a polygon.
@@ -166,13 +177,66 @@ class Network(WorkerThread):
             >>> project = create_example(project_path)
 
             >>> fields = ['distance']
-            >>> project.network.build_graphs(fields, modes = ['c', 'w'])
+            >>> network = project.network.build(fields, modes = ['c', 'w'])
 
             >>> project.close()
 
         """
-        from aequilibrae.paths import Graph
+        from aequilibrae.paths.network import Network
 
+        if isinstance(modes, str):
+            modes = [modes]
+
+        available = self.list_modes()
+        if modes is not None and (missing := set(modes) - set(available)):
+            raise ValueError(f"Modes are not available in this network: {sorted(missing)}")
+
+        modes = available if modes is None else modes
+        links, centroids, restrictions, allow_uturns = self._load_graph_data(fields, limit_to_area)
+
+        return Network(
+            links,
+            modes=modes,
+            centroids=centroids,
+            turn_restrictions=restrictions,
+            allow_uturns=allow_uturns,
+            lonlat=self.nodes.lonlat.set_index("node_id"),
+        )
+
+    def build_graph(
+        self,
+        mode: str,
+        cost: str,
+        *,
+        fields: list[str] | None = None,
+        centroids: ArrayLike | None = None,
+        skimming: str | Iterable[str] | None = None,
+        block_centroid_flows: bool = True,
+        limit_to_area: Polygon | None = None,
+        compact: bool = False,
+        remove_dead_ends: bool = False,
+        turn_restrictions: pd.DataFrame | None = None,
+        allow_uturns: bool | None = None,
+    ) -> "Graph":
+        """Build a standalone graph without retaining project connections."""
+        if isinstance(skimming, str):
+            skimming = [skimming]
+        if fields is not None:
+            fields = list(dict.fromkeys([*fields, cost, *(skimming or [])]))
+        return self.build(fields=fields, modes=[mode], limit_to_area=limit_to_area).build_graph(
+            mode,
+            cost,
+            centroids=centroids,
+            skimming=skimming or (),
+            compact=compact,
+            remove_dead_ends=remove_dead_ends,
+            block_centroid_flows=block_centroid_flows,
+            turn_restrictions=turn_restrictions,
+            allow_uturns=allow_uturns,
+        )
+
+    def _load_graph_data(self, fields=None, limit_to_area=None):
+        """Read source tables once for a graph or an assignment execution."""
         with self.__connections.db_connection as conn:
             if fields is None:
                 field_names = conn.execute("PRAGMA table_info(links);").fetchall()
@@ -180,14 +244,16 @@ class Network(WorkerThread):
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                fields.extend(["link_id", "a_node", "b_node", "direction", "modes", "link_type"])
-                all_fields = list(set(fields))
-
-            if modes is None:
-                modes = conn.execute("select mode_id from modes;").fetchall()
-                modes = [m[0] for m in modes]
-            elif isinstance(modes, str):
-                modes = [modes]
+                available = {f[1] for f in conn.execute("PRAGMA table_info(links);").fetchall()}
+                requested = ["link_id", "a_node", "b_node", "direction", "modes", "link_type"]
+                for field in fields:
+                    if field in available:
+                        requested.append(field)
+                    elif field + "_ab" in available and field + "_ba" in available:
+                        requested.extend([field + "_ab", field + "_ba"])
+                    else:
+                        raise ValueError(f"'{field}' not in network")
+                all_fields = list(dict.fromkeys(requested))
 
             if limit_to_area is not None:
                 load_spatialite_extension(conn)
@@ -208,7 +274,8 @@ class Network(WorkerThread):
                 df = pd.read_sql_query(sql, conn, params=(limit_to_area.wkb,)).fillna(value=np.nan)
 
                 # We filter to centroids existing in our filtered area
-                centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                if centroids is not None:
+                    centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
 
             # Load turn restrictions and allow_uturns setting
             turn_restrictions_df = None
@@ -241,48 +308,7 @@ class Network(WorkerThread):
             outgoing = pd.MultiIndex.from_frame(turn_restrictions_df[["via_node", "to_node"]])
             turn_restrictions_df = turn_restrictions_df.loc[incoming.isin(edges) & outgoing.isin(edges)].copy()
 
-        lonlat = self.nodes.lonlat.set_index("node_id")
-        data = df[all_fields]
-        for m in modes:
-            # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
-            # the compressed graph representation is created)
-            net = pd.DataFrame(data, copy=True)
-            net.loc[~net.modes.str.contains(m), "b_node"] = net.loc[~net.modes.str.contains(m), "a_node"]
-
-            g = Graph()
-            g.mode = m
-            g.network = net
-
-            if turn_restrictions_df is not None:
-                g._turn_restrictions = turn_restrictions_df[
-                    turn_restrictions_df["modes"].fillna("").astype(str).str.contains(m, regex=False)
-                ].copy()
-
-            g.prepare_graph(centroids, allow_uturns_everywhere=allow_uturns)
-            g.set_blocked_centroid_flows(True)
-            if centroids is None:
-                logger.warning("Your graph has no centroids")
-            g.lonlat_index = lonlat.loc[g.all_nodes]
-
-            # Load turn restrictions if any exist
-            if turn_restrictions_df is not None:
-                g.set_turn_restrictions(g._turn_restrictions, allow_path_uturns=allow_uturns)
-
-            self.graphs[m] = g
-
-    def set_time_field(self, time_field: str) -> None:
-        """
-        Set the time field for all graphs built in the model
-
-        :Arguments:
-            **time_field** (:obj:`str`): Network field with travel time information
-        """
-        for m, g in self.graphs.items():
-            if time_field not in list(g.graph.columns):
-                raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
-            g.free_flow_time = time_field
-            g.set_graph(time_field)
-            self.graphs[m] = g
+        return df[all_fields], centroids, turn_restrictions_df, allow_uturns
 
     def count_links(self) -> int:
         """
