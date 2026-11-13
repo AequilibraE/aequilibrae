@@ -289,4 +289,7 @@ def build_graph_mapping(
         graph_node_to_network,
         expansion_offsets,
         ordered_network_link_indices,
+        compact=compact,
+        remove_dead_ends=remove_dead_ends,
+        allow_uturns=allow_uturns,
     )

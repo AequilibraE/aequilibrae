@@ -54,12 +54,26 @@ cdef class GraphContext:
 
     Use a concrete node or turn context. Costs must be contiguous float64
     buffers; binding them never copies or changes their writeability flags.
+
+    ``centroid_count`` is the number of centroids supplied when building the context.
+    ``block_centroid_flows`` records whether the build requested blocking travel through centroids.
+    ``allow_uturns`` records whether the build allowed paths to turn back to the previous node.
     """
 
     def __cinit__(self):
         self.node_offsets = None
 
-    def __init__(self, fs, heads, costs, *, blocked_centroid_count=0):
+    def __init__(
+        self,
+        fs,
+        heads,
+        costs,
+        *,
+        blocked_centroid_count=0,
+        centroid_count: int | None = None,
+        block_centroid_flows: bool = True,
+        allow_uturns: bool = False,
+    ):
         if type(self) is GraphContext:
             raise TypeError("GraphContext is an abstract base class")
 
@@ -78,6 +92,9 @@ cdef class GraphContext:
         self.node_offsets = fs_array
         self.heads_buffer = heads_array
         self.blocked_centroid_count = blocked_centroid_count
+        self.centroid_count = blocked_centroid_count if centroid_count is None else centroid_count
+        self.block_centroid_flows = block_centroid_flows
+        self.allow_uturns = allow_uturns
         self.update_costs(costs)
 
     cpdef update_costs(self, object costs):
@@ -106,6 +123,9 @@ cdef class GraphContext:
         other.node_offsets = self.node_offsets
         other.heads_buffer = self.heads_buffer
         other.blocked_centroid_count = self.blocked_centroid_count
+        other.centroid_count = self.centroid_count
+        other.block_centroid_flows = self.block_centroid_flows
+        other.allow_uturns = self.allow_uturns
         other.update_costs(costs)
 
         if isinstance(self, TurnBasedContext):
@@ -115,7 +135,6 @@ cdef class GraphContext:
             other_turns.turn_offsets = source_turns.turn_offsets
             other_turns.turn_links = source_turns.turn_links
             other_turns.turn_penalties_buffer = source_turns.turn_penalties_buffer
-            other_turns.uturns_allowed = source_turns.uturns_allowed
             other_turns.first_nodes_buffer = source_turns.first_nodes_buffer
             other_turns.last_nodes_buffer = source_turns.last_nodes_buffer
         return other
@@ -213,12 +232,22 @@ cdef class TurnBasedContext(GraphContext):
             turn_to_links=None,
             turn_penalties=None,
             *,
-            allow_uturns=True,
+            allow_uturns: bool = True,
             blocked_centroid_count=0,
+            centroid_count: int | None = None,
+            block_centroid_flows: bool = True,
             first_nodes=None,
             last_nodes=None,
     ):
-        super().__init__(fs, heads, costs, blocked_centroid_count=blocked_centroid_count)
+        super().__init__(
+            fs,
+            heads,
+            costs,
+            blocked_centroid_count=blocked_centroid_count,
+            centroid_count=centroid_count,
+            block_centroid_flows=block_centroid_flows,
+            allow_uturns=allow_uturns,
+        )
 
         n = self.node_count
         m = self.link_count
@@ -256,7 +285,6 @@ cdef class TurnBasedContext(GraphContext):
         self.turn_penalties_buffer = array[double](turn_penalties.size, False, 0)
 
         np.copyto(np.asarray(self.turn_penalties_buffer), turn_penalties)
-        self.uturns_allowed = bool(allow_uturns)
 
         self.first_nodes_buffer = (
             self.heads_buffer if first_nodes is None else validate_index_array(first_nodes, "first_nodes")
@@ -277,7 +305,7 @@ cdef class TurnBasedContext(GraphContext):
         turns.turn_penalties = const_array_pointer[double](self.turn_penalties_buffer)
         turns.first_nodes = const_array_pointer(self.first_nodes_buffer)
         turns.last_nodes = const_array_pointer(self.last_nodes_buffer)
-        turns.allow_uturns = self.uturns_allowed
+        turns.allow_uturns = self.allow_uturns
         return turns
 
     @property
@@ -304,11 +332,6 @@ cdef class TurnBasedContext(GraphContext):
     def turn_penalties(self):
         """Read-only penalty for each explicit turn."""
         return readonly_view(self.turn_penalties_buffer)
-
-    @property
-    def allow_uturns(self):
-        """Whether paths may turn back to the previous node."""
-        return self.uturns_allowed
 
 
 cdef class SkimmingContext:

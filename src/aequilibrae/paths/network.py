@@ -396,8 +396,6 @@ class Network:
             skimming=skimming,
             mode=mode,
             cost_field=cost,
-            centroid_count=centroid_count,
-            block_centroid_flows=block_centroid_flows,
         )
 
     def _assignment_graph(self, configuration: TrafficClass) -> Graph:

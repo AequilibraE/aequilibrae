@@ -222,6 +222,9 @@ def make_routing_context(
             graph_link_heads,
             routing_costs,
             blocked_centroid_count=centroid_count if block_centroid_flows else 0,
+            centroid_count=centroid_count,
+            block_centroid_flows=block_centroid_flows,
+            allow_uturns=allow_uturns,
         )
 
     # A single bidirectional connector also needs a ban: explicit finite turn
@@ -240,6 +243,8 @@ def make_routing_context(
         turn_penalties=penalty_values,
         allow_uturns=allow_uturns,
         blocked_centroid_count=0,
+        centroid_count=centroid_count,
+        block_centroid_flows=block_centroid_flows,
         first_nodes=network.link_heads[first_network_links],
         last_nodes=network.link_tails[last_network_links],
     )

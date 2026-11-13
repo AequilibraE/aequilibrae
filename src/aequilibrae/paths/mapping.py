@@ -199,6 +199,9 @@ class GraphMapping:
     """
 
     network: NetworkMapping
+    compact: bool = field(default=False, kw_only=True)
+    remove_dead_ends: bool = field(default=False, kw_only=True)
+    allow_uturns: bool = field(default=False, kw_only=True)
     graph_node_to_network: np.ndarray = field(repr=False)
     expansion_offsets: np.ndarray = field(repr=False)
     expansion_links: np.ndarray = field(repr=False)
@@ -206,6 +209,10 @@ class GraphMapping:
     network_node_to_graph: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
+        for name in ("compact", "remove_dead_ends", "allow_uturns"):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{name} must be a boolean")
+
         nodes = _indices(self.graph_node_to_network, self.network.node_count, "graph_node_to_network")
         links = _indices(self.expansion_links, self.network.link_count, "expansion_links")
         offsets = _indices(self.expansion_offsets, links.size + 1, "expansion_offsets")

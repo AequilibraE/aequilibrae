@@ -1168,8 +1168,6 @@ class Graph:
     skimming: SkimmingContext
     mode: str
     cost_field: str | None = None
-    centroid_count: int = 0
-    block_centroid_flows: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.routing, GraphContext) or not isinstance(self.mapping, GraphMapping):
@@ -1184,12 +1182,31 @@ class Graph:
             raise ValueError("mode must be a nonempty string")
         if self.cost_field is not None and (not isinstance(self.cost_field, str) or not self.cost_field):
             raise ValueError("cost_field must be a nonempty string")
-        if isinstance(self.centroid_count, bool) or not isinstance(self.centroid_count, int):
-            raise ValueError("centroid_count must be an integer")
-        if not 0 <= self.centroid_count <= self.routing.node_count:
-            raise ValueError("centroid_count must be between zero and the graph node count")
-        if not isinstance(self.block_centroid_flows, bool):
-            raise ValueError("block_centroid_flows must be a boolean")
+
+    @property
+    def compact(self) -> bool:
+        """Whether link contraction was requested when building the mapping."""
+        return self.mapping.compact
+
+    @property
+    def remove_dead_ends(self) -> bool:
+        """Whether dead-end removal was requested when building the mapping."""
+        return self.mapping.remove_dead_ends
+
+    @property
+    def allow_uturns(self) -> bool:
+        """Whether U-turns were allowed when building the routing context."""
+        return self.routing.allow_uturns
+
+    @property
+    def centroid_count(self) -> int:
+        """Number of centroids supplied when building the routing context."""
+        return self.routing.centroid_count
+
+    @property
+    def block_centroid_flows(self) -> bool:
+        """Whether the build requested blocking travel through centroids."""
+        return self.routing.block_centroid_flows
 
     @property
     def centroids(self) -> npt.NDArray[np.uint64]:
