@@ -88,13 +88,15 @@ with project.db_connection as conn:
 # Let's perform a traffic assignment in this scenario with lowered capacity
 
 # Load the network snapshot
-network = project.network
+network = project.network.build()
 
 # Get the demand matrix
 mat = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
 # Create traffic assignment with alternative parameters
-traffic = TrafficClass(name="car", mode="c", cost="distance", demand=mat, block_centroid_flows=False)
+traffic = TrafficClass(
+    name="car", mode="c", cost="distance", demand=mat, graph_options={"block_centroid_flows": False}
+)
 assignment = TrafficAssignment(
     network=network, classes=[traffic], time_field="distance", capacity_field="capacity",
     vdf=bpr, name_mapping={"alpha": 0.15, "beta": 4.0}, algorithm="msa", project=project,

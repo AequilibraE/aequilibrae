@@ -125,7 +125,10 @@ Always run `spin lint` before committing Python or native-code changes.
 ## Key Patterns
 
 - **Project object**: `from aequilibrae import Project` — the central entry point for most workflows. Open with `project.open(path)` or create with `project.new(path)`.
-- **Graph**: `Graph` objects wrap the network for assignment; load with `project.network.graphs`.
+- **Network**: `project.network` manages database tables; `project.network.build()` copies them into an independent `aequilibrae.paths.Network`. Construct `Network(links, ...)` for in-memory data. Network configuration fields are fixed; use `dataclasses.replace()` for validated replacements, and construct a new Network after topology or row-order changes.
+- **Graph**: Build fixed-topology routing graphs with `network.build_graph(mode, cost, ...)` or the project network's `build_graph()` convenience method. Graphs expose `routing`, `mapping` and `skimming`, not source DataFrames. Change directed network-order costs with `graph.set_costs()`; rebuild for other configuration changes. Link contraction (`compact`) and dead-end removal (`remove_dead_ends`) are independent, opt-in options requiring centroids.
+- **Assignment**: Configure `TrafficClass` independently of graphs; routing policies belong in `graph_options`. `TrafficAssignment` builds each class's graph internally and enables contraction and dead-end removal by default. Pass `project=project` when using an independent network and saving project outputs.
+- **Path results**: `PathResults.path` contains local graph-link indices. Use `get_network_links()` for physical link IDs and directions. Both A* heuristics require explicit coordinates and a heuristic scale; graphs do not retain coordinates.
 - **Matrix**: `AequilibraeMatrix` wraps OMX files; `AequilibraeData` wraps tabular data.
 - **VDF functions**: Implemented as Cython files in `src/aequilibrae/paths/cython/` (e.g., `bpr.pyx`, `akcelik.pyx`). Note: In the Akcelik VDF, the `tau` parameter already absorbs the factor of 8.
 - **Parameters**: `Parameters` class reads/writes `parameters.yml`; use it instead of hardcoding defaults.
@@ -151,5 +154,6 @@ spin docs
 
 - API docs are generated automatically from docstrings.
 - Narrative guides and examples live in `docs/source/`.
+- `spin doctest` only collects selected docstrings and RST paths; it does not execute gallery scripts. Validate changed examples with the local build or a full `spin docs` run. `spin docs --no-plot` skips gallery execution, and Sphinx-Gallery may reuse cached results for unchanged scripts.
 - The `plot_vdf_functions.py` gallery script regenerates VDF visualization charts when VDF implementations change.
 - CI builds both HTML (with gallery) and LaTeX (with `-D plot_gallery=False`).

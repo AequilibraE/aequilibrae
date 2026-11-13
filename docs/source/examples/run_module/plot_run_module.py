@@ -22,11 +22,12 @@ In this example we demonstrate how to use AequilibraE's run module using Sioux F
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
 # %%
@@ -53,17 +54,19 @@ project.run["matrix_summary"]()
 mode = "c"
 
 # %%
-network = project.network
+network = project.network.build()
 graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
-# The graph exposes its full and compact topology counts directly.
+# The network mapping describes the source topology.  Building with
+# compact=True can reduce the routing counts without changing the source
+# mapping.
 {
-    "num_links": len(graph.full_link_ids),
-    "num_nodes": len(graph.full_node_ids),
+    "network_num_links": network.mapping.link_count,
+    "network_num_nodes": network.mapping.node_count,
     "num_zones": graph.num_zones,
-    "compact_num_links": graph.compact_num_links,
-    "compact_num_nodes": graph.compact_num_nodes,
+    "graph_num_links": graph.num_links,
+    "graph_num_nodes": graph.num_nodes,
 }
 
 # %%

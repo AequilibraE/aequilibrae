@@ -108,9 +108,10 @@ class AssignmentBase(ABC):
 class TrafficAssignment(AssignmentBase):
     """Traffic assignment class.
 
-    The constructor snapshots network data and checks compatibility.
-    ``execute()`` prepares compact routing contexts and returns link results.
-    Classes with matching routing policies share graph and reporting mappings.
+    The constructor copies project network data or retains a supplied standalone
+    Network, then checks compatibility. Do not mutate that Network during use.
+    ``execute()`` prepares each class's routing graph and returns link results.
+    Classes share the network reporting mapping, but build their own graph mappings.
     Each class owns its costs, demand, skims, and output buffers.
 
     For a comprehensive example on use, see the Use examples page.
@@ -173,7 +174,7 @@ class TrafficAssignment(AssignmentBase):
         preload=None,
         project=None,
     ) -> None:
-        """Snapshot and validate source data without preparing routing topology.
+        """Retain standalone network data or copy project data, then validate without preparing routing topology.
 
         ``name_mapping`` maps VDF parameter names to network fields or constants.
         Without a mapping, VDF defaults supply values.
@@ -322,8 +323,8 @@ class TrafficAssignment(AssignmentBase):
     ) -> pd.DataFrame:
         """Prepare graphs, run assignment, and return link results.
 
-        Execution options apply to this run. Source data comes from the
-        constructor's snapshot. Each run owns fresh routing contexts and outputs.
+        Execution options apply to this run. Source data comes from the network
+        retained by the constructor. Each run owns fresh routing contexts and outputs.
 
         ``bfw_conjugacy`` chooses how BFW solves for its direction coefficients. Ignored by every other algorithm.
 

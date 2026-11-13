@@ -86,8 +86,9 @@ network["link_id"] = network.index + 1
 network = network.astype({"a_node":"int64", "b_node": "int64"})
 
 # %%
-# Now we'll import the geometry (as lon/lat) for our network, this is required if you plan to 
-# use the `A*` path finding, otherwise it can safely be skipped.
+# Now we'll import the geometry (as lon/lat) for our network. For Haversine `A*` path finding,
+# pass these coordinates explicitly to the search and scale estimator. Euclidean `A*` requires
+# coordinates projected to a suitable local CRS instead. Geometry can otherwise be skipped.
 geom = pd.read_csv(geometry_file, skiprows=1, sep="\t", lineterminator=";", header=None)
 geom.columns = ["newline", "lon", "lat", "terminator"]
 geom.drop(columns=["newline", "terminator"], index=[24], inplace=True)
@@ -108,7 +109,8 @@ network = Network(network.assign(modes="c"), centroids=index, lonlat=geom)
 # Let's perform our assignment. Feel free to try different algorithms,
 # as well as change the maximum number of iterations and the gap
 assigclass = TrafficClass(
-    name="car", mode="c", cost="free_flow_time", demand=aem, skimming=["free_flow_time"], block_centroid_flows=False
+    name="car", mode="c", cost="free_flow_time", demand=aem, skimming=["free_flow_time"],
+    graph_options={"block_centroid_flows": False},
 )
 
 assig = TrafficAssignment(

@@ -15,6 +15,10 @@ from aequilibrae.paths.path_heuristics import HEURISTICS, make_heuristic_context
 class PathResults:
     """Path computation result holder.
 
+    ``path`` contains local graph-link indices. Use ``get_network_links()`` to
+    obtain physical link IDs and directions, expanding any contracted chains.
+    ``path_nodes`` and ``milepost`` describe the retained graph nodes on the path.
+
     .. code-block:: python
 
         >>> from aequilibrae.paths.results import PathResults
@@ -58,8 +62,9 @@ class PathResults:
 
             **heap** (:obj:`str` or None): Priority queue implementation to use.
 
-            **coordinates** (:obj:`pandas.DataFrame`, optional): Planar ``x`` and ``y`` columns indexed by external node
-                ID. Required for Euclidean A*. Haversine uses ``graph.lonlat_index`` in degrees instead.
+            **coordinates** (:obj:`pandas.DataFrame`, optional): Planar ``x`` and ``y`` columns for Euclidean A*,
+                or ``lon`` and ``lat`` columns in degrees for Haversine A*, indexed by external node ID.
+                Required for either A* heuristic. Coordinates are not retained by the graph.
 
             **heuristic_scale** (:obj:`float` or None): Explicit nonnegative, finite coefficient required for
                 A*. Converts coordinate distance into cost units. A value above a consistent bound can give non-shortest

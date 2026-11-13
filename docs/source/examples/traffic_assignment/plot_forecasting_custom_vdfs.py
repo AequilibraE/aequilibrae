@@ -62,7 +62,7 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass, VDF
 
 # %%
 
-network = project.network
+network = project.network.build()
 
 # %%
 # Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.
@@ -84,7 +84,7 @@ assigclass = TrafficClass(
     demand=demand,
     skimming=["free_flow_time", "distance"],
     # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
-    block_centroid_flows=False,
+    graph_options={"block_centroid_flows": False},
 )
 
 
@@ -110,6 +110,7 @@ vdf = VDF("bpr_example", bpr, bpr_spec, delta_bpr)
 # Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
+    project=project,
     classes=[assigclass],
     vdf=vdf,
     name_mapping={"alpha": "b", "beta": "power"},
@@ -333,7 +334,7 @@ assigclass = TrafficClass(
     demand=demand,
     skimming=["free_flow_time", "distance"],
     # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
-    block_centroid_flows=False,
+    graph_options={"block_centroid_flows": False},
 )
 
 
@@ -382,6 +383,7 @@ assigclass = replace(assigclass, select_link_sets=select_links)
 # Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
+    project=project,
     classes=[assigclass],
     vdf=vdf,
     name_mapping={"a": 0.15, "b": 1.0},

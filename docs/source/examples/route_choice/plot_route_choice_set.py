@@ -47,8 +47,8 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Load the network snapshot
-network = project.network
-# We get warnings that several fields in the project are filled with NaNs.
+network = project.network.build()
+# Several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
@@ -56,7 +56,7 @@ network = project.network
 graph = network.build_graph(mode="c", cost="distance", centroids=np.array(nodes_of_interest), compact=True)
 
 # Available network modes:
-network.list_modes()
+network.modes
 
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
 graph.centroids
@@ -68,8 +68,8 @@ graph.centroids
 from aequilibrae.paths import RouteChoice
 
 # %% 
-# This object construct might take a minute depending on the size of the graph due to the construction of the
-# compressed link to network link mapping that's required. This is a one time operation per graph and is cached.
+# Graph construction has already prepared the compressed-link to network-link mapping.
+# RouteChoice reuses that mapping and snapshots the routing costs.
 rc = RouteChoice(graph)
 
 # %%

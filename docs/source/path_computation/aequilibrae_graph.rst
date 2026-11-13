@@ -42,9 +42,10 @@ The ``direction`` field specifies the allowed directions:
 
 Direction-specific fields use the suffixes ``_ab`` and ``_ba``.
 For example, ``free_flow_time_ab`` and ``free_flow_time_ba`` supply the graph field ``free_flow_time``.
-``Network`` converts column names to lowercase.
+``Network`` preserves column names, and field names are case-sensitive.
 
-``network.field_values(name)`` returns numeric values for directed links, sorted by link ID and then direction.
+``network.field_values(name)`` returns numeric values in physical-link input row order,
+with AB before BA for each bidirectional link.
 ``network.link_ids`` and ``network.directions`` use the same order.
 This order includes links that the graph's mode cannot use.
 
@@ -63,7 +64,7 @@ To close links without a topology change, set their costs to positive infinity:
 A later call with finite costs can reopen the links.
 Negative costs and NaN values are invalid.
 
-For changes to link attributes or topology, edit the source data and build a new graph:
+For changes to numeric link attributes, edit the source data and build a new graph:
 
 .. code-block:: python
 
@@ -71,8 +72,13 @@ For changes to link attributes or topology, edit the source data and build a new
     >>> network.links.loc[network.links.link_type == 'motorway', 'speed_ba'] = 100
     >>> graph = network.build_graph('c', cost='distance')
 
-Changes to source attributes do not update an existing graph or calculate dependent attributes.
-For example, a speed change does not automatically change travel time.
+Changes to source attributes do not update an existing graph or calculate
+dependent attributes.  For example, a speed change does not automatically
+change travel time.  For topology changes (link IDs, endpoints, directions,
+added/removed links or row order), construct a new ``Network`` from the revised
+link table so its mappings are rebuilt.  Network configuration fields are
+fixed, use ``dataclasses.replace()`` to create a validated replacement when
+changing modes, centroids or turn restrictions.
 
 Skimming and centroids
 ----------------------
@@ -96,17 +102,21 @@ To change centroids or skim fields, build a new graph.
 Compact graphs
 --------------
 
-A compact graph contracts chains of links and removes dead ends that contain no centroids.
-This reduces routing work for traffic assignment and centroid-to-centroid skimming.
-Path results expand compact links back to source links.
+A compact graph contracts chains of links. Dead-end removal is an additional,
+separate option.  These reductions can reduce routing work for traffic
+assignment and centroid-to-centroid skimming.  Both are opt-in when building a
+graph, and both require centroids.  ``PathResults.path`` contains local
+graph-link indices, and ``get_network_links()`` expands these to physical link
+IDs and directions in traversal order.
 
-Compact graphs require centroids:
+To enable both reductions:
 
 .. code-block:: python
 
-    >>> compact = network.build_graph('c', cost='distance', compact=True)
+    >>> compact = network.build_graph('c', cost='distance', compact=True, remove_dead_ends=True)
 
-Traffic assignment builds compact graphs automatically.
+Traffic assignment enables both reductions by default. Each ``TrafficClass`` can override
+``compact`` and ``remove_dead_ends`` through its ``graph_options``.
 Congestion calculations still use individual directed network links.
 
 Blocking centroid flows

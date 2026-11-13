@@ -212,15 +212,17 @@ inside_nodes = nodes.sjoin(zones, how="inner").sort_index()
 inside_nodes.head()
 
 # %%
-# Let's filter those network links to graph links, dropping any dead ends and creating a `link_id`,
-# `dir` multi-index.
-retained = graph.mapping.crosswalk[graph.full_to_network] < graph.num_links
+# Let's filter those network links to links retained by the graph, including links inside contracted chains,
+# and create a `link_id`, `direction` multi-index.
+mapping = graph.mapping
+source = mapping.network
+retained = mapping.network_link_to_graph >= 0
 g = pd.DataFrame(
     {
-        "link_id": graph.full_link_ids[retained],
-        "direction": graph.full_directions[retained],
-        "a_node": graph.full_node_ids[graph.full_tails[retained]],
-        "b_node": graph.full_node_ids[graph.full_heads[retained]],
+        "link_id": source.link_ids[retained],
+        "direction": source.directions[retained],
+        "a_node": source.node_ids[source.link_tails[retained]],
+        "b_node": source.node_ids[source.link_heads[retained]],
     }
 )
 g = g.loc[g.link_id.isin(inner_links.link_id)].set_index(["link_id", "direction"])
@@ -253,12 +255,10 @@ f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 graph = network.build_graph(mode="c", cost="utility", compact=True, block_centroid_flows=False)
 
 # %%
-# This object construction might take a minute depending on the size of the
-# graph due to the construction of the compressed link to network link mapping
-# that's required. This is a one time operation per graph and is cached. We
-# need to supply a Graph and an AequilibraeMatrix or AequilibraeSparseMatrix
-# via the ``set_demand`` method, if demand is not provided link loading cannot
-# be performed.
+# Graph construction has already prepared the compressed-link to network-link
+# mapping. We need to supply a Graph and an AequilibraeMatrix or
+# AequilibraeSparseMatrix via the ``set_demand`` method, if demand is not
+# provided link loading cannot be performed.
 rc = RouteChoice(graph)
 rc.set_demand(mat)
 

@@ -60,7 +60,7 @@ basic_config()
 # ------------------
 
 # %%
-network = project.network
+network = project.network.build()
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.
@@ -84,12 +84,14 @@ demand = from_dict(
 
 # Create the assignment class
 assigclass = TrafficClass(
-    name="car", mode="c", cost="free_flow_time", demand=demand, skimming=[], block_centroid_flows=False
+    name="car", mode="c", cost="free_flow_time", demand=demand, skimming=[],
+    graph_options={"block_centroid_flows": False},
 )
 
 # Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
+    project=project,
     classes=[assigclass],
     vdf=bpr,
     name_mapping={"alpha": "b", "beta": "power"},

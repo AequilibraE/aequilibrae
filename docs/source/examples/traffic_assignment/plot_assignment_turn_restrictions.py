@@ -29,6 +29,7 @@ All turn directions are 1 and node-based U-turn transitions are allowed.
 
 # %%
 # Imports
+from dataclasses import replace
 from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
@@ -46,11 +47,20 @@ from aequilibrae.utils.create_example import create_example
 def run_assignment(network, matrix):
     """Runs a single-class traffic assignment and returns link flow results."""
     traffic_class = TrafficClass(
-        name="car", mode="c", cost="free_flow_time", demand=matrix, block_centroid_flows=False
+        name="car",
+        mode="c",
+        cost="free_flow_time",
+        demand=matrix,
+        graph_options={"block_centroid_flows": False},
     )
     assignment = TrafficAssignment(
-        network=network, classes=[traffic_class], time_field="free_flow_time", capacity_field="capacity",
-        vdf=bpr, name_mapping={"alpha": "b", "beta": "power"}, algorithm="bfw",
+        network=network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr,
+        name_mapping={"alpha": "b", "beta": "power"},
+        algorithm="bfw",
     )
     assignment.execute(max_iterations=100, rgap=1e-2)
 
@@ -64,7 +74,7 @@ project = create_example(fldr, "sioux_falls")
 
 # %%
 # Load the network and demand matrix.
-network = project.network.build()
+network = replace(project.network.build(), allow_uturns=True)
 
 matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
@@ -85,8 +95,8 @@ turn_restrictions = pd.DataFrame(
         "penalty": [5.0, np.nan],  # 5.0 minutes penalty, and one prohibited turn
     }
 )
-network.turn_restrictions = turn_restrictions
-network.allow_uturns = True
+# Network configuration is fixed so we will create a validated replacement with the new turns.
+network = replace(network, turn_restrictions=turn_restrictions)
 
 # %%
 # Assignment with custom turn controls.
@@ -96,10 +106,10 @@ restricted_flows = run_assignment(network, matrix)
 # Plot flows for both cases and the difference.
 links = project.network.links.data.set_index("link_id")
 
-plot_df = links[["geometry"]].join(
-    base_flows[["matrix_tot"]].rename(columns={"matrix_tot": "base_flow"})
-).join(
-    restricted_flows[["matrix_tot"]].rename(columns={"matrix_tot": "restricted_flow"})
+plot_df = (
+    links[["geometry"]]
+    .join(base_flows[["matrix_tot"]].rename(columns={"matrix_tot": "base_flow"}))
+    .join(restricted_flows[["matrix_tot"]].rename(columns={"matrix_tot": "restricted_flow"}))
 )
 plot_df["difference"] = plot_df["restricted_flow"] - plot_df["base_flow"]
 

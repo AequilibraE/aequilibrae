@@ -63,19 +63,19 @@ import numpy as np
 
 # %%
 # Load the network snapshot
-network = project.network
-# We get warnings that several fields in the project are filled with ``NaN``s.
+network = project.network.build()
+# Several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
 # we also see what modes are available
-network.list_modes()
+network.modes
 
-# let's say we want to minimize the distance
+# let's say we want to minimise the distance
 # And will skim distance while we are at it, other fields like ``free_flow_time`` or ``travel_time`` 
 # can be added here as well
 
-# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), 
+# But let's say we only want a skim matrix for nodes 28-40, and 49-90 (inclusive),
 # these happen to be a selection of western centroids.
 centroids = np.array(list(range(28, 41)) + list(range(49, 91)))
 graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], centroids=centroids, compact=True)

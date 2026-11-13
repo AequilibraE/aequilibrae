@@ -67,18 +67,17 @@ beta = 1.1
 nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
-# Let's build all graphs
-network = project.network
-# We get warnings that several fields in the project are filled with NaNs.
+# Let's load the source network snapshot
+network = project.network.build()
+# Several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
-# We also see what graphs are available
-network.list_modes()
+# We also see what modes are available
+network.modes
 
 # %%
 # Add the utility field to the source network before graph preparation.
-network = network.build()
 network.links["utility"] = network.links.distance * theta
 graph = network.build_graph(
     mode="c", cost="utility", centroids=np.array(nodes_of_interest), compact=True
@@ -129,8 +128,8 @@ def plot_results(link_loads):
 from aequilibrae.paths import RouteChoice
 
 # %%
-# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
-# link to network link mapping that's required. This is a one time operation per graph and is cached.
+# Graph construction has already prepared the compressed-link to network-link mapping.
+# RouteChoice reuses that mapping and snapshots the routing costs.
 rc = RouteChoice(graph)
 
 # Let's check the default parameters for the Route Choice class

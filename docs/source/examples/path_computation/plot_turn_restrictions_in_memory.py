@@ -4,7 +4,7 @@
 Path computation with in-memory turn restrictions
 =================================================
 
-In this example, we show how to apply turn restrictions directly to a graph already loaded in memory.
+In this example, we show how to build a new graph with turn restrictions from a network already loaded in memory.
 
 We use the Coquimbo example and compare paths before and after prohibiting one specific turn.
 """
@@ -61,7 +61,7 @@ turn_restrictions = pd.DataFrame(
 )
 
 # %%
-# Apply turn restrictions in memory, with node-based U-turns globally prohibited
+# Build a new graph with turn restrictions in memory, with node-based U-turns globally prohibited
 # (i.e. transitions that return to the previous node).
 graph = network.build_graph(
     mode="c", cost="distance", turn_restrictions=turn_restrictions,
@@ -75,8 +75,10 @@ res_after = graph.compute_path(origin, destination)
 # %%
 # Plot both paths.
 links = project.network.links.data.set_index("link_id")
-links_before = links.loc[res_before.path]
-links_after = links.loc[res_after.path]
+link_ids_before, directions_before = res_before.get_network_links()
+link_ids_after, directions_after = res_after.get_network_links()
+links_before = links.loc[link_ids_before]
+links_after = links.loc[link_ids_after]
 
 # %%
 m = links_before.explore(color="blue", style_kwds={'weight':5})

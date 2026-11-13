@@ -32,7 +32,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-network = project.network
+network = project.network.build()
 
 
 # %%
@@ -49,12 +49,13 @@ assigclass = TrafficClass(
     cost="free_flow_time",
     demand=demand,
     skimming=["free_flow_time", "distance"],
-    block_centroid_flows=False,
+    graph_options={"block_centroid_flows": False},
 )
 
 
 assig = TrafficAssignment(
     network=network,
+    project=project,
     classes=[assigclass],
     vdf=bpr,
     name_mapping={"alpha": 0.15, "beta": 4.0},

@@ -622,7 +622,7 @@ understand, and then we'll perform the assignment.
             fixed_cost_multiplier=1.0,
             vot=1.0,
             skimming=("free_flow_time",),
-            block_centroid_flows=first_thru_node > 1,
+            graph_options={"block_centroid_flows": first_thru_node > 1},
         )
 
         assig = TrafficAssignment(

@@ -20,7 +20,6 @@ from tempfile import gettempdir
 from uuid import uuid4
 
 import geopandas as gpd
-import pandas as pd
 
 from aequilibrae.paths import estimate_heuristic_scale
 from aequilibrae.utils.create_example import create_example
@@ -44,17 +43,17 @@ basic_config()
 
 # %%
 # Load the network snapshot
-network = project.network
 # We get warnings that several fields in the project are filled with ``NaN``s.
+network = project.network.build()
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars, minimize distance, and skim time and distance.
+# We build the graph for cars, minimise distance, and skim time and distance.
 graph = network.build_graph(mode="c", cost="distance", skimming=["travel_time", "distance"])
 
 # %%
 # we'll also see what modes are available.
-network.list_modes()
+network.modes
 
 # %%
 # Let's create a path results object from the graph and compute a path from
@@ -75,8 +74,9 @@ res = graph.compute_path(32343, 22041)
 res.path_nodes
 
 # %%
-# We can get the link sequence we traverse
-res.path
+# We can get the physical link IDs and directions we traverse.
+# ``res.path`` contains local graph-link indices instead.
+res.get_network_links()
 
 # %%
 # We can get the mileposts for our sequence of nodes
@@ -96,7 +96,7 @@ res = graph.compute_path(32343, 22041, early_exit=True)
 # reuses finalised paths, or searches again if needed, retaining the algorithm, heuristic, scale and heap.  Note that
 # a_star takes precedence over early_exit. Euclidean distance needs node coordinates projected to a suitable local CRS
 # and a scale parameter to transform it into a cost value.
-lonlat = graph.lonlat_index
+lonlat = network.lonlat
 points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
 points = points.to_crs(points.estimate_utm_crs())
 coordinates = points.get_coordinates()
@@ -110,10 +110,12 @@ res = graph.compute_path(32343, 22041, a_star=True, coordinates=coordinates, heu
 res.get_heuristics()
 
 # %%
-# To use geographic distance without projecting the coordinates, choose "haversine".  It uses the graph's
-# longitude/latitude data and needs its own scale.
-scale = estimate_heuristic_scale(graph, heuristic="haversine")
-res = graph.compute_path(32343, 22041, a_star=True, heuristic="haversine", heuristic_scale=scale)
+# To use geographic distance without projecting the coordinates, choose "haversine". Pass the network's
+# longitude/latitude data explicitly to both the scale estimator and the search.
+scale = estimate_heuristic_scale(graph, lonlat, heuristic="haversine")
+res = graph.compute_path(
+    32343, 22041, a_star=True, heuristic="haversine", coordinates=lonlat, heuristic_scale=scale
+)
 
 # %%
 # Suppose you want to adjust the path to the University of La Serena instead of Fort Lambert.  It is possible to adjust
@@ -131,7 +133,8 @@ res.path_nodes
 #
 # We do NOT recommend this, though... It is very slow for real networks.
 links = project.network.links.data.set_index("link_id")
-links = links.loc[res.path]
+link_ids, directions = res.get_network_links()
+links = links.loc[link_ids]
 
 # %%
 links.explore(color="blue", style_kwds={"weight": 5})

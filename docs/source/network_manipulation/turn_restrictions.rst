@@ -146,8 +146,7 @@ The U-turn setting is managed through the project's ``about`` table:
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you build a graph, turn restrictions are automatically loaded from the
-database and applied:
+When you build a network snapshot, turn restrictions are loaded from the database.
 
 .. code-block:: python
 
@@ -155,13 +154,14 @@ database and applied:
     >>> graph = network.build_graph('c', cost='distance')
 
     # Check if a graph has turn restrictions
-    >>> print(graph._has_turn_restrictions)
+    >>> print(graph.has_turn_restrictions)
     True
 
 Manual Turn Restriction Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also manually set turn restrictions on a graph:
+You can also supply turn restrictions when building a new graph.
+An existing graph's topology and turn configuration cannot be changed in place:
 
 .. code-block:: python
 
@@ -175,18 +175,22 @@ You can also manually set turn restrictions on a graph:
     ...     "penalty": [20.0],
     ... })
 
-    # Apply turn restrictions
-    >>> graph.set_turn_restrictions(turn_df, allow_path_uturns=False)
+    # Build a new graph with these turn restrictions
+    >>> graph = network.build_graph('c', cost='distance', turn_restrictions=turn_df, allow_uturns=False)
 
-    # Clear turn restrictions
-    >>> graph.clear_turn_restrictions()
+    # Build a new graph without turn restrictions, overriding the snapshot's turns with an empty table
+    >>> graph = network.build_graph('c', cost='distance', turn_restrictions=turn_df.iloc[:0])
+
+To change the source network's turn configuration for subsequent graphs or assignments,
+use ``dataclasses.replace(network, turn_restrictions=turn_df)``. Network configuration
+fields cannot be assigned in place.
 
 Traffic Assignment with Turn Restrictions
 -----------------------------------------
 
 Turn restrictions are automatically considered during traffic assignment when
-they are present in the graph. The turn penalties are applied as additional
-time costs during the equilibration process.
+they are present in the source network. The assignment builds its graphs internally.
+The turn penalties are applied as additional time costs during the equilibration process.
 
 .. code-block:: python
 
@@ -212,7 +216,7 @@ time costs during the equilibration process.
     ...     algorithm='bfw',
     ...     name_mapping={'alpha': 0.15, 'beta': 4.0},
     ... )
-    >>> assignment.execute()
+    >>> _ = assignment.execute()
 
 Route Choice with Turn Restrictions
 -----------------------------------

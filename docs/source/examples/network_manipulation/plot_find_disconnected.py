@@ -52,27 +52,16 @@ fldr = join(gettempdir(), uuid4().hex)
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
 
-# Let's analyze the mode car or 'c' in our model
+# Let's analyse the mode car or 'c' in our model
 mode = "c"
 
 # %%
-# We need to create the graph, but before that, we need to have at least one centroid in our network.
+# We can create an uncompressed graph without any centroids or changes to the project.
 
-# We get an arbitrary node to set as centroid and allow for the construction of graphs
+# We get the project nodes for reporting and load an independent network snapshot.
 nodes = project.network.nodes
-centroid_count = nodes.data.query('is_centroid == 1').shape[0]
-
-if centroid_count == 0:
-    arbitrary_node = nodes.data.query('modes.str.contains(@mode)')["node_id"].iloc[0]
-    nodes.update(arbitrary_node, is_centroid=1)
-
-network = project.network
-graph = network.build_graph(mode=mode, cost="distance", block_centroid_flows=False)
-
-if centroid_count == 0:
-    # Let's revert to setting up that node as centroid in case we had to do it
-
-    nodes.update(arbitrary_node, is_centroid=0)
+network = project.network.build()
+# No centroid changes need reverting: the project nodes have not been modified.
 
 # %%
 # We set the graph for computation

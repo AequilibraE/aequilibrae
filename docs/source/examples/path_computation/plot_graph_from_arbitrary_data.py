@@ -68,8 +68,9 @@ res = graph.compute_path(1, 17)
 print(res.path_nodes)
 
 # %%
-# ... and the path links.
-print(res.path)
+# ... and the physical path link IDs and directions.
+# ``res.path`` contains local graph-link indices instead.
+print(res.get_network_links())
 # %%
 # ``graph.compute_path()`` returns a ``PathResults`` object.
 # Its ``milepost`` array contains the cumulative path costs.

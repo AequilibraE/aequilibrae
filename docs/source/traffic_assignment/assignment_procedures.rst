@@ -94,8 +94,9 @@ It is also possible to set the common assignment parameters during class definit
     ...     name_mapping={"alpha": "b", "beta": "power"},
     ... )
 
-AequilibraE's traffic assignment is organised around a single constructor that snapshots the network and
-current class configuration, then prepares the required routing contexts during execution.
+AequilibraE's traffic assignment is organised around a single constructor that retains a standalone network
+and current class configuration, or copies source data from a project network. It then prepares each class's
+routing graph during execution. Do not mutate a standalone network while an assignment uses it.
 
 * **network**: the source network object or project network containing the links and modes
 * **project**: the project used when saving results or skims from an independent network
