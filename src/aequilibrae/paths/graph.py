@@ -1105,16 +1105,20 @@ class GraphBase(ABC):  # noqa: B024
         value is -1 then the node has been removed, either by compression of dead end link removal. If the value is
         greater than or equal to 0, then that value is the compressed node index.
 
+        Road graphs expose the corresponding arrays through ``graph.mapping``. These
+        use directed network link indices and dense network node indices, rather than
+        the legacy graph IDs and external node IDs used by this method.
+
         .. code-block:: python
 
             >>> project = create_example(project_path)
 
             >>> network = project.network.build()
-            >>> graph = GraphBase()
-            >>> graph.network = network.links
-            >>> graph.prepare_graph(np.arange(1,25))
+            >>> graph = network.build_graph("c", centroids=np.arange(1, 25), compact=True, remove_dead_ends=True)
 
-            >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
+            >>> idx = graph.mapping.expansion_offsets
+            >>> data = graph.mapping.expansion_links
+            >>> node_mapping = graph.mapping.network_node_to_graph
 
             >>> project.close()
 

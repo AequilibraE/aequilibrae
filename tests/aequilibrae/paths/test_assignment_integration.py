@@ -1,7 +1,6 @@
 """Assignment translation, output ownership and optimizer units."""
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -15,13 +14,11 @@ from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import available_heaps
 from aequilibrae.paths.assignment_context import AssignmentInputs
-from aequilibrae.paths.graph import GraphBase
 from aequilibrae.paths.vdf import bpr
 
 
 def diamond(turn=False):
-    graph = GraphBase()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [71, 12, 55, 24],
             "a_node": [10, 20, 10, 30],
@@ -33,34 +30,30 @@ def diamond(turn=False):
             "capacity": [10.0] * 4,
         }
     )
-    graph.prepare_graph(np.array([10, 20, 30, 40]), remove_dead_ends=False)
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    graph.set_skimming(["time", "distance"])
+    turns = None
     if turn:
-        graph.set_turn_restrictions(
-            pd.DataFrame(
-                {
-                    "from_node": [10],
-                    "via_node": [20],
-                    "to_node": [40],
-                    "penalty": [0.5],
-                }
-            )
+        turns = pd.DataFrame(
+            {
+                "from_node": [10],
+                "via_node": [20],
+                "to_node": [40],
+                "penalty": [0.5],
+            }
         )
-    return graph
+    return Network(links.assign(modes="c"), centroids=[10, 20, 30, 40], turn_restrictions=turns)
 
 
-def matrix_for(graph, demand=None):
+def matrix_for(network, demand=None):
     if demand is None:
+        zones = len(network.centroids)
         demand = {
-            "work": np.zeros((graph.num_zones, graph.num_zones)),
-            "other": np.zeros((graph.num_zones, graph.num_zones)),
+            "work": np.zeros((zones, zones)),
+            "other": np.zeros((zones, zones)),
         }
         demand["work"][0, -1] = 8.0
         demand["other"][0, -1] = 12.0
 
-    matrix = AequilibraeMatrix(index=graph.centroids.copy())
+    matrix = AequilibraeMatrix(index=network.centroids.copy())
     if isinstance(demand, dict):
         for name, values in demand.items():
             matrix[name] = values
@@ -72,18 +65,13 @@ def matrix_for(graph, demand=None):
     return matrix
 
 
-def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
-    network = Network(graph.network.assign(modes="c"), turn_restrictions=graph._turn_restrictions)
-    prepared = network._assignment_graph(
-        SimpleNamespace(
-            mode="c",
-            demand=matrix,
-            graph_options={
-                "compact": True,
-                "remove_dead_ends": True,
-                "block_centroid_flows": graph.block_centroid_flows,
-            },
-        )
+def routing_inputs(network, matrix, time_field, selected_links, cores, *, block_centroid_flows=False, **kwargs):
+    prepared = network.build_graph(
+        "c",
+        centroids=matrix.index,
+        compact=True,
+        remove_dead_ends=True,
+        block_centroid_flows=block_centroid_flows,
     )
     return AssignmentInputs(
         prepared,
@@ -92,21 +80,19 @@ def routing_inputs(graph, matrix, time_field, selected_links, cores, **kwargs):
         selected_links,
         cores,
         field_values=network.field_values,
-        skim_fields=kwargs.pop("skim_fields", graph.skim_fields),
+        skim_fields=kwargs.pop("skim_fields", ["time", "distance"]),
         **kwargs,
     )
 
 
-def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, name_mapping=None, **options):
-    links = graph.network.assign(modes="c")
-    network = Network(links, centroids=graph.centroids, turn_restrictions=graph._turn_restrictions)
+def assignment_for(network, matrix=None, algorithm="all-or-nothing", pce=2.5, name_mapping=None, **options):
     traffic = TrafficClass(
         name="cars",
         mode="c",
         cost="time",
-        demand=matrix or matrix_for(graph),
+        demand=matrix or matrix_for(network),
         pce=pce,
-        skimming=graph.skim_fields,
+        skimming=["time", "distance"],
         graph_options={"block_centroid_flows": False},
         select_link_sets={"upper": [(71, 1)], "either": [(71, 1), (55, 1)]},
         **options,
@@ -126,13 +112,13 @@ def assignment_for(graph, matrix=None, algorithm="all-or-nothing", pce=2.5, name
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("tolls", [[np.nan] * 4, [np.nan, 2.0, 0.0, np.nan]])
 def test_nan_fixed_costs_warn_and_assign_as_zero(caplog, turn, tolls):
-    graph = diamond(turn)
-    graph.network["toll"] = tolls
+    network = diamond(turn)
+    network = replace(network, links=network.links.assign(toll=tolls))
     options = {"fixed_cost_field": "toll", "fixed_cost_multiplier": 2.0, "vot": 4.0}
-    assignment, traffic = assignment_for(graph, **options)
+    assignment, traffic = assignment_for(network, **options)
     assert "Cost field toll has NaN values. Converted to zero" in caplog.text
-    graph.network["toll"] = graph.network.toll.fillna(0.0)
-    reference, _ = assignment_for(graph, **options)
+    reference_network = replace(network, links=network.links.assign(toll=network.links.toll.fillna(0.0)))
+    reference, _ = assignment_for(reference_network, **options)
     for _ in range(2):
         assignment.execute(max_iterations=1, cores=1)
         reference.execute(max_iterations=1, cores=1)
@@ -160,19 +146,20 @@ def test_assignment_uses_selected_heap(heap, turn):
 @pytest.mark.parametrize("turn", [False, True])
 @pytest.mark.parametrize("cores", [1, 2])
 def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
-    graph = diamond(turn)
-    assignment, traffic = assignment_for(graph)
+    network = diamond(turn)
+    assignment, traffic = assignment_for(network)
     original = {name: values.copy() for name, values in traffic.demand.items()}
-    graph_costs = graph.compact_cost.copy()
-    graph_skims = graph.compact_skims.copy()
     assignment.execute(max_iterations=8, rgap=0.0, cores=cores, elementwise_cores=1)
 
+    graph = assignment._class_states[0].graph
     results = assignment.class_results[traffic.name]
     assert isinstance(results.skims, SkimmingOutputs)
     assert isinstance(results.output.loading, LoadingOutputs)
     inputs = assignment.assignment.inputs[traffic.name]
     assert isinstance(inputs.routing, TurnBasedContext if turn else NodeBasedContext)
-    assert results.output.loading.link_count == graph.compact_num_links
+    assert results.output.loading.link_count == graph.num_links
+    assert not np.shares_memory(inputs.costs, graph.cost)
+    assert "time" in inputs.skimming.fields
     loads = results.get_load_results()
     for link in (71, 12):
         assert loads.loc[link, "work_ab"] == 8.0
@@ -191,8 +178,8 @@ def test_aon_uses_compact_owners_and_keeps_demand_units(turn, cores):
     assert results.skims.matrices["distance"][0, 3] == 7.0
     for name, values in original.items():
         np.testing.assert_array_equal(traffic.demand[name], values)
-    np.testing.assert_array_equal(graph.compact_cost, graph_costs)
-    np.testing.assert_array_equal(graph.compact_skims, graph_skims)
+    np.testing.assert_array_equal(graph.cost, np.zeros(graph.num_links))
+    assert graph.skim_fields == []
 
 
 @pytest.mark.parametrize("algorithm", ["msa", "frank-wolfe", "cfw", "bfw"])
@@ -226,41 +213,41 @@ def test_turn_cost_and_selected_outputs_follow_accepted_solution(algorithm):
 
 @pytest.mark.parametrize("bad", [-1.0, np.nan, np.inf, -np.inf])
 def test_invalid_demand_rejected_at_assignment_entry(bad):
-    graph = diamond()
-    matrix = matrix_for(graph)
+    network = diamond()
+    matrix = matrix_for(network)
     matrix["work"][0, 1] = bad
     with pytest.raises(ValueError, match="finite and nonnegative"):
-        assignment_for(graph, matrix)
+        assignment_for(network, matrix)
 
 
 def test_strided_demand_is_copied_once_without_reshaping_caller():
-    graph = diamond()
+    network = diamond()
     source = np.arange(4 * 8, dtype=float).reshape(4, 8)
     view = {"work": source[:, ::2], "other": source[:, 1::2]}
-    matrix = matrix_for(graph, view)
+    matrix = matrix_for(network, view)
     input_values = {name: values.copy() for name, values in matrix.items()}
-    packed = assignment_demand(matrix, graph.centroids)
+    packed = assignment_demand(matrix, network.centroids)
     assert isinstance(packed, DenseMatrix)
     assert packed.field_names == tuple(matrix)
-    for name, values in packed.to_matrix(graph.centroids).items():
+    for name, values in packed.to_matrix(network.centroids).items():
         assert not np.shares_memory(values, source)
         np.testing.assert_array_equal(values, input_values[name])
 
-    matrix = matrix_for(graph, source[:, ::2])
-    packed = assignment_demand(matrix, graph.centroids)
+    matrix = matrix_for(network, source[:, ::2])
+    packed = assignment_demand(matrix, network.centroids)
     assert (packed.origin_count, packed.destination_count, packed.field_count) == (4, 4, 1)
     assert matrix["work"].ndim == 2
 
 
 @pytest.mark.parametrize("cores", [1, 2])
 def test_unreachable_demand_is_reported_without_loading_or_counting_intrazonal(caplog, cores):
-    graph = diamond()
-    matrix = matrix_for(graph)
+    network = diamond()
+    matrix = matrix_for(network)
     matrix["work"][3, 0] = 3.0
     matrix["other"][3, 0] = 7.0
     matrix["work"][3, 3] = 100.0
     matrix["other"][3, 3] = 200.0
-    assignment, traffic = assignment_for(graph, matrix)
+    assignment, traffic = assignment_for(network, matrix)
     assignment.execute(max_iterations=8, rgap=0.0, cores=cores, elementwise_cores=1)
     assert assignment.class_results[traffic.name].unassigned_demand == 10.0
     assert assignment._class_states[0]._aon_results.unassigned_demand == 10.0
@@ -293,12 +280,11 @@ def test_repeated_execution_clears_history_and_preserves_old_output_views():
 
 
 def test_assignment_classes_build_independent_graphs_and_cost_buffers():
-    graph = diamond()
-    network = Network(graph.network.assign(modes="c"))
+    network = diamond()
     configuration = TrafficClass(
         mode="c",
         cost="time",
-        demand=matrix_for(graph),
+        demand=matrix_for(network),
         graph_options={"block_centroid_flows": False},
     )
     prepared = network._assignment_graph(configuration)
@@ -313,7 +299,7 @@ def test_assignment_classes_build_independent_graphs_and_cost_buffers():
             {},
             1,
             field_values=network.field_values,
-            skim_fields=graph.skim_fields,
+            skim_fields=["time", "distance"],
         )
         for index in range(2)
     ]
@@ -331,15 +317,15 @@ def test_assignment_classes_build_independent_graphs_and_cost_buffers():
 
 
 def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
-    graph = diamond(True)
-    matrix = matrix_for(graph)
-    inputs = routing_inputs(graph, matrix, "time", {"upper": [0]}, 2)
+    network = diamond(True)
+    matrix = matrix_for(network)
+    inputs = routing_inputs(network, matrix, "time", {"upper": [0]}, 2)
     state = inputs.make_state(1, 10000)
     output = state.output
     buffers = [output.loading.link_loads, output.skimming.skims]
     addresses = [buffer.ctypes.data for buffer in buffers]
     for cost in (1.0, 2.0, np.inf, 1.0):
-        inputs.update_costs(np.full(graph.num_links, cost), np.zeros(graph.num_links))
+        inputs.update_costs(np.full(network.mapping.link_count, cost), np.zeros(network.mapping.link_count))
         inputs.driver.run(output)
         state.update_totals()
         assert [
@@ -354,8 +340,7 @@ def test_prepared_driver_reuses_output_storage_and_replaces_unassigned_total():
 
 
 def test_compressed_chain_and_removed_link_project_without_dummy_storage():
-    graph = GraphBase()
-    graph.network = pd.DataFrame(
+    links = pd.DataFrame(
         {
             "link_id": [9, 2, 7],
             "a_node": [10, 20, 20],
@@ -364,16 +349,14 @@ def test_compressed_chain_and_removed_link_project_without_dummy_storage():
             "time": [1.0, 2.0, 3.0],
         }
     )
-    graph.prepare_graph(np.array([10, 30]))
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph("time")
-    inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    full = Network(graph.network).field_values("time")
+    network = Network(links.assign(modes="c"), centroids=[10, 30])
+    inputs = routing_inputs(network, matrix_for(network), "time", {}, 1, skim_fields=[])
+    full = network.field_values("time")
     inputs.update_costs(full, np.zeros_like(full))
     output = inputs.driver.run(inputs.driver.make_outputs())
     projected = inputs.mapping.project_loads(output.loading.link_loads)
-    network = inputs.mapping.network
-    for row, (link_id, direction) in enumerate(zip(network.link_ids, network.directions, strict=True)):
+    mapping = inputs.mapping.network
+    for row, (link_id, direction) in enumerate(zip(mapping.link_ids, mapping.directions, strict=True)):
         expected = [8.0, 12.0] if link_id in (9, 2) and direction == 1 else [0.0, 0.0]
         np.testing.assert_array_equal(projected[row], expected)
     assert output.loading.link_count == inputs.mapping.link_count
@@ -382,10 +365,9 @@ def test_compressed_chain_and_removed_link_project_without_dummy_storage():
 
 @pytest.mark.parametrize("turn", [False, True])
 def test_zero_demand_without_skims_leaves_no_optional_outputs(turn):
-    graph = diamond(turn)
-    graph.set_skimming([])
-    matrix = matrix_for(graph, np.zeros((4, 4, 1)))
-    inputs = routing_inputs(graph, matrix, "time", {}, 2)
+    network = diamond(turn)
+    matrix = matrix_for(network, np.zeros((4, 4, 1)))
+    inputs = routing_inputs(network, matrix, "time", {}, 2, skim_fields=[])
     output = inputs.driver.run(inputs.driver.make_outputs())
     assert inputs.driver.origins.size == 0
     assert output.skimming is None
@@ -395,8 +377,8 @@ def test_zero_demand_without_skims_leaves_no_optional_outputs(turn):
 
 
 def test_unassigned_total_is_copied_blended_and_reset_with_output_group():
-    graph = diamond()
-    inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
+    network = diamond()
+    inputs = routing_inputs(network, matrix_for(network), "time", {}, 1)
     reached, missing, output = [inputs.driver.make_outputs() for _ in range(3)]
     inputs.update_costs(np.ones(4), np.zeros(4))
     inputs.driver.run(reached)
@@ -417,14 +399,13 @@ def test_unassigned_total_is_copied_blended_and_reset_with_output_group():
 
 
 def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
-    graph = diamond()
-    graph.network.loc[graph.network.link_id == 71, "toll"] = 10.0
-    network = Network(graph.network.assign(modes="c"), centroids=graph.centroids)
+    network = diamond()
+    network = replace(network, links=network.links.assign(toll=np.where(network.links.link_id == 71, 10.0, 0.0)))
     cars = TrafficClass(
         name="cars",
         mode="c",
         cost="time",
-        demand=matrix_for(graph),
+        demand=matrix_for(network),
         pce=0.5,
         graph_options={"block_centroid_flows": False},
     )
@@ -452,12 +433,11 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
 def test_translation_preserves_graph_centroid_blocking(turn):
     from .routing_helpers import search
 
-    graph = diamond(turn)
-    graph.set_blocked_centroid_flows(True)
-    inputs = routing_inputs(graph, matrix_for(graph), "time", {}, 1)
-    # The existing turn branch relies on the builder's generated connector bans,
+    network = diamond(turn)
+    inputs = routing_inputs(network, matrix_for(network), "time", {}, 1, block_centroid_flows=True)
+    # The turn branch relies on the graph's generated connector bans,
     # rather than adding the routing context's blocked centroid prefix.
-    expected = 0 if graph.has_turn_restrictions else graph.num_zones
+    expected = 0 if turn else len(network.centroids)
     assert inputs.routing.blocked_centroid_count == expected
     assert not search(inputs.routing, 0).reachable_to(3)
 
@@ -519,9 +499,9 @@ def test_exports_use_named_skims_and_every_selected_demand_column(sioux_falls_si
 
 
 def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields():
-    graph = diamond(True)
-    assignment, traffic = assignment_for(graph, algorithm="msa")
+    assignment, traffic = assignment_for(diamond(True), algorithm="msa")
     assignment.execute(max_iterations=4, rgap=0.0, cores=1, elementwise_cores=1)
+    graph = assignment._class_states[0].graph
     original_fields = graph.skim_fields.copy()
     original_skims = assignment._class_states[0]._aon_results.skims
     original_values = original_skims.skims.copy()
@@ -542,34 +522,34 @@ def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields()
 def test_assignment_time_and_cost_skims_have_separate_meanings(turn):
     from .routing_helpers import search
 
-    graph = diamond(turn)
+    network = diamond(turn)
     inputs = routing_inputs(
-        graph,
-        matrix_for(graph),
+        network,
+        matrix_for(network),
         "time",
         {},
         1,
         skim_fields=["time", "distance", "assignment_cost"],
         cost_name="assignment_cost",
     )
-    full = Network(graph.network).field_values("time")
+    full = network.field_values("time")
     inputs.update_costs(full, np.full(inputs.mapping.network.link_count, 0.25))
     raw = inputs.driver.run(inputs.driver.make_outputs()).skimming
     output = inputs.report_skims(raw)
     assert output.matrices["time"][0, 3] == (2.5 if turn else 2.0)
     assert output.matrices["assignment_cost"][0, 3] == (3.0 if turn else 2.5)
-    for origin in range(graph.num_zones):
+    for origin in range(len(network.centroids)):
         results = search(inputs.routing, origin)
-        for destination in range(graph.num_zones):
+        for destination in range(len(network.centroids)):
             assert output.matrices["assignment_cost"][origin, destination] == results.path_cost_to(destination)
 
 
 @pytest.mark.parametrize("turn", [False, True])
 def test_congested_time_excludes_tolls_but_keeps_turn_delay(turn):
-    graph = diamond(turn)
-    graph.network.loc[graph.network.link_id == 71, "toll"] = 2.0
+    network = diamond(turn)
+    network = replace(network, links=network.links.assign(toll=np.where(network.links.link_id == 71, 2.0, 0.0)))
     assignment, traffic = assignment_for(
-        graph, fixed_cost_field="toll", vot=2.0, name_mapping={"alpha": 0.0, "beta": 1.0}
+        network, fixed_cost_field="toll", vot=2.0, name_mapping={"alpha": 0.0, "beta": 1.0}
     )
     assignment.execute(max_iterations=8, rgap=0.0, cores=1, elementwise_cores=1)
 
@@ -589,17 +569,17 @@ def test_congested_time_excludes_tolls_but_keeps_turn_delay(turn):
 
 
 def test_congested_skim_reporting_does_not_add_turn_delay_twice():
-    graph = diamond(True)
+    network = diamond(True)
     inputs = routing_inputs(
-        graph,
-        matrix_for(graph),
+        network,
+        matrix_for(network),
         "time",
         {},
         1,
         skim_fields=["time", "distance", "assignment_cost"],
         cost_name="assignment_cost",
     )
-    full = Network(graph.network).field_values("time")
+    full = network.field_values("time")
     inputs.update_costs(full, np.zeros_like(full))
     raw = inputs.driver.run(inputs.driver.make_outputs()).skimming
     original = raw.skims.copy()

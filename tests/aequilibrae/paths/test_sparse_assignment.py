@@ -12,13 +12,13 @@ from .test_assignment_integration import assignment_for, diamond, matrix_for
 
 @pytest.mark.parametrize("format", ["csr", "csc", "coo", "bsr", "lil", "dok"])
 def test_sparse_assignment_matches_dense_results(format):
-    graph = diamond(turn=True)
-    dense = matrix_for(graph)
+    network = diamond(turn=True)
+    dense = matrix_for(network)
     sparse_demand = from_dict(
         {name: sparse.csr_array(values).asformat(format) for name, values in dense.items()}, dense.index
     )
-    dense_assignment, dense_traffic = assignment_for(graph, dense)
-    sparse_assignment, sparse_traffic = assignment_for(graph, sparse_demand)
+    dense_assignment, dense_traffic = assignment_for(network, dense)
+    sparse_assignment, sparse_traffic = assignment_for(network, sparse_demand)
 
     dense_assignment.execute(cores=1)
     sparse_assignment.execute(cores=1)
