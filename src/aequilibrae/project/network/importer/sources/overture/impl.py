@@ -19,6 +19,7 @@ def acquire_cloud(
     modes: Sequence[str],
     download_cache: DownloadCache,
     model_area,
+    include_private: bool = False,
 ) -> StagedNetwork:
     overturemaps = require("overturemaps", feature="Overture cloud download")
 
@@ -60,6 +61,7 @@ def acquire_cloud(
         segments=segments_gdf,
         modes=modes,
         source_meta=source_meta,
+        include_private=include_private,
     )
 
 
