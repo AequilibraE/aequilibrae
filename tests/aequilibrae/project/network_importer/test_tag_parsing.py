@@ -4,6 +4,7 @@ import pytest
 
 from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
     directional_lanes,
+    modes_for_tags,
     parse_speed,
 )
 
@@ -59,3 +60,20 @@ def test_parse_speed_valid(value, expected):
 )
 def test_parse_speed_rejects_messy_values(value):
     assert parse_speed(value) is None
+
+
+@pytest.mark.parametrize(
+    "access", ["private", "destination", "customers", "delivery", "permit", "private;delivery", "no"]
+)
+def test_include_private(access):
+    tags = {"highway": "residential", "access": access}
+    assert modes_for_tags(tags) == ""
+    assert modes_for_tags(tags, include_private=True) == "bctw"
+    tags.update(foot="no", motor_vehicle="no")
+    assert modes_for_tags(tags, include_private=True) == "b"
+
+
+def test_include_private_driveway():
+    tags = {"highway": "service", "service": "driveway"}
+    assert modes_for_tags(tags) == "bw"
+    assert modes_for_tags(tags, include_private=True) == "bctw"

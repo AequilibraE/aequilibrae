@@ -68,6 +68,7 @@ def build_staged_from_overture(
     segments: gpd.GeoDataFrame,
     modes: Sequence[str],
     source_meta: dict,
+    include_private: bool = False,
 ) -> StagedNetwork:
     if len(segments) == 0:
         raise ImporterError("Overture returned no segments in the requested area")
@@ -96,7 +97,9 @@ def build_staged_from_overture(
     node_ids = count(NODE_ID_START + len(connectors))
     for seg, geom in zip(segments.drop(columns=["geometry"]).to_dict(orient="records"), segments.geometry, strict=True):
         link_rows.extend(
-            _segment_to_links(seg, geom, gers_to_node, requested_codes, synthetic_nodes, node_ids, skipped)
+            _segment_to_links(
+                seg, geom, gers_to_node, requested_codes, synthetic_nodes, node_ids, skipped, include_private
+            )
         )
 
     if synthetic_nodes:
@@ -139,6 +142,7 @@ def _segment_to_links(
     synthetic_nodes: list,
     node_ids,
     skipped: Counter,
+    include_private: bool = False,
 ) -> list:
     if geom is None or geom.is_empty:
         skipped["empty_geometry"] += 1
@@ -149,7 +153,7 @@ def _segment_to_links(
         skipped["too_few_connectors"] += 1
         return []
 
-    filtered_modes = filter_by_modes(_modes_for_segment(seg), requested_codes)
+    filtered_modes = filter_by_modes(_modes_for_segment(seg, include_private), requested_codes)
     if not filtered_modes:
         skipped["mode_filter"] += 1
         return []
@@ -213,7 +217,7 @@ def _parse_connectors_field(value) -> list:
     return pairs
 
 
-def _modes_for_segment(seg: dict) -> str:
+def _modes_for_segment(seg: dict, include_private: bool = False) -> str:
     subtype = str(seg["subtype"] or "").lower()
     if subtype in _NON_ROAD_SUBTYPES:
         return ""
@@ -236,6 +240,19 @@ def _modes_for_segment(seg: dict) -> str:
             out.add(MODE_CODE["bicycle"])
     if cls in _BICYCLE_CLASSES:
         out.add(MODE_CODE["bicycle"])
+    restrictions = seg.get("access_restrictions")
+    for rule in restrictions if restrictions is not None else ():
+        when = rule.get("when") or {}
+        restricted = rule.get("access_type") == "allowed" and (
+            when.get("recognized") is not None or when.get("using") is not None
+        )
+        denied = rule.get("access_type") == "denied" and not any(
+            when.get(key) is not None for key in ("heading", "during", "using", "recognized", "vehicle")
+        )
+        modes = when.get("mode")
+        if (restricted and not include_private) or (denied and (not include_private or modes is not None)):
+            codes = {"vehicle": "bct", "motor_vehicle": "ct", "car": "c", "bus": "t", "bicycle": "b", "foot": "w"}
+            out.difference_update("".join(codes.get(mode, "") for mode in modes) if modes is not None else out)
     return "".join(sorted(out))
 
 

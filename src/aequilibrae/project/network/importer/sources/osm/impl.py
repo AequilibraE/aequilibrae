@@ -62,6 +62,7 @@ def acquire_overpass(
     model_area=None,
     place_name=None,
     custom_filter=None,
+    include_private: bool = False,
 ) -> StagedNetwork:
     ox = require("osmnx", feature="OSM Overpass download")
     import networkx as nx
@@ -117,7 +118,9 @@ def acquire_overpass(
         "source_url": source_url,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-    return _edges_nodes_to_staged(edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area)
+    return _edges_nodes_to_staged(
+        edges_gdf, nodes_gdf, modes=modes, source_meta=source_meta, clip_to=model_area, include_private=include_private
+    )
 
 
 def _fetch_graph(ox, area, fetch_kwargs, source_url: str, part: int, total: int):
@@ -311,6 +314,11 @@ def _configure_osmnx(ox) -> dict:
     from aequilibrae.parameters import Parameters
 
     params = Parameters().parameters.get("osm", {}) or {}
+    ox.settings.useful_tags_way = list(
+        dict.fromkeys(
+            ox.settings.useful_tags_way + ["vehicle", "motor_vehicle", "motorcar", "foot", "bicycle", "bus", "psv"]
+        )
+    )
     if "overpass_endpoint" in params:
         ox.settings.overpass_url = params["overpass_endpoint"].rstrip("/")
     if "nominatim_endpoint" in params:
@@ -359,6 +367,7 @@ def acquire_pbf(
     pbf_path: Path,
     modes: Sequence[str],
     download_cache: DownloadCache,
+    include_private: bool = False,
 ) -> StagedNetwork:
     pyrosm = require("pyrosm", feature="OSM PBF reading")
 
@@ -367,7 +376,7 @@ def acquire_pbf(
         raise FileNotFoundError(f"PBF file not found: {pbf_path}")
 
     osm = pyrosm.OSM(str(pbf_path))
-    result = osm.get_network(network_type="all", nodes=True)
+    result = osm.get_network(network_type="all", nodes=True, extra_attributes=["vehicle", "bus"])
     if result is None:
         raise ImporterError(f"pyrosm returned no data from {pbf_path}")
     nodes_raw, edges = result
@@ -382,7 +391,9 @@ def acquire_pbf(
         "source_url": str(pbf_path),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-    return _edges_nodes_to_staged(edges, nodes, modes=modes, source_meta=source_meta, clip_to=None)
+    return _edges_nodes_to_staged(
+        edges, nodes, modes=modes, source_meta=source_meta, clip_to=None, include_private=include_private
+    )
 
 
 def _first_last_points(geom):
@@ -443,11 +454,12 @@ def _edges_nodes_to_staged(
     modes: Sequence[str],
     source_meta: dict,
     clip_to,
+    include_private: bool = False,
 ) -> StagedNetwork:
     requested_codes = requested_mode_codes(modes)
     nodes_gdf, osm_to_node = _prepare_nodes(nodes_gdf)
     edges = _prepare_edges(edges_gdf, osm_to_node)
-    edges = _add_osm_attributes(edges, requested_codes)
+    edges = _add_osm_attributes(edges, requested_codes, include_private)
     edges = _filter_edges(edges, modes, clip_to)
     edges = _finalize_edges(edges)
     used_nodes = set(edges["a_node"]) | set(edges["b_node"])
@@ -511,7 +523,9 @@ def _edge_diagnostics(edges: gpd.GeoDataFrame, limit: int = 10) -> str:
     return f"{details.to_dict(orient='records')}{suffix}"
 
 
-def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.GeoDataFrame:
+def _add_osm_attributes(
+    edges: gpd.GeoDataFrame, requested_codes: set, include_private: bool = False
+) -> gpd.GeoDataFrame:
     records = edges[[c for c in edges.columns if c not in _NON_TAG_COLS]].to_dict(orient="records")
     attributes = []
 
@@ -524,7 +538,7 @@ def _add_osm_attributes(edges: gpd.GeoDataFrame, requested_codes: set) -> gpd.Ge
         lanes_ab, lanes_ba = directional_lanes(tags)
         attributes.append(
             {
-                "modes": filter_by_modes(modes_for_tags(tags), requested_codes),
+                "modes": filter_by_modes(modes_for_tags(tags, include_private), requested_codes),
                 "direction": parse_direction(tags),
                 "speed_ab": speed_ab,
                 "speed_ba": speed_ba,
