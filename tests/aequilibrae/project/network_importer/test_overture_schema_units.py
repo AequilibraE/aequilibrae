@@ -172,3 +172,14 @@ def test_all_segments_malformed_still_raises():
             modes=("car",),
             source_meta=_META,
         )
+
+
+@pytest.mark.parametrize(
+    "when", [{"recognized": ["as_private"]}, {"using": ["at_destination", "as_customer", "to_deliver"]}]
+)
+def test_include_private(when):
+    seg = {"subtype": "road", "class": "service", "access_restrictions": [{"access_type": "allowed", "when": when}]}
+    assert _modes_for_segment(seg) == ""
+    assert _modes_for_segment(seg, include_private=True) == "ctw"
+    seg["access_restrictions"].append({"access_type": "denied", "when": {"mode": ["foot"]}})
+    assert _modes_for_segment(seg, include_private=True) == "ct"

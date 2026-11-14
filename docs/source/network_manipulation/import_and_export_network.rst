@@ -64,6 +64,9 @@ apply a link-type allow-list; filtering is controlled by the ``modes`` argument.
 OSM tags that do not map to real project table columns are stored as JSON in
 ``other_attributes``.
 
+OSM and Overture imports exclude private/restricted access by default. Pass
+``include_private=True`` to retain it; explicit mode prohibitions still apply.
+
 Overpass imports write the downloaded payload and a manifest under
 ``<project>/downloaded data/osm-overpass/``. Local PBF imports do not create a
 download cache because the source file is already local.

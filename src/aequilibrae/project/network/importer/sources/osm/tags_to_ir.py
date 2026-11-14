@@ -10,18 +10,21 @@ def _has(tags: Mapping, key: str, *values: str) -> bool:
     v = tags.get(key)
     if v is None:
         return False
-    return str(v).lower() in values
+    return any(part.strip() in values for part in str(v).lower().split(";"))
 
 
-def _denied(tags: Mapping, key: str) -> bool:
-    return _has(tags, key, "no", "private", "destination", "customers", "forestry", "agricultural", "delivery")
+def _denied(tags: Mapping, key: str, include_private: bool = False) -> bool:
+    return _has(tags, key, "no") or (
+        not include_private
+        and _has(tags, key, "private", "destination", "customers", "forestry", "agricultural", "delivery", "permit")
+    )
 
 
 def _explicit_allowed(tags: Mapping, key: str) -> bool:
     return _has(tags, key, "yes", "designated", "permissive", "official")
 
 
-def _allow_car(tags: Mapping) -> bool:
+def _allow_car(tags: Mapping, include_private: bool) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
@@ -37,34 +40,38 @@ def _allow_car(tags: Mapping) -> bool:
         "escalator",
         "via_ferrata",
     }
+    if not include_private and _denied(tags, "access") and not _explicit_allowed(tags, "motor_vehicle"):
+        return False
+    if _denied(tags, "motor_vehicle", include_private) or _denied(tags, "motorcar", include_private):
+        return False
+    if _denied(tags, "vehicle", include_private) and not _explicit_allowed(tags, "motor_vehicle"):
+        return False
     if highway in pedestrian_only:
         return _explicit_allowed(tags, "motor_vehicle") or _explicit_allowed(tags, "vehicle")
-    if _denied(tags, "access") and not _explicit_allowed(tags, "motor_vehicle"):
-        return False
-    if _denied(tags, "motor_vehicle"):
-        return False
-    if _denied(tags, "vehicle") and not _explicit_allowed(tags, "motor_vehicle"):
-        return False
-    if highway == "service" and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access"):
+    if (
+        not include_private
+        and highway == "service"
+        and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access")
+    ):
         return False
     return True
 
 
-def _allow_walk(tags: Mapping) -> bool:
+def _allow_walk(tags: Mapping, include_private: bool) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
     motor_only = {"motorway", "motorway_link", "trunk", "trunk_link"}
     if highway in motor_only:
         return _explicit_allowed(tags, "foot")
-    if _denied(tags, "access") and not _explicit_allowed(tags, "foot"):
+    if not include_private and _denied(tags, "access") and not _explicit_allowed(tags, "foot"):
         return False
-    if _denied(tags, "foot"):
+    if _denied(tags, "foot", include_private):
         return False
     return True
 
 
-def _allow_bicycle(tags: Mapping) -> bool:
+def _allow_bicycle(tags: Mapping, include_private: bool) -> bool:
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
@@ -74,21 +81,21 @@ def _allow_bicycle(tags: Mapping) -> bool:
     pedestrian_blocked = {"footway", "steps", "corridor", "elevator", "escalator"}
     if highway in pedestrian_blocked:
         return _explicit_allowed(tags, "bicycle")
-    if _denied(tags, "access") and not _explicit_allowed(tags, "bicycle"):
+    if not include_private and _denied(tags, "access") and not _explicit_allowed(tags, "bicycle"):
         return False
-    if _denied(tags, "bicycle"):
+    if _denied(tags, "bicycle", include_private):
         return False
     return True
 
 
-def _allow_transit(tags: Mapping) -> bool:
+def _allow_transit(tags: Mapping, include_private: bool) -> bool:
     """Bus-capable highways (proxy for 'transit')."""
     highway = str(tags.get("highway", "")).lower()
     if not highway:
         return False
-    if highway in {"bus_guideway", "busway"}:
-        return True
     bus_capable = {
+        "bus_guideway",
+        "busway",
         "motorway",
         "motorway_link",
         "trunk",
@@ -107,11 +114,19 @@ def _allow_transit(tags: Mapping) -> bool:
     }
     if highway not in bus_capable:
         return False
-    if _denied(tags, "access") and not _explicit_allowed(tags, "bus"):
+    if not include_private and _denied(tags, "access") and not _explicit_allowed(tags, "bus"):
         return False
-    if _has(tags, "psv", "no") and not _explicit_allowed(tags, "bus"):
+    if _denied(tags, "bus", include_private):
         return False
-    if highway == "service" and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access"):
+    if any(_denied(tags, key, include_private) for key in ("vehicle", "motor_vehicle", "psv")) and not (
+        _explicit_allowed(tags, "bus") or _explicit_allowed(tags, "psv")
+    ):
+        return False
+    if (
+        not include_private
+        and highway == "service"
+        and _has(tags, "service", "parking_aisle", "driveway", "private", "emergency_access")
+    ):
         return False
     return True
 
@@ -124,8 +139,10 @@ MODE_RULES = {
 }
 
 
-def modes_for_tags(tags: Mapping) -> str:
-    return "".join(sorted(code for code, predicate in MODE_RULES.items() if predicate(tags)))
+def modes_for_tags(tags: Mapping, include_private: bool = False) -> str:
+    if not include_private and _has(tags, "service", "private"):
+        return ""
+    return "".join(sorted(code for code, predicate in MODE_RULES.items() if predicate(tags, include_private)))
 
 
 _SQL_KEY_RE = re.compile(r"[^a-zA-Z0-9_]+")

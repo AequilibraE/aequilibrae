@@ -49,6 +49,7 @@ class Importer:
         place_name: Optional[str] = None,
         pbf_path=None,
         modes=DEFAULT_MODES,
+        include_private: bool = False,
         custom_filter: Optional[str] = None,
         simplify=False,
         consolidate_tolerance: Optional[float] = 10.0,
@@ -77,6 +78,7 @@ class Importer:
             simplify=simplify,
             consolidate_tolerance=consolidate_tolerance,
             cache_tag=cache_tag,
+            include_private=include_private,
             **source_kwargs,
         )
 
@@ -85,6 +87,7 @@ class Importer:
         *,
         model_area: Polygon,
         modes=DEFAULT_MODES,
+        include_private: bool = False,
         simplify=False,
         consolidate_tolerance: Optional[float] = 10.0,
     ) -> None:
@@ -98,6 +101,7 @@ class Importer:
             consolidate_tolerance=consolidate_tolerance,
             cache_tag="bbox_" + "_".join(f"{b:.4f}" for b in model_area.bounds),
             model_area=model_area,
+            include_private=include_private,
         )
 
     def gmns(
