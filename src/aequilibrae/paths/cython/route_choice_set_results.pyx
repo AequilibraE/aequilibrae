@@ -364,7 +364,7 @@ cdef class RouteChoiceSetResults:
     ) noexcept nogil:
         """Compute PSL from costs and links, preserving any supplied exclusions."""
         cdef vector[long long] keys, counts
-        cdef vector[pair[long long, long long]] turns
+        cdef vector[pair[long long, long long]] turns, route_turn_pairs
         cdef pair[long long, long long] turn
         cdef size_t j, k
         cdef long long previous, link
@@ -382,14 +382,23 @@ cdef class RouteChoiceSetResults:
                 if not route_mask[j]:
                     continue
 
+                route_turn_pairs.clear()
                 previous = -1
                 for k in range(d(route_set[j]).size()):
                     link = d(route_set[j])[k]
                     if previous != -1:
                         turn.first = previous
                         turn.second = link
-                        turns.push_back(turn)
+                        route_turn_pairs.push_back(turn)
                     previous = link
+
+                # Count routes containing each turn, not repeated traversals within a route.
+                sort(route_turn_pairs.begin(), route_turn_pairs.end())
+                turns.insert(
+                    turns.end(),
+                    route_turn_pairs.begin(),
+                    unique(route_turn_pairs.begin(), route_turn_pairs.end()),
+                )
 
             sort(turns.begin(), turns.end())
 

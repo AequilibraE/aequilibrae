@@ -36,6 +36,33 @@ def test_invalid_prepare_nodes(route_choice_setup, nodes):
         route_choice_setup["rc"].prepare(nodes)
 
 
+@pytest.mark.parametrize("turn_based", [False, True])
+def test_import_rejects_disallowed_uturn_even_when_masked(import_routes, turn_based):
+    links = pd.DataFrame(
+        {"link_id": [11, 12], "a_node": [10, 10], "b_node": [20, 40], "direction": [0, 1], "time": 1.0}
+    )
+    turns = (
+        pd.DataFrame({"from_node": [20], "via_node": [10], "to_node": [40], "penalty": [0.0]}) if turn_based else None
+    )
+    graph = Network(links, centroids=[10, 40], turn_restrictions=turns).build_graph(
+        "c", "time", block_centroid_flows=False
+    )
+    choice = configured_choice(graph)
+    choice.set_demand(single_od_demand(10, 40))
+    supplied = pd.DataFrame(
+        {
+            "origin id": [10],
+            "destination id": [40],
+            "route set": [[11, 11, 12]],
+            "route directions": [[1, -1, 1]],
+            "probability": [1.0],
+            "mask": [False],
+        }
+    )
+    with pytest.raises(ValueError, match="disallowed U-turn"):
+        import_routes(choice, supplied)
+
+
 @pytest.mark.parametrize(
     "algorithm,options,error,match",
     [

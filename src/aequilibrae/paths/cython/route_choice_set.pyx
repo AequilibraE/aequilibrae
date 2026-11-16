@@ -763,7 +763,7 @@ cdef class RouteChoiceSet:
         cdef size_t i, j, previous, current, lo, hi, mid
         cdef uint64_t origin, destination
         cdef size_t blocked_centroids = self.routing.blocked_centroid_count
-        cdef bint allow_uturns = not self.turn_based or self.routing.allow_uturns
+        cdef bint allow_uturns = self.routing.allow_uturns
         cdef bint connected, explicit_turn
         cdef double cost, penalty
 

@@ -157,6 +157,35 @@ def test_shared_turn_cost_counts_towards_overlap():
             assert imported_table[route][field] == pytest.approx(generated[field])
 
 
+@pytest.mark.parametrize("alternative", [False, True])
+def test_repeated_turn_counts_once_per_route_in_overlap(alternative):
+    links = pd.DataFrame(
+        {
+            "link_id": [11, 12, 13, 14],
+            "a_node": [10, 20, 30, 30],
+            "b_node": [20, 30, 10, 40],
+            "direction": 1,
+            "time": 1.0,
+        }
+    )
+    turns = pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [30], "penalty": [3.0]})
+    graph = Network(links, centroids=[10, 40], turn_restrictions=turns).build_graph(
+        "c", "time", block_centroid_flows=False
+    )
+    routes = [[11, 12, 13, 11, 12, 14]]
+    if alternative:
+        routes.append([11, 12, 14])
+    result = recompute_imported_routes(graph, routes)
+
+    # Repeated traversals add cost, but each route contributes only once to a turn's frequency.
+    costs = np.array([12.0, 6.0] if alternative else [12.0])
+    overlap = np.array([6.5 / 12.0, 0.5] if alternative else [1.0])
+    weights = overlap * np.exp(-costs)
+    np.testing.assert_allclose(result["cost"], costs)
+    np.testing.assert_allclose(result["path overlap"], overlap)
+    np.testing.assert_allclose(result["probability"], weights / weights.sum())
+
+
 def test_recomputed_psl_uses_turn_penalties():
     rows = recompute_imported_routes(diamond(5.0), [[71, 12], [55, 24]])
     table = {tuple(row["route set"]): row for _, row in rows.iterrows()}
@@ -166,7 +195,7 @@ def test_recomputed_psl_uses_turn_penalties():
     assert table[71, 12]["probability"] == pytest.approx(1.0 / (1.0 + np.exp(3.0)))
 
 
-@pytest.mark.parametrize("policy", ["node-based", "implicit-ban", "explicit-allow"])
+@pytest.mark.parametrize("policy", ["node-based", "node-based-allow", "implicit-ban", "explicit-allow"])
 def test_recomputed_psl_applies_uturn_rules(policy):
     links = pd.DataFrame(
         {
@@ -179,7 +208,7 @@ def test_recomputed_psl_applies_uturn_rules(policy):
     )
 
     turns = None
-    if policy != "node-based":
+    if policy not in ("node-based", "node-based-allow"):
         turns = pd.DataFrame(
             {
                 "from_node": [10],
@@ -188,15 +217,15 @@ def test_recomputed_psl_applies_uturn_rules(policy):
                 "penalty": [0.0],
             }
         )
-    graph = Network(links, centroids=[10, 20, 40], turn_restrictions=turns).build_graph(
-        "c", cost="time", compact=True, block_centroid_flows=False
-    )
+    graph = Network(
+        links, centroids=[10, 20, 40], turn_restrictions=turns, allow_uturns=policy == "node-based-allow"
+    ).build_graph("c", cost="time", compact=True, block_centroid_flows=False)
 
-    if policy == "implicit-ban":
+    if policy in ("node-based", "implicit-ban"):
         with pytest.raises(ValueError, match="disallowed U-turn"):
             recompute_imported_routes(graph, [[11, 12, 13], [11, 14]])
     else:
-        # Node-based routing does not impose an additional U-turn policy on imports.
+        # Global permission or an explicit finite turn permits the U-turn.
         result = recompute_imported_routes(graph, [[11, 12, 13], [11, 14]])
         assert result["mask"].all()
         np.testing.assert_allclose(result["cost"], [3.0, 2.0])
