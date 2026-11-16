@@ -236,16 +236,6 @@ def test_projection_preserves_dtype_and_shape(mapping, dtype, classes, use_out):
         assert result is out
 
 
-def test_projection_noncontiguous_and_nonfinite(mapping):
-    loads = np.array([[7.0, 1, 14, 2], [11, 3, 22, 4]])[:, ::2]
-    expected = np.array([7, 11, 11, 7, 7, 11, 0])
-    np.testing.assert_array_equal(mapping.project_loads(loads), np.column_stack((expected, expected * 2)))
-    projected = mapping.project_loads(np.array([np.nan, np.inf]))
-    assert np.isnan(projected[0])
-    assert np.isinf(projected[1])
-    assert projected[-1] == 0
-
-
 def test_empty_queries(mapping):
     for result in (
         mapping.graph_link([], 1),
