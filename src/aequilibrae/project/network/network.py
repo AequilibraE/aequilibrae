@@ -219,7 +219,7 @@ class Network(WorkerThread):
         allow_uturns: bool | None = None,
     ) -> "Graph":
         """Build a standalone graph without retaining project connections."""
-        skimming = (skimming,) if isinstance(skimming, str) else tuple(skimming or ())
+        skimming = (skimming,) if isinstance(skimming, str) else tuple(() if skimming is None else skimming)
         if fields is not None:
             fields = list(dict.fromkeys([*fields, cost, *skimming]))
         return self.build(fields=fields, modes=[mode], limit_to_area=limit_to_area).build_graph(
