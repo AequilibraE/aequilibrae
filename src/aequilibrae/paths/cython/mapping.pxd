@@ -1,5 +1,7 @@
 cimport cython
 
+from aequilibrae.utils.cython.array_allocations cimport ArrayElement
+
 
 # Dense-index kernels for validated mapping buffers. Outputs must be distinct
 # from inputs and large enough; callers bind the Python-owned arrays under the GIL.
@@ -19,6 +21,6 @@ cdef void aggregate_link_costs(
 
 cdef void project_link_loads(
     const Py_ssize_t[::1] network_link_to_graph,
-    const cython.floating[:, ::1] loads,
-    cython.floating[:, ::1] output,
+    const ArrayElement[:, ::1] loads,
+    ArrayElement[:, ::1] output,
 ) noexcept nogil

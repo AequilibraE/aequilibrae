@@ -1,4 +1,4 @@
-from libcpp.algorithm cimport sort, lower_bound, upper_bound
+from libcpp.algorithm cimport sort, lower_bound, upper_bound, unique
 from libcpp.utility cimport pair
 from libc.math cimport INFINITY, exp, pow, log, isfinite
 from libcpp.memory cimport shared_ptr, make_shared
@@ -13,7 +13,7 @@ import numpy as np
 import cython
 import logging
 
-from aequilibrae.paths.mapping import _integers
+from aequilibrae.paths.mapping import _ids, _integers
 
 logger = logging.getLogger(__name__)
 
@@ -198,12 +198,14 @@ cdef class RouteChoiceSetResults:
                 import json
                 # HACK: assign() rather than __setitem__: pandas 3's chained-assignment check can't see locals
                 # of a compiled Cython frame, so plain df[col] = ... warns spuriously here
-                if column == "route set":
-                    df = df.assign(**{column: df[column].map(lambda x: np.asarray(json.loads(x), dtype=np.uint64))})
-                else:
-                    df = df.assign(**{
-                        column: df[column].map(lambda x: _integers(json.loads(x), column, scalar=False))
-                    })
+                df = df.assign(**{column: df[column].map(json.loads)})
+
+            # Validate both encodings before any conversion can truncate invalid IDs.
+            for values in df[column]:
+                if not isinstance(values, (list, np.ndarray)):
+                    raise TypeError(f"route sets and directions must be a list or Numpy array, found {type(values)}")
+            validator = _ids if column == "route set" else _integers
+            df = df.assign(**{column: df[column].map(lambda x: validator(x, column, scalar=False))})
 
         return df
 
@@ -510,6 +512,7 @@ cdef class RouteChoiceSetResults:
         """
         cdef:
             vector[long long] link_union
+            vector[long long] route_links
             vector[long long].const_iterator union_iter
 
             # Scratch objects
@@ -531,7 +534,10 @@ cdef class RouteChoiceSetResults:
             if not route_mask[i]:
                 continue
 
-            link_union.insert(link_union.end(), d(route_set[i]).begin(), d(route_set[i]).end())
+            # A route contributes each link once, even when it traverses a cycle so we must de-duplicate them
+            route_links = d(route_set[i])
+            sort(route_links.begin(), route_links.end())
+            link_union.insert(link_union.end(), route_links.begin(), unique(route_links.begin(), route_links.end()))
 
         sort(link_union.begin(), link_union.end())
 

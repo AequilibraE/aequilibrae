@@ -209,12 +209,22 @@ def test_network_scenarios(scenario_example, scenario):
         else:
             raise AssertionError
 
-        try:
-            pd.testing.assert_frame_equal(graph1, graph2)
-        except AssertionError:
-            pass
-        else:
-            raise AssertionError
+        # Compare graph data, not Graph objects through pandas' type validation.
+        arrays = [
+            (
+                graph.routing.fs,
+                graph.routing.heads,
+                graph.routing.costs,
+                graph.mapping.network.node_ids,
+                graph.mapping.network.link_ids,
+                graph.mapping.network.directions,
+                graph.mapping.graph_node_to_network,
+                graph.mapping.expansion_offsets,
+                graph.mapping.expansion_links,
+            )
+            for graph in (graph1, graph2)
+        ]
+        assert any(not np.array_equal(a, b) for a, b in zip(*arrays, strict=True))
 
 
 @pytest.mark.parametrize("scenario", ["root", "nauru", "coquimbo"])

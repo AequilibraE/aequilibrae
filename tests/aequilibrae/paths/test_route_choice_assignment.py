@@ -293,38 +293,49 @@ def test_route_choice_keeps_borrowed_graph_alive():
     assert choice.recompute_psl(supplied)["cost"].iloc[0] == 2.5
 
 
-def test_complete_expansion_traversals_are_not_deduplicated():
-    # Use a connected cycle so the repeated traversal is a valid imported path.
-    network = Network(
+@pytest.mark.parametrize("member_count", range(1, 6))
+@pytest.mark.parametrize("recompute_psl", [False, True])
+def test_select_link_sets_dont_double_count(member_count, recompute_psl):
+    graph = Network(
         pd.DataFrame(
             {
-                "link_id": [11, 12, 13, 14],
-                "a_node": [10, 20, 30, 40],
-                "b_node": [20, 30, 40, 10],
+                "link_id": range(11, 18),
+                "a_node": [10, 20, 30, 40, 50, 60, 20],
+                "b_node": [20, 30, 40, 50, 60, 10, 60],
                 "direction": 1,
                 "time": 1.0,
             }
         ),
-        centroids=[10, 40],
-    )
-    choice = configured_choice(network.build_graph("c", "time", compact=True, block_centroid_flows=False))
-    choice.set_demand(single_od_demand(10, 40, flow=2.0))
-
-    route = [11, 12, 13, 14, 11, 12, 13]
+        centroids=[10, 60],
+    ).build_graph("c", "time", block_centroid_flows=False)
+    choice = configured_choice(graph)
+    choice.set_demand(single_od_demand(10, 60, flow=2.0))
+    matching = [(link, 1) for link in range(11, 11 + member_count)]
+    missing = [*matching[:-1], (17, 1)]
+    choice.set_select_links({"matching": [matching], "missing": [missing], "alternative": [missing, matching]})
+    route = [11, 12, 13, 14, 15, 16, 11, 12, 13, 14, 15]
     supplied = pd.DataFrame(
         {
             "origin id": [10],
-            "destination id": [40],
+            "destination id": [60],
             "route set": [route],
             "route directions": [[1] * len(route)],
             "probability": [1.0],
         }
     )
+    choice.execute_from_pandas(supplied, recompute_psl=recompute_psl)
 
-    choice.execute_from_pandas(supplied)
+    expected = [4.0] * 5 + [2.0, 0.0]
+    np.testing.assert_allclose(choice.get_load_results()["flow_tot"], expected)
+    selected = choice.get_select_link_loading_results()
+    selected_od = choice.get_select_link_od_matrix_results()
 
-    assert choice.get_load_results()["flow_tot"].tolist() == [4.0, 4.0, 4.0, 2.0]
-    assert choice.get_results()["route set"].iloc[0].tolist() == route
+    for name in ("matching", "alternative"):
+        np.testing.assert_allclose(selected[f"flow_{name}_tot"], expected)
+        assert selected_od[name]["flow"].sum() == 2.0
+
+    np.testing.assert_array_equal(selected["flow_missing_tot"], 0.0)
+    assert selected_od["missing"]["flow"].sum() == 0.0
 
 
 def test_costs_are_snapshotted_for_search_and_imports():

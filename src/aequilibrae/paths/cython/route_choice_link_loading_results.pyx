@@ -1,5 +1,5 @@
 from cython.operator cimport dereference as d
-from cython.operator cimport predecrement as pre_dec
+from libcpp.algorithm cimport find
 
 from aequilibrae.paths.cython.network_loading cimport cpp_reduce_loading_outputs
 from aequilibrae.paths.cython.select_link_loading cimport cpp_reduce_select_link_loading
@@ -39,18 +39,13 @@ cdef class LinkLoadingResults:
         # use these frequently and they don't change: a vector of OR alternatives,
         # each containing an unordered AND set of links.
         cdef vector[unique_ptr[unordered_set[long long]]] *selection
-        cdef vector[size_t] *lengths
 
         for or_set in (select_links or {}).values():
             selection = new vector[unique_ptr[unordered_set[long long]]]()
             self.select_link_sets.emplace_back(selection)
 
-            lengths = new vector[size_t]()
-            self.select_link_set_lengths.emplace_back(lengths)
-
             for and_set in or_set:
                 selection.emplace_back(new unordered_set[long long](and_set))
-                lengths.push_back(len(and_set))
 
         self.loading = LoadingOutputs(num_links, field_count)
         self.selected_loading = SelectLinkLoadingOutputs(
@@ -131,24 +126,24 @@ cdef class LinkLoadingResults:
 
     @staticmethod
     cdef bool is_in_select_link_set(
-        vector[long long] &route,
+        const vector[long long] &route,
         const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        const vector[size_t] &select_link_set_lengths,
     ) noexcept nogil:
         """Confirm whether a route satisfies a select link set.
 
-        Assumes the route contains unique links. Repeated links would be counted
-        more than once within an AND set.
+        Repeated route traversals count at most once per selected member.
         """
-        cdef vector[size_t] link_counts = select_link_set_lengths
         cdef long long link
         cdef size_t i
         # Iterate over an AND set first so a satisfied alternative short-circuits.
         for i in range(select_link_set.size()):
-            for link in route:
-                if d(select_link_set[i]).find(link) != d(select_link_set[i]).end():
-                    if pre_dec(link_counts[i]) == 0:
-                        return True
+            if d(select_link_set[i]).empty():
+                continue
+            for link in d(select_link_set[i]):
+                if find(route.cbegin(), route.cend(), link) == route.cend():
+                    break
+            else:
+                return True
         return False
 
     cdef void sl_link_load_single_route_set(
@@ -171,7 +166,6 @@ cdef class LinkLoadingResults:
                 if prob_vec[route] == 0 or not LinkLoadingResults.is_in_select_link_set(
                     d(route_set[route]),
                     d(self.select_link_sets[selection]),
-                    d(self.select_link_set_lengths[selection]),
                 ):
                     continue
 

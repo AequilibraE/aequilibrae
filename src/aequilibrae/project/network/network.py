@@ -219,15 +219,14 @@ class Network(WorkerThread):
         allow_uturns: bool | None = None,
     ) -> "Graph":
         """Build a standalone graph without retaining project connections."""
-        if isinstance(skimming, str):
-            skimming = [skimming]
+        skimming = (skimming,) if isinstance(skimming, str) else tuple(skimming or ())
         if fields is not None:
-            fields = list(dict.fromkeys([*fields, cost, *(skimming or [])]))
+            fields = list(dict.fromkeys([*fields, cost, *skimming]))
         return self.build(fields=fields, modes=[mode], limit_to_area=limit_to_area).build_graph(
             mode,
             cost,
             centroids=centroids,
-            skimming=skimming or (),
+            skimming=skimming,
             compact=compact,
             remove_dead_ends=remove_dead_ends,
             block_centroid_flows=block_centroid_flows,
@@ -276,6 +275,8 @@ class Network(WorkerThread):
                 # We filter to centroids existing in our filtered area
                 if centroids is not None:
                     centroids = centroids[np.isin(centroids, df.a_node) | np.isin(centroids, df.b_node)]
+                    if not centroids.size:
+                        centroids = None
 
             # Load turn restrictions and allow_uturns setting
             turn_restrictions_df = None

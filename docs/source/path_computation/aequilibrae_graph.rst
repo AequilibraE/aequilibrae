@@ -25,6 +25,8 @@ To restrict the source data to an area, supply a polygon:
 
 .. code-block:: python
 
+    >>> from shapely.geometry import Polygon
+
     >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
     >>> network = project.network.build(limit_to_area=polygon)  # doctest: +SKIP
 
@@ -55,6 +57,8 @@ Cost updates and link closures
 To close links without a topology change, set their costs to positive infinity:
 
 .. code-block:: python
+
+    >>> import numpy as np
 
     >>> costs = network.field_values('distance').copy()
     >>> costs[np.isin(network.link_ids, [123, 975])] = np.inf

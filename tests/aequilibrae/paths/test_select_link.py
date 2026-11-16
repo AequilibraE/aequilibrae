@@ -294,7 +294,7 @@ def test_select_link_export_preserves_shared_centroid_order(sioux_falls_single_c
     for name in ("first", "second"):
         centroids = [3, 1, 4, 2]
         demand = AequilibraeMatrix(index=np.array(centroids))
-        demand["flow"] = np.ones((len(centroids), len(centroids)), dtype=np.float64)
+        demand["flow"] = np.arange(1, len(centroids) ** 2 + 1, dtype=np.float64).reshape(len(centroids), len(centroids))
         classes.append(
             TrafficClass(
                 name=name,

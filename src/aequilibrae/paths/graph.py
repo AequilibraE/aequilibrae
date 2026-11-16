@@ -1281,10 +1281,14 @@ class Graph:
         return skimmer
 
     def disconnected_nodes(self) -> np.ndarray:
-        """Identify all disconnected nodes using strongly connected components analysis.
+        """Identify nodes unable to reach and be reached from the main network.
 
-        Returns:
-            All nodes that are disconnected from the main portion of the network.
+        The largest strongly connected component selects the main network.
+        Blocked centroids can be endpoints, but cannot connect other nodes
+        through themselves. Individual turn restrictions are not considered.
+        With no active links, only the first retained node is considered connected.
+
+        :returns: Disconnected external node IDs in retained graph-node order.
         """
         # Extract active directed links from the routing context
         active = np.isfinite(self.cost)

@@ -39,7 +39,7 @@ def test_invalid_prepare_nodes(route_choice_setup, nodes):
 @pytest.mark.parametrize(
     "algorithm,options,error,match",
     [
-        ("unknown", {}, AttributeError, "algorithm not available"),
+        ("unknown", {}, ValueError, "algorithm not available"),
         ("bfsle", {"unknown": 1}, ValueError, "Invalid parameter"),
         ("bfsle", {"disutility_cutoff_constant": 0}, ValueError, "Both must be set or unset"),
     ],

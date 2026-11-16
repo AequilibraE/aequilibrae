@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import connected_components
+from scipy.sparse.csgraph import breadth_first_order, connected_components
 
 sys.dont_write_bytecode = True
 
@@ -28,22 +28,28 @@ def disconnected_analysis(
     block_centroid_flows: bool,
     centroids: np.ndarray,
 ) -> np.ndarray:
-    """Identify disconnected nodes using strongly connected components analysis.
+    """Identify nodes unable to reach and be reached from the main network.
 
-    Args:
-        anodes: Array of link tail node indices (in compact routing order)
-        bnodes: Array of link head node indices (in compact routing order)
-        all_nodes: Array of all node IDs in network order
-        block_centroid_flows: Whether to block flows through centroids
-        centroids: Array of centroid node IDs
+    Blocked centroids can be endpoints, but cannot connect other nodes through
+    themselves. The largest strongly connected component selects the main
+    network; ties retain the first component. With no active links, the first
+    retained node is the singleton main component.
 
-    Returns:
-        Array of disconnected node IDs
+    :Arguments:
+        **anodes** (:obj:`np.ndarray`): Array of link tail node indices in graph order.
+        **bnodes** (:obj:`np.ndarray`): Array of link head node indices in graph order.
+        **all_nodes** (:obj:`np.ndarray`): Array of all retained node IDs in graph order.
+        **block_centroid_flows** (:obj:`bool`): Whether to block flows through centroids.
+        **centroids** (:obj:`np.ndarray`): Array of centroid node IDs.
+
+    :Returns:
+        :obj:`np.ndarray`: Array of disconnected node IDs.
     """
     if block_centroid_flows:
-        # Turn restrictions: find links entering and leaving each non-centroid node
-        nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
-        nodes_to_indices[all_nodes] = np.arange(len(all_nodes))
+        if not len(all_nodes):
+            return all_nodes.copy()
+
+        # Find links entering and leaving each non-centroid node
         centroid_set = set(centroids)
 
         # Find which compact links form turn transitions through non-centroid nodes
@@ -67,17 +73,32 @@ def disconnected_analysis(
                         turn_anodes.append(in_link)
                         turn_bnodes.append(out_link)
 
-        if turn_anodes:
+        reference = 0
+        if anodes.size:
             disconnected = _analysis(
                 np.array(turn_anodes, dtype=np.int64),
                 np.array(turn_bnodes, dtype=np.int64),
+                len(anodes),
             )
-            if disconnected.size > 0:
-                disconnected_links = disconnected
-                # Map back to nodes
-                disconnected_nodes = np.unique(all_nodes[anodes[disconnected_links]])
-                return all_nodes[np.isin(all_nodes, disconnected_nodes)]
-        return np.array([], dtype=np.int64)
+            main_links = np.ones(len(anodes), dtype=bool)
+            main_links[disconnected] = False
+            reference = int(anodes[np.flatnonzero(main_links)[0]])
+
+        # Centroid connectors provide endpoint access, not evidence of disconnected tails.
+        # Check both directions from the main component, stopping at blocked centroids.
+        blocked = np.isin(all_nodes, centroids)
+        blocked[reference] = False  # A centroid may still be the search origin.
+        connected = np.ones(len(all_nodes), dtype=bool)
+        for tails, heads in ((anodes, bnodes), (bnodes, anodes)):
+            active = ~blocked[tails]
+            csr = coo_matrix(
+                (np.ones(np.count_nonzero(active)), (tails[active], heads[active])),
+                shape=(len(all_nodes), len(all_nodes)),
+            ).tocsr()
+            reachable = np.zeros(len(all_nodes), dtype=bool)
+            reachable[breadth_first_order(csr, reference, directed=True, return_predecessors=False)] = True
+            connected &= reachable
+        return all_nodes[~connected]
     else:
         # Non-blocking: find nodes in largest strongly connected component
         disconnected_indices = _analysis(anodes, bnodes, len(all_nodes))

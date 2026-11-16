@@ -272,11 +272,16 @@ class TrafficAssignment(AssignmentBase):
                     raise ValueError("Fixed costs must be nonnegative and finite where present")
                 if np.isnan(values).any():
                     logger.warning(f"Cost field {cls.fixed_cost_field} has NaN values. Converted to zero")
-            for members in cls.select_link_sets.values():
-                for link, direction in members:
-                    rows = network.links.loc[network.mode_mask(cls.mode) & (network.links.link_id == link)]
-                    if rows.empty or (direction != 0 and (rows.direction == -direction).any()):
-                        raise ValueError(f"Selected link {(link, direction)} is not available for mode {cls.mode}")
+            if cls.select_link_sets:
+                available = dict(
+                    network.links.loc[network.mode_mask(cls.mode), ["link_id", "direction"]].itertuples(
+                        index=False, name=None
+                    )
+                )
+                for members in cls.select_link_sets.values():
+                    for link, direction in members:
+                        if link not in available or (direction != 0 and available[link] == -direction):
+                            raise ValueError(f"Selected link {(link, direction)} is not available for mode {cls.mode}")
         arrays = {}
         for name in self.vdf.spec:
             value = self._vdf_sources[name]
@@ -947,6 +952,8 @@ class TransitAssignment(AssignmentBase):
         """
         if not isinstance(time_field, str) or not time_field:
             raise ValueError("time_field must be a nonempty string")
+        # FIXME(transit): OptimalStrategies.execute still uses each prepared graph's
+        # time field. Validate the selected field against it or rebuild its context.
         self.time_field = time_field
         self._config["Time field"] = time_field
 
@@ -982,5 +989,7 @@ class TransitAssignment(AssignmentBase):
             if not isinstance(skimming_fields, list):
                 raise TypeError("Skimming Fields should be defined on a list, tuple or set")
 
+        # FIXME(transit): Forward skim changes, including None, to each prepared
+        # graph's set_skimming_fields() before OptimalStrategies.execute uses its context.
         fields = list(skimming_fields or [])
         self._config["Skimming Fields"] = fields

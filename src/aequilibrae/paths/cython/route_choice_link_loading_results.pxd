@@ -34,7 +34,6 @@ cdef class LinkLoadingResults:
         # A select link set is represented by a vector of unordered AND sets, OR'd together.
         # Number of select link sets * number of OR sets * number of AND members.
         vector[unique_ptr[vector[unique_ptr[unordered_set[long long]]]]] select_link_sets
-        vector[unique_ptr[vector[size_t]]] select_link_set_lengths
 
         readonly object link_loading_objects
         readonly object sl_link_loading_objects
@@ -53,9 +52,8 @@ cdef class LinkLoadingResults:
 
     @staticmethod
     cdef bool is_in_select_link_set(
-        vector[long long] &route,
+        const vector[long long] &route,
         const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        const vector[size_t] &select_link_set_lengths,
     ) noexcept nogil
 
     cdef void sl_link_load_single_route_set(

@@ -146,9 +146,7 @@ class RouteChoice:
             algorithm = algo_dict.get(algorithm.lower(), sentinel)
 
             if algorithm is sentinel:
-                raise AttributeError(
-                    f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}"
-                )
+                raise ValueError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
             defaults = self.default_parameters["generic"] | self.default_parameters[algorithm]
             for key in kwargs.keys():

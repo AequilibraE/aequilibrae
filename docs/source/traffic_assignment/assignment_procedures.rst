@@ -56,7 +56,8 @@ It is also possible to set the common assignment parameters during class definit
 
 * **pce**: passenger-car equivalent for multi-class assignment; default is ``1.0``.
 * **vot**: value of time used to convert fixed costs to time units; default is ``1.0``.
-* **fixed_cost_field**: link field providing a time-equivalent fixed cost, if needed.
+* **fixed_cost_field**: link field providing a monetary or other fixed cost in units compatible with ``vot``.
+  ``TrafficClass`` converts it to time by multiplying by ``fixed_cost_multiplier`` and dividing by ``vot``.
 * **fixed_cost_multiplier**: scale applied to the fixed cost field.
 
 .. doctest::

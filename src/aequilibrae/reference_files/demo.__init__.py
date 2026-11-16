@@ -47,16 +47,16 @@ def matrix_summary():
 
 
 def graph_summary(graph=None):
-    """Return the full and compact graph counts, or an empty dictionary without a supplied graph."""
+    """Return the full and prepared graph counts, or an empty dictionary without a supplied graph."""
     if graph is None:
         return {}
     return {
         graph.mode: {
-            "num_links": len(graph.full_link_ids) if isinstance(graph, Graph) else graph.num_links,
-            "num_nodes": len(graph.full_node_ids) if isinstance(graph, Graph) else graph.num_nodes,
+            "num_links": graph.mapping.network.link_count if isinstance(graph, Graph) else graph.num_links,
+            "num_nodes": graph.mapping.network.node_count if isinstance(graph, Graph) else graph.num_nodes,
             "num_zones": graph.num_zones,
-            "compact_num_links": graph.compact_num_links,
-            "compact_num_nodes": graph.compact_num_nodes,
+            "compact_num_links": graph.num_links if isinstance(graph, Graph) else graph.compact_num_links,
+            "compact_num_nodes": graph.num_nodes if isinstance(graph, Graph) else graph.compact_num_nodes,
         }
     }
 

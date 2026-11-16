@@ -7,8 +7,6 @@ Cython callers may cimport the allocation-free kernels from mapping.pxd.
 cimport cython
 import numpy as np
 
-from libc.string cimport memcpy, memset
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -49,19 +47,21 @@ cdef void aggregate_link_costs(
 @cython.wraparound(False)
 cdef void project_link_loads(
     const Py_ssize_t[::1] network_link_to_graph,
-    const cython.floating[:, ::1] loads,
-    cython.floating[:, ::1] output,
+    const ArrayElement[:, ::1] loads,
+    ArrayElement[:, ::1] output,
 ) noexcept nogil:
-    """Copy floating-point rows without doing arithmetic."""
-    cdef Py_ssize_t row, link, width = loads.shape[1] * sizeof(cython.floating)
+    """Copy contiguous numeric rows without doing arithmetic."""
+    cdef Py_ssize_t row, link, field, width = loads.shape[1]
     if width == 0:
         return
     for row in range(network_link_to_graph.shape[0]):
         link = network_link_to_graph[row]
         if link >= 0:
-            memcpy(&output[row, 0], &loads[link, 0], width)
+            for field in range(width):
+                output[row, field] = loads[link, field]
         else:
-            memset(&output[row, 0], 0, width)
+            for field in range(width):
+                output[row, field] = 0
 
 
 def expand_links(
@@ -95,9 +95,9 @@ def aggregate_costs(
 
 def project_loads(
     const Py_ssize_t[::1] network_link_to_graph,
-    const cython.floating[:, ::1] loads,
-    cython.floating[:, ::1] output,
+    const ArrayElement[:, ::1] loads,
+    ArrayElement[:, ::1] output,
 ):
-    """Copy complete floating-point rows into a directed-network load array."""
+    """Copy numeric rows into a directed-network load array, preserving dtype."""
     with nogil:
         project_link_loads(network_link_to_graph, loads, output)
