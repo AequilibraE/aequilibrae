@@ -409,7 +409,8 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
         pce=0.5,
         graph_options={"block_centroid_flows": False},
     )
-    trucks = replace(cars, name="trucks", pce=3.0, vot=2.0, fixed_cost_field="toll")
+    truck_demand = matrix_for(network, {f"truck_{name}": values for name, values in cars.demand.items()})
+    trucks = replace(cars, name="trucks", demand=truck_demand, pce=3.0, vot=2.0, fixed_cost_field="toll")
     assignment = TrafficAssignment(
         network=network,
         classes=[cars, trucks],
@@ -422,8 +423,8 @@ def test_classes_sharing_network_data_route_with_their_own_costs_and_pce():
     assignment.execute(cores=2, elementwise_cores=1)
     car_results, truck_results = assignment.class_results["cars"], assignment.class_results["trucks"]
     assert car_results.get_load_results().loc[71, "work_ab"] == 8.0
-    assert truck_results.get_load_results().loc[71, "work_ab"] == 0.0
-    assert truck_results.get_load_results().loc[55, "work_ab"] == 8.0
+    assert truck_results.get_load_results().loc[71, "truck_work_ab"] == 0.0
+    assert truck_results.get_load_results().loc[55, "truck_work_ab"] == 8.0
     expected = 0.5 * car_results.total_link_loads + 3.0 * truck_results.total_link_loads
     np.testing.assert_allclose(assignment.assignment.total_flow, expected)
     assert assignment._class_states[1].fixed_cost.max() == 5.0
@@ -516,6 +517,37 @@ def test_congested_skims_use_final_costs_without_replacing_aon_or_graph_fields()
     shortest = min(by_link[71] + by_link[12] + 0.5, by_link[55] + by_link[24])
     assert output.matrices["__assignment_cost__"][0, 3] == pytest.approx(shortest)
     assert output.matrices["__congested_time__"][0, 3] == pytest.approx(shortest)
+
+
+@pytest.mark.parametrize("network_policy,override", [(False, None), (True, None), (False, True), (True, False)])
+def test_class_uturn_policy_overrides_or_inherits_network(network_policy, override):
+    links = pd.DataFrame(
+        {
+            "link_id": [1, 2, 3, 4],
+            "a_node": [10, 20, 20, 10],
+            "b_node": [20, 40, 30, 40],
+            "direction": [1, 1, 0, 1],
+            "time": [1.0, 1.0, 1.0, 10.0],
+            "capacity": 100.0,
+        }
+    )
+    turns = pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [np.inf]})
+    network = Network(links, centroids=[10, 40], turn_restrictions=turns, allow_uturns=network_policy)
+    options = {} if override is None else {"allow_uturns": override}
+    traffic = TrafficClass(mode="c", cost="time", demand=matrix_for(network), skimming=("time",), graph_options=options)
+    assignment = TrafficAssignment(
+        network=network,
+        classes=[traffic],
+        time_field="time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="all-or-nothing",
+    )
+    assignment.execute(cores=1, elementwise_cores=1)
+    allowed = network_policy if override is None else override
+    results = assignment.class_results[traffic.name]
+    assert results.skims.matrices["time"][0, 1] == (4.0 if allowed else 10.0)
+    assert results.get_load_results().loc[1, "work_ab"] == (8.0 if allowed else 0.0)
 
 
 @pytest.mark.parametrize("turn", [False, True])

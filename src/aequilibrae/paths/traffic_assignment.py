@@ -160,6 +160,13 @@ class TrafficAssignment(AssignmentBase):
 
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
     all_bfw_conjugacies = ["approximate", "exact"]
+    _result_fields = (
+        ("Preload", "Preload_tot", np.nansum),
+        ("Congested_Time", "Congested_Time_Max", np.nanmax),
+        ("Delay_factor", "Delay_factor_Max", np.nanmax),
+        ("VOC", "VOC_max", np.nanmax),
+        ("PCE", "PCE_tot", np.nansum),
+    )
 
     def __init__(
         self,
@@ -244,6 +251,17 @@ class TrafficAssignment(AssignmentBase):
         return {name: results.skims for name, results in self.class_results.items()}
 
     def _validate_network_configuration(self, network):
+        result_columns = [
+            f"{name}_{direction}" for cls in self.classes for name in cls.demand for direction in ("ab", "ba", "tot")
+        ]
+        result_columns.extend(
+            column for name, total_name, _ in self._result_fields for column in (f"{name}_AB", f"{name}_BA", total_name)
+        )
+        # SQLite result tables treat column names as case-insensitive.
+        if len(result_columns) != len({column.casefold() for column in result_columns}):
+            raise ValueError(
+                "Demand matrix names must produce unique result columns across classes and network metrics"
+            )
         centroids = network.centroids if network.centroids is not None else self.classes[0].demand.index
         fields = [self.time_field, self.capacity_field]
         for cls in self.classes:
@@ -262,10 +280,12 @@ class TrafficAssignment(AssignmentBase):
             network.validate_centroids(cls.demand.index)
             validate_assignment_demand(cls.demand, centroids)
             network._validate_turns(cls.mode)
-            for field in [cls.cost, *cls.skimming]:
-                values = field_values(field)
-                if not np.isfinite(values).all() or np.any(values < 0):
-                    raise ValueError(f"Field {field} must contain nonnegative finite values")
+            values = field_values(cls.cost)
+            if not np.isfinite(values).all() or np.any(values < 0):
+                raise ValueError(f"Field {cls.cost} must contain nonnegative finite values")
+            for field in cls.skimming:
+                if not np.isfinite(field_values(field)).all():
+                    raise ValueError(f"Skim field {field} must contain finite values")
             if cls.fixed_cost_field:
                 values = field_values(cls.fixed_cost_field)
                 if np.isinf(values).any() or np.any(values < 0):
@@ -525,6 +545,9 @@ class TrafficAssignment(AssignmentBase):
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
 
+        Class load columns use demand matrix names without a traffic-class prefix.
+        Names must be unique across classes and shared network metrics.
+
         :Returns:
             **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on `link_id`
         """
@@ -556,15 +579,8 @@ class TrafficAssignment(AssignmentBase):
         directional[valid] = nan_to_num(values[indices[valid]])
         ab, ba = directional[:, 0], directional[:, 1]
 
-        fields = [
-            ("Preload", "Preload_tot", np.nansum),
-            ("Congested_Time", "Congested_Time_Max", np.nanmax),
-            ("Delay_factor", "Delay_factor_Max", np.nanmax),
-            ("VOC", "VOC_max", np.nanmax),
-            ("PCE", "PCE_tot", np.nansum),
-        ]
         columns = {}
-        for index, (name, total_name, reduce) in enumerate(fields):
+        for index, (name, total_name, reduce) in enumerate(self._result_fields):
             columns[f"{name}_AB"] = ab[:, index]
             columns[f"{name}_BA"] = ba[:, index]
             columns[total_name] = reduce([ab[:, index], ba[:, index]], axis=0)

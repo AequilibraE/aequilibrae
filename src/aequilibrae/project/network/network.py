@@ -236,6 +236,8 @@ class Network(WorkerThread):
 
     def _load_graph_data(self, fields=None, limit_to_area=None):
         """Read source tables once for a graph or an assignment execution."""
+        from aequilibrae.paths.network import _field_columns
+
         with self.__connections.db_connection as conn:
             if fields is None:
                 field_names = conn.execute("PRAGMA table_info(links);").fetchall()
@@ -246,12 +248,7 @@ class Network(WorkerThread):
                 available = {f[1] for f in conn.execute("PRAGMA table_info(links);").fetchall()}
                 requested = ["link_id", "a_node", "b_node", "direction", "modes", "link_type"]
                 for field in fields:
-                    if field in available:
-                        requested.append(field)
-                    elif field + "_ab" in available and field + "_ba" in available:
-                        requested.extend([field + "_ab", field + "_ba"])
-                    else:
-                        raise ValueError(f"'{field}' not in network")
+                    requested.extend(_field_columns(field, available))
                 all_fields = list(dict.fromkeys(requested))
 
             if limit_to_area is not None:

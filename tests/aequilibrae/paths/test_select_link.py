@@ -294,7 +294,7 @@ def test_select_link_export_preserves_shared_centroid_order(sioux_falls_single_c
     for name in ("first", "second"):
         centroids = [3, 1, 4, 2]
         demand = AequilibraeMatrix(index=np.array(centroids))
-        demand["flow"] = np.arange(1, len(centroids) ** 2 + 1, dtype=np.float64).reshape(len(centroids), len(centroids))
+        demand[name] = np.arange(1, len(centroids) ** 2 + 1, dtype=np.float64).reshape(len(centroids), len(centroids))
         classes.append(
             TrafficClass(
                 name=name,
@@ -320,6 +320,6 @@ def test_select_link_export_preserves_shared_centroid_order(sioux_falls_single_c
     exported = from_file(project.matrices.folder / "shared_centroids.omx")
     np.testing.assert_array_equal(exported.index, [3, 1, 4, 2])
     for traffic in classes:
-        source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"]["flow"].toarray()
+        source = assignment.class_results[traffic.name].select_link_od.matrices["chosen"][traffic.name].toarray()
         assert source.sum() > 0
-        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_flow"].toarray(), source)
+        np.testing.assert_array_equal(exported[f"chosen_{traffic.name}_{traffic.name}"].toarray(), source)

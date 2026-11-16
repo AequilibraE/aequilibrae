@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -16,6 +16,15 @@ from aequilibrae.paths.mapping import NetworkMapping
 if TYPE_CHECKING:
     from aequilibrae.paths.graph import Graph
     from aequilibrae.paths.traffic_class import TrafficClass
+
+
+def _field_columns(name: str, columns: Collection[str]) -> tuple[str, str]:
+    """Resolve each direction to its suffixed column, falling back to the base field."""
+    ab = name + "_ab" if name + "_ab" in columns else name
+    ba = name + "_ba" if name + "_ba" in columns else name
+    if ab not in columns or ba not in columns:
+        raise ValueError(f"'{name}' not in network")
+    return ab, ba
 
 
 @dataclass(frozen=True, eq=False)
@@ -247,8 +256,7 @@ class Network:
         for name in names:
             values = np.empty(len(self._link_rows), dtype=np.float64)
 
-            for direction, suffix in ((1, "_ab"), (-1, "_ba")):
-                column = name + suffix if name + suffix in self.links else name
+            for direction, column in zip((1, -1), _field_columns(name, self.links.columns), strict=True):
                 mask = self.directions == direction
                 rows = self._link_rows[mask]
                 try:

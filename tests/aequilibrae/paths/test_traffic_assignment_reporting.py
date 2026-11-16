@@ -1,5 +1,7 @@
 """Assignment reporting follows the shared network, not a class's reduced graph."""
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -54,6 +56,69 @@ def make_assignment():
         return assignment
 
     return make
+
+
+@pytest.fixture
+def reporting_configuration(sioux_falls_example):
+    network = Network(
+        pd.DataFrame(
+            {"link_id": [1], "a_node": [10], "b_node": [20], "direction": [0], "time": [1.0], "capacity": [100.0]}
+        ),
+        centroids=[10, 20],
+    )
+    values = np.array([[0.0, 5.0], [3.0, 0.0]])
+    classes = [
+        TrafficClass(mode="c", name=name, cost="time", demand=from_dict({core: values}, network.centroids))
+        for name, core in (("cars", "commute"), ("trucks", "freight"))
+    ]
+    return {
+        "network": network,
+        "classes": classes,
+        "time_field": "time",
+        "capacity_field": "capacity",
+        "vdf": bpr,
+        "algorithm": "all-or-nothing",
+        "project": sioux_falls_example,
+    }
+
+
+def test_combined_results_keep_demand_names_and_save(reporting_configuration):
+    assignment = TrafficAssignment(**reporting_configuration)
+    frame = assignment.execute(cores=1, elementwise_cores=1)
+    assert frame.columns.is_unique
+    assert frame.columns[:6].tolist() == [
+        "commute_ab",
+        "commute_ba",
+        "commute_tot",
+        "freight_ab",
+        "freight_ba",
+        "freight_tot",
+    ]
+    for results in assignment.class_results.values():
+        class_frame = results.get_load_results()
+        pd.testing.assert_frame_equal(frame[class_frame.columns], class_frame.rename_axis("link_id"))
+    assignment.save_results("unique_core_results")
+    stored = assignment.project.results.get_results("unique_core_results")
+    pd.testing.assert_frame_equal(stored, frame.reset_index(), check_dtype=False)
+
+
+@pytest.mark.parametrize("names", [("flow", "flow"), ("flow", "FLOW"), ("PCE", "other"), ("Preload", "other")])
+def test_conflicting_result_names_rejected_before_execution(reporting_configuration, names):
+    traffic = reporting_configuration["classes"][0]
+    classes = [
+        replace(traffic, name=class_name, demand=from_dict({core: traffic.demand["commute"]}, traffic.demand.index))
+        for class_name, core in zip(("cars", "trucks"), names, strict=True)
+    ]
+    with pytest.raises(ValueError, match="unique result columns"):
+        TrafficAssignment(**(reporting_configuration | {"classes": classes}))
+
+
+def test_execution_rechecks_result_name_conflicts(reporting_configuration):
+    assignment = TrafficAssignment(**reporting_configuration)
+    demand = assignment.classes[1].demand
+    demand["commute"] = demand["freight"]
+    with pytest.raises(ValueError, match="unique result columns"):
+        assignment.execute(cores=1)
 
 
 def test_result_tables_keep_source_row_order(make_assignment):

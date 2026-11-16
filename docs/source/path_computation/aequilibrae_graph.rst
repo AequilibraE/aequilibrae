@@ -42,9 +42,11 @@ The ``direction`` field specifies the allowed directions:
 * ``-1`` permits BA traversal.
 * ``0`` permits both directions.
 
-Direction-specific fields use the suffixes ``_ab`` and ``_ba``.
-For example, ``free_flow_time_ab`` and ``free_flow_time_ba`` supply the graph field ``free_flow_time``.
-``Network`` preserves column names, and field names are case-sensitive.
+Direction-specific fields use the suffixes ``_ab`` and ``_ba``.  For example,
+``free_flow_time_ab`` and ``free_flow_time_ba`` supply the graph field
+``free_flow_time``.  ``Network`` preserves column names, and field names are
+case-sensitive.  For each direction, a suffixed column takes precedence over
+the base column.
 
 ``network.field_values(name)`` returns numeric values in physical-link input row order,
 with AB before BA for each bidirectional link.

@@ -50,6 +50,8 @@ The required information is:
     ...                      graph_options={"block_centroid_flows": False})
 
 Routing policies such as ``block_centroid_flows`` are supplied through ``graph_options``.
+It accepts ``compact``, ``remove_dead_ends``, ``block_centroid_flows`` and ``allow_uturns``.
+When ``allow_uturns`` is omitted, the network's setting is used.
 The assignment builds the required graphs internally from the network.
 
 It is also possible to set the common assignment parameters during class definition:
@@ -143,6 +145,15 @@ The ``skimming`` fields are set on each ``TrafficClass`` before constructing the
   >>> _ = assignment.execute(max_iterations=10, cores=1)
   >>> assignment.save_skims("one_matrix_name", which_ones="all")
   ['one_matrix_name_car.omx', 'one_matrix_name_truck.omx']
+
+Combined link results
+~~~~~~~~~~~~~~~~~~~~~
+
+``assignment.results()`` and ``execute()`` return class load columns named
+``<demand_matrix>_ab``, ``_ba`` and ``_tot``, without traffic-class prefixes.
+Result column names must be unique across all classes and shared network
+metrics, such as ``PCE_tot``. Conflicts are checked before execution, ignoring
+case to match SQLite result tables.
 
 Unassigned demand
 ~~~~~~~~~~~~~~~~~

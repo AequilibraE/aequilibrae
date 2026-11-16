@@ -20,7 +20,9 @@ class TrafficClass:
     ``fixed_cost_multiplier`` and divided by ``vot``.
 
     Demand matrices must contain float64 values. ``name`` defaults to the
-    mode. Classes with the same mode need distinct names.
+    mode. Classes with the same mode need distinct names. ``graph_options``
+    accepts ``compact``, ``remove_dead_ends``, ``block_centroid_flows`` and
+    ``allow_uturns``. Omitted U-turn policy inherits the network setting.
 
     .. code-block:: python
 
@@ -112,7 +114,7 @@ class TrafficClass:
             raise TypeError("graph_options must be a mapping")
 
         graph_options = {"compact": True, "remove_dead_ends": True, "block_centroid_flows": True}
-        if unknown := options.keys() - graph_options.keys():
+        if unknown := options.keys() - (graph_options.keys() | {"allow_uturns"}):
             raise ValueError(f"Unknown graph options: {list(unknown)}")
 
         graph_options.update(options)

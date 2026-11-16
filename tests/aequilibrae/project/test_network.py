@@ -170,6 +170,57 @@ def test_assignment_reports_demand_at_mode_excluded_centroid_as_unassigned(netwo
     assert np.isinf(results.skims.matrices["free_flow_time"][1, 0])
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [
+        None,
+        [],
+        ["review_cost"],
+        ["review_cost_ab", "review_cost_ba"],
+        ["review_cost", "review_cost_ab", "review_cost_ba"],
+    ],
+)
+def test_field_selection_preserves_directional_cost_precedence(sioux_falls_example, fields):
+    project = sioux_falls_example
+    with project.db_connection as conn:
+        conn.execute("ALTER TABLE links ADD COLUMN review_cost REAL")
+        conn.execute("ALTER TABLE links ADD COLUMN review_cost_ab REAL")
+        conn.execute("ALTER TABLE links ADD COLUMN review_cost_ba REAL")
+        conn.execute("UPDATE links SET review_cost = ?, review_cost_ab = ?, review_cost_ba = ?", (1.0, 2.0, 3.0))
+        conn.execute("UPDATE links SET direction = ? WHERE link_id = ?", (0, 1))
+
+    graph = project.network.build_graph("c", "review_cost", fields=fields)
+    network_costs = np.where(graph.mapping.network.directions == 1, 2.0, 3.0)
+    np.testing.assert_array_equal(graph.cost, graph.mapping.aggregate_costs(network_costs))
+
+    source = project.network.build(fields=["review_cost"])
+    np.testing.assert_array_equal(source.field_values("review_cost"), np.where(source.directions == 1, 2.0, 3.0))
+
+
+@pytest.mark.parametrize("directional_column", [None, "review_cost_ab", "review_cost_ba"])
+def test_selected_field_falls_back_to_base_per_direction(sioux_falls_example, directional_column):
+    project = sioux_falls_example
+    with project.db_connection as conn:
+        conn.execute("ALTER TABLE links ADD COLUMN review_cost REAL")
+        conn.execute("UPDATE links SET review_cost = ?", (1.0,))
+        conn.execute("UPDATE links SET direction = ? WHERE link_id = ?", (0, 1))
+        if directional_column == "review_cost_ab":
+            conn.execute("ALTER TABLE links ADD COLUMN review_cost_ab REAL")
+            conn.execute("UPDATE links SET review_cost_ab = ?", (2.0,))
+        elif directional_column == "review_cost_ba":
+            conn.execute("ALTER TABLE links ADD COLUMN review_cost_ba REAL")
+            conn.execute("UPDATE links SET review_cost_ba = ?", (3.0,))
+
+    full = project.network.build()
+    selected = project.network.build(fields=["review_cost"])
+    expected = np.ones(full.mapping.link_count)
+    if directional_column is not None:
+        direction, value = (1, 2.0) if directional_column.endswith("_ab") else (-1, 3.0)
+        expected[full.directions == direction] = value
+    np.testing.assert_array_equal(full.field_values("review_cost"), expected)
+    np.testing.assert_array_equal(selected.field_values("review_cost"), expected)
+
+
 def test_build_rejects_nonexistent_directed_turn_leg(sioux_falls_example):
     network = sioux_falls_example.network
     network.turn_restrictions.insert(from_node=1, via_node=4, to_node=5, penalty=5.0, modes="c")
