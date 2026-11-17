@@ -8,7 +8,7 @@ import pandas as pd
 
 from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.transit import Transit, TransitAssignment, TransitClass
+from aequilibrae.transit import TransitAssignment, TransitClass
 
 
 def run_example(from_model: str, zones: list[int]) -> dict[str, pd.DataFrame]:
@@ -27,7 +27,7 @@ def run_example(from_model: str, zones: list[int]) -> dict[str, pd.DataFrame]:
 
         print(path)
 
-        data = Transit(project)
+        data = project.transit
 
         graph = data.create_graph(
             with_outer_stop_transfers=False,
@@ -46,10 +46,10 @@ def run_example(from_model: str, zones: list[int]) -> dict[str, pd.DataFrame]:
 
         data.load()
 
-        data = Transit(project)
+        data = project.transit
 
-        # Graphs can also be reloaded with TransitGraphBuilder.from_db(project, period_id).
-        # graph_db = TransitGraphBuilder.from_db(project, project.tables.periods.default_period.period_id)
+        # Reloaded graphs are available through the project's transit gateway.
+        # graph_db = data.graphs[project.tables.periods.default_period.period_id]
         # graph_db.vertices.drop(columns="geometry")
 
         transit_graph = graph.to_transit_graph()

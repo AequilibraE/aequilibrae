@@ -11,7 +11,7 @@ from aequilibrae import Project
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf, SyntheticGravityModel
 from aequilibrae.examples import create_example
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 
 
 @pytest.fixture(autouse=True)

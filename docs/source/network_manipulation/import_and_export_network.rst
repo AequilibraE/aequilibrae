@@ -28,7 +28,7 @@ The relevant optional packages are:
 Importing from OpenStreetMap
 ----------------------------
 
-Use :func:`aequilibrae.builder.Importer.osm` to create
+Use ``project.tables.importer.osm()`` to create
 an AequilibraE network from OpenStreetMap. Exactly one source selector must be
 provided:
 
@@ -77,7 +77,7 @@ top result and logs a warning describing the substituted area.
 Importing from Overture Maps
 ----------------------------
 
-Use :func:`aequilibrae.builder.Importer.overture` to
+Use ``project.tables.importer.overture()`` to
 import the Overture Maps transportation network for an EPSG:4326 polygon::
 
     from shapely.geometry import box
@@ -250,12 +250,12 @@ Public API summary
 
 The main entry points are:
 
-* :func:`aequilibrae.builder.Importer.osm`;
-* :func:`aequilibrae.builder.Importer.overture`;
-* :func:`aequilibrae.builder.Importer.source` for explicit
+* ``project.tables.importer.osm()``;
+* ``project.tables.importer.overture()``;
+* ``project.tables.importer.source()`` for explicit
   source names: ``"osm-overpass"``, ``"osm-pbf"`` and ``"overture-cloud"``;
-* :func:`aequilibrae.builder.Importer.gmns`;
-* :func:`aequilibrae.project.Tables.export_to_gmns`.
+* ``project.tables.importer.gmns()``;
+* ``project.tables.export_to_gmns()`` through :attr:`aequilibrae.Project.tables`.
 
 Import methods share one namespace on the network object::
 
@@ -336,8 +336,8 @@ specification.
 
 .. seealso::
 
-    * :func:`aequilibrae.builder.Importer.gmns`
-        Function documentation
+    * :attr:`aequilibrae.Project.tables`
+        Access to ``project.tables.importer.gmns()``
     * :ref:`import_from_gmns`
         Usage example
 
@@ -378,7 +378,7 @@ You can find the GMNS specification
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Tables.export_to_gmns`
+    * ``project.tables.export_to_gmns()`` through :attr:`aequilibrae.Project.tables`
         Function documentation
     * :ref:`export_to_gmns`
         Usage example

@@ -13,7 +13,7 @@ import pytest
 from aequilibrae import Project
 from aequilibrae.examples import create_example
 from aequilibrae.project.project_creation import _remove_triggers
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 from aequilibrae.utils import ensure_spatialite_binaries
 
 faulthandler.enable()

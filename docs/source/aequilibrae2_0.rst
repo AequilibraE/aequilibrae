@@ -4,7 +4,7 @@ Understanding the changes in AequilibraE 2.0
 AequilibraE 2.0 is a substantially different software than the 1.X versions that preceded it.
 
 While the change from 0.X to 1.X was mostly due to the maturing of the software feature set with the addition of
-public transport modeling capabilities, the change from 1.X to 2.0 includes a wide range of breaking changes
+public transport modelling capabilities, the change from 1.X to 2.0 includes a wide range of breaking changes
 in the API and changes in software behaviour, in addition to a series of new features and performance improvements.
 
 
@@ -18,38 +18,65 @@ Performance improvements
 Network skimming
 ~~~~~~~~~~~~~~~~
 
-The parallelization of the network skimming procedure was re-implemented in Cython, bringing tangible performance
+The parallelisation of the network skimming procedure was re-implemented in Cython, bringing tangible performance
 improvements for small and medium networks, which cover a significant amount of the real-world networks
 in use by transportation planning agencies in 2026.
 
 TODO: RUN THESE BENCHMARKS
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| R01C01_12345678 | Links      | Graph Links | Nodes      | centroids | AequilibraE 2.0 speed-up |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| Arkansas        |   300,146  |  591,489    |  243,059   |   6,445   |          0%              |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| Australia wide  | 4,113,479  |  7,760,714  | 30,000,000 | 60,000    |          0%              |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| Chicago         |   39,018   |   39,018    |  12,979    |  1,790    |         12%              |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| Coquimbo        |   19,983   |   34,546    |  15,724    |  133      |         31%              |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
-| Lyon            |  253,305   |  468,761    |  179,940   |  4,617    |          0%              |
-+-----------------+------------+-------------+------------+-----------+--------------------------+
+
+.. list-table:: Network skimming benchmarks
+   :header-rows: 1
+
+   * - Network
+     - Links
+     - Graph Links
+     - Nodes
+     - Centroids
+     - AequilibraE 2.0 speed-up
+   * - Arkansas
+     - 300,146
+     - 591,489
+     - 243,059
+     - 6,445
+     - 0%
+   * - Australia wide
+     - 4,113,479
+     - 7,760,714
+     - 30,000,000
+     - 60,000
+     - 0%
+   * - Chicago
+     - 39,018
+     - 39,018
+     - 12,979
+     - 1,790
+     - 12%
+   * - Coquimbo
+     - 19,983
+     - 34,546
+     - 15,724
+     - 133
+     - 31%
+   * - Lyon
+     - 253,305
+     - 468,761
+     - 179,940
+     - 4,617
+     - 0%
 
 The following conditions apply to this benchmark:
 
 - The skimming procedure was run for a single mode and a single cost variable (i.e. "distance" for cars).
 - It does not include the time taken to build the graph or to save the result to disk.
 - The benchmarking was run on a desktop PC equipped with a intel i9 285K with 192GB of RAM, and
-using 8 threads for the parallelization (this CPU's *performance cores*).
+using 8 threads for the parallelisation (this CPU's *performance cores*).
 - The speed-up procedure considers the ratio between the median time for 10 runs.
 
 
 API Changes
 --------------------
 
-Public imports and project ownership
+Public imports and package structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each public object has one documented import namespace. Import the objects used by a workflow from that
@@ -64,11 +91,7 @@ namespace rather than from the package root or an implementation module:
    * - ``aequilibrae``
      - ``Project``, ``__version__``
    * - ``aequilibrae.project``
-     - ``Tables``, ``Scenario``, ``Parameters``, ``Log``, ``Matrices``, ``Results``,
-       ``MigrationManager``, ``NetworkSimplifier``
-   * - ``aequilibrae.builder``
-     - ``Importer``, ``GMNSBuilder``, ``GMNSExporter``, ``GTFSRouteSystemBuilder``,
-       ``TransitGraphBuilder``, ``export_gtfs``
+     - ``Parameters``, ``MigrationManager``, ``NetworkSimplifier``
    * - ``aequilibrae.routing``
      - ``Network``, ``Graph``, ``PathResults``, ``SkimResults``, ``NetworkSkimming``,
        ``available_heaps``, ``estimate_heuristic_scale``
@@ -77,7 +100,7 @@ namespace rather than from the package root or an implementation module:
    * - ``aequilibrae.traffic.vdf``
      - ``bpr``, ``bpr2``, ``conical``, ``inrets``, ``akcelik``, ``builtin_vdfs``
    * - ``aequilibrae.transit``
-     - ``Transit``, ``TransitClass``, ``TransitAssignment``, ``TransitGraph``, ``TransitAssignmentResults``
+     - ``TransitClass``, ``TransitAssignment``, ``TransitGraph``, ``TransitAssignmentResults``
    * - ``aequilibrae.route_choice``
      - ``RouteChoice``, ``SubAreaAnalysis``
    * - ``aequilibrae.distribution``
@@ -145,6 +168,9 @@ remain available for explicit use.
 parameters, or ``Parameters(path=project_folder)`` for an explicit folder. ``write_back()`` requires a folder and
 raises ``ValueError`` when none was supplied. GMNS import/export through ``project.tables`` uses that project's
 parameters.
+
+Project run modules
+~~~~~~~~~~~~~~~~~~~
 
 Run-module functions must accept an explicit ``project`` argument. ``Project.run`` supplies it along with the
 configured arguments; the CLI also supplies it when ``--no-defaults`` is selected. Update custom project

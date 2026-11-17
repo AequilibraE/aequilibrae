@@ -6,7 +6,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.routing import Network
 from aequilibrae.traffic import TrafficAssignment, TrafficClass
 from aequilibrae.traffic.vdf import bpr
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 
 
 @pytest.fixture(scope="function")

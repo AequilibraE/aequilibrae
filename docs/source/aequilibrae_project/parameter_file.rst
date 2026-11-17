@@ -92,8 +92,8 @@ to the use of **integer**, **numeric** and **varchar**.
 
 .. note::
 
-   The OSM/Overture importers (:func:`~aequilibrae.builder.Importer.osm`
-   and :func:`~aequilibrae.builder.Importer.overture`) do not use the
+   The OSM/Overture importers (``project.tables.importer.osm()``
+   and ``project.tables.importer.overture()``) do not use the
    link-field parameter specification to decide which tags to read. They parse OSM/Overture tags
    internally and store any attribute that does not map to a real table column in the
    ``other_attributes`` JSON column. Directional handling is also built in: ``maxspeed`` is applied
@@ -158,7 +158,7 @@ the case of the *driving side* and  *default_directory* parameters.
 Open Street Maps
 ----------------
 The OSM section of the parameter file configures the Overpass download used by
-:func:`~aequilibrae.builder.Importer.osm`. It is
+``project.tables.importer.osm()``. It is
 relevant only when one plans to download a substantial amount of data from an
 Overpass API, in which case it is recommended to deploy a local Overpass server
 and point ``overpass_endpoint`` at it.

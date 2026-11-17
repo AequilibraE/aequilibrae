@@ -230,8 +230,6 @@ To create a preload for public transport vehicles operating between 8 AM to 10 A
 
 .. doctest::
 
-    >>> from aequilibrae.transit import Transit
-
     # Times are specified in seconds from midnight
     >>> transit = project.scenario.create_transit_database()
     >>> preload = transit.build_pt_preload(start=8*3600, end=10*3600)

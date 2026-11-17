@@ -6,7 +6,8 @@ import pytest
 
 from aequilibrae import Project
 from aequilibrae.distribution import GravityApplication, GravityCalibration, Ipf
-from aequilibrae.project import Parameters, Tables
+from aequilibrae.project import Parameters
+from aequilibrae.project.tables import Tables
 
 
 def test_create_and_open_contexts(tmp_path):

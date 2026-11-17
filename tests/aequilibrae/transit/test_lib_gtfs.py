@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from aequilibrae.builder import GTFSRouteSystemBuilder
+from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
 
 @pytest.fixture(scope="function")

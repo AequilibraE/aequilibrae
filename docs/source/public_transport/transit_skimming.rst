@@ -30,11 +30,10 @@ Skims are always dense ``AequilibraeMatrix`` objects using the demand's zone ind
     >>> import numpy as np
     >>> from aequilibrae.matrix import AequilibraeMatrix
     >>> from aequilibrae.transit import TransitAssignment, TransitClass
-    >>> from aequilibrae.transit import Transit
     >>> from aequilibrae.examples import create_example
 
     >>> project = create_example(project_path, "coquimbo")
-    >>> data = Transit(project)
+    >>> data = project.transit
 
     >>> graph = data.create_graph(
     ...     with_outer_stop_transfers=False,
@@ -83,7 +82,7 @@ One example is skimming travel time in rail only.
     >>> from aequilibrae.transit import TransitAssignment, TransitClass
 
     >>> project = create_example(f"{project_path}v2", "coquimbo")
-    >>> data = Transit(project)
+    >>> data = project.transit
 
     >>> graph = data.create_graph(
     ...     with_outer_stop_transfers=False,

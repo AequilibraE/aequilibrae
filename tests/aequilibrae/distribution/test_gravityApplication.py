@@ -6,7 +6,8 @@ import pytest
 
 from aequilibrae.distribution import GravityApplication, SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project import Matrices, Parameters
+from aequilibrae.project import Parameters
+from aequilibrae.project.data.matrices import Matrices
 
 
 @pytest.fixture(scope="session")

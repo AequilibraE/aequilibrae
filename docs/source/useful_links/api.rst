@@ -11,7 +11,6 @@ API Reference
 
     aequilibrae
     aequilibrae.project
-    aequilibrae.builder
     aequilibrae.routing
     aequilibrae.traffic
     aequilibrae.traffic.vdf

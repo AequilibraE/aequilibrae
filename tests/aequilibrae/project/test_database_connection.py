@@ -2,7 +2,7 @@ from os.path import join
 
 from aequilibrae.context import activate_project
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import read_and_close
 
 

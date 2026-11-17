@@ -19,8 +19,8 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :class:`aequilibrae.transit.Transit`
-#     * :class:`aequilibrae.builder.TransitGraphBuilder`
+#     * :attr:`aequilibrae.Project.transit`
+#     * ``project.transit.create_graph()``
 #     * :class:`aequilibrae.transit.TransitClass`
 #     * :class:`aequilibrae.transit.TransitAssignment`
 #     * :class:`aequilibrae.matrix.AequilibraeMatrix`
@@ -35,8 +35,6 @@ import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.transit import TransitAssignment, TransitClass
-from aequilibrae.transit import Transit
-from aequilibrae.builder import TransitGraphBuilder
 from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/skimming.png'
@@ -49,8 +47,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# Let's create our ``Transit`` object.
-data = Transit(project)
+# Let's access our project's transit gateway.
+data = project.transit
 
 # %%
 # Graph building
@@ -77,7 +75,7 @@ data.save_graphs()
 data.load()
 
 # Reading back into AequilibraE
-graph_db = TransitGraphBuilder.from_db(project, project.tables.periods.default_period.period_id)
+graph_db = data.graphs[project.tables.periods.default_period.period_id]
 graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.

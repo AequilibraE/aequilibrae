@@ -18,8 +18,8 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :class:`aequilibrae.transit.Transit`
-#     * :class:`aequilibrae.builder.TransitGraphBuilder`
+#     * :attr:`aequilibrae.Project.transit`
+#     * ``project.transit.create_graph()``
 #     * :class:`aequilibrae.transit.TransitClass`
 #     * :class:`aequilibrae.transit.TransitAssignment`
 #     * :class:`aequilibrae.matrix.AequilibraeMatrix`
@@ -31,7 +31,6 @@ from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
 
-from aequilibrae.transit import Transit
 from aequilibrae.examples import create_example
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/hyperpath_bell_n_10_alpha_100d0.png'
 
@@ -42,8 +41,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# Let's create our ``Transit`` object.
-data = Transit(project)
+# Let's access our project's transit gateway.
+data = project.transit
 
 # %%
 # Graph building
@@ -65,9 +64,9 @@ graph.vertices.drop(columns="geometry")
 graph.edges
 
 # %%
-# The graphs also also stored in the ``Transit.graphs`` dictionary. They are keyed by the 'period_id' they 
+# The graphs are also stored in the ``project.transit.graphs`` dictionary. They are keyed by the 'period_id' they
 # were created for. A graph for a different 'period_id' can be created by providing ``period_id=`` in the 
-# ``Transit.create_graph`` call. You can view previously created periods with the ``Periods`` object.
+# ``project.transit.create_graph`` call. You can view previously created periods with the ``Periods`` object.
 periods = project.tables.periods
 periods.data
 
@@ -105,12 +104,12 @@ data.load()
 # 
 # Reading back into AequilibraE
 # -----------------------------
-# You can create back in a particular graph via it's 'period_id'.
-from aequilibrae.builder import TransitGraphBuilder
+# You can retrieve a reloaded graph via its 'period_id'.
+period_id = periods.default_period.period_id
 
 # %%
 
-graph_db = TransitGraphBuilder.from_db(project, periods.default_period.period_id)
+graph_db = data.graphs[period_id]
 graph_db.vertices.drop(columns="geometry")
 
 # %%

@@ -9,7 +9,7 @@ import pytest
 from scipy.sparse import csr_array
 
 from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
-from aequilibrae.project import Matrices
+from aequilibrae.project.data.matrices import Matrices
 
 
 def test_list_available_matrices(sioux_falls_example):

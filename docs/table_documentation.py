@@ -15,7 +15,6 @@ class CreateTablesSRC:
     def __init__(self, component: str, tgt_fldr: str):
         from aequilibrae.project.database_connection import database_connection
         from aequilibrae import Project
-        from aequilibrae.transit import Transit
 
         # Create a new project
         self.proj_path = join(gettempdir(), f"aequilibrae_{uuid4().hex[:6]}")

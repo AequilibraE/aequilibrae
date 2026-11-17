@@ -287,8 +287,8 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. seealso::
     
-    * :func:`aequilibrae.project.Log`
-        Class documentation
+    * :meth:`aequilibrae.Project.log`
+        Project log access
     * :ref:`useful-log-tips`
         Usage example
     
@@ -344,8 +344,8 @@ otherwise, provide ``index_name`` explicitly.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.Matrices`
-        Class documentation
+    * :attr:`aequilibrae.Project.matrices`
+        Project matrix manager
 
 ``project.tables.link_types``
 ------------------------------

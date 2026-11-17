@@ -8,15 +8,13 @@ the **public_transport.sqlite** are discussed on a nearly *per-table* basis belo
 recommend understanding the role of each table before setting an AequilibraE model 
 you intend to use.
 
-The public transport database is created on the run when the ``Transit`` module is executed
-for the first time and it can take a little while. 
+Create the public transport database with ``project.scenario.create_transit_database()`` if it does not
+already exist, then access its gateway through ``project.transit``. Creating the database can take a little while.
 
 .. seealso::
 
-    * :func:`aequilibrae.transit.Transit`
-        Class documentation
-    * :func:`aequilibrae.builder.TransitGraphBuilder`
-        Class documentation
+    * :attr:`aequilibrae.Project.transit`
+        Transit gateway; use ``project.transit.create_graph()`` to obtain a graph builder
 
 In the following sections, we'll dive deep into the tables existing in the public transport database.
 Please notice that some tables are homonyms to the ones existing in the **project_database.sqlite**,

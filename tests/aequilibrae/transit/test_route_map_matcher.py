@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 from shapely import LineString, Point
 
-from aequilibrae.builder import GTFSRouteSystemBuilder
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
+from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 
 

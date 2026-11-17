@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 
 
 @pytest.mark.parametrize(

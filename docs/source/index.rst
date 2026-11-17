@@ -18,6 +18,8 @@ Python
 **Previous versions**: documentation for all AequilibraE's versions are available 
 :doc:`here <useful_links/version_history>`.
 
+**Migrating to AequilibraE 2.0**: :doc:`Read the migration guide <aequilibrae2_0>`.
+
 **Useful links**: :doc:`useful_links/installation` | :doc:`API Reference <useful_links/_autosummary/aequilibrae>` | :doc:`useful_links/development` | :doc:`useful_links/support` |  :doc:`useful_links/history` | :doc:`_auto_examples/index`
 
 |
@@ -140,6 +142,7 @@ Python
    :hidden:
    :maxdepth: 1
 
+   aequilibrae2_0
    aequilibrae_project
    run_module
    network_manipulation

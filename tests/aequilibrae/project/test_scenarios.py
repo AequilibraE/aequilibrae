@@ -10,7 +10,8 @@ from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
 from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
 from aequilibrae.traffic import TrafficAssignment, TrafficClass
 from aequilibrae.traffic.vdf import bpr
-from aequilibrae.transit import Transit, TransitAssignment, TransitClass
+from aequilibrae.transit import TransitAssignment, TransitClass
+from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.cython.bridge import Bridge
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from aequilibrae.routing import Network, PathResults, estimate_heuristic_scale
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 
 
 def build_graph(links, centroids=None, **options):

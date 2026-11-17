@@ -4,8 +4,7 @@ import sqlite3
 import pandas as pd
 import pytest
 
-from aequilibrae.project import Results
-from aequilibrae.project.data.results import format_dataframe
+from aequilibrae.project.data.results import Results, format_dataframe
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.utils.db_utils import ConnectionClosure
 
