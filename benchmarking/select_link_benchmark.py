@@ -23,7 +23,7 @@ def aequilibrae_init(proj_path: str, cost: str) -> tuple[dict[str, object], Traf
     """
     Prepare an independent network and assignment configuration for `cost`.
     """
-    proj = Project.open(proj_path)
+    proj = Project(proj_path)
     try:
         network = proj.road.build_network(fields=[cost, "distance", "capacity"], modes=["c"])
         with proj.matrices.get_matrix("demand.omx") as store:
@@ -48,7 +48,7 @@ def aequilibrae_init(proj_path: str, cost: str) -> tuple[dict[str, object], Traf
 
 
 def arkansas(path: str) -> tuple[dict[str, object], TrafficClass]:
-    proj = Project.open(path)
+    proj = Project(path)
     try:
         source = proj.road.build_network(modes=["c"])
         # These centroids are not in the matrices, so omit them from the independent snapshot.

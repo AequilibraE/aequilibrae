@@ -589,7 +589,7 @@ def main(argv=None):
     from aequilibrae.project.project import Project
 
     try:
-        prj = Project.open(args.project)
+        prj = Project(args.project)
     except Exception as e:
         print(f"Error opening project at '{args.project}': {e}", file=sys.stderr)
         return 2

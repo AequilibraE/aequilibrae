@@ -19,7 +19,7 @@ def run_example(from_model: str, zones: list[int]) -> dict[str, pd.DataFrame]:
         path = join(examples_dir, f"{from_model}_{n_zones}")
 
         if os.path.isdir(path):
-            project = Project.open(path)
+            project = Project(path)
 
         else:
             print("example not created.")

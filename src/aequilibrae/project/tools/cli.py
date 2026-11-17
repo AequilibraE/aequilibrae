@@ -119,7 +119,7 @@ def list_functions(parser, args, unparsed_args):
     # We attempt to parse the remaining arguments to provide a good error message in case something was provided.
     args = parser.parse_args(args=unparsed_args, namespace=args)
 
-    project = Project.open(args.project)
+    project = Project(args.project)
 
     pprint(list(project.parameters["run"].keys()))
 
@@ -134,7 +134,7 @@ def run(args, unparsed_args):
 
     from aequilibrae.project.project import Project
 
-    project = Project.open(args.project)
+    project = Project(args.project)
 
     try:
         run_module = project.run

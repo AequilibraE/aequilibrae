@@ -42,7 +42,7 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
 
 
 def _prepare_graph(model_path: Path, mode: str):
-    project = Project.open(model_path)
+    project = Project(model_path)
     try:
         network = project.road.build_network(modes=[mode])
         graph = network.build_graph(mode, "distance", skimming=["distance"], block_centroid_flows=False)

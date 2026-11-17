@@ -44,23 +44,17 @@ class Project:
     .. code-block:: python
         :caption: Open Project
 
-        >>> existing_project = Project.open(project_path)
+        >>> existing_project = Project(project_path)
 
         >>> existing_project.close()
     """
 
-    def __init__(self) -> None:
-        raise TypeError("Use Project.open(path) or Project.create(path)")
-
-    @classmethod
-    def open(cls, project_path: os.PathLike | str) -> "Project":
+    def __init__(self, project_path: os.PathLike | str) -> None:
         """Load a ready-to-use project from disk.
 
         :param project_path: Full path to the project data folder.
-        :returns: The open project, usable as a context manager.
         :raises FileNotFoundError: If the project database does not exist.
         """
-        self = object.__new__(cls)
         base_path = Path(project_path)
         file_name = base_path / "project_database.sqlite"
 
@@ -85,7 +79,10 @@ class Project:
 
         logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
-        return self
+
+    @classmethod
+    def open(cls, project_path: os.PathLike | str) -> "Project":
+        return cls(project_path)
 
     def __enter__(self) -> "Project":
         if not self.db_connection.is_open():

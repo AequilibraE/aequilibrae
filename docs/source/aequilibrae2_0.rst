@@ -204,9 +204,10 @@ export.
 Project creation and lifetime
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create or open a ready-to-use project with class methods. When opening multiple
-projects, the context manager should be used to close the project's connections
-upon completion, and when an operation raises an exception:
+Create a project with ``Project.create()`` or open one with the constructor.
+When opening multiple projects, the context manager should be used to close the
+project's connections upon completion, and when an operation raises an
+exception:
 
 .. code-block:: python
 
@@ -215,12 +216,12 @@ upon completion, and when an operation raises an exception:
     with Project.create("/path/to/new_project") as project:
         links = project.tables.links.data
 
-    with Project.open("/path/to/existing_project") as project:
+    with Project("/path/to/existing_project") as project:
         network = project.road.build_network()
 
 Without a ``with`` block, call ``project.close()`` explicitly. Opening a
 project no longer requires two-stage initialisation. Replace ``project =
-Project(); project.open(path)`` with ``project = Project.open(path)``, and
+Project(); project.open(path)`` with ``project = Project(path)``, and
 ``project = Project(); project.new(path)`` with ``project =
 Project.create(path)``.  ``create_example()`` also returns an open project and
 can be used as a context manager.

@@ -7,7 +7,7 @@ from aequilibrae.utils.db_utils import read_and_close
 def test_opening_wrong_folder(tmp_path):
     not_a_project = str(tmp_path)
     with pytest.raises(FileNotFoundError):
-        Project.open(not_a_project)
+        Project(not_a_project)
 
 
 @pytest.mark.parametrize(

@@ -45,7 +45,7 @@ project = create_example(fldr, "coquimbo")
 # the database, then reopen the project and create a fresh transit database.
 project.close()
 remove(join(fldr, "public_transport.sqlite"))
-project = Project.open(fldr)
+project = Project(fldr)
 
 # %%
 # Let's import the GTFS feed.

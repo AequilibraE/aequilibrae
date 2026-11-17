@@ -29,7 +29,7 @@ def create_example(path: os.PathLike | str, from_model="sioux_falls") -> Project
 
     pth.mkdir(parents=True, exist_ok=True)
     zipfile.ZipFile(source).extractall(pth)
-    project = Project.open(str(pth))
+    project = Project(str(pth))
     project.upgrade()
 
     # This refreshes the metadata of the project, so that the project is ready to be used.

@@ -53,7 +53,7 @@ Quickstart — Python API
     from aequilibrae import Project
     from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator
 
-    prj = Project.open('/path/to/project')
+    prj = Project('/path/to/project')
 
     gen = SimwrapperConfigGenerator(prj, output_dir='simwrapper', max_results_tables=3)
     gen.write_yamls()

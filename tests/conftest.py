@@ -56,7 +56,7 @@ def no_index_omx(test_data_path, tmp_path):
 def cached_model(model_name, cache_pth, test_folder) -> Project:
     source = cache_pth / model_name
     shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    return Project.open(test_folder)
+    return Project(test_folder)
 
 
 @pytest.fixture(scope="session")
