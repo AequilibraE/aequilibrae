@@ -2,13 +2,13 @@
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.search_query import SearchQuery
-from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import SearchWorkspace
 
-from aequilibrae.paths import Network
+from aequilibrae.routing import Network
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.routing.cython.dijkstra import dijkstra
+from aequilibrae.routing.cython.search_query import SearchQuery
+from aequilibrae.routing.cython.search_results import SearchResults
+from aequilibrae.routing.cython.workspaces import SearchWorkspace
 
 
 def diamond_graph(turn=False):

@@ -1,22 +1,22 @@
-"""``project.network.importer`` -- every way of getting a network *into* a project."""
+"""``project.tables.importer`` -- every way of getting a network *into* a project."""
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from shapely.geometry import Polygon
 
 from aequilibrae.project.network.importer.schema.modes import DEFAULT_MODES
 
 if TYPE_CHECKING:
-    from aequilibrae.project.network.network import Network
+    from aequilibrae.project.tables import Tables
 
 logger = logging.getLogger(__name__)
 
 
 class Importer:
-    """Network import entry points, reached as ``project.network.importer``."""
+    """Network import entry points, reached as ``project.tables.importer``."""
 
-    def __init__(self, network: "Network"):
+    def __init__(self, network: "Tables"):
         self._network = network
         self._project = network.project
 

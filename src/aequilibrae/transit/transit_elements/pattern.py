@@ -1,4 +1,3 @@
-from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 import logging
 from sqlite3 import Connection
 from typing import List
@@ -10,11 +9,11 @@ import shapely
 from shapely.geometry import LineString
 
 from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 from aequilibrae.transit.route_types import lookup_by_route_type
-
-from .basic_element import BasicPTElement
-from .link import Link
-from .mode_correspondence import mode_corresp
+from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
+from aequilibrae.transit.transit_elements.link import Link
+from aequilibrae.transit.transit_elements.mode_correspondence import mode_corresp
 
 DEAD_END_RUN = 40
 

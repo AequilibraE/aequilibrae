@@ -21,9 +21,9 @@ skim the last iteration after the assignment is done.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.traffic.TrafficClass`
+#     * :func:`aequilibrae.traffic.TrafficAssignment`
 
 # %%
 
@@ -35,10 +35,10 @@ from uuid import uuid4
 from scipy.sparse import csr_array
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/sparse_matrix.png'
 
@@ -60,7 +60,7 @@ basic_config()
 # ------------------
 
 # %%
-network = project.network.build()
+network = project.tables.build()
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.

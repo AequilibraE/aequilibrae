@@ -11,6 +11,7 @@ pyfiles = [
   'project_cleaning.py',
   'project_creation.py',
   'scenario.py',
+  'tables.py',
 ]
 
 pkgs = [

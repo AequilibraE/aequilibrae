@@ -295,7 +295,7 @@ network:
       equivalency:
         mode_name: use
 osm:
-  # Used by project.network.importer.osm to configure osmnx via osmnx.settings.
+  # Used by project.tables.importer.osm to configure osmnx via osmnx.settings.
   # AequilibraE splits larger boundaries before querying Overpass.
   max_query_area_size: 100000000
   overpass_endpoint: https://overpass-api.de/api

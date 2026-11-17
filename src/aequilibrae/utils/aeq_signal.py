@@ -1,5 +1,6 @@
-from aequilibrae.utils.qgis_utils import inside_qgis
 from typing import TYPE_CHECKING
+
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 
 def noop(_):

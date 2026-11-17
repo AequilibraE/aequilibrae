@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
 
 def clean(project: "Project") -> None:

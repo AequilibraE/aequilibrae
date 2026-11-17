@@ -1,5 +1,3 @@
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
-
 from aequilibrae.utils.core_setter import (
     DEFAULT_THREADING_THRESHOLD,
     ELEMENTWISE_CORES_CAP,
@@ -7,6 +5,7 @@ from aequilibrae.utils.core_setter import (
     resolve_elementwise_cores,
     resolve_threading_threshold,
 )
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 class TestResolveCores:
@@ -89,7 +88,7 @@ class TestResolveElementwiseCores:
 
 class TestAssignmentResultsResolution:
     def test_env_vars_flow_into_results(self, monkeypatch):
-        from aequilibrae.paths.results import AssignmentResults
+        from aequilibrae.traffic import AssignmentResults
 
         monkeypatch.setenv("AEQ_CPUS", "-2")
         monkeypatch.setenv("AEQ_THREADING_THRESHOLD", "5000")
@@ -100,7 +99,7 @@ class TestAssignmentResultsResolution:
         assert res.elementwise_cores == 3
 
     def test_set_cores_keeps_threshold_unless_given(self, monkeypatch):
-        from aequilibrae.paths.results import AssignmentResults
+        from aequilibrae.traffic import AssignmentResults
 
         monkeypatch.delenv("AEQ_CPUS", raising=False)
         monkeypatch.delenv("AEQ_THREADING_THRESHOLD", raising=False)
@@ -116,7 +115,7 @@ class TestAssignmentResultsResolution:
         assert res.threading_threshold == 123
 
     def test_elementwise_cores_track_cores_unless_pinned(self, monkeypatch):
-        from aequilibrae.paths.results import AssignmentResults
+        from aequilibrae.traffic import AssignmentResults
 
         monkeypatch.delenv("AEQ_CPUS", raising=False)
         monkeypatch.delenv("AEQ_THREADING_THRESHOLD", raising=False)

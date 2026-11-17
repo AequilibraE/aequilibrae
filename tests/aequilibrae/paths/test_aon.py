@@ -6,12 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
+
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
-from aequilibrae.paths.cython.aon import PreparedAoN
-from aequilibrae.paths.cython.context import SelectLinkContext, SkimmingContext
-from aequilibrae.paths.cython.outputs import AoNOutputs, LoadingOutputs, SelectLinkLoadingOutputs
-from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import AoNWorkspace
+from aequilibrae.routing.cython.aon import PreparedAoN
+from aequilibrae.routing.cython.context import SelectLinkContext, SkimmingContext
+from aequilibrae.routing.cython.outputs import AoNOutputs, LoadingOutputs, SelectLinkLoadingOutputs
+from aequilibrae.routing.cython.search_results import SearchResults
+from aequilibrae.routing.cython.workspaces import AoNWorkspace
 
 from .routing_helpers import history_context, make_context, path_walk_outputs, search
 
@@ -210,7 +211,7 @@ def test_cost_updates_refresh_routing_without_repreparing_workers(turn, rebind, 
         raise AssertionError("setup should not run inside an iteration")
 
     for name in ("choose_origins", "make_destination_masks"):
-        monkeypatch.setattr(f"aequilibrae.paths.cython.aon.{name}", unexpected)
+        monkeypatch.setattr(f"aequilibrae.routing.cython.aon.{name}", unexpected)
 
     for iteration in range(3):
         values = [1.0, 20.0 + iteration, 1.0, 1.0] if turn else [20.0 + iteration, 1.0, 1.0, 1.0]

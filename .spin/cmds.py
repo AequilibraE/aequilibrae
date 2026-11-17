@@ -14,6 +14,7 @@ from spin.cmds import meson
 def doctest(*, parent_callback, pytest_args, **kwargs):
     """Use the same doctest targets and exclusions as the documentation workflow."""
     args = (
+        "--import-mode=importlib",
         "--doctest-modules",
         "--doctest-glob=*.rst",
         "--ignore-glob=*setup_ipf.py",
@@ -21,7 +22,9 @@ def doctest(*, parent_callback, pytest_args, **kwargs):
         "--ignore-glob=*database_specification*",
         "src/aequilibrae/distribution",
         "src/aequilibrae/matrix",
-        "src/aequilibrae/paths",
+        "src/aequilibrae/routing",
+        "src/aequilibrae/traffic",
+        "src/aequilibrae/route_choice",
         "src/aequilibrae/project",
         "src/aequilibrae/log.py",
         "src/aequilibrae/parameters.py",

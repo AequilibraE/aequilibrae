@@ -103,7 +103,7 @@ Run the development checks from the repository root::
 Supplying pytest arguments replaces that entire argument list rather than appending to it. Use ``-j`` to change
 the worker count. These defaults do not affect direct pytest invocations. For example::
 
-  spin test tests/aequilibrae/paths
+  spin test tests/aequilibrae/routing
   spin test -j 2 -- -k graph --durations=10
 
 ``spin lint`` runs Ruff lint/format checks, cython-lint, clang-tidy and clang-format in check-only mode. Install the LLVM tools

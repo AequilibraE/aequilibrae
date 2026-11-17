@@ -211,7 +211,7 @@ the paths we found. The workspace holds things we only need while doing the
 work, such as the heap and intermediate sums. We can allocate these once and
 reuse them in each thread instead of re-allocating them.
 
-``src/aequilibrae/paths/cython/workspaces.pyx`` has a small workspace for each
+``src/aequilibrae/routing/cython/workspaces.pyx`` has a small workspace for each
 operation, with a matching C++ view:
 
 * ``SearchWorkspace`` holds the chosen heap. ``AStarWorkspace`` also has
@@ -249,7 +249,7 @@ run. The same workers must not be shared by concurrent runs.
 Search results and operation outputs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``SearchResults``, in ``src/aequilibrae/paths/cython/search_results.pyx``,
+``SearchResults``, in ``src/aequilibrae/routing/cython/search_results.pyx``,
 holds the path tree and costs from a search. It does not need to keep the graph
 or workspace. Routing writes through ``view()``, while skimming and loading use
 ``read_view()`` to read the same results without changing the paths in an

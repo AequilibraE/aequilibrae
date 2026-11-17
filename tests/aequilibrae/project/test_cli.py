@@ -2,7 +2,7 @@ import argparse
 
 import pytest
 
-from aequilibrae.project import Project
+from aequilibrae import Project
 from aequilibrae.project.tools.cli import _extract_target_call, add_subcommand_from_function, cli
 
 
@@ -98,8 +98,7 @@ def test_help_shows_docstring_and_annotations(capsys):
 @pytest.fixture(scope="module")
 def project_path(tmp_path_factory):
     path = tmp_path_factory.mktemp("cli") / "project"
-    project = Project()
-    project.new(str(path))
+    project = Project.create(str(path))
     project.close()
     return str(path)
 

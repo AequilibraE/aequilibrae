@@ -17,7 +17,7 @@ This is useful when you need to use the latest AequilibraE's database schemas or
 # .. seealso::
 #     Functions used in this example:
 #
-#     * :func:`aequilibrae.project.project.Project.upgrade`
+#     * :func:`aequilibrae.Project.upgrade`
 
 # %%
 
@@ -26,8 +26,8 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.project.tools import MigrationManager
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.project import MigrationManager
+from aequilibrae.examples import create_example
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 # %%

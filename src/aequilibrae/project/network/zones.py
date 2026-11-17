@@ -29,7 +29,7 @@ class Zones(SpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> zones = project.network.zones
+        >>> zones = project.tables.zones
 
         >>> zone_downtown = zones.get(1)
         >>> zones.update(1, population=637, employment=10039)

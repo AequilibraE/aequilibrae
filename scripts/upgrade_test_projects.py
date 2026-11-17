@@ -8,8 +8,8 @@ from pathlib import Path
 
 from aequilibrae.project.project import _upgrade
 from aequilibrae.project.project_creation import _remove_triggers
+from aequilibrae.utils import basic_config
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.logging_utils import basic_config
 
 ROOT_PATH = Path(__file__).resolve().parent.parent
 PROJECT_DATABASE = "project_database.sqlite"

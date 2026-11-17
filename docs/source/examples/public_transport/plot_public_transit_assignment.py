@@ -18,11 +18,11 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.transit.transit`
-#     * :func:`aequilibrae.transit.transit_graph_builder`
-#     * :func:`aequilibrae.paths.traffic_class.TransitClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TransitAssignment`
-#     * :func:`aequilibrae.matrix.aequilibrae_matrix`
+#     * :class:`aequilibrae.transit.Transit`
+#     * :class:`aequilibrae.builder.TransitGraphBuilder`
+#     * :class:`aequilibrae.transit.TransitClass`
+#     * :class:`aequilibrae.transit.TransitAssignment`
+#     * :class:`aequilibrae.matrix.AequilibraeMatrix`
 
 # %%
 
@@ -32,7 +32,7 @@ from os.path import join
 from tempfile import gettempdir
 
 from aequilibrae.transit import Transit
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
@@ -68,7 +68,7 @@ graph.edges
 # The graphs also also stored in the ``Transit.graphs`` dictionary. They are keyed by the 'period_id' they 
 # were created for. A graph for a different 'period_id' can be created by providing ``period_id=`` in the 
 # ``Transit.create_graph`` call. You can view previously created periods with the ``Periods`` object.
-periods = project.network.periods
+periods = project.tables.periods
 periods.data
 
 # %%
@@ -106,7 +106,7 @@ data.load()
 # Reading back into AequilibraE
 # -----------------------------
 # You can create back in a particular graph via it's 'period_id'.
-from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
+from aequilibrae.builder import TransitGraphBuilder
 
 # %%
 
@@ -140,13 +140,13 @@ mat["pt"] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 # Hyperpath generation/assignment
 # -------------------------------
 # We'll create a ``TransitAssignment`` object as well as a ``TransitClass``
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit import TransitAssignment, TransitClass
 
 # %%
 # Create the assignment class
 assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
-assig = TransitAssignment()
+assig = TransitAssignment(project=project)
 
 assig.add_class(assigclass)
 

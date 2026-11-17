@@ -1,4 +1,4 @@
-from aequilibrae.utils.create_example import list_examples
+from aequilibrae.examples import list_examples
 
 
 def test_list_examples():

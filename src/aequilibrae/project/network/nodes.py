@@ -20,7 +20,7 @@ class Nodes(SpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> nodes = project.network.nodes
+        >>> nodes = project.tables.nodes
 
         # We can get a single node as an immutable record
         >>> node = nodes.get(21)

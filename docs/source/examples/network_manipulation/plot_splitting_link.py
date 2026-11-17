@@ -25,7 +25,7 @@ in the database equal. Distance is proportionally computed automatically in the 
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 from shapely.ops import substring
 import matplotlib.pyplot as plt
 
@@ -39,8 +39,8 @@ project = create_example(fldr)
 # %%
 # We will split link 37 right in the middle.
 # Let's get the link and check its length.
-links = project.network.links
-all_nodes = project.network.nodes
+links = project.tables.links
+all_nodes = project.tables.nodes
 
 link = links.get(37)
 print(link.distance)

@@ -7,7 +7,7 @@ import numpy as np
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 cimport cython
-from .matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array
 
 

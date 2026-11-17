@@ -4,9 +4,9 @@ from dataclasses import replace
 
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths import available_heaps
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.routing import available_heaps
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 @pytest.fixture
@@ -14,7 +14,7 @@ def assignment(sioux_falls_single_class):
     project = sioux_falls_single_class
     matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     result = TrafficAssignment(
-        network=project.network,
+        network=project.tables.build(),
         classes=[TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix)],
         time_field="free_flow_time",
         capacity_field="capacity",

@@ -1,6 +1,5 @@
 from shapely.geometry import LineString, Point
 
-
 _PATTERN_ID = 10001001000
 
 

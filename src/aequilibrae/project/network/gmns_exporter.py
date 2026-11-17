@@ -1,12 +1,8 @@
 from os.path import join
-from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from aequilibrae.parameters import Parameters
-
-if TYPE_CHECKING:
-    pass
 
 
 class GMNSExporter:
@@ -16,8 +12,10 @@ class GMNSExporter:
         nodes,
         modes,
         path: str,
+        *,
+        parameters: Parameters | None = None,
     ) -> None:
-        self.p = Parameters()
+        self.p = Parameters() if parameters is None else parameters
         self.links_df = links.data
         self.nodes_df = nodes.data
         self.output_path = path

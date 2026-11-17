@@ -1,5 +1,6 @@
 from sqlite3 import Connection
-from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
+
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER, Constants
 
 
 class Fare:

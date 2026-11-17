@@ -1,0 +1,767 @@
+import itertools
+import json
+import logging
+import pathlib
+import socket
+import warnings
+from collections.abc import Hashable
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
+from uuid import uuid4
+
+import numpy as np
+import pandas as pd
+
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, AequilibraeSparseMatrix
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.routing.cython.route_choice_set_results import RouteChoiceSetResults, check_disutility_cutoff_values
+from aequilibrae.routing.graph import Graph
+from aequilibrae.utils.core_setter import clamp_cores
+from aequilibrae.utils.cython.bridge import Bridge
+
+logger = logging.getLogger(__name__)
+
+
+class RouteChoice:
+    all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
+
+    default_parameters = {
+        "generic": {
+            "seed": 0,
+            "max_routes": 0,
+            "max_depth": 0,
+            "max_misses": 100,
+            "penalty": 1.01,
+            "disutility_cutoff_constant": float("inf"),
+            "disutility_cutoff_coefficient": float("inf"),
+            "beta": 1.0,
+            "store_results": True,
+            "a_star": False,
+            "heuristic": "euclidean",
+            "heuristic_scale": None,
+        },
+        "link-penalisation": {},
+        "bfsle": {"penalty": 1.0},
+    }
+
+    def __init__(self, graph: Graph, project=None, *, coordinates: pd.DataFrame | None = None):
+        self.parameters = {}
+        self.procedure_id = None
+        self.procedure_date = None
+
+        self.project = project
+
+        self.cores: int = 0
+        self.__rc = RouteChoiceSet(graph, coordinates=coordinates)
+        self.demand: AequilibraeMatrix | AequilibraeSparseMatrix | None = None
+        self._nodes = None
+
+        self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
+        self.sl_link_loads: Optional[Dict[str, np.array]] = None
+
+        self.where: Optional[pathlib.Path] = None
+        self.to_parquet_kwargs = {}
+        self.index_name = "route_choice_sl_index"
+
+        self._config = {}
+        self._selected_links = {}
+        self.sl_link_loading = True
+
+    def _resolve_project(self, project):
+        project = self.project if project is None else project
+        if project is None:
+            raise ValueError("An explicit project is required to save route-choice results")
+        return project
+
+    def set_choice_set_generation(self, /, algorithm: str = None, **kwargs) -> None:
+        """
+        Chooses the assignment algorithm and set its parameters.
+
+        Options for algorithm are 'bfsle' for breadth first search with link removal, or
+        'link-penalisation'/'link-penalization'. 'lp' is also accepted as an alternative to
+        'link-penalisation'. If ``algorithm`` is ``None``, none will be set, but the parameters
+        will be updated. This is useful when assigning from path-files.
+
+        BFSLE implementation based on "Route choice sets for very high-resolution data" by
+        Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
+        `DOI: 10.1080/18128602.2012.671383 <https://doi.org/10.1080/18128602.2012.671383>`_.
+
+        Setting the parameters for the route choice:
+
+        * ``seed`` is a BFSLE specific parameters.
+
+        * Although not required, setting ``max_depth`` or ``max_misses``, is strongly
+          recommended to prevent runaway algorithms.
+
+        * ``max_misses`` is the maximum amount of duplicate routes found per OD pair. If a set
+          of routes is returned in a case where ``max_misses`` is exceeded, the number of routes
+          may be fewer than ``max_routes``. Assumes a default value of 100.
+
+        * When using **BFSLE** ``max_depth`` corresponds to the maximum height of the graph.
+          It's value is largely dependent on the size of the paths within the network. For
+          very small networks a value of 10 is a recommended starting point. For large networks
+          a good starting value is 5. Increase the value until the number of desired routes is
+          being consistently returned. If a set of routes is returned in a case where
+          ``max_depth`` is exceeded, the number of routes may be fewer than ``max_routes``.
+
+        * When using **LP**, ``max_depth`` corresponds to the maximum number of iterations
+          performed. While not enforced, it should be higher than ``max_routes``. It's value is
+          dependent on the magnitude of the cost field, specifically if it's related to the log
+          base ``penalty`` of the ratio of costs between two alternative routes. If a set of
+          routes is returned in a case where ``max_depth`` is exceeded, the number of routes
+          may be fewer than ``max_routes``.
+
+        * Additionally BFSLE has the option to incorporate link penalisation. Every link in all
+          routes found at a depth are penalised with the penalty factor for the next depth. So at
+          a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0
+          are penalised, then the links marked for removal are removed. All links in the routes
+          found at depth 1 are then penalised for the next depth. The penalisation compounds.
+          Set ``penalty=1.0`` to disable. For both algorithms, ``penalty`` must be finite and at least 1.
+
+        * Set ``a_star=True`` to use A* instead of Dijkstra. ``heuristic`` accepts ``euclidean``
+          (default) or ``haversine``. Euclidean distance uses the constructor's ``coordinates``;
+          Haversine uses the constructor's ``lon`` and ``lat`` coordinates in degrees.
+
+        * A* requires an finite, nonnegative ``heuristic_scale`` to convert distance to
+          cost units. Use ``estimate_heuristic_scale`` to calculate a conservative value. A scale
+          above a consistent bound can give non-shortest paths and change the generated route sets.
+          A consistent bound remains valid as links are removed or penalised.
+
+        * When performing an assignment, ``disutility_cutoff_constant`` and
+          ``disutility_cutoff_coefficient`` can be provided to exclude routes from the path-sized
+          logit model. Any route with a cost higher when applied to this function
+          ``disutility_cutoff_coefficient * cost + disutility_cutoff_constant`` within the route set
+          is masked out.
+
+        :Arguments:
+            **algorithm** (:obj:`str`): Algorithm to be used
+
+            **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
+        """
+        if algorithm is not None:
+            algo_dict = {i: i for i in self.all_algorithms}
+            algo_dict["lp"] = "link-penalisation"
+            algo_dict["link-penalization"] = "link-penalisation"
+
+            sentinel = object()
+            algorithm = algo_dict.get(algorithm.lower(), sentinel)
+
+            if algorithm is sentinel:
+                raise ValueError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+
+            defaults = self.default_parameters["generic"] | self.default_parameters[algorithm]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid parameter '{key}' provided for algorithm `{algorithm}`")
+        else:
+            defaults = self.default_parameters["generic"]
+            for key in kwargs.keys():
+                if key not in defaults:
+                    raise ValueError(f"Invalid or non-generic parameter '{key}' provided")
+
+        # this is not stored anywhere, it is here to give an early warning to the user
+        disutility_cutoff_constant = kwargs.get("disutility_cutoff_constant", float("inf"))
+        disutility_cutoff_coefficient = kwargs.get("disutility_cutoff_coefficient", float("inf"))
+
+        check_disutility_cutoff_values(disutility_cutoff_constant, disutility_cutoff_coefficient)
+
+        parameters = defaults | kwargs
+        RouteChoiceSet._validate_search_options(
+            parameters["a_star"], parameters["heuristic"], parameters["heuristic_scale"], parameters["penalty"]
+        )
+        self.algorithm = algorithm
+        self._config["Algorithm"] = algorithm
+
+        self.parameters = parameters
+
+    def set_cores(self, cores: int) -> None:
+        """Allows one to set the number of cores to be used
+
+            Inherited from :obj:`AssignmentResultsBase`
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of CPU cores to use
+        """
+        self.cores = clamp_cores(cores)
+
+    def set_save_routes(self, where: Optional[str] = None, to_parquet_kwargs: dict[str, Any] | None = None) -> None:
+        """
+        Set save path for route choice results. Provide ``None`` to disable.
+
+        .. warning:
+
+            Enabling route saving will disable in memory results. Viewing the results will read
+            the results from disk first.
+
+        :Arguments:
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
+        """
+
+        if where is not None:
+            where = pathlib.Path(where)
+            if not where.exists():
+                raise ValueError(f"Path does not exist `{where}`")
+        self.where = where
+        self.to_parquet_kwargs = to_parquet_kwargs if to_parquet_kwargs is not None else {}
+
+    def set_demand(self, demand: AequilibraeMatrix | AequilibraeSparseMatrix | None) -> None:
+        """
+        Set the demand matrix for the assignment.
+
+        :Arguments:
+            **demand** (:obj:`AequilibraeMatrix` or
+                :obj:`AequilibraeSparseMatrix`, *Optional*): Demand for
+                assignment. Node IDs are inferred from the index and must be
+                graph centroids. Use :func:`aequilibrae.matrix.from_df` to
+                convert a DataFrame.
+        """
+        if not isinstance(demand, (AequilibraeMatrix, AequilibraeSparseMatrix)):
+            raise TypeError("demand must be an AequilibraeMatrix or AequilibraeSparseMatrix")
+
+        self.demand = demand
+        self._nodes = None
+        self.__rc.clear_results()
+
+    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]], None] = None) -> None:
+        """
+        Prepare OD pairs for batch computation.
+
+        :Arguments:
+            **nodes** (:obj:`Union[list[int], list[tuple[int, int]]]`): List of node IDs to
+            operate on. If a 1D list is provided, OD pairs are taken to be all pair
+            permutations of the list. If a list of pairs is provided OD pairs are taken as is.
+            All node IDs must be present in the compressed graph. To make a node ID always appear
+            in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+            If ``None`` is provided, all OD pairs with non-zero flows will be used.
+        """
+        if nodes is not None and self.demand is not None:
+            raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
+        elif nodes is None:
+            return
+        elif len(nodes) == 0:
+            raise ValueError("`nodes` list-like empty.")
+
+        if all(
+            isinstance(pair, tuple)
+            and len(pair) == 2
+            and isinstance(pair[0], (int, np.integer))
+            and isinstance(pair[1], (int, np.integer))
+            for pair in nodes
+        ):
+            pairs = list(nodes)
+        elif len(nodes) > 1 and all(isinstance(x, (int, np.integer)) for x in nodes):
+            pairs = list(itertools.permutations(nodes, r=2))
+        else:
+            raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
+
+        self._nodes = pairs
+        self.__rc.clear_results()
+
+    def execute_single(self, origin: int, destination: int, demand: float = 0.0) -> list[tuple[np.ndarray, np.ndarray]]:
+        """
+        Generate route choice sets between origin and destination, potentially performing an
+        assignment.
+
+        Does not require preparation.
+
+        Node IDs must be present in the compressed graph. To make a node ID always appear in
+        the compressed graph add it as a centroid.
+
+        :Arguments:
+            **origin** (:obj:`int`): Origin node ID.
+
+            **destination** (:obj:`int`): Destination node ID.
+
+            **demand** (:obj:`float`): If provided an assignment will be
+                performed with this demand.  Non-zero demand requires centroid
+                endpoints.
+
+        :Returns:
+            **route set** (:obj:`list[tuple[np.ndarray, np.ndarray]]`): A list of routes as ID/direction array pairs.
+        """
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
+
+        with Bridge(logger) as bridge:
+            return self.__rc.run(
+                origin,
+                destination,
+                demand=demand,
+                bfsle=self.algorithm == "bfsle",
+                path_size_logit=bool(demand),
+                cores=self.cores,
+                where=str(self.where) if self.where is not None else None,
+                to_parquet_kwargs=self.to_parquet_kwargs,
+                sl_link_loading=self.sl_link_loading,
+                bridge=bridge,
+                **self.parameters,
+            )
+
+    def execute(self, perform_assignment: bool = True) -> None:
+        """
+        Generate route choice sets between the previously supplied nodes, potentially performing
+        an assignment.
+
+        To access results see ``RouteChoice.get_results()``.
+
+        :Arguments:
+            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment.
+            Defaults to ``False``.
+        """
+        if self.demand is None and self._nodes is None:
+            logging.warning("There is no demand or pairs of OD pairs to compute Route choice for.", stacklevel=2)
+            return
+
+        self.procedure_date = str(datetime.today())
+
+        with Bridge(logger) as bridge:
+            self.__rc.batched(
+                self.demand,
+                self._selected_links,
+                nodes=self._nodes,
+                bfsle=self.algorithm == "bfsle",
+                path_size_logit=perform_assignment,
+                cores=self.cores,
+                where=str(self.where) if self.where is not None else None,
+                to_parquet_kwargs=self.to_parquet_kwargs,
+                sl_link_loading=self.sl_link_loading,
+                bridge=bridge,
+                **self.parameters,
+            )
+
+    def recompute_psl(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Validate and recost routes, then return their PSL results by OD.
+
+        Invalid routes raise ValueError, including masked routes.
+        """
+        defaults = self.default_parameters["generic"]
+        return self.__rc.recompute_psl(
+            df,
+            beta=self.parameters.get("beta", defaults["beta"]),
+            disutility_cutoff_constant=self.parameters.get(
+                "disutility_cutoff_constant", defaults["disutility_cutoff_constant"]
+            ),
+            disutility_cutoff_coefficient=self.parameters.get(
+                "disutility_cutoff_coefficient", defaults["disutility_cutoff_coefficient"]
+            ),
+        )
+
+    def execute_from_path_files(self, path_files: Union[pathlib.Path, str], recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment from an existing set of path-files.
+
+        This method expects the path-files to be written by the ``self.save_path_files()`` method, however any parquet
+        hive dataset with the correct structure is accepted. This allows the use of AequilibraE's path-sized logit, link
+        loading, select link analysis, and assignment while using externally generated routes. With
+        ``recompute_psl=True``, costs (including turn penalties), probabilities and overlap are recomputed.
+        Otherwise, supplied results are used. Invalid routes always raise ValueError, including masked routes.
+        """
+
+        # Read the dataset schema and make sure it conforms to what we want
+        df = RouteChoiceSetResults.read_dataset(path_files)
+        required_fields = ["origin id", "destination id", "route set", "route directions"] + (
+            [] if recompute_psl else ["probability"]
+        )
+        schema = {
+            "destination id": "uint64",
+            "route set": "object",
+            "route directions": "object",
+            "cost": "float64",
+            "mask": "bool",
+            "path overlap": "float64",
+            "probability": "float64",
+            "origin id": "uint64",
+        }
+        dtypes = df.dtypes
+
+        try:
+            for field in required_fields:
+                if schema[field] != dtypes.loc[field]:
+                    raise TypeError(
+                        f"schema of required field '{field}' does not match. "
+                        f"Expected {schema[field]}, "
+                        f"found {dtypes.loc[field]}"
+                    )
+        except KeyError as e:
+            raise KeyError(f"Column '{field}' does not exist in the path-files") from e
+
+        self.execute_from_pandas(df=df, recompute_psl=recompute_psl)
+
+    def execute_from_pandas(self, df: pd.DataFrame, recompute_psl: bool = False) -> None:
+        """
+        Perform an assignment using route sets from a Pandas DataFrame.
+
+        Requires the DataFrame contains the ``origin id``, ``destination id``
+        and ``route set`` columns. The route sets must be lists of unsigned
+        link IDs, with matching +1/-1 arrays in ``route
+        directions``. Additionally, when ``recompute_psl`` is ``False``, the
+        ``probability`` column must also be present.
+
+        When ``recompute_psl`` is ``True``, the path-sized logit is recomputed
+        for each route with respect to the graph's cost field and the ``beta``,
+        ``disutility_cutoff_constant`` and ``disutility_cutoff_coefficient``
+        parameters. With PSL recomputation, the supplied mask is combined with
+        the cost-cutoff mask.  Otherwise, supplied costs and masks are
+        kept. Invalid routes wil raise ValueError, including masked routes,
+        regardless of PSL recomputation. This includes empty paths, incomplete
+        graph-link expansions, wrong OD endpoints, disconnected links,
+        prohibited turns, disallowed U-turns, blocked centroid flow and
+        infinite costs.  Masked routes are not loaded regardless of supplied
+        probabilities. Without recomputation, unmasked probabilities are not
+        changed. Links absent from the graph or compact graph raise an error.
+
+        All origin and destination IDs within the DataFrame must exist within
+        the demand matrix.
+
+        All link IDs and directions must exist within the graph. Links must
+        also be present within the compressed graph.
+
+        The table returned from ``self.get_results()`` includes recalculated
+        costs and a combined mask when PSL is recomputed. Otherwise, missing
+        costs and path overlap default to zero and masked probabilities are
+        zero.
+        """
+
+        required_columns = ["origin id", "destination id", "route set", "route directions"] + (
+            [] if recompute_psl else ["probability"]
+        )
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"provided DataFrame is missing required column '{col}'")
+
+        self.__rc.assign_from_df(
+            df,
+            self.demand,
+            select_links=self._selected_links,
+            recompute_psl=recompute_psl,
+            sl_link_loading=self.sl_link_loading,
+            store_results=self.parameters["store_results"],
+            beta=self.parameters["beta"],
+            disutility_cutoff_constant=self.parameters["disutility_cutoff_constant"],
+            disutility_cutoff_coefficient=self.parameters["disutility_cutoff_coefficient"],
+        )
+
+    def info(self) -> dict:
+        """Returns information for the transit assignment procedure
+
+        Dictionary contains keys:
+
+        * Algorithm,
+        * Matrix totals
+        * Computer name
+        * Procedure ID
+        * Parameters
+        * Select links
+
+        The classes key is also a dictionary with all the user classes per transit class and
+        their respective matrix totals.
+
+        :Returns:
+            **info** (:obj:`dict`): Dictionary with summary information
+        """
+
+        matrix_totals = self.demand.totals() if self.demand is not None else {}
+
+        info = {
+            "Algorithm": self.algorithm,
+            "Matrix totals": matrix_totals,
+            "Computer name": socket.gethostname(),
+            "Procedure ID": self.procedure_id,
+            "Parameters": self.parameters,
+            "Select links": [list(x) for x in self._selected_links],
+        }
+        return info
+
+    def log_specification(self):
+        logger.info("Route Choice specification")
+        logger.info(self._config)
+
+    def get_results(self) -> pd.DataFrame:
+        """
+        Returns the results of the route choice procedure
+
+        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).  Represents paths from
+        ``origin`` to ``destination``. Matching ``route directions`` arrays contain +1 for the ab direction
+        and -1 for the ba direction.
+
+        :Returns:
+            **results** (:obj:`pd.DataFrame`): Table with the results of the route choice procedure
+        """
+        if self.where is None:
+            results = self.__rc.get_results()
+        else:
+            results = RouteChoiceSetResults.read_dataset(self.where)
+
+        return results
+
+    def save_path_files(self, where: Optional[pathlib.Path] = None, **to_parquet_kwargs):
+        """
+        Save path-files to the directory specific.
+
+        Files will be saved as a parquet hive dataset partitioned by the origin ID. Existing path-files will not be
+        removed to allow incremental route choice set generation.
+
+        :Arguments:
+            **where** (:obj:`Optional[pathlib.Path]`): Directory to save the dataset to.
+            **to_parquet_kwargs** (:obj:`dict`): Keyword arguments to supply to the underlying ``to_parquet`` call.
+        """
+        where = where if where is not None else self.where
+        if where is None:
+            raise ValueError("either the 'where' argument or 'self.where' property must not None")
+
+        self.__rc.write_path_files(where, to_parquet_kwargs)
+
+    def get_load_results(self) -> pd.DataFrame:
+        """
+        Translates the link loading results from the graph format into the network format.
+
+        :Returns:
+            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`): A tuple
+            of link loading results as DataFrames. Columns are the matrix name concatenated
+            direction.
+        """
+
+        if self.demand is None:
+            warnings.warn(
+                "No demand was provided. To perform link loading set a demand matrix",
+                stacklevel=2,
+            )
+            return pd.DataFrame([])
+
+        ll = self.__rc.get_link_loading(cores=self.cores)
+        ll = {(k,): v for k, v in ll.items()}
+
+        # Create a data store with a row for each uncompressed link
+        df = self.__link_loads_to_df(self.__rc.network_mapping, ll)
+
+        return df
+
+    def __link_loads_to_df(self, mapping, link_loads):
+        lids = mapping.physical_link_ids
+        df = pd.DataFrame(
+            {"link_id": lids} | {(*k, dir): np.zeros(lids.shape) for k in link_loads.keys() for dir in ["ab", "ba"]}
+        )
+        added_dfs = []
+        for k, v in link_loads.items():
+            # Directional Flows
+            for slot, direction in enumerate(("ab", "ba")):
+                indices = mapping.directed_link_indices[:, slot]
+                present = indices >= 0
+                df.iloc[present, df.columns.get_loc((*k, direction))] = np.nan_to_num(v[indices[present]])
+
+            # Tot Flow
+            added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
+
+        df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
+        df.columns = ["_".join(x) for x in df.columns]
+
+        return df
+
+    def set_select_links(
+        self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]], link_loading=True
+    ):
+        """
+        Set the selected links. Checks if the links and directions are valid. Supports **OR** and
+        **AND** sets of links.
+
+        Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a
+        list of ``(link_id, direction)``.
+
+        The elements of the first list represent the **AND** sets, together they are OR'ed. If any
+        of these sets is satisfied the link are loaded as appropriate.
+
+        The **AND** sets are comprised of either a single ``(link_id, direction)`` tuple or a list
+        of ``(link_id, direction)``. The single tuple represents an **AND** set with a single
+        element.
+
+        All links and directions in an **AND** set must appear in any order within a route for it
+        to be considered satisfied.
+
+        Supply ``links=None`` to disable select link analysis.
+
+        :Arguments:
+            **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
+            Name of link set and link IDs and directions to be used in select link analysis.
+
+            **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix
+            results are available.
+
+        """
+        self._selected_links = {}
+        self.sl_link_loading = link_loading
+
+        if links is None:
+            del self._config["select_links"]
+            return
+
+        for name, link_set in links.items():
+            normalised_link_set = []
+            or_set = set()
+            for link_ids in link_set:
+                if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
+                    warnings.warn(
+                        f"Adding both directions of a link ({link_ids[0]}) to a single AND set is likely "
+                        "unintentional. Selecting its available graph directions as OR alternatives",
+                        stacklevel=2,
+                    )
+                    or_set.update(frozenset((link,)) for link in self.__rc.compact_links(link_ids[0], 0))
+                else:
+                    # A tuple can be one link pair or a tuple of link pairs.
+                    single_link = (
+                        isinstance(link_ids, tuple)
+                        and len(link_ids) == 2
+                        and not isinstance(link_ids[0], (tuple, list))
+                    )
+                    normalised_link_set.append([link_ids] if single_link else link_ids)
+
+            for link_ids in normalised_link_set:
+                and_set = set()
+                for link, dir in link_ids:
+                    for comp_id in self.__rc.compact_links(link, dir):
+                        # Check for duplicate compressed link ids in the current link set
+                        if comp_id in and_set:
+                            warnings.warn(
+                                "Two input links map to the same compressed link in the network"
+                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}",
+                                stacklevel=2,
+                            )
+                        else:
+                            and_set.add(comp_id)
+
+                or_set.add(frozenset(and_set))
+            self._selected_links[name] = frozenset(or_set)
+        self._config["select_links"] = str(links)
+
+    def get_select_link_loading_results(self) -> pd.DataFrame:
+        """
+        Get the select link loading results.
+
+        :Returns:
+            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results
+            as DataFrames. Columns are the matrix name concatenated with the select link set
+            and direction.
+        """
+
+        if self.demand is None:
+            raise ValueError("no demand was provided. To perform link loading set a demand matrix")
+        elif not self.sl_link_loading:
+            raise ValueError("select link loading was disabled via `set_select_links(..., link_loading=False)`")
+
+        sl_link_loads = {}
+        for sl_name, sl_res in self.__rc.get_sl_link_loading().items():
+            for demand_name, res in sl_res.items():
+                sl_link_loads[demand_name, sl_name] = res
+
+        # Create a data store with a row for each uncompressed link
+        df = self.__link_loads_to_df(self.__rc.network_mapping, sl_link_loads)
+
+        return df
+
+    def get_select_link_od_matrix_results(self) -> Dict[str, AequilibraeSparseMatrix]:
+        """
+        Get the select link OD matrix results as a sparse matrix.
+
+        :Returns:
+            **select link OD matrix results** (:obj:`Dict[str,
+                AequilibraeSparseMatrix]`): Returns a dict of select link set
+                names to labelled sparse OD matrices.
+        """
+
+        if self.demand is None:
+            raise ValueError("No demand was provided. To perform link loading set a demand matrix")
+
+        return self.__rc.get_sl_od_matrices()
+
+    def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
+        self.procedure_id = uuid4().hex
+
+        project.results.create(
+            table_name=table_name,
+            data=df,
+            procedure=method_name,
+            procedure_id=self.procedure_id,
+            procedure_report=json.dumps(report),
+            timestamp=self.procedure_date,
+            description=description,
+        )
+
+    def save_link_flows(self, table_name: str, project=None) -> None:
+        """
+        Saves the link link flows for all classes into the results database.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table being inserted to.
+
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+            Defaults to the explicitly supplied constructor project
+        """
+        project = self._resolve_project(project)
+
+        df = self.get_load_results()
+        info = self.info()
+        self.__save_dataframe(
+            df,
+            "Link loading",
+            "Uncompressed link loading results",
+            table_name + "_uncompressed",
+            info,
+            project=project,
+        )
+
+    def save_select_link_flows(self, table_name: str, project=None) -> None:
+        """
+        Saves the select link link flows into the results database.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table being inserted to.
+
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+            Defaults to the explicitly supplied constructor project
+        """
+        project = self._resolve_project(project)
+
+        u = self.get_select_link_loading_results()
+        info = self.info()
+        self.__save_dataframe(
+            u,
+            "Select link analysis",
+            "Uncompressed select link analysis results",
+            table_name + "_uncompressed",
+            info,
+            project=project,
+        )
+
+    def save_select_link_matrices(self, matrix_name: str, project=None) -> None:
+        """Save the select link OD matrices to a new OMX file in the project matrices folder."""
+        project = self._resolve_project(project)
+
+        results = self.get_select_link_od_matrix_results()
+        matrices = {
+            f"{sl_name}_{demand_name}": matrix
+            for sl_name, values in results.items()
+            for demand_name, matrix in values.items()
+        }
+        if not matrices:
+            return
+
+        assert self.demand is not None, "got sl od matrices without demand?"
+        out_matrix = AequilibraeSparseMatrix._from_shared_arrays(
+            data=matrices,
+            index=self.demand.index,
+            index_name=self.index_name,
+        )
+        project.matrices.save_matrix(
+            file_name=f"{matrix_name}.omx",
+            matrix=out_matrix,
+            procedure="Route choice OD select link",
+            procedure_id=self.procedure_id,
+            timestamp=self.procedure_date,
+            description=f"Select link matrices from procedure ID {self.procedure_id}.",
+        )
+
+    def save_select_link(self, name: str, project=None) -> None:
+        """Save both select link flows and OD matrices using the same name."""
+        self.save_select_link_flows(name, project=project)
+        self.save_select_link_matrices(name, project=project)

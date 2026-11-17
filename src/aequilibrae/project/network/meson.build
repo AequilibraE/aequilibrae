@@ -9,7 +9,6 @@ pyfiles = [
     'link_types.py',
     'links.py',
     'modes.py',
-    'network.py',
     'nodes.py',
     'periods.py',
     'turn_restrictions.py',

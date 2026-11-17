@@ -13,7 +13,7 @@ class Modes(NonSpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> modes = project.network.modes
+        >>> modes = project.tables.modes
 
         # We can get a mode as an immutable record
         >>> car_mode = modes.get('c')

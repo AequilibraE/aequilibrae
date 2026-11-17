@@ -1,5 +1,6 @@
 import logging
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import numpy as np
@@ -8,17 +9,19 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import MultiLineString, Point
 
-from aequilibrae.context import get_active_project
+if TYPE_CHECKING:
+    from aequilibrae.project.project import Project
 from aequilibrae.transit.constants import PATTERN_ID_MULTIPLIER, Constants
 from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.gtfs_loader import GTFSReader
 from aequilibrae.transit.route_map_matcher import RouteMapMatcher
 from aequilibrae.transit.route_types import base_route_type, lookup_by_route_type
-from aequilibrae.transit.transit_elements import Link, Pattern, mode_corresp
+from aequilibrae.transit.transit_elements.link import Link
+from aequilibrae.transit.transit_elements.mode_correspondence import mode_corresp
+from aequilibrae.transit.transit_elements.pattern import Pattern
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-
-from .gtfs_loader import GTFSReader
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +31,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None):
+    def __init__(
+        self, project: "Project", agency_identifier, file_path, day="", description="", capacities=None, pces=None
+    ) -> None:
         """Instantiates a transit class for the network
 
         :Arguments:
 
-            **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+            **project** (:obj:`Project`): Supply the project into which this GTFS will be imported
 
             **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
 
@@ -48,8 +53,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
         WorkerThread.__init__(self, None)
 
-        self.__network = network
-        self.project = get_active_project(False)
+        self.project = project
         self.archive_dir = None  # type: str
         self.day = day
         with self.project.transit_connection as conn:
@@ -67,7 +71,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
-        self.__has_taz = len(self.project.network.zones) > 0
+        self.__has_taz = len(self.project.tables.zones) > 0
 
         if file_path is not None:
             logger.info(f"Creating GTFS feed object for {file_path}")
@@ -81,7 +85,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_patterns = {}
         self.select_links = {}
 
-        links = self.project.network.links.data
+        links = self.project.tables.links.data
         self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
@@ -244,8 +248,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             for stop in simple_progress(self.select_stops.values(), self.signal, "Saving stops (Step: 10/12)"):
                 if self.__has_taz:
-                    closest_zone = self.project.network.zones.get_closest_zone(stop.geo)
-                    if stop.geo.within(self.project.network.zones.get(closest_zone).geometry):
+                    closest_zone = self.project.tables.zones.get_closest_zone(stop.geo)
+                    if stop.geo.within(self.project.tables.zones.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
 
@@ -437,8 +441,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
         """
 
-        all_link_gdf = self.project.network.links.data
-        all_nodes_gdf = self.project.network.nodes.data
+        all_link_gdf = self.project.tables.links.data
+        all_nodes_gdf = self.project.tables.nodes.data
 
         utm_zone = metre_crs_for_gdf(all_link_gdf)
         self.mm_transformer = Transformer.from_crs(self.srid, utm_zone, always_xy=True)

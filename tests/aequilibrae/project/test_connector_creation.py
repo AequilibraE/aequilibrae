@@ -9,10 +9,10 @@ def initial_state(coquimbo_example):
     """Get initial state of the project for comparison."""
     project = coquimbo_example
     return {
-        "nodes": project.network.nodes.data,
-        "links": project.network.links.data,
-        "zones": project.network.zones.data,
-        "initial_connectors": project.network.links.data[project.network.links.data.link_type == "centroid_connector"],
+        "nodes": project.tables.nodes.data,
+        "links": project.tables.links.data,
+        "zones": project.tables.zones.data,
+        "initial_connectors": project.tables.links.data[project.tables.links.data.link_type == "centroid_connector"],
     }
 
 
@@ -32,8 +32,8 @@ def test_bulk_connector_creation_single_mode(coquimbo_example, initial_state):
         )
 
     # Refresh data after operation
-    updated_links = project.network.links.data
-    updated_nodes = project.network.nodes.data
+    updated_links = project.tables.links.data
+    updated_nodes = project.tables.nodes.data
 
     # Number of nodes should remain constant
     assert len(updated_nodes) == len(initial_state["nodes"]), "Node count should not change"
@@ -69,8 +69,8 @@ def test_bulk_connector_creation_multiple_modes(coquimbo_example, initial_state,
             limit_to_zone=True,
         )
 
-    updated_links = project.network.links.data
-    updated_nodes = project.network.nodes.data
+    updated_links = project.tables.links.data
+    updated_nodes = project.tables.nodes.data
 
     assert len(updated_nodes) == len(initial_state["nodes"]), "Node count should not change"
 
@@ -100,7 +100,7 @@ def test_bulk_connector_creation_k_connectors(coquimbo_example, initial_state, k
             limit_to_zone=True,
         )
 
-    updated_links = project.network.links.data
+    updated_links = project.tables.links.data
 
     new_connectors = updated_links[updated_links.link_type == "centroid_connector"]
     added_connectors = new_connectors[~new_connectors.link_id.isin(initial_state["initial_connectors"].link_id)]
@@ -132,7 +132,7 @@ def test_bulk_connector_creation_zone_limitation(coquimbo_example, initial_state
             limit_to_zone=limit_to_zone,
         )
 
-    updated_links = project.network.links.data
+    updated_links = project.tables.links.data
 
     new_connectors = updated_links[updated_links.link_type == "centroid_connector"]
     added_connectors = new_connectors[~new_connectors.link_id.isin(initial_state["initial_connectors"].link_id)]
@@ -163,7 +163,7 @@ def test_bulk_connector_creation_geometry_validation(coquimbo_example, initial_s
             limit_to_zone=True,
         )
 
-    updated_links = project.network.links.data
+    updated_links = project.tables.links.data
 
     new_connectors = updated_links[updated_links.link_type == "centroid_connector"]
     added_connectors = new_connectors[~new_connectors.link_id.isin(initial_state["initial_connectors"].link_id)]
@@ -200,7 +200,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
             distance_upper_bound=100,
         )
 
-    updated_links_small = project.network.links.data
+    updated_links_small = project.tables.links.data
     connectors_small = updated_links_small[updated_links_small.link_type == "centroid_connector"]
 
     # Reset and test with large distance bound
@@ -208,7 +208,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
         bulk_connector_creation(
             conn=conn,
             project_nodes=initial_state["nodes"],
-            project_links=project.network.links.data,
+            project_links=project.tables.links.data,
             project_zones=initial_state["zones"],
             modes=["c"],
             k_connectors=5,
@@ -216,7 +216,7 @@ def test_bulk_connector_creation_distance_upper_bound(coquimbo_example, initial_
             distance_upper_bound=float("inf"),
         )
 
-    updated_links_large = project.network.links.data
+    updated_links_large = project.tables.links.data
     connectors_large = updated_links_large[updated_links_large.link_type == "centroid_connector"]
 
     # With larger distance bound, should generally have same or more connectors
@@ -240,21 +240,21 @@ def test_bulk_connector_creation_no_changes_when_no_work(coquimbo_example, initi
             limit_to_zone=True,
         )
 
-    intermediate_links = project.network.links.data.copy()
+    intermediate_links = project.tables.links.data.copy()
 
     # Run again with same parameters - should not create duplicate connectors
     with project.db_connection as conn:
         bulk_connector_creation(
             conn=conn,
-            project_nodes=project.network.nodes.data,
-            project_links=project.network.links.data,
+            project_nodes=project.tables.nodes.data,
+            project_links=project.tables.links.data,
             project_zones=initial_state["zones"],
             modes=["c"],
             k_connectors=1,
             limit_to_zone=True,
         )
 
-    final_links = project.network.links.data
+    final_links = project.tables.links.data
 
     # Should have same number of links
     assert len(final_links) == len(intermediate_links), "Should not create duplicate connectors"

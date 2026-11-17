@@ -3,15 +3,15 @@ import pytest
 from shapely.geometry import Polygon
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 def test_import_from_osm_via_pbf(empty_project):
     pytest.importorskip("pyrosm")
     from pyrosm import get_data
 
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=get_data("test_pbf"),
         modes=("car",),
         simplify=False,
@@ -24,23 +24,23 @@ def test_import_from_osm_via_pbf(empty_project):
 
 
 def test_count_centroids(sioux_falls_test):
-    items = sioux_falls_test.network.count_centroids()
+    items = sioux_falls_test.tables.count_centroids()
     assert items == 24, "Wrong number of centroids found"
 
-    nodes = sioux_falls_test.network.nodes
+    nodes = sioux_falls_test.tables.nodes
     nodes.update(1, is_centroid=0)
 
-    items = sioux_falls_test.network.count_centroids()
+    items = sioux_falls_test.tables.count_centroids()
     assert items == 23, "Wrong number of centroids found"
 
 
 def test_count_links(sioux_falls_test):
-    items = sioux_falls_test.network.count_links()
+    items = sioux_falls_test.tables.count_links()
     assert items == 76, "Wrong number of links found"
 
 
 def test_count_nodes(sioux_falls_test):
-    items = sioux_falls_test.network.count_nodes()
+    items = sioux_falls_test.tables.count_nodes()
     assert items == 24, "Wrong number of nodes found"
 
 
@@ -50,7 +50,7 @@ def test_build_with_polygons(sioux_falls_test):
 
     fields = ["distance"]
 
-    network = sioux_falls_test.network
+    network = sioux_falls_test.tables
 
     g = network.build_graph(mode="c", cost="distance", fields=fields, limit_to_area=polygon)
     assert g.num_nodes == 19
@@ -61,7 +61,7 @@ def test_build_with_polygons(sioux_falls_test):
 
 
 def test_build_without_polygons(sioux_falls_test):
-    network = sioux_falls_test.network
+    network = sioux_falls_test.tables
     assert len(network.list_modes()) == 3
 
     g = network.build_graph(mode="c", cost="distance")
@@ -71,17 +71,17 @@ def test_build_without_polygons(sioux_falls_test):
 
 
 def test_build_applies_project_uturn_setting_without_turns(sioux_falls_example):
-    assert len(sioux_falls_example.network.turn_restrictions) == 0
+    assert len(sioux_falls_example.tables.turn_restrictions) == 0
     sioux_falls_example.about.update(infoname="allow_uturns", infovalue=1)
 
-    network = sioux_falls_example.network.build()
+    network = sioux_falls_example.tables.build()
     assert network.allow_uturns
     graph = network.build_graph("c", "distance")
     assert not graph.has_turn_restrictions
 
 
 def test_build_filters_turns_by_mode(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     kept = network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="w")
 
@@ -93,7 +93,7 @@ def test_build_filters_turns_by_mode(sioux_falls_example):
 
 
 def test_build_filters_turns_by_area(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     kept = network.turn_restrictions.insert(from_node=5, via_node=9, to_node=10, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="c")
     network.turn_restrictions.insert(from_node=4, via_node=5, to_node=9, penalty=9.0, modes="c")
@@ -111,7 +111,7 @@ def test_build_filters_turns_by_area(sioux_falls_example):
 
 @pytest.fixture
 def network_with_mode_excluded_centroid(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     other_mode = next(mode for mode in network.list_modes() if mode != "c")
     with sioux_falls_example.db_connection as conn:
         conn.execute("UPDATE links SET modes = ? WHERE a_node = ? OR b_node = ?", (other_mode, 1, 1))
@@ -131,7 +131,7 @@ def test_build_preserves_centroids_across_modes(network_with_mode_excluded_centr
 
 
 def test_build_graph_remove_dead_ends_option(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     empty_mode = next(mode for mode in network.list_modes() if mode != "c")
     with sioux_falls_example.db_connection as conn:
         conn.execute("UPDATE links SET modes = ?", ("c",))
@@ -189,11 +189,11 @@ def test_field_selection_preserves_directional_cost_precedence(sioux_falls_examp
         conn.execute("UPDATE links SET review_cost = ?, review_cost_ab = ?, review_cost_ba = ?", (1.0, 2.0, 3.0))
         conn.execute("UPDATE links SET direction = ? WHERE link_id = ?", (0, 1))
 
-    graph = project.network.build_graph("c", "review_cost", fields=fields)
+    graph = project.tables.build_graph("c", "review_cost", fields=fields)
     network_costs = np.where(graph.mapping.network.directions == 1, 2.0, 3.0)
     np.testing.assert_array_equal(graph.cost, graph.mapping.aggregate_costs(network_costs))
 
-    source = project.network.build(fields=["review_cost"])
+    source = project.tables.build(fields=["review_cost"])
     np.testing.assert_array_equal(source.field_values("review_cost"), np.where(source.directions == 1, 2.0, 3.0))
 
 
@@ -211,8 +211,8 @@ def test_selected_field_falls_back_to_base_per_direction(sioux_falls_example, di
             conn.execute("ALTER TABLE links ADD COLUMN review_cost_ba REAL")
             conn.execute("UPDATE links SET review_cost_ba = ?", (3.0,))
 
-    full = project.network.build()
-    selected = project.network.build(fields=["review_cost"])
+    full = project.tables.build()
+    selected = project.tables.build(fields=["review_cost"])
     expected = np.ones(full.mapping.link_count)
     if directional_column is not None:
         direction, value = (1, 2.0) if directional_column.endswith("_ab") else (-1, 3.0)
@@ -222,7 +222,7 @@ def test_selected_field_falls_back_to_base_per_direction(sioux_falls_example, di
 
 
 def test_build_rejects_nonexistent_directed_turn_leg(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     network.turn_restrictions.insert(from_node=1, via_node=4, to_node=5, penalty=5.0, modes="c")
 
     with pytest.raises(ValueError, match="missing directed legs from_node -> via_node"):

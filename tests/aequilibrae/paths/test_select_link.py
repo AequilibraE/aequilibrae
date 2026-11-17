@@ -5,15 +5,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Graph, Network, PathResults, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.routing import Graph, Network, PathResults
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 @pytest.fixture
 def select_link_setup(sioux_falls_single_class):
     project = sioux_falls_single_class
-    network = project.network
+    network = project.tables.build()
     matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     def make(links=None, algorithm="msa"):

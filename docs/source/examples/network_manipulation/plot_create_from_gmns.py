@@ -34,7 +34,7 @@ The source files of this network are publicly available in the
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.importers.Importer.gmns`
+#     * :func:`aequilibrae.builder.Importer.gmns`
 
 # %%
 
@@ -44,7 +44,6 @@ from os.path import join
 from tempfile import gettempdir
 
 from aequilibrae import Project
-from aequilibrae.parameters import Parameters
 import folium
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_import_from_gmns.png'
 
@@ -63,8 +62,7 @@ use_group_file = f"{example_folder}/use_group.csv"
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.create(fldr)
 
 # %%
 # In this cell, we modify the AequilibraE parameters.yml file so it contains additional
@@ -79,7 +77,7 @@ new_node_fields = {
     "hospital": {"description": "hospital flag", "type": "text", "required": False},
 }
 
-par = Parameters()
+par = project.project_parameters
 par.parameters["network"]["gmns"]["link"]["fields"].update(new_link_fields)
 par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
 par.write_back()
@@ -88,7 +86,7 @@ par.write_back()
 # As it is specified that the geometries are in the coordinate system EPSG:32619,
 # which is different than the system supported by AequilibraE (EPSG:4326), we inform
 # the srid in the method call:
-project.network.importer.gmns(
+project.tables.importer.gmns(
     link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
 )
 
@@ -96,8 +94,8 @@ project.network.importer.gmns(
 # Now, let's plot a map. This map can be compared with the images of the README.md
 # file located in this example repository on GitHub:
 # https://github.com/zephyr-data-specs/GMNS/blob/develop/examples/Arlington_Signals/README.md
-links = project.network.links.data
-nodes = project.network.nodes.data
+links = project.tables.links.data
+nodes = project.tables.nodes.data
 
 # %%
 map = links.explore(color="black", style_kwds={"weight": 2}, tool_tip="link_type", name="links")

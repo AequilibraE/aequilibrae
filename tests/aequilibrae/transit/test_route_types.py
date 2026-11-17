@@ -1,7 +1,7 @@
 import pytest
 
 from aequilibrae.transit.route_types import base_route_type
-from aequilibrae.transit.transit_elements import Pattern
+from aequilibrae.transit.transit_elements.pattern import Pattern
 
 from .synthetic_gtfs import add_stop, add_trips, base_tables, import_feed
 

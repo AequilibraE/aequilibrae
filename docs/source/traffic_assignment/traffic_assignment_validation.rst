@@ -305,9 +305,10 @@ understand, and then we'll perform the assignment.
     from quetzal.model import stepmodel
 
     from aequilibrae.matrix import AequilibraeMatrix, from_file
-    from aequilibrae.paths import Network, TrafficAssignment
-    from aequilibrae.paths.traffic_class import TrafficClass
-    from aequilibrae.paths.vdf import bpr
+    from aequilibrae.routing import Network
+    from aequilibrae.traffic import TrafficAssignment
+    from aequilibrae.traffic import TrafficClass
+    from aequilibrae.traffic.vdf import bpr
 
 
     BASE = Path(r"C:\Users\jake\src\aequilibrae\TransportationNetworks")

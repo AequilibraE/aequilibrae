@@ -1,17 +1,15 @@
 import pandas as pd
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
+from aequilibrae.builder import GTFSRouteSystemBuilder
 
 
 @pytest.fixture(scope="function")
 def route_system_builder(build_gtfs_project):
     gtfs_file = build_gtfs_project.project.project_base_path / "gtfs_coquimbo.zip"
-    with database_connection("transit") as transit_conn:
-        yield GTFSRouteSystemBuilder(
-            network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
-        )
+    yield GTFSRouteSystemBuilder(
+        project=build_gtfs_project.project, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
+    )
 
 
 def test_set_capacities(route_system_builder):

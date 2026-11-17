@@ -10,8 +10,8 @@ In this example, we show how to perform path computation for Coquimbo, a city in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.results.path_results`
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.routing.results.path_results`
 
 # %%
 # Imports
@@ -21,9 +21,9 @@ from uuid import uuid4
 
 import geopandas as gpd
 
-from aequilibrae.paths import estimate_heuristic_scale
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.routing import estimate_heuristic_scale
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
 
 # %%
 # We create the example project inside our temp folder
@@ -44,7 +44,7 @@ basic_config()
 # %%
 # Load the network snapshot
 # We get warnings that several fields in the project are filled with ``NaN``s.
-network = project.network.build()
+network = project.tables.build()
 # This is true, but we won't use those fields.
 
 # %%
@@ -64,7 +64,7 @@ res = graph.compute_path(32343, 22041)
 # Computing paths directly from the graph is more straightforward, though we could
 # alternatively use the ``PathResults`` class to achieve the same result.
 #
-# from aequilibrae.paths import PathResults
+# from aequilibrae.routing import PathResults
 # res = PathResults(graph, 32343, 22041)
 #
 # ``graph.compute_path`` has already performed this setup above.
@@ -132,7 +132,7 @@ res.path_nodes
 # If you want to show the path in Python.
 #
 # We do NOT recommend this, though... It is very slow for real networks.
-links = project.network.links.data.set_index("link_id")
+links = project.tables.links.data.set_index("link_id")
 link_ids, directions = res.get_network_links()
 links = links.loc[link_ids]
 

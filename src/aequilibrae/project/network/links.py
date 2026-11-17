@@ -16,7 +16,7 @@ class Links(SpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> links = project.network.links
+        >>> links = project.tables.links
 
         # We can get a single link as an immutable record
         >>> link = links.get(1)

@@ -19,11 +19,11 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.transit.transit`
-#     * :func:`aequilibrae.transit.transit_graph_builder`
-#     * :func:`aequilibrae.paths.traffic_class.TransitClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TransitAssignment`
-#     * :func:`aequilibrae.matrix.aequilibrae_matrix`
+#     * :class:`aequilibrae.transit.Transit`
+#     * :class:`aequilibrae.builder.TransitGraphBuilder`
+#     * :class:`aequilibrae.transit.TransitClass`
+#     * :class:`aequilibrae.transit.TransitAssignment`
+#     * :class:`aequilibrae.matrix.AequilibraeMatrix`
 
 # %%
 # Imports for example construction
@@ -34,10 +34,10 @@ from uuid import uuid4
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
+from aequilibrae.transit import TransitAssignment, TransitClass
 from aequilibrae.transit import Transit
-from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.builder import TransitGraphBuilder
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/transit/skimming.png'
 
@@ -77,7 +77,7 @@ data.save_graphs()
 data.load()
 
 # Reading back into AequilibraE
-graph_db = TransitGraphBuilder.from_db(project, project.network.periods.default_period.period_id)
+graph_db = TransitGraphBuilder.from_db(project, project.tables.periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
 
 # To perform an assignment we need to convert the graph builder into a graph.
@@ -101,7 +101,7 @@ mat["pt"] = np.full((zones, zones), 1.0)
 # Create the assignment class
 assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
 
-assig = TransitAssignment()
+assig = TransitAssignment(project=project)
 
 assig.add_class(assigclass)
 
@@ -119,7 +119,8 @@ assig.get_skim_results()["pt"]["boardings"].sum()
 # %%
 # Saving results
 # --------------
-# We'll be saving the skimming results.
+# We'll save the assignment's link-volume results to results_database.sqlite.
+# The skim matrices returned above remain in memory; this call does not save them.
 assig.save_results(table_name='hyperpath example')
 
 # %%

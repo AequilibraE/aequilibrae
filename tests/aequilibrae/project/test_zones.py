@@ -14,7 +14,7 @@ def zones_setup(project):
 
 def test_add_centroid(coquimbo_example):
     proj, centroids = zones_setup(coquimbo_example)
-    proj.network.zones.add_centroids()
+    proj.tables.zones.add_centroids()
     with proj.db_connection as conn:
         num_centroids = conn.execute("SELECT COUNT(node_id) FROM nodes WHERE is_centroid=1;").fetchone()[0]
     assert num_centroids > centroids, "Centroids should've been added."
@@ -23,16 +23,16 @@ def test_add_centroid(coquimbo_example):
 @pytest.mark.parametrize("bulk", [True, False])
 def test_connect_mode(coquimbo_example, bulk):
     proj, _ = zones_setup(coquimbo_example)
-    links_before = proj.network.links.data.shape[0]
-    proj.network.zones.add_centroids()
-    proj.network.zones.connect_mode(mode_id="c", connectors=1, bulk=bulk)
-    links_after = proj.network.links.data.shape[0]
+    links_before = proj.tables.links.data.shape[0]
+    proj.tables.zones.add_centroids()
+    proj.tables.zones.connect_mode(mode_id="c", connectors=1, bulk=bulk)
+    links_after = proj.tables.links.data.shape[0]
     assert links_after > links_before, "Centroid connectors should've been added."
 
 
 def test_coverage_and_spatial_table_interfaces(coquimbo_example):
     proj, _ = zones_setup(coquimbo_example)
-    zones = proj.network.zones
+    zones = proj.tables.zones
     cov = zones.coverage()
     assert isinstance(cov, Polygon), "Coverage geometry type is incorrect"
     assert isinstance(zones.extent(), Polygon)
@@ -56,7 +56,7 @@ def test_create_zones_table(coquimbo_example):
         conn.execute("DELETE FROM attributes_documentation WHERE name_table LIKE 'zones'")
         fields = [x[1] for x in conn.execute("PRAGMA table_info(zones);").fetchall()]
     assert fields == [], "Zone table fields still exist"
-    zones = proj.network.zones
+    zones = proj.tables.zones
     zones.create_zones_table()
     with proj.db_connection as conn:
         fields = [x[1] for x in conn.execute("PRAGMA table_info(zones);").fetchall()]

@@ -1,6 +1,5 @@
-import pytest
-
 import pandas as pd
+import pytest
 
 from aequilibrae.transit.gtfs_loader import GTFSReader
 

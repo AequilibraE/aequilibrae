@@ -1,8 +1,7 @@
-from sqlite3 import Connection
 import logging
+from sqlite3 import Connection
 
-
-from aequilibrae.transit.constants import Constants, TRIP_ID_MULTIPLIER
+from aequilibrae.transit.constants import TRIP_ID_MULTIPLIER, Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 logger = logging.getLogger(__name__)

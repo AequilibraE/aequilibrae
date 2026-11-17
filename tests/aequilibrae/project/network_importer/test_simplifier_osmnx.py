@@ -20,7 +20,7 @@ SOURCE_META = {
 
 
 def test_simplify_osmnx_runs_and_reduces(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car",),
         simplify="osmnx",
@@ -34,7 +34,7 @@ def test_simplify_osmnx_runs_and_reduces(empty_project, pbf_path):
 
 
 def test_simplify_osmnx_with_consolidation(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car", "walk"),
         simplify="osmnx",

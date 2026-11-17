@@ -1,7 +1,6 @@
-import pandas as pd
-from typing import Any, Dict, Set, cast
+from typing import TYPE_CHECKING, Any, Dict, Set, cast
 
-from typing import TYPE_CHECKING
+import pandas as pd
 
 if TYPE_CHECKING:
     from aequilibrae.project.project import Project

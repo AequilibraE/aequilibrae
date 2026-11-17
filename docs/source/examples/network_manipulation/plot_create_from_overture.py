@@ -24,8 +24,8 @@ Install the optional dependencies first::
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.network.importers.Importer.overture`
-#     * :func:`aequilibrae.project.network.importers.Importer.osm`
+#     * :func:`aequilibrae.builder.Importer.overture`
+#     * :func:`aequilibrae.builder.Importer.osm`
 
 # %%
 from os.path import join
@@ -40,8 +40,7 @@ from aequilibrae import Project
 # Create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.create(fldr)
 
 # %%
 # Both Overture and OSM imports require an EPSG:4326 polygon.
@@ -51,7 +50,7 @@ model_area = box(-112.185, 36.59, -112.179, 36.60)
 # Import from Overture Maps (the recommended default). The importer always uses
 # the latest release advertised by Overture's STAC catalog and records that
 # release in the project's ``about`` table.
-project.network.importer.overture(model_area=model_area, modes=("car", "walk"), simplify=False)
+project.tables.importer.overture(model_area=model_area, modes=("car", "walk"), simplify=False)
 
 # %%
 # To import from OpenStreetMap instead, comment out the Overture call above and
@@ -67,14 +66,14 @@ project.network.importer.overture(model_area=model_area, modes=("car", "walk"), 
 #     params.parameters["osm"]["timeout"] = 180  # seconds to wait for Overpass before giving up
 #     params.write_back()
 #
-#     project.network.importer.osm(model_area=model_area, modes=("car", "walk"), simplify=False)
+#     project.tables.importer.osm(model_area=model_area, modes=("car", "walk"), simplify=False)
 #     # or import a whole place by name:
-#     # project.network.importer.osm(place_name="Nauru")
+#     # project.tables.importer.osm(place_name="Nauru")
 #     # or import from a local extract:
-#     # project.network.importer.osm(pbf_path="path/to/extract.osm.pbf")
+#     # project.tables.importer.osm(pbf_path="path/to/extract.osm.pbf")
 
 # %%
-links = project.network.links.data
+links = project.tables.links.data
 links.explore(color="blue", style_kwds={"weight": 2}, tooltip="link_type")
 
 # %%

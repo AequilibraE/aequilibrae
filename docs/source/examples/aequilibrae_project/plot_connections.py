@@ -16,9 +16,9 @@ In this example, we show how to use AequilibraE's database connections within a 
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.project.Project.db_connection`
-#     * :func:`aequilibrae.project.project.Project.results_connection`
-#     * :func:`aequilibrae.project.project.Project.transit_connection`
+#     * :func:`aequilibrae.Project.db_connection`
+#     * :func:`aequilibrae.Project.results_connection`
+#     * :func:`aequilibrae.Project.transit_connection`
 
 # %%
 
@@ -30,7 +30,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 # %%
 

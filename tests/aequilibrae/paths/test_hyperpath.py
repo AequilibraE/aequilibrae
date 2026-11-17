@@ -14,7 +14,7 @@ from scipy import sparse
 
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
-from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+from aequilibrae.routing.cython.public_transport import HyperpathGenerating
 
 
 def create_vertices(n):

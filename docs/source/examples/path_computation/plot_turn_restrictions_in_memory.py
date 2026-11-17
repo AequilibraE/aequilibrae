@@ -13,8 +13,8 @@ We use the Coquimbo example and compare paths before and after prohibiting one s
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.network.Network.build_graph`
-#     * :func:`aequilibrae.paths.graph.Graph.compute_path`
+#     * :func:`aequilibrae.routing.Network.build_graph`
+#     * :func:`aequilibrae.routing.Graph.compute_path`
 
 # %%
 # Imports
@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 # %%
 # We create the example project inside our temp folder
@@ -35,7 +35,7 @@ project = create_example(fldr, "coquimbo")
 
 # %%
 # Load the network snapshot and get the car graph.
-network = project.network.build()
+network = project.tables.build()
 graph = network.build_graph(mode="c", cost="distance", block_centroid_flows=False)
 
 # %%
@@ -74,7 +74,7 @@ res_after = graph.compute_path(origin, destination)
 
 # %%
 # Plot both paths.
-links = project.network.links.data.set_index("link_id")
+links = project.tables.links.data.set_index("link_id")
 link_ids_before, directions_before = res_before.get_network_links()
 link_ids_after, directions_after = res_after.get_network_links()
 links_before = links.loc[link_ids_before]

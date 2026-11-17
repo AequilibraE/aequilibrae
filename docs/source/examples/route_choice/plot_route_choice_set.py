@@ -16,7 +16,7 @@ a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.route_choice`
+#     * :func:`aequilibrae.route_choice.route_choice`
 
 # %%
 
@@ -27,7 +27,7 @@ from os.path import join
 
 import folium
 import numpy as np
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_route_choice_set.png'
 
@@ -47,7 +47,7 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Load the network snapshot
-network = project.network.build()
+network = project.tables.build()
 # Several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
@@ -65,7 +65,7 @@ graph.centroids
 # Route Choice class
 # ------------------
 # Here we'll construct and use the Route Choice class to generate our route sets
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 # %% 
 # Graph construction has already prepared the compressed-link to network-link mapping.
@@ -109,7 +109,7 @@ choice_set = rc.get_results()
 # We get the data we will use for the plot: links, nodes and the route choice set
 plot_routes = choice_set[(choice_set["origin id"] == 77011)]["route set"].values
 
-links = project.network.links.data
+links = project.tables.links.data
 
 # For ease of plot, we create a GeoDataFrame for each route in the choice set
 route_1 = links[links.link_id.isin(np.absolute(plot_routes[0]))]
@@ -118,7 +118,7 @@ route_3 = links[links.link_id.isin(np.absolute(plot_routes[2]))]
 route_4 = links[links.link_id.isin(np.absolute(plot_routes[3]))]
 route_5 = links[links.link_id.isin(np.absolute(plot_routes[4]))]
 
-nodes = project.network.nodes.data
+nodes = project.tables.nodes.data
 nodes = nodes[nodes["node_id"].isin([77011, 74089])]
 
 # %%

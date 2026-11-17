@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Dict, List
 import pandas as pd
 
 if TYPE_CHECKING:
-    from aequilibrae import Project
+    from aequilibrae.project.project import Project
 
 from aequilibrae.transit.gtfs_exporter import export_gtfs
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
@@ -36,8 +36,7 @@ class Transit(WorkerThread):
     def __init__(self, project: "Project"):
         """
         :Arguments:
-            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
-            active project
+            **project** (:obj:`Project`): The Project to connect to.
         """
         super().__init__(None)
 
@@ -65,7 +64,7 @@ class Transit(WorkerThread):
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
-            network=self.project.project_base_path,
+            project=self.project,
             agency_identifier=agency,
             file_path=file_path,
             day=day,
@@ -102,9 +101,9 @@ class Transit(WorkerThread):
         All arguments are forwarded to 'TransitGraphBuilder'.
 
         A 'period_id' may be specified to select a time period. By default, a whole day is used. See
-        'project.network.Periods' for more details.
+        'project.tables.Periods' for more details.
         """
-        period_id: int = kwargs.pop("period_id", self.project.network.periods.default_period.period_id)
+        period_id: int = kwargs.pop("period_id", self.project.tables.periods.default_period.period_id)
 
         graph = TransitGraphBuilder(self.project, period_id, **kwargs)
         graph.create_graph()
@@ -118,7 +117,7 @@ class Transit(WorkerThread):
 
         :Arguments:
             **period_ids** (:obj:`int`): List of periods of to save. Defaults to
-                'project.network.periods.default_period.period_id'.
+                'project.tables.periods.default_period.period_id'.
             **force** (:obj:`bool`): Remove the existing graphs before saving the 'period_ids' graphs. Default 'False'.
 
         """

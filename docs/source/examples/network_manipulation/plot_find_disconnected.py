@@ -29,7 +29,7 @@ We use the Nauru example to find disconnected links.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.results.path_results`
+#     * :func:`aequilibrae.routing.results.path_results`
 
 # %%
 
@@ -40,8 +40,8 @@ from os.path import join
 from datetime import datetime
 import pandas as pd
 import numpy as np
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.paths.results import PathResults
+from aequilibrae.examples import create_example
+from aequilibrae.routing import PathResults
 # sphinx_gallery_thumbnail_path = '../source/_images/disconnected_network.png'
 
 # %%
@@ -59,8 +59,8 @@ mode = "c"
 # We can create an uncompressed graph without any centroids or changes to the project.
 
 # We get the project nodes for reporting and load an independent network snapshot.
-nodes = project.network.nodes
-network = project.network.build()
+nodes = project.tables.nodes
+network = project.tables.build()
 # No centroid changes need reverting: the project nodes have not been modified.
 
 # %%

@@ -15,11 +15,11 @@ def random_string():
 
 @pytest.fixture
 def link_types(empty_no_triggers_project):
-    return empty_no_triggers_project.network.link_types
+    return empty_no_triggers_project.tables.link_types
 
 
 def test_changing_link_type_id(no_triggers_test):
-    link_types = no_triggers_test.network.link_types
+    link_types = no_triggers_test.tables.link_types
     lt = random.choice(list(link_types))
     other = next(candidate for candidate in link_types if candidate.link_type_id != lt.link_type_id)
 

@@ -6,10 +6,9 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 
-from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 
 logger = logging.getLogger(__name__)
@@ -92,8 +91,7 @@ class GravityApplication:
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
-            active project
+            **project** (:obj:`Project`, *Optional*): The Project supplying parameters and result ownership.
 
             **core_name** (:obj:`str`, *Optional*): Name for the output matrix core. Defaults to "gravity"
 
@@ -198,10 +196,12 @@ class GravityApplication:
             **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the explicitly supplied constructor project
         """
 
-        project = project or get_active_project()
+        project = self.project if project is None else project
+        if project is None:
+            raise ValueError("An explicit project is required")
         project.matrices.save_matrix(
             file_name,
             self.output,

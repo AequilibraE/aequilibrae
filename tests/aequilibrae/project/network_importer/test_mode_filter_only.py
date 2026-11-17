@@ -2,7 +2,7 @@ import sqlite3
 
 
 def test_osm_import_preserves_all_link_types_for_active_modes(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("walk",),
         simplify=False,

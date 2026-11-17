@@ -3,9 +3,9 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae.paths import Network
+from aequilibrae.routing import Network
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
 
 from .routing_helpers import search
 

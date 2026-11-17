@@ -4,8 +4,7 @@ import pytest
 from scipy.sparse import csr_array
 
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.paths.graph import TransitGraph
+from aequilibrae.transit import TransitAssignment, TransitClass, TransitGraph
 
 
 @pytest.fixture

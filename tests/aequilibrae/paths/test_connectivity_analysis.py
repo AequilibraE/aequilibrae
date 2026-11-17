@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Network
-from aequilibrae.paths.connectivity_analysis import disconnected_analysis
+from aequilibrae.routing import Network
+from aequilibrae.routing.connectivity_analysis import disconnected_analysis
 
 
 def test_connectivity_analysis(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     graph = network.build_graph(mode="c", cost="distance", block_centroid_flows=False)
 
     disconnected = graph.disconnected_nodes()

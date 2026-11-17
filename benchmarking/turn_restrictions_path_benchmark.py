@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, TypedDict
 import networkx as nx
 import numpy as np
 import pandas as pd
+
 from aequilibrae import Project
 
 
@@ -40,9 +41,9 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
 
 
 def _prepare_graph(model_path: Path, mode: str):
-    project = Project.from_path(model_path)
-    project.network.build_graphs(modes=[mode])
-    graph = project.network.graphs[mode]
+    project = Project.open(model_path)
+    project.tables.build_graphs(modes=[mode])
+    graph = project.tables.graphs[mode]
 
     centroids = np.asarray(graph.centroids, dtype=np.int64)
     if centroids.size == 0:

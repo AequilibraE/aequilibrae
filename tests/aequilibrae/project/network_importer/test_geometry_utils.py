@@ -5,10 +5,7 @@ import math
 import geopandas as gpd
 from shapely.geometry import LineString
 
-from aequilibrae.project.network.importer.utils import (
-    aligned_along_geometry,
-    compute_lengths,
-)
+from aequilibrae.project.network.importer.utils import aligned_along_geometry, compute_lengths
 
 
 def _arc(scale=1.0, reverse=False):

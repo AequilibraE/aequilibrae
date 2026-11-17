@@ -2,9 +2,9 @@
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
 
-from aequilibrae.paths.network_skimming import NetworkSkimming
+from aequilibrae.routing import NetworkSkimming
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
 
 from .path_finding_benchmark import left_turn_restrictions, load_node_coordinates
 

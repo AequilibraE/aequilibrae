@@ -16,7 +16,13 @@ from aequilibrae.transit.date_tools import create_days_between, format_date, to_
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.route_types import lookup_by_route_type
-from aequilibrae.transit.transit_elements import Agency, Fare, FareRule, Route, Service, Stop, Trip
+from aequilibrae.transit.transit_elements.agency import Agency
+from aequilibrae.transit.transit_elements.fare import Fare
+from aequilibrae.transit.transit_elements.fare_rule import FareRule
+from aequilibrae.transit.transit_elements.route import Route
+from aequilibrae.transit.transit_elements.service import Service
+from aequilibrae.transit.transit_elements.stop import Stop
+from aequilibrae.transit.transit_elements.trip import Trip
 from aequilibrae.utils.aeq_signal import SIGNAL, simple_progress
 from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.utils.interface.worker_thread import WorkerThread

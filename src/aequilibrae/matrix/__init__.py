@@ -1,4 +1,4 @@
-from .aequilibrae_matrix import (
+from aequilibrae.matrix.aequilibrae_matrix import (
     AequilibraeMatrix,
     AequilibraeSparseMatrix,
     MatrixStore,

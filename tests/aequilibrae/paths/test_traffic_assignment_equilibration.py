@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
+from aequilibrae.utils import basic_config
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def configuration(sioux_falls_test):
     project = sioux_falls_test
     demand = project.matrices.get_matrix("SiouxFalls2.omx", subset=["matrix"])
     return {
-        "network": project.network,
+        "network": project.tables.build(),
         "classes": [
             TrafficClass(
                 name="car",
@@ -149,14 +149,14 @@ def test_execute_no_project(configuration):
     project = configuration.pop("project")
     with project.db_connection as conn:
         reference = pd.read_sql("select volume from links order by link_id", conn).volume
-    configuration["network"] = project.network.build()
+    configuration["network"] = project.tables.build()
     project.close()
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))
     assignment.execute(max_iterations=10, cores=1)
     assert assignment.project is None
     correl = np.corrcoef(assignment.class_results["car"].total_link_loads, reference)[0, 1]
     assert 0.8 < correl
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ValueError, match="explicit project"):
         assignment.save_results("anything")
 
 

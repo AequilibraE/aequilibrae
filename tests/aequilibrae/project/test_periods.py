@@ -8,7 +8,7 @@ from aequilibrae.utils.db_utils import read_and_close
 
 
 def test_get(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     for num in range(2, 6):
         periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 
@@ -22,7 +22,7 @@ def test_get(sioux_falls_example):
 
 
 def test_fields(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     f_editor = periods.fields
     fields = sorted(f_editor.all_fields())
 
@@ -33,7 +33,7 @@ def test_fields(sioux_falls_example):
 
 
 def test_new_period_and_default_period(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     assert periods.default_period.period_id == 1
 
     period_id = periods.new_period(2, start=7 * 3600, end=9 * 3600, description="Morning peak")
@@ -44,7 +44,7 @@ def test_new_period_and_default_period(sioux_falls_example):
 
 
 def test_update(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     with pytest.raises(IntegrityError, match="Cannot update default period"):
         periods.update(1, period_description="whole day")
 
@@ -54,7 +54,7 @@ def test_update(sioux_falls_example):
 
 
 def test_save(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     for num in range(2, 6):
         periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 

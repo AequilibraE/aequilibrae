@@ -5,9 +5,9 @@ from types import MappingProxyType
 
 import numpy as np
 import pytest
-from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, from_dict
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 
 
 @pytest.fixture(params=[np.float32, np.float64])

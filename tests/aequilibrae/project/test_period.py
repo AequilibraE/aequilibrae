@@ -6,14 +6,14 @@ import pytest
 
 def add_extra_test_periods(project):
     for num in range(2, 6):
-        project.network.periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
+        project.tables.periods.insert(period_id=num, period_start=num, period_end=num, period_description="test")
 
     return project
 
 
 def test_save_and_assignment(sioux_falls_example):
     project = add_extra_test_periods(sioux_falls_example)
-    periods = project.network.periods
+    periods = project.tables.periods
     nd = randint(2, 5)
     assert "modes" not in periods.columns
     assert "link_types" not in periods.columns
@@ -34,7 +34,7 @@ def test_save_and_assignment(sioux_falls_example):
 
 
 def test_data_fields(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     fields = sorted(periods.columns)
     with sioux_falls_example.db_connection as conn:
         dt = conn.execute("pragma table_info(periods)").fetchall()
@@ -43,7 +43,7 @@ def test_data_fields(sioux_falls_example):
 
 
 def test_renumber(sioux_falls_example):
-    periods = sioux_falls_example.network.periods
+    periods = sioux_falls_example.tables.periods
     period = periods.get(1)
     with pytest.raises(ValueError, match="You cannot renumber"):
         periods.renumber(period.period_id, 1)

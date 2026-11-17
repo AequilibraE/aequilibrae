@@ -16,7 +16,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 import folium
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_network_image.png'
 
@@ -30,8 +30,8 @@ project = create_example(fldr, "nauru")
 
 # %%
 # We grab all the links data as a geopandas GeoDataFrame so we can process it easier
-links = project.network.links.data
-nodes = project.network.nodes.data
+links = project.tables.links.data
+nodes = project.tables.nodes.data
 
 # %%
 # And if you want to take a quick look in your GeoDataFrames, you can plot it!

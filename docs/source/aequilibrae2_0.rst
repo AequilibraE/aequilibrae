@@ -49,6 +49,116 @@ using 8 threads for the parallelization (this CPU's *performance cores*).
 API Changes
 --------------------
 
+Public imports and project ownership
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each public object has one documented import namespace. Import the objects used by a workflow from that
+namespace rather than from the package root or an implementation module:
+
+.. list-table:: Public namespaces
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Namespace
+     - Public objects
+   * - ``aequilibrae``
+     - ``Project``, ``__version__``
+   * - ``aequilibrae.project``
+     - ``Tables``, ``Scenario``, ``Parameters``, ``Log``, ``Matrices``, ``Results``,
+       ``MigrationManager``, ``NetworkSimplifier``
+   * - ``aequilibrae.builder``
+     - ``Importer``, ``GMNSBuilder``, ``GMNSExporter``, ``GTFSRouteSystemBuilder``,
+       ``TransitGraphBuilder``, ``export_gtfs``
+   * - ``aequilibrae.routing``
+     - ``Network``, ``Graph``, ``PathResults``, ``SkimResults``, ``NetworkSkimming``,
+       ``available_heaps``, ``estimate_heuristic_scale``
+   * - ``aequilibrae.traffic``
+     - ``TrafficClass``, ``TrafficAssignment``, ``AssignmentResults``, ``AssignmentPaths``, ``VDF``
+   * - ``aequilibrae.traffic.vdf``
+     - ``bpr``, ``bpr2``, ``conical``, ``inrets``, ``akcelik``, ``builtin_vdfs``
+   * - ``aequilibrae.transit``
+     - ``Transit``, ``TransitClass``, ``TransitAssignment``, ``TransitGraph``, ``TransitAssignmentResults``
+   * - ``aequilibrae.route_choice``
+     - ``RouteChoice``, ``SubAreaAnalysis``
+   * - ``aequilibrae.distribution``
+     - ``Ipf``, ``GravityCalibration``, ``GravityApplication``, ``SyntheticGravityModel``
+   * - ``aequilibrae.matrix``
+     - ``AequilibraeMatrix``, ``AequilibraeSparseMatrix``, ``MatrixStore``, ``from_df``, ``from_dict``, ``from_file``
+   * - ``aequilibrae.examples``
+     - ``create_example``, ``list_examples``
+   * - ``aequilibrae.utils``
+     - ``basic_config``, ``ensure_spatialite_binaries``, ``set_known_spatialite_folder``
+
+The ``aequilibrae.paths`` package is replaced by ``aequilibrae.routing``. Traffic assignment and route choice
+implementations live in their respective packages, and transit assignment lives in ``aequilibrae.transit``.
+There are no deprecated import aliases. The package version is available as ``aequilibrae.__version__`` rather
+than ``aequilibrae.version``. Upper-case VDF aliases are removed; import the lower-case VDF objects instead.
+
+Create or open a ready-to-use project with class methods. A context manager closes the project's connections,
+including when an operation raises an exception:
+
+.. code-block:: python
+
+    from aequilibrae import Project
+
+    with Project.create("/path/to/new_project") as project:
+        links = project.tables.links.data
+
+    with Project.open("/path/to/existing_project") as project:
+        network = project.tables.build()
+
+Bare ``Project()``, ``Project.new()`` and ``Project.from_path()`` are not supported. Without a ``with`` block,
+call ``project.close()`` explicitly.
+
+The database-backed ``Network`` gateway is named ``Tables`` and accessed through ``project.tables`` or
+``project.scenario.tables``. The independent, in-memory ``Network`` retains its name. Obtain individual tables
+through their owning project; table classes and extension infrastructure are not public re-exports.
+``project.about``, ``project.matrices`` and ``project.results`` retain their accessors.
+
+Build the independent network explicitly before traffic assignment:
+
+.. code-block:: python
+
+    from aequilibrae.traffic import TrafficAssignment
+
+    network = project.tables.build()
+    assignment = TrafficAssignment(network=network, project=project, **assignment_options)
+
+``TrafficAssignment`` accepts only the built ``Network``, not ``Tables``. The explicit ``project`` argument
+supplies project parameters and ownership for saving results. Results can also be saved to an explicitly supplied
+project in the saving method. DataFrame and result-container interfaces are unchanged.
+
+Network import/export remains available through ``project.tables.importer.source()``, ``.osm()``, ``.overture()``
+and ``.gmns()``, and ``project.tables.export_to_gmns()``. ``project.tables.build_graph()`` remains the graph-building
+convenience method. GTFS still uses ``new_gtfs_builder()``, ``load_date()``, optional map matching and
+``save_to_disk()``. Direct construction of ``GTFSRouteSystemBuilder`` requires its owning ``project``.
+
+Library workflows no longer infer ownership from the active project. Pass a project or connection explicitly to
+project-dependent operations, including result saving and network simplification. Database path/connection helpers
+require an explicit project folder. The active-project context API and ``Project.activate()``/``deactivate()``
+remain available for explicit use.
+
+``Parameters()`` loads independent software defaults. Use ``project.project_parameters`` for the owning project's
+parameters, or ``Parameters(path=project_folder)`` for an explicit folder. ``write_back()`` requires a folder and
+raises ``ValueError`` when none was supplied. GMNS import/export through ``project.tables`` uses that project's
+parameters.
+
+Run-module functions must accept an explicit ``project`` argument. ``Project.run`` supplies it along with the
+configured arguments; the CLI also supplies it when ``--no-defaults`` is selected. Update custom project
+``run/__init__.py`` files accordingly:
+
+.. code-block:: python
+
+    def results_summary(project):
+        return project.results.list()
+
+``Project.db_connection_spatial`` is removed; use ``Project.db_connection``. Deprecated trigger wrappers
+``add_triggers`` and ``remove_triggers`` are removed. Internal callers suspending triggers use
+``aequilibrae.utils.sqlite_utils.without_triggers`` within a managed transaction; it is not re-exported from
+project creation. Compatibility modules ``distribution.ipf_core`` and ``paths.public_transport`` are removed.
+``TransitGraphBuilder`` no longer accepts the unused ``seed``, ``geometry_noise`` or ``noise_coef`` arguments,
+and its saving methods no longer accept ``robust``.
+
 .. toctree::
    :maxdepth: 1
 
@@ -141,7 +251,7 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from aequilibrae.utils.create_example import create_example
+    from aequilibrae.examples import create_example
 
     _aequilibrae2_docs_tmp = TemporaryDirectory()
     project_path = str(Path(_aequilibrae2_docs_tmp.name) / "project")
@@ -149,7 +259,7 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
 .. doctest::
 
     >>> project = create_example(project_path)
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
     >>> graph = network.build_graph('c', cost='distance')
 
     # Check for disconnected nodes

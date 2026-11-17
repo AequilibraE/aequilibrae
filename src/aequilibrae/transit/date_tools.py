@@ -1,6 +1,6 @@
 import time
-from datetime import timedelta, datetime
-from typing import Union, Any, Optional
+from datetime import datetime, timedelta
+from typing import Any, Optional, Union
 
 day_sequence = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 

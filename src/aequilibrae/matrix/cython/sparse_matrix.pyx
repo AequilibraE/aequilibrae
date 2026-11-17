@@ -10,7 +10,7 @@ from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, Aequilibrae
 cimport cython
 from libcpp cimport nullptr
 
-from .matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 from aequilibrae.utils.cython.array_allocations cimport array, array_pointer
 
 

@@ -66,7 +66,7 @@ we refer to it as:
 
 .. code-block:: text
 
-    * :func:`aequilibrae.parameters.Parameters`
+    * :func:`aequilibrae.project.Parameters`
         Class documentation
 
 Docstrings

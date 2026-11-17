@@ -1,6 +1,8 @@
 from sqlite3 import Connection
+
 from shapely.geometry import MultiLineString
-from aequilibrae.transit.constants import Constants, ROUTE_ID_MULTIPLIER, AGENCY_MULTIPLIER
+
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER, ROUTE_ID_MULTIPLIER, Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 

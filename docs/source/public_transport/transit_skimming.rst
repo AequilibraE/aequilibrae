@@ -29,9 +29,9 @@ Skims are always dense ``AequilibraeMatrix`` objects using the demand's zone ind
 
     >>> import numpy as np
     >>> from aequilibrae.matrix import AequilibraeMatrix
-    >>> from aequilibrae.paths import TransitAssignment, TransitClass
+    >>> from aequilibrae.transit import TransitAssignment, TransitClass
     >>> from aequilibrae.transit import Transit
-    >>> from aequilibrae.utils.create_example import create_example
+    >>> from aequilibrae.examples import create_example
 
     >>> project = create_example(project_path, "coquimbo")
     >>> data = Transit(project)
@@ -42,7 +42,7 @@ Skims are always dense ``AequilibraeMatrix`` objects using the demand's zone ind
     ...     blocking_centroid_flows=False,
     ...     connector_method="overlapping_regions",
     ... )
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
 
     >>> graph.create_line_geometry(method="direct", graph="c")
 
@@ -80,7 +80,7 @@ One example is skimming travel time in rail only.
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TransitAssignment, TransitClass
+    >>> from aequilibrae.transit import TransitAssignment, TransitClass
 
     >>> project = create_example(f"{project_path}v2", "coquimbo")
     >>> data = Transit(project)
@@ -91,7 +91,7 @@ One example is skimming travel time in rail only.
     ...     blocking_centroid_flows=False,
     ...     connector_method="overlapping_regions",
     ... )
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
 
     >>> graph.create_line_geometry(method="direct", graph="c")
 

@@ -36,8 +36,7 @@ def fetch(project, sql: str) -> list[tuple]:
 def export_and_import(project, tmp_path) -> Project:
     """Export the transit services of the project and return a new project with the export imported."""
     project.transit.export_gtfs(tmp_path / "export.zip", URL, TIME_ZONE)
-    copy = Project()
-    copy.new(tmp_path / "copy")
+    copy = Project.create(tmp_path / "copy")
     import_zip(copy, tmp_path / "export.zip")
     return copy
 
@@ -147,8 +146,7 @@ def test_coquimbo_exports_and_imports_again(coquimbo_example, tmp_path):
     (service_date,) = fetch(coquimbo_example, "SELECT service_date FROM agencies")[0]
     before = fetch(coquimbo_example, counts), schedules(coquimbo_example)
 
-    copy = Project()
-    copy.new(tmp_path / "copy")
+    copy = Project.create(tmp_path / "copy")
     import_zip(copy, tmp_path / "export.zip", service_date=service_date)
     assert (fetch(copy, counts), schedules(copy)) == before
     copy.close()

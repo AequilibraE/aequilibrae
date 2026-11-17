@@ -4,8 +4,8 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import LineString, Point
 
-from aequilibrae.project.network.importer import StagedNetwork
 from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
+from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 
 def _make_minimal_staged():

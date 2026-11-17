@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from aequilibrae import Project, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae import Project
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -20,10 +21,9 @@ def aequilibrae_init(proj_path: str, cost: str):
     """
     Prepare the graph for skimming the network for `cost`
     """
-    proj = Project()
-    proj.open(proj_path)
-    proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
-    graph = proj.network.graphs["c"]
+    proj = Project.open(proj_path)
+    proj.tables.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
+    graph = proj.tables.graphs["c"]
     matrix = proj.matrices.get_matrix("demand.omx")
     matrix.computational_view()
     assignment = TrafficAssignment()
@@ -44,13 +44,12 @@ def arkansas(path: str):
     import logging
 
     from aequilibrae import Project
-    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.traffic import TrafficAssignment, TrafficClass
 
     logger = logging.getLogger("aequilibrae")
 
-    proj = Project()
-    proj.open(path)
-    net = proj.network
+    proj = Project.open(path)
+    net = proj.tables
     nodes = net.nodes  # These centroids are not in the matrices, so we turn them off
     for n in [4701, 4702, 4703]:
         nd = nodes.get(n)

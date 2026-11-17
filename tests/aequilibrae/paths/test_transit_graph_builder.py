@@ -124,7 +124,7 @@ def test_saving_loading_removing(build_gtfs_project):
     # save multiple transit graph
     graph = data.graphs[1]
     for i in range(10, 13):
-        data.project.network.periods.insert(period_id=i, period_start=0, period_end=0, period_description="")
+        data.project.tables.periods.insert(period_id=i, period_start=0, period_end=0, period_description="")
         graph.period_id = i
         graph.save()
 

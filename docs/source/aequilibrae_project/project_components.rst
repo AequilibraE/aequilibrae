@@ -19,7 +19,7 @@ non-geometric classes related to the project network, such as Modes, LinkTypes, 
 
 One important thing to observe is that related to each table in Network,
 there is an object with similar name that corresponds to one object in the class. 
-Thus ``project.network.links`` enables the access to manipulate the 'links' table, and each item in 
+Thus ``project.tables.links`` enables the access to manipulate the 'links' table, and each item in 
 the items table is a ``Link`` object.
 
 .. image:: ../_images/project_components_and_items.png

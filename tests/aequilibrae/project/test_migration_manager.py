@@ -1,6 +1,7 @@
 import pytest
 
-from aequilibrae.project.tools import MigrationManager, MigrationStatus
+from aequilibrae.project import MigrationManager
+from aequilibrae.project.tools.migration_manager import MigrationStatus
 from aequilibrae.utils.db_utils import ConnectionClosure
 
 

@@ -7,11 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 import networkx as nx
 import numpy as np
 import pytest
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.search_query import SearchQuery
-from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import SearchWorkspace
+
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.routing.cython.dijkstra import dijkstra
+from aequilibrae.routing.cython.search_query import SearchQuery
+from aequilibrae.routing.cython.search_results import SearchResults
+from aequilibrae.routing.cython.workspaces import SearchWorkspace
 
 from .routing_helpers import allocate_results, assert_state_tree, history_context, make_context, search
 

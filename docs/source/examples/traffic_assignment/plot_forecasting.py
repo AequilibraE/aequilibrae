@@ -14,9 +14,9 @@ which are going to be the input of a future year assignment with select link ana
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.traffic.TrafficClass`
+#     * :func:`aequilibrae.traffic.TrafficAssignment`
 #     * :func:`aequilibrae.distribution.ipf`
 #     * :func:`aequilibrae.distribution.gravity_calibration`
 #     * :func:`aequilibrae.distribution.gravity_application`
@@ -31,9 +31,9 @@ from tempfile import gettempdir
 
 import pandas as pd
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
+from aequilibrae.traffic.vdf import bpr
 
 # sphinx_gallery_thumbnail_number = 3
 # %%
@@ -56,11 +56,11 @@ basic_config()
 # traffic assignment for the base-year.
 
 from dataclasses import replace
-from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
 
 # %%
 
-network = project.network.build()
+network = project.tables.build()
 
 # %%
 # Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.
@@ -239,7 +239,7 @@ args = {
     "nan_as_zero": True,
 }
 
-ipf = Ipf(**args)
+ipf = Ipf(project=project, **args)
 ipf.fit()
 
 # %%
@@ -275,7 +275,7 @@ for function in ["power", "expo"]:
         "nan_as_zero": True,
     }
 
-    gravity = GravityApplication(**args)
+    gravity = GravityApplication(project=project, **args)
     gravity.apply()
 
     # We get the output matrix and save it to OMX too,

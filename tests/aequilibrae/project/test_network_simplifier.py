@@ -1,7 +1,7 @@
 import pytest
 from shapely.geometry import LineString
 
-from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
+from aequilibrae.project import NetworkSimplifier
 
 
 @pytest.fixture(scope="function")
@@ -16,29 +16,29 @@ def project_with_graph(nauru_example):
 
         # Let's create a centroid to build a graph
         arbitrary_node = conn.execute("select node_id from nodes limit 1").fetchone()[0]
-        nodes = nauru_example.network.nodes
+        nodes = nauru_example.tables.nodes
         nodes.update(arbitrary_node, is_centroid=1)
 
     mode = "c"
 
-    network = nauru_example.network.build()
+    network = nauru_example.tables.build()
     graph = network.build_graph(mode, "distance", skimming=["distance"], compact=True, block_centroid_flows=False)
 
-    yield graph
+    yield nauru_example, graph
 
 
 def test_simplify(project_with_graph):
-    net = NetworkSimplifier()
-    graph = project_with_graph
+    project, graph = project_with_graph
+    net = NetworkSimplifier(project)
 
     links_before = net.link_layer.shape[0]
-    nodes_before = net.network.nodes.data.shape[0]
+    nodes_before = net.tables.nodes.data.shape[0]
 
     net.simplify(graph)
 
     assert net.graph is graph
-    assert links_before > net.network.links.data.shape[0]
-    assert nodes_before > net.network.nodes.data.shape[0]
+    assert links_before > net.tables.links.data.shape[0]
+    assert nodes_before > net.tables.nodes.data.shape[0]
 
 
 def test_simplify_uses_ordered_network_expansions(empty_project):
@@ -56,12 +56,12 @@ def test_simplify_uses_ordered_network_expansions(empty_project):
             ],
         )
         conn.execute("UPDATE nodes SET is_centroid=1 WHERE node_id IN (SELECT b_node FROM links)")
-    empty_project.network.refresh_schemas()
+    empty_project.tables.refresh_schemas()
 
-    graph = empty_project.network.build().build_graph("c", "distance", compact=True)
+    graph = empty_project.tables.build().build_graph("c", "distance", compact=True)
     NetworkSimplifier(empty_project).simplify(graph)
 
-    links = empty_project.network.links.data
+    links = empty_project.tables.links.data
     assert len(links) == 1
     merged = links.iloc[0]
     assert list(merged.geometry.coords) == [(0, 0), (0.02, 0), (0.03, 0)]
@@ -73,12 +73,13 @@ def test_simplify_uses_ordered_network_expansions(empty_project):
 
 
 def test_collapse_links_into_nodes(project_with_graph):
-    net = NetworkSimplifier()
+    project, _ = project_with_graph
+    net = NetworkSimplifier(project)
 
     links_before = net.link_layer.shape[0]
-    nodes_before = net.network.nodes.data.shape[0]
+    nodes_before = net.tables.nodes.data.shape[0]
 
     net.collapse_links_into_nodes([903])
 
     assert links_before > net.link_layer.shape[0]
-    assert nodes_before > net.network.nodes.data.shape[0]
+    assert nodes_before > net.tables.nodes.data.shape[0]

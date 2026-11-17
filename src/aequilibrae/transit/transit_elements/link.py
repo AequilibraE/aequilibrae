@@ -1,9 +1,10 @@
 import math
 from sqlite3 import Connection
+
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
 
-from aequilibrae.transit.constants import Constants, TRANSIT_LINK_RANGE
+from aequilibrae.transit.constants import TRANSIT_LINK_RANGE, Constants
 
 
 class Link:

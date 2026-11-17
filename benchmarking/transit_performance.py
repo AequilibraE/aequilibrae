@@ -1,15 +1,13 @@
-from os.path import join
 import os
-
-from aequilibrae.transit import Transit
-from aequilibrae.project.project import Project
+import time
+from os.path import join
 
 import numpy as np
 import pandas as pd
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
 
-import time
+from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.transit import Transit, TransitAssignment, TransitClass
 
 
 def run_example(from_model, zones):
@@ -20,7 +18,7 @@ def run_example(from_model, zones):
         path = join(examples_dir, f"{from_model}_{n_zones}")
 
         if os.path.isdir(path):
-            project = Project.from_path(path)
+            project = Project.open(path)
 
         else:
             print("example not created.")
@@ -37,7 +35,7 @@ def run_example(from_model, zones):
             connector_method="overlapping_regions",
         )
 
-        project.network.build_graphs()
+        project.tables.build_graphs()
 
         # c for All motorized vehicles
         graph.create_line_geometry(method="direct", graph="c")

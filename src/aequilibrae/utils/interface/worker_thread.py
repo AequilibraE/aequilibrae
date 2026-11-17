@@ -1,8 +1,9 @@
-from aequilibrae.utils.qgis_utils import inside_qgis
 from typing import TYPE_CHECKING
 
+from aequilibrae.utils.qgis_utils import inside_qgis
+
 if inside_qgis and not TYPE_CHECKING:
-    from qgis.PyQt.QtCore import pyqtSignal, QThread
+    from qgis.PyQt.QtCore import QThread, pyqtSignal
 
     class WorkerThread(QThread):
         if inside_qgis:

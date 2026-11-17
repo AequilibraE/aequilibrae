@@ -15,7 +15,7 @@ from TNTP.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
+#     * :func:`aequilibrae.routing.graph`
 
 # %%
 
@@ -23,7 +23,7 @@ from TNTP.
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Network
+from aequilibrae.routing import Network
 # sphinx_gallery_thumbnail_path = '../source/_images/graph_network.png'
 
 # %%

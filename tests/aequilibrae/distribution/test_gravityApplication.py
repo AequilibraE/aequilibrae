@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
+from aequilibrae.distribution import GravityApplication, SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.parameters import Parameters
-from aequilibrae.project.data.matrices import Matrices
+from aequilibrae.project import Matrices, Parameters
 
 
 @pytest.fixture(scope="session")

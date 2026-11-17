@@ -1,8 +1,8 @@
-import geopandas as gpd
 import json
+
+import geopandas as gpd
 import pytest
-from shapely.geometry import LineString
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point
 
 from aequilibrae.project.network.importer.simplifiers.impl_neatnet import (
     _classify_orientation_fast,

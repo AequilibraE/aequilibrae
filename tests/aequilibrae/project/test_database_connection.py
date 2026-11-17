@@ -1,17 +1,15 @@
 from os.path import join
 
-import pytest
-
 from aequilibrae.context import activate_project
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.db_utils import read_and_close
 
 
-def test_cannot_connect_when_no_active_project():
+def test_connection_uses_explicit_project_path(empty_project):
     activate_project(None)
-    with pytest.raises(FileNotFoundError):
-        database_connection("network")
+    with database_connection("network", empty_project.project_base_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM links").fetchone()[0] == 0
 
 
 def test_connection_with_new_project(empty_project):
@@ -31,9 +29,3 @@ def test_connection_with_transit(empty_project):
 def test_db_connection_is_spatial(empty_project):
     with empty_project.db_connection as conn:
         assert conn.execute("select spatialite_version()").fetchone()[0]
-
-
-def test_db_connection_spatial_is_deprecated(empty_project):
-    with pytest.warns(DeprecationWarning, match="removed in version 2.1"):
-        with empty_project.db_connection_spatial as conn:
-            assert conn.execute("select spatialite_version()").fetchone()[0]

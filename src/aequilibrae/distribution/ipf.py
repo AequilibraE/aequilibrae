@@ -1,15 +1,13 @@
-import os
 from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-import yaml
 
-from aequilibrae.context import get_active_project
 from aequilibrae.distribution.cython.ipf_core import ipf_core
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 from aequilibrae.utils.core_setter import resolve_cores
 
 
@@ -52,6 +50,9 @@ class Ipf:
         """
         Instantiates the IPF problem
 
+        :param project: Optional project supplying default parameters and owning saved results. If omitted,
+            library defaults are used and :meth:`save_to_project` requires an explicit project.
+
         :Arguments:
             **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
 
@@ -72,6 +73,7 @@ class Ipf:
 
             **error** (:obj:`str`): Error description
         """
+        self.project = project
         self.cpus = 0
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
@@ -200,10 +202,12 @@ class Ipf:
             **file_name** (:obj:`str`): Name for the OMX matrix file
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
-            Defaults to the active project
+            Defaults to the explicitly supplied constructor project
         """
 
-        project = project or get_active_project()
+        project = self.project if project is None else project
+        if project is None:
+            raise ValueError("An explicit project is required")
         mats = project.matrices
         mats.save_matrix(
             file_name,
@@ -214,9 +218,6 @@ class Ipf:
         )
 
     def __get_parameters(self, model):
-        path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        with open(path + "/parameters.yml", "r") as yml:
-            path = yaml.safe_load(yml)
-
-        self.cpus = resolve_cores(path["system"])
-        return path["distribution"][model]
+        parameters = self.project.parameters if self.project is not None else Parameters().parameters
+        self.cpus = resolve_cores(parameters["system"])
+        return parameters["distribution"][model].copy()

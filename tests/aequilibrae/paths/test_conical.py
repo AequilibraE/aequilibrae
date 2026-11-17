@@ -1,6 +1,7 @@
-from aequilibrae.paths.cython.vdf_core import conical, delta_conical
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import numpy as np
+
+from aequilibrae.routing.cython.vdf_core import conical, delta_conical
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 def test_conical_function():

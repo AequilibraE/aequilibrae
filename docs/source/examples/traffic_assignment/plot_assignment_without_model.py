@@ -17,15 +17,15 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment` 
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.traffic.TrafficClass`
+#     * :func:`aequilibrae.traffic.TrafficAssignment` 
 #     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
 # %%
 
 # Imports
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.traffic.vdf import bpr
 import os
 import pandas as pd
 import numpy as np
@@ -33,9 +33,9 @@ from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Network
-from aequilibrae.paths import TrafficAssignment
-from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.routing import Network
+from aequilibrae.traffic import TrafficAssignment
+from aequilibrae.traffic import TrafficClass
 # sphinx_gallery_thumbnail_path = '../source/_images/assignment_plot.png'
 
 # %%

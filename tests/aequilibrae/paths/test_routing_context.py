@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Network
-from aequilibrae.paths.routing_context import GraphMapping
+from aequilibrae.routing import Network
+from aequilibrae.routing.routing_context import GraphMapping
 
 from .routing_helpers import diamond_graph, make_context, search
 

@@ -1,0 +1,104 @@
+from libc.stddef cimport size_t
+from libc.stdint cimport uint32_t
+from libcpp cimport bool as cpp_bool
+from libcpp.vector cimport vector
+from aequilibrae.routing.cython.outputs cimport CppSelectLinkODOutputsView
+from aequilibrae.matrix.cython.sparse_matrix_builder cimport CppSparseMatrixBuilderView
+
+
+cdef extern from "workspaces.hpp" namespace "aequilibrae::paths::cpp::routing" nogil:
+    cdef enum CppSearchHeap "aequilibrae::paths::cpp::routing::SearchHeap":
+        CPP_FOUR_ARY "aequilibrae::paths::cpp::routing::SearchHeap::FourAry"
+        CPP_PAIRING "aequilibrae::paths::cpp::routing::SearchHeap::Pairing"
+        CPP_STD "aequilibrae::paths::cpp::routing::SearchHeap::Std"
+
+    cdef cppclass CppSearchHeapStorage "aequilibrae::paths::cpp::routing::SearchHeapStorage"[T]:
+        CppSearchHeapStorage(size_t, CppSearchHeap) except +
+
+    cdef cppclass CppSearchWorkspace "aequilibrae::paths::cpp::routing::SearchWorkspace"[T]:
+        CppSearchWorkspace() noexcept
+        CppSearchHeapStorage[T] *heap
+
+    cdef cppclass CppAStarEstimateCache "aequilibrae::paths::cpp::routing::AStarEstimateCache"[T]:
+        CppAStarEstimateCache() noexcept
+
+    cdef cppclass CppAStarWorkspace "aequilibrae::paths::cpp::routing::AStarWorkspace"[T]:
+        CppAStarWorkspace() noexcept
+        CppSearchWorkspace[T] search
+        T *costs
+        T *estimates
+        uint32_t *estimate_epochs
+        CppAStarEstimateCache[T] *estimate_cache
+
+    cdef cppclass CppLoadingWorkspace "aequilibrae::paths::cpp::routing::LoadingWorkspace"[T]:
+        CppLoadingWorkspace() noexcept
+        size_t state_count
+        size_t class_count
+        T *state_loads
+
+    cdef cppclass CppSkimmingWorkspace "aequilibrae::paths::cpp::routing::SkimmingWorkspace"[T]:
+        CppSkimmingWorkspace() noexcept
+        size_t state_count
+        size_t field_count
+        T *state_skims
+
+    cdef cppclass CppSelectLinkWorkspace "aequilibrae::paths::cpp::routing::SelectLinkWorkspace":
+        CppSelectLinkWorkspace() noexcept
+        size_t state_count
+        cpp_bool *selected_paths
+
+    cdef cppclass CppAoNWorkspace "aequilibrae::paths::cpp::routing::AoNWorkspace"[T]:
+        CppAoNWorkspace() noexcept
+        CppSearchWorkspace[T] search
+        CppLoadingWorkspace[T] loading
+        CppSkimmingWorkspace[T] skimming
+        CppSelectLinkWorkspace select_link
+        CppSelectLinkODOutputsView[T] selected_od
+
+
+cdef class SearchWorkspace:
+    cdef readonly size_t node_count, state_count
+    cdef readonly object heap
+    cdef CppSearchHeapStorage[double] *heap_storage
+    cdef CppSearchWorkspace[double] view(self) noexcept nogil
+
+
+cdef class AStarWorkspace(SearchWorkspace):
+    cdef double[::1] costs_buffer, estimates_buffer
+    cdef uint32_t[::1] estimate_epochs_buffer
+    cdef CppAStarEstimateCache[double] estimate_cache
+    cdef CppAStarWorkspace[double] a_star_view(self) noexcept nogil
+
+
+cdef class LoadingWorkspace:
+    cdef readonly size_t state_count, class_count
+    cdef double[:, ::1] state_loads_buffer
+    cdef CppLoadingWorkspace[double] view(self) noexcept nogil
+
+
+cdef class SkimmingWorkspace:
+    cdef readonly size_t state_count, field_count
+    cdef double[:, ::1] state_skims_buffer
+    cdef CppSkimmingWorkspace[double] view(self) noexcept nogil
+
+
+cdef class SelectLinkWorkspace:
+    cdef readonly size_t state_count
+    cdef cpp_bool[::1] selected_paths_buffer
+    cdef CppSelectLinkWorkspace view(self) noexcept nogil
+
+
+cdef class SelectLinkODWorkspace:
+    cdef readonly tuple builders
+    cdef vector[CppSparseMatrixBuilderView[double]] builder_views
+    cdef CppSelectLinkODOutputsView[double] view(self) noexcept nogil
+
+
+cdef class AoNWorkspace:
+    cdef readonly size_t node_count, state_count
+    cdef readonly SearchWorkspace search
+    cdef readonly LoadingWorkspace loading
+    cdef readonly SkimmingWorkspace skimming
+    cdef readonly SelectLinkWorkspace select_link
+    cdef readonly SelectLinkODWorkspace selected_od
+    cdef CppAoNWorkspace[double] view(self) noexcept nogil

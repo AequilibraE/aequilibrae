@@ -5,7 +5,7 @@ Usage
 .. code-block:: python
     :caption: Generate SimWrapper dashboard for an example project
 
-    >>> from aequilibrae.utils.create_example import create_example
+    >>> from aequilibrae.examples import create_example
     >>> from aequilibrae.utils.simwrapper.generate_simwrapper_config import SimwrapperConfigGenerator
     >>> prj = create_example(project_path)
     >>> gen = SimwrapperConfigGenerator(prj, output_dir='simwrapper')
@@ -30,11 +30,7 @@ from aequilibrae.utils.simwrapper.simwrapper_panel import (
     TextPanel,
     TilePanel,
 )
-from aequilibrae.utils.simwrapper.simwrapper_utils import (
-    export_convergence_csv,
-    get_project_center,
-    get_project_zoom,
-)
+from aequilibrae.utils.simwrapper.simwrapper_utils import export_convergence_csv, get_project_center, get_project_zoom
 
 
 class SimwrapperConfigGenerator:
@@ -141,7 +137,7 @@ class SimwrapperConfigGenerator:
 
     def _get_link_types(self):
         """Return a list of link-type *names* present in the project's network (empty list if none)."""
-        return [link_type.link_type for link_type in self.project.network.link_types]
+        return [link_type.link_type for link_type in self.project.tables.link_types]
 
     def _categorical_palette(self, n):
         """Returns n visually distinct hex colour strings.
@@ -590,11 +586,10 @@ def main(argv=None):
     # lazy import to avoid side-effects at module import time
     import sys
 
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
-    prj = Project()
     try:
-        prj.open(args.project)
+        prj = Project.open(args.project)
     except Exception as e:
         print(f"Error opening project at '{args.project}': {e}", file=sys.stderr)
         return 2

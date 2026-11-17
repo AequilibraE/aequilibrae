@@ -91,7 +91,7 @@ This runs `ruff check`, `ruff format --check`, cython-lint, clang-tidy and clang
 Config lives in `pyproject.toml` under `[tool.ruff]`. Key settings:
 - Line length: 120 characters
 - Python target: 3.11
-- Selected rules: B, C, E, F, W (flake8-style)
+- Selected rules: B, C, E, F, W (flake8-style), I (import ordering), RUF022 (sorted `__all__`) and TID252 (absolute library imports; tests may use relative imports)
 - Max McCabe complexity: 20
 
 Always run `spin lint` before committing Python or native-code changes.
@@ -110,7 +110,7 @@ Always run `spin lint` before committing Python or native-code changes.
 
 ### Cython (`.pyx`, `.pxd`, `.pxi`)
 
-- Cython files live in `src/aequilibrae/paths/cython/`, `src/aequilibrae/distribution/cython/`, and `src/aequilibrae/matrix/`.
+- Cython files live in `src/aequilibrae/routing/cython/`, `src/aequilibrae/distribution/cython/`, and `src/aequilibrae/matrix/`.
 - Use `cdef` classes and typed memoryviews for performance-critical code.
 - Use OpenMP via `prange` in `nogil` regions only when iterations are independent or use valid reductions. Releasing the GIL does not make shared writes safe: make ownership of mutable buffers explicit. Benchmark changes, use workload thresholds where appropriate, and account for oversubscription from pytest workers and other thread pools.
 - After modifying Cython files, rebuild with `spin build`, or let `spin test` rebuild before testing. Editable installations rebuild on import instead.
@@ -123,13 +123,13 @@ Always run `spin lint` before committing Python or native-code changes.
 
 ## Key Patterns
 
-- **Project object**: `from aequilibrae import Project` — the central entry point for most workflows. Open with `project.open(path)` or create with `project.new(path)`.
-- **Network**: `project.network` manages database tables; `project.network.build()` copies them into an independent `aequilibrae.paths.Network`. Construct `Network(links, ...)` for in-memory data. Network configuration fields are fixed; use `dataclasses.replace()` for validated replacements, and construct a new Network after topology or row-order changes.
+- **Project object**: `from aequilibrae import Project` — the central entry point for most workflows. Open with `Project.open(path)` or create with `Project.create(path)`; both return ready-to-use context managers.
+- **Network**: `project.tables` manages database tables; `project.tables.build()` copies them into an independent `aequilibrae.routing.Network`. Construct `Network(links, ...)` for in-memory data. Network configuration fields are fixed; use `dataclasses.replace()` for validated replacements, and construct a new Network after topology or row-order changes.
 - **Graph**: Build fixed-topology routing graphs with `network.build_graph(mode, cost, ...)` or the project network's `build_graph()` convenience method. Graphs expose `routing`, `mapping` and `skimming`, not source DataFrames. Change directed network-order costs with `graph.set_costs()`; rebuild for other configuration changes. Link contraction (`compact`) and dead-end removal (`remove_dead_ends`) are independent, opt-in options requiring centroids.
 - **Assignment**: Configure `TrafficClass` independently of graphs; routing policies belong in `graph_options`. `TrafficAssignment` builds each class's graph internally and enables contraction and dead-end removal by default. Pass `project=project` when using an independent network and saving project outputs.
 - **Path results**: `PathResults.path` contains local graph-link indices. Use `get_network_links()` for physical link IDs and directions. Both A* heuristics require explicit coordinates and a heuristic scale; graphs do not retain coordinates.
 - **Matrix**: `AequilibraeMatrix` holds dense matrices in memory; `AequilibraeSparseMatrix` holds SciPy sparse arrays in memory. Both share a zone index across their matrices. `MatrixStore` provides OMX-backed dense and sparse storage; prefer a `with` block to manage its lifetime. Store reads return independent arrays, so assign changes back explicitly.
-- **VDF functions**: Implemented as Cython files in `src/aequilibrae/paths/cython/` (e.g., `bpr.pyx`, `akcelik.pyx`). Note: In the Akcelik VDF, the `tau` parameter already absorbs the factor of 8.
+- **VDF functions**: Implemented as Cython files in `src/aequilibrae/routing/cython/` (e.g., `bpr.pyx`, `akcelik.pyx`). Note: In the Akcelik VDF, the `tau` parameter already absorbs the factor of 8.
 - **Parameters**: `Parameters` class reads/writes `parameters.yml`; use it instead of hardcoding defaults.
 
 ## Testing Conventions

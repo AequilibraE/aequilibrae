@@ -1,4 +1,3 @@
-from .matrices import Matrices
-from .results import Results
+"""Internal project matrix and results storage implementations."""
 
-__all__ = ["Matrices", "Results"]
+__all__ = []

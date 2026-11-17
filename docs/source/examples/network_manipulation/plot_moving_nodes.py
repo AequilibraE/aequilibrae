@@ -24,7 +24,7 @@ what happens to the links.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 
@@ -39,8 +39,8 @@ project = create_example(fldr)
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom.
 
 # We also add the node we want to move.
-all_nodes = project.network.nodes
-links = project.network.links
+all_nodes = project.tables.nodes
+links = project.tables.links
 node = all_nodes.get(1)
 new_geo = Point(node.geometry.x + 0.02, node.geometry.y - 0.02)
 all_nodes.update(node.node_id, geometry=new_geo)

@@ -1,3 +1,3 @@
-from aequilibrae.project.network.importer.sources.base import SOURCES, resolve_source
+"""Internal network source implementations."""
 
-__all__ = ["SOURCES", "resolve_source"]
+__all__ = []

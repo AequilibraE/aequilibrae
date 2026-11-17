@@ -8,7 +8,7 @@ import pytest
 
 @pytest.fixture
 def turns(sioux_falls_example):
-    return sioux_falls_example.network.turn_restrictions
+    return sioux_falls_example.tables.turn_restrictions
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ def test_insert_requires_modes(turns, movements, operation):
 
 
 def test_mode_order_is_preserved(sioux_falls_example, turns, movements):
-    sioux_falls_example.network.modes.insert(mode_id="x", mode_name="test mode x")
+    sioux_falls_example.tables.modes.insert(mode_id="x", mode_name="test mode x")
     key = turns.insert(**movements[0], modes="xc")
     assert turns.get(key).modes == "xc"
 

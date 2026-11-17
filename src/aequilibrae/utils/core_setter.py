@@ -1,5 +1,6 @@
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import os
+
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 DEFAULT_THREADING_THRESHOLD = 10_000
 

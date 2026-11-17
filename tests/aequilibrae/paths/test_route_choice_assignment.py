@@ -3,10 +3,11 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import Network, RouteChoice
+from aequilibrae.route_choice import RouteChoice
+from aequilibrae.routing import Network
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
 
 from .route_choice_helpers import (
     chain_graph,
@@ -23,7 +24,7 @@ from .route_choice_helpers import (
 def test_sioux_falls_assignment(route_choice_setup, cost, beta, algorithm):
     project = route_choice_setup["project"]
     graph = route_choice_setup["graph"]
-    graph.set_costs(project.network.build().field_values(cost))
+    graph.set_costs(project.tables.build().field_values(cost))
 
     choice = RouteChoice(graph)
     choice.set_cores(1)
@@ -47,7 +48,7 @@ def test_sioux_falls_assignment(route_choice_setup, cost, beta, algorithm):
     np.testing.assert_allclose(rows.groupby(["origin id", "destination id"])["probability"].sum(), 1.0)
     assert (rows.groupby(["origin id", "destination id"]).size() > 1).all()
 
-    source_links = project.network.links.data.set_index("link_id")
+    source_links = project.tables.links.data.set_index("link_id")
     expected_loads = pd.DataFrame(0.0, index=source_links.index, columns=["all", "either", "both"])
     expected_ods = {name: pd.DataFrame(0.0, index=demand.index, columns=demand.index) for name in ["either", "both"]}
 
@@ -115,7 +116,7 @@ def test_assign_from_df_omits_ods_without_demand(route_choice_setup, recompute_p
     np.testing.assert_array_equal(result["mask"], True)
 
     if recompute_psl:
-        links = route_choice_setup["project"].network.links.data.set_index("link_id")
+        links = route_choice_setup["project"].tables.links.data.set_index("link_id")
         np.testing.assert_allclose(result["cost"], links.loc[[1, 2], "distance"])
         np.testing.assert_array_equal(result[["path overlap", "probability"]], 1.0)
     else:

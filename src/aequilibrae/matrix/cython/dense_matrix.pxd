@@ -1,7 +1,7 @@
 cimport cython
 
-from .matrix_base cimport _MatrixBase
-from .views cimport CppDenseMatrix
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.views cimport CppDenseMatrix
 
 
 @cython.final

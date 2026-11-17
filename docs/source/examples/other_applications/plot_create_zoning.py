@@ -55,7 +55,7 @@ from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
 
-from aequilibrae.utils.create_example import create_example, list_examples
+from aequilibrae.examples import create_example, list_examples
 from aequilibrae.utils.aeq_signal import simple_progress, SIGNAL
 s = SIGNAL(object)
 
@@ -84,7 +84,7 @@ zones = 100
 # %%
 # Spatialite requires a few things to compute hex bins.
 # One of them is the area you want to cover.
-network = project.network
+network = project.tables
 
 # %%
 # So we use the convenient network method ``convex_hull()`` (it may take some time for very large networks)
@@ -129,7 +129,7 @@ for i in range(1, 301):
 # %%
 
 # Now we can add them to the model and add centroids to them while we are at it.
-zone_table = project.network.zones
+zone_table = project.tables.zones
 for i, zone_geo in enumerate(simple_progress(grid, s, "Add zone centroids")):
     zone_id = i + 1
     zone_table.insert(zone_id=zone_id, geometry=zone_geo)

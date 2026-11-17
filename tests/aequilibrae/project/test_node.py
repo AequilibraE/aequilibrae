@@ -1,15 +1,15 @@
 from random import randint, random
 from sqlite3 import IntegrityError
 
+import pytest
 import shapely.wkb
 from shapely.geometry import Point
-import pytest
 
 from aequilibrae.utils.db_utils import read_and_close
 
 
 def test_save_and_assignment(sioux_falls_example):
-    nodes = sioux_falls_example.network.nodes
+    nodes = sioux_falls_example.tables.nodes
     nd = randint(1, 24)
     node = nodes.get(nd)
 
@@ -40,7 +40,7 @@ def test_save_and_assignment(sioux_falls_example):
 
 
 def test_data_fields(sioux_falls_example):
-    nodes = sioux_falls_example.network.nodes
+    nodes = sioux_falls_example.tables.nodes
     node1 = nodes.get(randint(1, 24))
     node2 = nodes.get(randint(1, 24))
     assert node1.__dataclass_fields__ == node2.__dataclass_fields__, "Different nodes have different data fields"
@@ -53,7 +53,7 @@ def test_data_fields(sioux_falls_example):
 
 
 def test_renumber(sioux_falls_example):
-    nodes = sioux_falls_example.network.nodes
+    nodes = sioux_falls_example.tables.nodes
     node = nodes.get(randint(2, 24))
     x = node.geometry.x
     y = node.geometry.y

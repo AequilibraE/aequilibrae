@@ -85,12 +85,12 @@ Use ``project.transaction()`` to group writes.
     >>> project = create_example(project_path)
 
     # Sioux Falls free_flow_time is in minutes, so convert it to seconds for these examples.
-    >>> project.network.links.fields.add("travel_time_seconds", "Free-flow travel time in seconds", "REAL")
+    >>> project.tables.links.fields.add("travel_time_seconds", "Free-flow travel time in seconds", "REAL")
     >>> with project.db_connection as conn:
     ...     _ = conn.execute("UPDATE links SET travel_time_seconds = free_flow_time * 60.0")
 
     # Get the turn restrictions object
-    >>> turns = project.network.turn_restrictions
+    >>> turns = project.tables.turn_restrictions
 
     # Add a prohibited turn (penalty=None means prohibited)
     >>> restriction_id = turns.insert(from_node=1, via_node=2, to_node=6, modes="c")
@@ -145,7 +145,7 @@ The U-turn setting is managed through the project's ``about`` table:
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
     # Rebuild network and build graphs to apply the change
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
     >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
 Building Graphs with Turn Restrictions
@@ -155,7 +155,7 @@ When you build a network snapshot, turn restrictions are loaded from the databas
 
 .. code-block:: python
 
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
     >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
     # Check if a graph has turn restrictions
@@ -172,7 +172,7 @@ An existing graph's topology and turn configuration cannot be changed in place:
 
     >>> import pandas as pd
 
-    >>> links = project.network.links.data.set_index("link_id")
+    >>> links = project.tables.links.data.set_index("link_id")
     >>> turn_df = pd.DataFrame({
     ...     "from_node": [int(links.loc[7, "a_node"])],
     ...     "via_node": [int(links.loc[7, "b_node"])],
@@ -199,10 +199,10 @@ The turn penalties are applied as additional time costs during the equilibration
 
 .. code-block:: python
 
-    >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
-    >>> from aequilibrae.paths.vdf import bpr
+    >>> from aequilibrae.traffic import TrafficAssignment, TrafficClass
+    >>> from aequilibrae.traffic.vdf import bpr
 
-    >>> network = project.network.build()
+    >>> network = project.tables.build()
     >>> demand_matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     >>> traffic_class = TrafficClass(
     ...     mode='c',

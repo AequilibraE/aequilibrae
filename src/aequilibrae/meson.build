@@ -2,6 +2,7 @@ thisdir = 'aequilibrae'
 
 pyfiles = [
   '__init__.py',
+  '_assignment.py',
   'context.py',
   'log.py',
   'parameters.py',
@@ -9,9 +10,13 @@ pyfiles = [
 ]
 
 pkgs = [
+  'builder',
   'distribution',
+  'examples',
   'matrix',
-  'paths',
+  'routing',
+  'route_choice',
+  'traffic',
   'project',
   'reference_files',
   'transit',

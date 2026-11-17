@@ -22,8 +22,7 @@ By default an AequilibraE project comes with four example functions: ``matrix_su
 ``graph_summary``, ``results_summary``, and ``example_function_with_kwargs``. The summary functions
 are not named within the default ``parameters.yml`` as they take no arguments.
 
-Functions should use the ``get_active_project()`` function to obtain a reference to the current
-project.
+Functions must accept an explicit ``project`` argument, supplied by ``Project.run``.
 
 State within the module should be avoided as the file may be run multiple times.
 

@@ -17,15 +17,16 @@ choice set generation and path-size logit calculations.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :class:`aequilibrae.paths.network.Network`
-#     * :func:`aequilibrae.paths.route_choice.RouteChoice`
+#     * :class:`aequilibrae.routing.Network`
+#     * :func:`aequilibrae.route_choice.RouteChoice`
 
 # %%
 # Imports
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import Network, RouteChoice
+from aequilibrae.routing import Network
+from aequilibrae.route_choice import RouteChoice
 
 # %%
 # Create a small network with two routes from node 10 to node 40.

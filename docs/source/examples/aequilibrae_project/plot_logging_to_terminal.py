@@ -25,7 +25,7 @@ AequilibraE uses the standard Python `logging` module, but with specific configu
 # terminal or notebook, you should use the provided helper.
 
 import logging
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.utils import basic_config
 
 # %%
 # This helper installs a custom StreamHandler that writes to ``stdout`` via ``tqdm.write``,
@@ -67,7 +67,7 @@ logger.debug("This is a debug message with a custom format.")
 # logging for specific modules if you want to debug only one part of the system.
 
 # Example: Turn on DEBUG logging only for the paths module
-paths_logger = logging.getLogger("aequilibrae.paths")
+paths_logger = logging.getLogger("aequilibrae.routing")
 paths_logger.setLevel(logging.DEBUG)
 
 # %%

@@ -29,10 +29,10 @@
 # work developed with the software.
 # ---------------------------------------------------------------------------------------------------------------------
 
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
-
 import numpy as np
-from aequilibrae.paths.cython.vdf_core import inrets, delta_inrets
+
+from aequilibrae.routing.cython.vdf_core import delta_inrets, inrets
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 def test_inrets_function():

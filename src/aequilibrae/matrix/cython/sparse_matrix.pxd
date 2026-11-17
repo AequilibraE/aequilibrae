@@ -2,9 +2,9 @@ from libc.stddef cimport size_t
 
 cimport cython
 
-from .matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 
-from .views cimport CppSparseMatrix
+from aequilibrae.matrix.cython.views cimport CppSparseMatrix
 
 
 @cython.final

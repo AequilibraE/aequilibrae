@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 
 from aequilibrae.matrix import from_df
-from aequilibrae.paths import Network, RouteChoice, estimate_heuristic_scale
+from aequilibrae.route_choice import RouteChoice
+from aequilibrae.routing import Network, estimate_heuristic_scale
 
 from .route_choice_helpers import (
     batched_junction_routes,

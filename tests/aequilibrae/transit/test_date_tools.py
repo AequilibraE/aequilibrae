@@ -1,9 +1,17 @@
-import pytest
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
 from random import randint
-from aequilibrae.transit.date_tools import to_seconds, to_time_string, one_day_before, create_days_between
-from aequilibrae.transit.date_tools import day_of_week, format_date
+
+import pytest
+
+from aequilibrae.transit.date_tools import (
+    create_days_between,
+    day_of_week,
+    format_date,
+    one_day_before,
+    to_seconds,
+    to_time_string,
+)
 
 
 class TestDateTools:

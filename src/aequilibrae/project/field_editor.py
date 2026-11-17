@@ -25,10 +25,10 @@ class FieldEditor:
         >>> project = create_example(project_path)
 
         # To edit the fields of the link_types table
-        >>> lt_fields = project.network.link_types.fields
+        >>> lt_fields = project.tables.link_types.fields
 
         # To edit the fields of the modes table
-        >>> m_fields = project.network.modes.fields
+        >>> m_fields = project.tables.modes.fields
 
         >>> project.close()
 

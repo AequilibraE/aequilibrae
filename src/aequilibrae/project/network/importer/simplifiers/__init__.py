@@ -1,3 +1,3 @@
-from aequilibrae.project.network.importer.simplifiers.base import SIMPLIFIERS, resolve_simplifier
+"""Internal staged-network simplifiers."""
 
-__all__ = ["SIMPLIFIERS", "resolve_simplifier"]
+__all__ = []

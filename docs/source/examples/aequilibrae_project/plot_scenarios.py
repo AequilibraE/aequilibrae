@@ -16,10 +16,10 @@ within a single project, using different example networks to demonstrate scenari
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.project.project.Project.list_scenarios`
-#     * :func:`aequilibrae.project.project.Project.use_scenario`
-#     * :func:`aequilibrae.project.project.Project.create_empty_scenario`
-#     * :func:`aequilibrae.project.project.Project.clone_scenario`
+#     * :func:`aequilibrae.Project.list_scenarios`
+#     * :func:`aequilibrae.Project.use_scenario`
+#     * :func:`aequilibrae.Project.create_empty_scenario`
+#     * :func:`aequilibrae.Project.clone_scenario`
 
 # %%
 
@@ -28,9 +28,9 @@ from uuid import uuid4
 from tempfile import gettempdir
 from pathlib import Path
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.examples import create_example
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_scenarios.png'
 
@@ -52,8 +52,8 @@ project.list_scenarios()
 # The root scenario is always present and represents the base model.
 # Let's examine the current scenario's network
 
-print(f"Current scenario network has {len(project.network.links.data)} links")
-print(f"Current scenario network has {len(project.network.nodes.data)} nodes")
+print(f"Current scenario network has {len(project.tables.links.data)} links")
+print(f"Current scenario network has {len(project.tables.nodes.data)} nodes")
 
 # %%
 # Creating new scenarios
@@ -78,7 +78,7 @@ project.list_scenarios()
 
 # Switch to the cloned scenario
 project.use_scenario("limited_capacity")
-print(f"This scenario has {len(project.network.links.data)} links")
+print(f"This scenario has {len(project.tables.links.data)} links")
 
 # Modify the network
 with project.db_connection as conn:
@@ -88,7 +88,7 @@ with project.db_connection as conn:
 # Let's perform a traffic assignment in this scenario with lowered capacity
 
 # Load the network snapshot
-network = project.network.build()
+network = project.tables.build()
 
 # Get the demand matrix
 mat = project.matrices.get_matrix("demand.omx", subset=["matrix"])
@@ -111,7 +111,7 @@ print(f"Assignment completed. Total flow: {assignment.class_results['car'].total
 # %%
 # Switch to empty scenario for modifications
 project.use_scenario("test_modifications")
-print(f"Empty scenario has {len(project.network.links.data)} links")
+print(f"Empty scenario has {len(project.tables.links.data)} links")
 
 # This scenario starts with an empty network, suitable for building from scratch
 # or testing specific network configurations
@@ -122,7 +122,7 @@ print(f"Empty scenario has {len(project.network.links.data)} links")
 # Let's switch back to root and show that scenarios are isolated
 
 project.use_scenario("root")
-print(f"Back to root scenario with {len(project.network.links.data)} links")
+print(f"Back to root scenario with {len(project.tables.links.data)} links")
 
 # Check results - only root scenario results should be visible
 root_results = project.results.list()
@@ -149,7 +149,7 @@ final_scenarios = project.list_scenarios()
 print("\nFinal scenario summary:")
 for _, scenario in final_scenarios.iterrows():
     project.use_scenario(scenario['scenario_name'])
-    link_count = len(project.network.links.data)
+    link_count = len(project.tables.links.data)
     result_count = len(project.results.list())
     print(f"  {scenario['scenario_name']}: {link_count} links, {result_count} results")
     print(f"    Description: {scenario['description']}")

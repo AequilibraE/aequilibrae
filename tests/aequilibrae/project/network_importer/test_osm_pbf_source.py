@@ -5,7 +5,7 @@ import pytest
 
 
 def test_basic_pbf_import_no_simplify(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
@@ -22,7 +22,7 @@ def test_basic_pbf_import_no_simplify(empty_project, pbf_path):
 def test_pbf_writes_no_download_cache(empty_project, pbf_path):
     from pathlib import Path
 
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
@@ -32,7 +32,7 @@ def test_pbf_writes_no_download_cache(empty_project, pbf_path):
 
 
 def test_pbf_mode_filter_only_keeps_walk_links(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("walk",),
         simplify=False,
@@ -47,7 +47,7 @@ def test_pbf_mode_filter_only_keeps_walk_links(empty_project, pbf_path):
 
 
 def test_pbf_unknown_tags_land_in_other_attributes(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car",),
         simplify=False,
@@ -65,7 +65,7 @@ def test_pbf_unknown_tags_land_in_other_attributes(empty_project, pbf_path):
 
 
 def test_pbf_contract_fields_are_valid(empty_project, pbf_path):
-    empty_project.network.importer.osm(
+    empty_project.tables.importer.osm(
         pbf_path=pbf_path,
         modes=("car", "walk"),
         simplify=False,

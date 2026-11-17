@@ -5,7 +5,7 @@ import string
 import pandas as pd
 import pytest
 
-from aequilibrae.project.project import Project
+from aequilibrae import Project
 from aequilibrae.utils.db_utils import read_and_close
 
 
@@ -71,7 +71,6 @@ def test_write_back(sioux_falls_example: Project):
         )
     )
 
-    project = Project()
-    project.open(base_path)
+    project = Project.open(base_path)
     assert val == project.about.get("good_info_field_perhaps").infovalue, "failed to save data to about table"
     assert val2 == project.about.get("description").infovalue, "failed to save data to about table"

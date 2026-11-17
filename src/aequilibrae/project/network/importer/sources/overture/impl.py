@@ -1,8 +1,9 @@
-import geopandas as gpd
 import json
 from datetime import datetime, timezone
 from typing import Sequence
 from urllib.request import urlopen
+
+import geopandas as gpd
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError
