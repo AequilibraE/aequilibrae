@@ -22,18 +22,31 @@ def model_folder(tntp_root, model_stub):
 
 
 @pytest.mark.parametrize("algorithm", METHODS)
-def test_sioux_falls(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub):
+def test_sioux_falls(
+    benchmark, tntp_network, tntp_matrix, tntp_reference, algorithm, model_stub, tntp_block_centroid_flows
+):
     run_validation(
         benchmark,
-        tntp_graph,
+        tntp_network,
         tntp_matrix,
         tntp_reference,
         model_stub,
         algorithm,
+        block_centroid_flows=tntp_block_centroid_flows,
     )
 
 
 @pytest.mark.parametrize("algorithm", ["dijkstra", "a_star"], ids=["dijkstra", "a_star"])
 @pytest.mark.parametrize("turn_penalties", [False, True], ids=["without_turn_penalties", "with_turn_penalties"])
-def test_sioux_falls_path_finding(benchmark, tntp_graph, model_stub, model_folder, algorithm, turn_penalties):
-    run_path_finding_search(benchmark, tntp_graph, model_stub, model_folder, algorithm, turn_penalties)
+def test_sioux_falls_path_finding(
+    benchmark, tntp_network, model_stub, model_folder, algorithm, turn_penalties, tntp_block_centroid_flows
+):
+    run_path_finding_search(
+        benchmark,
+        tntp_network,
+        model_stub,
+        model_folder,
+        algorithm,
+        turn_penalties,
+        block_centroid_flows=tntp_block_centroid_flows,
+    )

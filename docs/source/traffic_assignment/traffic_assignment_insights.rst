@@ -154,15 +154,15 @@ networks, as in the end there is only physical network across all modes, regardl
 each mode (e.g. truck lanes, high-occupancy lanes, etc.). This handling is often done with something called a
 *super-network*.
 
-A super-network consists in having all classes with the same links in their sub-graphs, but assigning `b_node` 
-identical to `a_node` for all links whenever a link is not available for a certain user class.
+A shared ``NetworkMapping`` gives all classes a consistent directed network-link order for
+costs, congestion and reporting. Each class's graph includes only links available to its mode.
 
-This approach is slightly less efficient when we are computing shortest paths, but it gets eliminated when 
-topologically compressing the network for centroid-to-centroid path computation and it is a LOT more efficient 
-when we are aggregating flows.
+Each ``GraphMapping`` maps its retained routing links back to the shared network order,
+including expansions of contracted chains. Link loads are projected through these mappings,
+so classes can use different routing topologies while reporting flows on the same physical network.
 
-The use of the AequilibraE project and its built-in methods to build graphs ensure that all graph will be built 
-in a consistent manner and multi-class assignment is possible.
+The ``Network`` and its graph-building methods maintain these correspondences for both project
+networks and networks constructed directly from link tables.
 
 References
 ----------

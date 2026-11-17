@@ -44,7 +44,8 @@ Both methods use Dijkstra by default. To use A*, supply coordinates when constru
     )
 
 Euclidean A* requires coordinates for every graph node in a planar coordinate system. For Haversine A*, use
-``heuristic="haversine"``.
+``heuristic="haversine"`` and explicitly supply a DataFrame with ``lon`` and ``lat`` columns in degrees
+to both ``estimate_heuristic_scale()`` and ``RouteChoice()``. Graphs do not retain coordinates.
 
 A* requires an explicit finite, nonnegative scale to convert distance to cost units.  A scale above a consistent bound
 can give non-shortest paths and change the route sets.  A consistent bound remains valid when links are removed or their

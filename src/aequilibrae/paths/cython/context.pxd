@@ -51,6 +51,8 @@ cdef class GraphContext:
     cdef const size_t[::1] node_offsets, heads_buffer
     cdef const double[::1] costs_buffer
     cdef readonly size_t blocked_centroid_count
+    cdef readonly size_t centroid_count
+    cdef readonly cpp_bool block_centroid_flows, allow_uturns
     cpdef update_costs(self, object costs)
     cdef CppNodeBasedContext[double] graph_view(self) noexcept nogil
 
@@ -63,7 +65,6 @@ cdef class TurnBasedContext(GraphContext):
     cdef const size_t[::1] tails_buffer, turn_offsets, turn_links
     cdef const size_t[::1] first_nodes_buffer, last_nodes_buffer
     cdef double[::1] turn_penalties_buffer
-    cdef cpp_bool uturns_allowed
     cdef CppTurnBasedContext[double] view(self) noexcept nogil
 
 

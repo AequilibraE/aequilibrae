@@ -21,9 +21,10 @@ transportation models usually house networks for multiple transport modes, so th
 available for a passenger car may be different than those available for a heavy truck, as it happens 
 in practice.
 
-For this reason, all path computation in AequilibraE happens through ``Graph`` objects. While users 
-can operate models by simply selecting the mode they want AequilibraE to create graphs for, ``Graph`` 
-objects can also be manipulated in memory or even created from networks that are 
+For this reason, road path computation in AequilibraE happens through ``Graph`` objects built from a ``Network``.
+Users can load an independent network with ``project.network.build()``, then select a mode and cost field
+with ``network.build_graph()``. Graph topology is fixed after construction, but routing costs can be updated
+in memory. Networks can also be created from link tables that are
 :ref:`NOT housed inside an AequilibraE model <plot_assignment_without_model>`.
 
 AequilibraE's graphs are the backbone of path computation, skimming and traffic assignment. 

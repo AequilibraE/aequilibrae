@@ -63,29 +63,21 @@ beta = 1.1  # PSL parameter
 
 # %%
 # Let's build all graphs
-project.network.build_graphs()
+network = project.network.build()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
 # We grab the graph for cars
-graph = project.network.graphs["c"]
-
-# %%
-# We also see what graphs are available
-project.network.graphs.keys()
+network.modes
 # %%
 # Let's say that utility is just a function of distance.
 # So we build our *utility* field as the :math:`distance * theta`.
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
+network.links["utility"] = network.links.distance * theta
 
 # %%
-# Prepare the graph with all nodes of interest as centroids
-graph.prepare_graph(graph.centroids)
-
-# %%
-# And set the cost of the graph the as the utility field just created
-graph.set_graph("utility")
+# Prepare a compact graph for the project centroids.
+graph = network.build_graph(mode="c", cost="utility", compact=True)
 
 # %%
 # Mock demand matrix
@@ -141,8 +133,7 @@ demand
 # %%
 # We'll re-prepare our graph but with our new "external" ODs.
 new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
-graph.prepare_graph(new_centroids)
-graph.set_graph("utility")
+graph = network.build_graph(mode="c", cost="utility", centroids=new_centroids, compact=True)
 new_centroids
 
 # %%
@@ -221,15 +212,20 @@ inside_nodes = nodes.sjoin(zones, how="inner").sort_index()
 inside_nodes.head()
 
 # %%
-# Let's filter those network links to graph links, dropping any dead ends and creating a `link_id`,
-# `dir` multi-index.
-g = (
-    graph.graph.set_index("link_id")
-    .loc[inner_links.link_id]
-    .drop(graph.dead_end_links, errors="ignore")
-    .reset_index()
-    .set_index(["link_id", "direction"])
+# Let's filter those network links to links retained by the graph, including links inside contracted chains,
+# and create a `link_id`, `direction` multi-index.
+mapping = graph.mapping
+source = mapping.network
+retained = mapping.network_link_to_graph >= 0
+g = pd.DataFrame(
+    {
+        "link_id": source.link_ids[retained],
+        "direction": source.directions[retained],
+        "a_node": source.node_ids[source.link_tails[retained]],
+        "b_node": source.node_ids[source.link_heads[retained]],
+    }
 )
+g = g.loc[g.link_id.isin(inner_links.link_id)].set_index(["link_id", "direction"])
 g.head()
 
 # %%
@@ -248,26 +244,21 @@ map
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists
 # our polygon. To do so we perform a select link analysis on all links and pairs of links that cross
 # the boundary. We create them as tuples of tuples to make represent the select link AND sets.
-edge_pairs = {x: (x,) for x in itertools.permutations(g.index, r=2)}
+entering = g.loc[~g.a_node.isin(inside_nodes.index) & g.b_node.isin(inside_nodes.index)].index
+exiting = g.loc[g.a_node.isin(inside_nodes.index) & ~g.b_node.isin(inside_nodes.index)].index
+edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
 single_edges = {x: ((x,),) for x in g.index}
 f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 
 # %%
 # Let's prepare our graph once again
-project.network.build_graphs()
-graph = project.network.graphs["c"]
-graph.network = graph.network.assign(utility=graph.network.distance * theta)
-graph.prepare_graph(graph.centroids)
-graph.set_graph("utility")
-graph.set_blocked_centroid_flows(False)
+graph = network.build_graph(mode="c", cost="utility", compact=True, block_centroid_flows=False)
 
 # %%
-# This object construction might take a minute depending on the size of the
-# graph due to the construction of the compressed link to network link mapping
-# that's required. This is a one time operation per graph and is cached. We
-# need to supply a Graph and an AequilibraeMatrix or AequilibraeSparseMatrix
-# via the ``set_demand`` method, if demand is not provided link loading cannot
-# be performed.
+# Graph construction has already prepared the compressed-link to network-link
+# mapping. We need to supply a Graph and an AequilibraeMatrix or
+# AequilibraeSparseMatrix via the ``set_demand`` method, if demand is not
+# provided link loading cannot be performed.
 rc = RouteChoice(graph)
 rc.set_demand(mat)
 
@@ -337,9 +328,9 @@ for (link_id, dir), v in edge_totals.items():
         d_inside = d in inside_nodes.index
 
         if o_inside and not d_inside:
-            exited[o, graph.all_nodes[link.b_node]] += load
+            exited[o, link.b_node] += load
         elif not o_inside and d_inside:
-            entered[graph.all_nodes[link.a_node], d] += load
+            entered[link.a_node, d] += load
         elif not o_inside and not d_inside:
             pass
 
@@ -365,7 +356,7 @@ for (l1, l2), v in edge_pair_values.items():
         d_inside = d in inside_nodes.index
 
         if not o_inside and not d_inside:
-            through[graph.all_nodes[link1.a_node], graph.all_nodes[link2.b_node]] += load
+            through[link1.a_node, link2.b_node] += load
 
 through
 
@@ -381,13 +372,13 @@ demand = pd.DataFrame(
     ),
     columns=["demand"],
 ).sort_index()
+demand.index = demand.index.set_levels([level.astype(np.int64) for level in demand.index.levels])
 demand.head()
 
 # %%
 # We'll re-prepare our graph but with our new "external" ODs.
-new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
-graph.prepare_graph(new_centroids)
-graph.set_graph("utility")
+new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy(dtype=np.int64).reshape(-1))
+graph = network.build_graph(mode="c", cost="utility", centroids=new_centroids, compact=True)
 new_centroids
 
 # %%

@@ -33,7 +33,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Network
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
 # sphinx_gallery_thumbnail_path = '../source/_images/assignment_plot.png'
@@ -86,8 +86,9 @@ network["link_id"] = network.index + 1
 network = network.astype({"a_node":"int64", "b_node": "int64"})
 
 # %%
-# Now we'll import the geometry (as lon/lat) for our network, this is required if you plan to 
-# use the `A*` path finding, otherwise it can safely be skipped.
+# Now we'll import the geometry (as lon/lat) for our network. For Haversine `A*` path finding,
+# pass these coordinates explicitly to the search and scale estimator. Euclidean `A*` requires
+# coordinates projected to a suitable local CRS instead. Geometry can otherwise be skipped.
 geom = pd.read_csv(geometry_file, skiprows=1, sep="\t", lineterminator=";", header=None)
 geom.columns = ["newline", "lon", "lat", "terminator"]
 geom.drop(columns=["newline", "terminator"], index=[24], inplace=True)
@@ -95,23 +96,11 @@ geom["node_id"] = geom.index + 1
 geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set_index("node_id")
 
 # %%
-# Let's build our Graph! In case you're in doubt about AequilibraE Graph, 
-# :ref:`click here <aequilibrae-graphs>` to read more about it.
+# Create the network snapshot from the link table.
+# See :ref:`aequilibrae-graphs` for more information about graphs.
 
 # %%
-g = Graph()
-g.cost = network['free_flow_time'].values
-g.capacity = network['capacity'].values
-g.free_flow_time = network['free_flow_time'].values
-
-g.network = network
-g.prepare_graph(index)
-g.set_graph("free_flow_time")
-g.cost = np.array(g.cost, copy=True)
-g.set_skimming(["free_flow_time"])
-g.set_blocked_centroid_flows(False)
-g.network["id"] = g.network.link_id
-g.lonlat_index = geom.loc[g.all_nodes]
+network = Network(network.assign(modes="c"), centroids=index, lonlat=geom)
 
 # %%
 # The named matrix is ready to use in the assignment.
@@ -119,19 +108,21 @@ g.lonlat_index = geom.loc[g.all_nodes]
 # %%
 # Let's perform our assignment. Feel free to try different algorithms,
 # as well as change the maximum number of iterations and the gap
-assigclass = TrafficClass("car", g, aem)
+assigclass = TrafficClass(
+    name="car", mode="c", cost="free_flow_time", demand=aem, skimming=["free_flow_time"],
+    graph_options={"block_centroid_flows": False},
+)
 
-assig = TrafficAssignment()
-
-assig.set_classes([assigclass])
-assig.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-assig.set_time_field("free_flow_time")
-assig.set_capacity_field("capacity")
-
-assig.set_algorithm("fw")
-assig.max_iter = 100
-assig.rgap_target = 1e-6
-assig.execute()
+assig = TrafficAssignment(
+    network=network,
+    classes=[assigclass],
+    vdf=bpr,
+    name_mapping={"alpha": "b", "beta": "power"},
+    time_field="free_flow_time",
+    capacity_field="capacity",
+    algorithm="fw",
+)
+assig.execute(max_iterations=100, rgap=1e-6)
 # %%
 # Now let's take a look at the Assignment results
 assig.results()

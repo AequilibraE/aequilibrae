@@ -34,7 +34,6 @@ cdef class LinkLoadingResults:
         # A select link set is represented by a vector of unordered AND sets, OR'd together.
         # Number of select link sets * number of OR sets * number of AND members.
         vector[unique_ptr[vector[unique_ptr[unordered_set[long long]]]]] select_link_sets
-        vector[unique_ptr[vector[size_t]]] select_link_set_lengths
 
         readonly object link_loading_objects
         readonly object sl_link_loading_objects
@@ -49,13 +48,12 @@ cdef class LinkLoadingResults:
         size_t thread_id,
     ) noexcept nogil
     cdef void reduce_link_loading(self)
-    cdef object project_loads(self, object loads, const long long[::1] compressed_id_view, int cores)
+    cdef object project_loads(self, object loads, object mapping)
 
     @staticmethod
     cdef bool is_in_select_link_set(
-        vector[long long] &route,
+        const vector[long long] &route,
         const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        const vector[size_t] &select_link_set_lengths,
     ) noexcept nogil
 
     cdef void sl_link_load_single_route_set(
@@ -71,6 +69,6 @@ cdef class LinkLoadingResults:
 
     cdef void reduce_sl_link_loading(self)
     cdef void reduce_sl_od_matrix(self)
-    cdef object link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores)
-    cdef object sl_link_loading_to_objects(self, const long long[::1] compressed_id_view, int cores)
+    cdef object link_loading_to_objects(self, object mapping)
+    cdef object sl_link_loading_to_objects(self, object mapping)
     cdef object sl_od_matrices_structs_to_objects(self)

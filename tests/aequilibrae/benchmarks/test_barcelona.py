@@ -23,22 +23,31 @@ def model_folder(tntp_root, model_stub):
 
 
 @pytest.mark.parametrize("algorithm", METHODS)
-def test_barcelona(benchmark, tntp_graph, tntp_matrix, tntp_reference, algorithm, model_stub):
+def test_barcelona(
+    benchmark, tntp_network, tntp_matrix, tntp_reference, algorithm, model_stub, tntp_block_centroid_flows
+):
     run_validation(
         benchmark,
-        tntp_graph,
+        tntp_network,
         tntp_matrix,
         tntp_reference,
         model_stub,
         algorithm,
+        block_centroid_flows=tntp_block_centroid_flows,
     )
 
 
 @pytest.mark.parametrize("algorithm", ["dijkstra", "a_star"], ids=["dijkstra", "a_star"])
-def test_barcelona_path_finding(benchmark, tntp_graph, model_stub, model_folder, algorithm):
-    run_path_finding_search(benchmark, tntp_graph, model_stub, model_folder, algorithm)
+def test_barcelona_path_finding(
+    benchmark, tntp_network, model_stub, model_folder, algorithm, tntp_block_centroid_flows
+):
+    run_path_finding_search(
+        benchmark, tntp_network, model_stub, model_folder, algorithm, block_centroid_flows=tntp_block_centroid_flows
+    )
 
 
 @pytest.mark.parametrize("routing_case", SKIMMING_CASES)
-def test_barcelona_skimming(benchmark, tntp_graph, model_stub, model_folder, routing_case):
-    run_skimming_benchmark(benchmark, tntp_graph, model_stub, model_folder, routing_case)
+def test_barcelona_skimming(benchmark, tntp_network, model_stub, model_folder, routing_case, tntp_block_centroid_flows):
+    run_skimming_benchmark(
+        benchmark, tntp_network, model_stub, model_folder, routing_case, block_centroid_flows=tntp_block_centroid_flows
+    )

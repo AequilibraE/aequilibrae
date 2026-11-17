@@ -90,7 +90,7 @@ This runs `ruff check`, `ruff format --check`, cython-lint, clang-tidy and clang
 
 Config lives in `pyproject.toml` under `[tool.ruff]`. Key settings:
 - Line length: 120 characters
-- Python target: 3.11+
+- Python target: 3.11
 - Selected rules: B, C, E, F, W (flake8-style)
 - Max McCabe complexity: 20
 
@@ -100,20 +100,19 @@ Always run `spin lint` before committing Python or native-code changes.
 
 ### Python
 
-- **Python 3.11+** syntax only; use type hints where they match existing style.
-- **Imports**:
-  - Use `from aequilibrae.log import logger` (not from `aequilibrae` top-level) to avoid circular imports.
-  - Use `from aequilibrae.parameters import Parameters` in internal modules.
-- **pandas 3+ compatibility**: Do not mutate `.values` arrays in-place; use `.to_numpy(copy=...)` and assign back.
-- **Logging**: Use `logger` from `aequilibrae.log`; avoid bare `print` in library code.
-- **Error handling**: Raise `ValueError` for user-input errors; use descriptive messages.
-- **Docstrings**: Sphinx/reST-style (e.g., ``:Arguments:``, ``:Returns:``, ``.. code-block::``), matching existing files in the module.
+- **Python compatibility**: All code must run on Python 3.11; do not use syntax or standard-library APIs requiring a newer version without a compatible fallback.
+- **Type hints**: Annotate new or substantially changed public APIs. Prefer built-in generics (`list[str]`) and unions (`T | None`). Keep annotation changes scoped to the task.
+- **Imports**: Use `from aequilibrae.parameters import Parameters` in internal modules. Avoid importing internal dependencies through the package's top-level re-exports, which can cause circular imports.
+- **pandas 3+ compatibility**: Prefer direct pandas assignment, such as `.loc[...] = ...`. Do not mutate `.values` arrays in-place. If an algorithm requires a writable NumPy buffer, use `.to_numpy(copy=True)`, mutate it, then explicitly assign the result back. `.to_numpy(copy=False)` may return a read-only array; do not force shared arrays writable.
+- **Logging**: Use `import logging` and a module-level `logger = logging.getLogger(__name__)`. Avoid bare `print` in library code.
+- **Error handling**: Use `TypeError` for inappropriate argument types and `ValueError` for invalid values of an appropriate type. Preserve specific operational exceptions such as `FileNotFoundError` and `PermissionError`, and existing public exception contracts. Use descriptive messages and explicit chaining (`raise ... from exc`) when translating exceptions.
+- **Docstrings**: Use standard Sphinx/reST fields (`:param name:`, `:returns:`, `:raises ValueError:`) for new or substantially revised API documentation. Describe current behavior and contracts, not historical behavior or comparisons with previous implementations. Keep examples in reST directives such as `.. code-block:: python`. Keep documentation changes scoped to the task.
 
 ### Cython (`.pyx`, `.pxd`, `.pxi`)
 
 - Cython files live in `src/aequilibrae/paths/cython/`, `src/aequilibrae/distribution/cython/`, and `src/aequilibrae/matrix/`.
 - Use `cdef` classes and typed memoryviews for performance-critical code.
-- Enable OpenMP via `prange` for parallelism; guard with `nogil` blocks.
+- Use OpenMP via `prange` in `nogil` regions only when iterations are independent or use valid reductions. Releasing the GIL does not make shared writes safe: make ownership of mutable buffers explicit. Benchmark changes, use workload thresholds where appropriate, and account for oversubscription from pytest workers and other thread pools.
 - After modifying Cython files, rebuild with `spin build`, or let `spin test` rebuild before testing. Editable installations rebuild on import instead.
 
 ### SQL / SpatiaLite
@@ -125,8 +124,11 @@ Always run `spin lint` before committing Python or native-code changes.
 ## Key Patterns
 
 - **Project object**: `from aequilibrae import Project` — the central entry point for most workflows. Open with `project.open(path)` or create with `project.new(path)`.
-- **Graph**: `Graph` objects wrap the network for assignment; load with `project.network.graphs`.
-- **Matrix**: `AequilibraeMatrix` wraps OMX files; `AequilibraeData` wraps tabular data.
+- **Network**: `project.network` manages database tables; `project.network.build()` copies them into an independent `aequilibrae.paths.Network`. Construct `Network(links, ...)` for in-memory data. Network configuration fields are fixed; use `dataclasses.replace()` for validated replacements, and construct a new Network after topology or row-order changes.
+- **Graph**: Build fixed-topology routing graphs with `network.build_graph(mode, cost, ...)` or the project network's `build_graph()` convenience method. Graphs expose `routing`, `mapping` and `skimming`, not source DataFrames. Change directed network-order costs with `graph.set_costs()`; rebuild for other configuration changes. Link contraction (`compact`) and dead-end removal (`remove_dead_ends`) are independent, opt-in options requiring centroids.
+- **Assignment**: Configure `TrafficClass` independently of graphs; routing policies belong in `graph_options`. `TrafficAssignment` builds each class's graph internally and enables contraction and dead-end removal by default. Pass `project=project` when using an independent network and saving project outputs.
+- **Path results**: `PathResults.path` contains local graph-link indices. Use `get_network_links()` for physical link IDs and directions. Both A* heuristics require explicit coordinates and a heuristic scale; graphs do not retain coordinates.
+- **Matrix**: `AequilibraeMatrix` holds dense matrices in memory; `AequilibraeSparseMatrix` holds SciPy sparse arrays in memory. Both share a zone index across their matrices. `MatrixStore` provides OMX-backed dense and sparse storage; prefer a `with` block to manage its lifetime. Store reads return independent arrays, so assign changes back explicitly.
 - **VDF functions**: Implemented as Cython files in `src/aequilibrae/paths/cython/` (e.g., `bpr.pyx`, `akcelik.pyx`). Note: In the Akcelik VDF, the `tau` parameter already absorbs the factor of 8.
 - **Parameters**: `Parameters` class reads/writes `parameters.yml`; use it instead of hardcoding defaults.
 
@@ -151,5 +153,6 @@ spin docs
 
 - API docs are generated automatically from docstrings.
 - Narrative guides and examples live in `docs/source/`.
+- `spin doctest` only collects selected docstrings and RST paths; it does not execute gallery scripts. Validate changed examples with the local build or a full `spin docs` run. `spin docs --no-plot` skips gallery execution, and Sphinx-Gallery may reuse cached results for unchanged scripts.
 - The `plot_vdf_functions.py` gallery script regenerates VDF visualization charts when VDF implementations change.
 - CI builds both HTML (with gallery) and LaTeX (with `-D plot_gallery=False`).

@@ -22,11 +22,12 @@ In this example we demonstrate how to use AequilibraE's run module using Sioux F
 # %%
 
 # Imports
-from uuid import uuid4
-from tempfile import gettempdir
 from os.path import join
+from tempfile import gettempdir
+from uuid import uuid4
 
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
 # %%
@@ -53,22 +54,20 @@ project.run["matrix_summary"]()
 mode = "c"
 
 # %%
-network = project.network
-network.build_graphs(modes=[mode])
-graph = network.graphs[mode]
-graph.set_graph("distance")
-graph.set_skimming("distance")
-graph.set_blocked_centroid_flows(False)
+network = project.network.build()
+graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
-# With the method ``graph_summary()``, we can check the total number of links, nodes, and zones,
-# as well as the compact number of links and nodes used for computation. If we had more than
-# one graph, its information would be displayed within the nested dictionary.
-
-project.run["graph_summary"]()
-
-# %%
-# If no graphs have been built, an empty dictionary will be returned.
+# The network mapping describes the source topology.  Building with
+# compact=True can reduce the routing counts without changing the source
+# mapping.
+{
+    "network_num_links": network.mapping.link_count,
+    "network_num_nodes": network.mapping.node_count,
+    "num_zones": graph.num_zones,
+    "graph_num_links": graph.num_links,
+    "graph_num_nodes": graph.num_nodes,
+}
 
 # %%
 # Let's add a ``create_delaunay`` function to our ``run/__init__.py`` file.

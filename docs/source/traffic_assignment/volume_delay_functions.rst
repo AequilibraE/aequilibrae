@@ -373,18 +373,33 @@ attributes:
 
 .. code-block:: python
 
-    from aequilibrae.paths import TrafficAssignment
+    from aequilibrae.paths import TrafficAssignment, TrafficClass
     from aequilibrae.paths.vdf import bpr
 
-    assig = TrafficAssignment()
-    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
+    assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="bfw",
+        name_mapping={"alpha": 0.15, "beta": 4.0},
+    )
 
 **Link-specific parameters:**
 
 .. code-block:: python
 
     # Parameters can reference field names in your network
-    assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
+    assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="bfw",
+        name_mapping={"alpha": "alpha_field", "beta": "beta_field"},
+    )
 
 This flexibility allows you to:
 
@@ -453,8 +468,15 @@ Basic Usage
     # Output: dict_keys(['bpr', 'bpr2', 'conical', 'inrets', 'akcelik'])
 
     # Setup traffic assignment with BPR
-    assig = TrafficAssignment()
-    assig.set_vdf(vdfs["bpr"], {"alpha": 0.15, "beta": 4.0})
+    assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=vdfs["bpr"],
+        algorithm="bfw",
+        name_mapping={"alpha": 0.15, "beta": 4.0},
+    )
 
 Using Different VDFs
 ~~~~~~~~~~~~~~~~~~~~
@@ -462,13 +484,37 @@ Using Different VDFs
 .. code-block:: python
 
     # Highway network - standard BPR
-    assig.set_vdf(bpr, {"alpha": 0.15, "beta": 4.0})
+    highway_assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="bfw",
+        name_mapping={"alpha": 0.15, "beta": 4.0},
+    )
 
     # Urban network with signals - Akcelik
-    assig.set_vdf(akcelik, {"alpha": 0.25, "tau": 0.8, "length": "distance"})
-    
+    signal_assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=akcelik,
+        algorithm="bfw",
+        name_mapping={"alpha": 0.25, "tau": 0.8, "length": "distance"},
+    )
+
     # Network with strong capacity constraints - BPR2
-    assig.set_vdf(bpr2, {"alpha": 0.15, "beta": 4.0})
+    strong_capacity_assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr2,
+        algorithm="bfw",
+        name_mapping={"alpha": 0.15, "beta": 4.0},
+    )
 
 Link-Specific Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -477,7 +523,15 @@ Link-Specific Parameters
 
     # Assume your network has fields 'alpha_field' and 'beta_field'
     # with values calibrated for each link
-    assig.set_vdf(bpr, {"alpha": "alpha_field", "beta": "beta_field"})
+    variable_assignment = TrafficAssignment(
+        network=project.network,
+        classes=[traffic_class],
+        time_field="free_flow_time",
+        capacity_field="capacity",
+        vdf=bpr,
+        algorithm="bfw",
+        name_mapping={"alpha": "alpha_field", "beta": "beta_field"},
+    )
 
 Creating Custom VDFs
 --------------------

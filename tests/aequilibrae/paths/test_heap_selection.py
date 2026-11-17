@@ -18,12 +18,7 @@ from .routing_helpers import make_context
 
 
 def build_graph(project):
-    project.network.build_graphs()
-    graph = project.network.graphs["c"]
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph(cost_field="distance")
-    graph.set_skimming("distance")
-    return graph
+    return project.network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 
 @pytest.mark.parametrize("heap", available_heaps())
@@ -152,10 +147,10 @@ def test_path_results_remembers_selected_heap(sioux_falls_example, heap, monkeyp
 @pytest.mark.parametrize("heuristic", ["haversine", "euclidean"])
 def test_path_results_support_astar(sioux_falls_example, heuristic):
     graph = build_graph(sioux_falls_example)
-    lonlat = graph.lonlat_index
+    lonlat = sioux_falls_example.network.nodes.lonlat.set_index("node_id")
     points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
     points = points.to_crs(points.estimate_utm_crs())
-    coordinates = pd.DataFrame({"x": points.x, "y": points.y})
+    coordinates = lonlat if heuristic == "haversine" else pd.DataFrame({"x": points.x, "y": points.y})
     scale = estimate_heuristic_scale(graph, coordinates, heuristic=heuristic)
     result = PathResults(graph, 1, 20, a_star=True, heuristic=heuristic, coordinates=coordinates, heuristic_scale=scale)
     reference = PathResults(graph, 1, 20)

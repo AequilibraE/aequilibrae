@@ -84,6 +84,11 @@ Use ``project.transaction()`` to group writes.
 
     >>> project = create_example(project_path)
 
+    # Sioux Falls free_flow_time is in minutes, so convert it to seconds for these examples.
+    >>> project.network.links.fields.add("travel_time_seconds", "Free-flow travel time in seconds", "REAL")
+    >>> with project.db_connection as conn:
+    ...     _ = conn.execute("UPDATE links SET travel_time_seconds = free_flow_time * 60.0")
+
     # Get the turn restrictions object
     >>> turns = project.network.turn_restrictions
 
@@ -139,28 +144,29 @@ The U-turn setting is managed through the project's ``about`` table:
 
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
-    # Rebuild graphs to apply the change
-    >>> project.network.build_graphs()
+    # Rebuild network and build graphs to apply the change
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
 Building Graphs with Turn Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you call ``build_graphs()``, turn restrictions are automatically loaded
-from the database and applied to all generated graphs:
+When you build a network snapshot, turn restrictions are loaded from the database.
 
 .. code-block:: python
 
-    >>> project.network.build_graphs()
+    >>> network = project.network.build()
+    >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
     # Check if a graph has turn restrictions
-    >>> graph = project.network.graphs['c']
     >>> print(graph.has_turn_restrictions)
     True
 
 Manual Turn Restriction Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also manually set turn restrictions on a graph:
+You can also supply turn restrictions when building a new graph.
+An existing graph's topology and turn configuration cannot be changed in place:
 
 .. code-block:: python
 
@@ -174,39 +180,48 @@ You can also manually set turn restrictions on a graph:
     ...     "penalty": [20.0],
     ... })
 
-    # Apply turn restrictions
-    >>> graph.set_turn_restrictions(turn_df, allow_path_uturns=False)
+    # Build a new graph with these turn restrictions
+    >>> graph = network.build_graph('c', cost='travel_time_seconds', turn_restrictions=turn_df, allow_uturns=False)
 
-    # Clear turn restrictions
-    >>> graph.clear_turn_restrictions()
+    # Build a new graph without turn restrictions, overriding the snapshot's turns with an empty table
+    >>> graph = network.build_graph('c', cost='travel_time_seconds', turn_restrictions=turn_df.iloc[:0])
+
+To change the source network's turn configuration for subsequent graphs or assignments,
+use ``dataclasses.replace(network, turn_restrictions=turn_df)``. Network configuration
+fields cannot be assigned in place.
 
 Traffic Assignment with Turn Restrictions
 -----------------------------------------
 
 Turn restrictions are automatically considered during traffic assignment when
-they are present in the graph. The turn penalties are applied as additional
-time costs during the equilibration process.
+they are present in the source network. The assignment builds its graphs internally.
+The turn penalties are applied as additional time costs during the equilibration process.
 
 .. code-block:: python
 
     >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
     >>> from aequilibrae.paths.vdf import bpr
 
-    >>> project.network.build_graphs()
-    >>> graph = project.network.graphs['c']
-    >>> graph.set_graph('free_flow_time')
-
-    # Turn restrictions are automatically included
+    >>> network = project.network.build()
     >>> demand_matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
-    >>> traffic_class = TrafficClass('car', graph, demand_matrix)
+    >>> traffic_class = TrafficClass(
+    ...     mode='c',
+    ...     cost='travel_time_seconds',
+    ...     demand=demand_matrix,
+    ...     name='car',
+    ...     skimming=('travel_time_seconds',),
+    ... )
 
-    >>> assignment = TrafficAssignment()
-    >>> assignment.set_classes([traffic_class])
-    >>> assignment.set_vdf(bpr, {'alpha': 0.15, 'beta': 4.0})
-    >>> assignment.set_capacity_field('capacity')
-    >>> assignment.set_time_field('free_flow_time')
-    >>> assignment.set_algorithm('bfw')
-    >>> assignment.execute()
+    >>> assignment = TrafficAssignment(
+    ...     network=network,
+    ...     classes=[traffic_class],
+    ...     time_field='travel_time_seconds',
+    ...     capacity_field='capacity',
+    ...     vdf=bpr,
+    ...     algorithm='bfw',
+    ...     name_mapping={'alpha': 0.15, 'beta': 4.0},
+    ... )
+    >>> _ = assignment.execute()
 
 Route Choice with Turn Restrictions
 -----------------------------------
@@ -235,9 +250,11 @@ of links rather than number of nodes). For this reason:
 Turn Penalty Units
 ------------------
 
-Turn penalties must be specified in the same time unit as the graph's cost field
-(typically the ``time`` field). For example, if ``time`` is
-in seconds, turn penalties should also be in seconds.
+Turn penalties must use the same units as the graph's cost function. For
+traffic assignment, the class cost and assignment ``time_field`` must also use
+the same time units. The examples above convert the sample model's
+``free_flow_time`` from minutes to ``travel_time_seconds``, so their turn
+penalties are in seconds.
 
 Limitations
 -----------

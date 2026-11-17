@@ -10,7 +10,7 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Graph, TrafficAssignment
+from aequilibrae.paths import Network, TrafficAssignment
 from aequilibrae.paths.results.assignment_results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import bpr
@@ -70,8 +70,14 @@ def tntp_matrix(model_folder, model_stub):
 
 
 @pytest.fixture(scope="module")
-def tntp_graph(model_folder, model_stub, tntp_matrix):
-    return load_tntp_graph(model_folder, model_stub, tntp_matrix.index)
+def tntp_block_centroid_flows(model_folder, model_stub):
+    header = parse_tntp_header(model_folder, model_stub)
+    return header.get("FIRST THRU NODE", 2) > 1
+
+
+@pytest.fixture(scope="module")
+def tntp_network(model_folder, model_stub, tntp_matrix):
+    return load_tntp_network(model_folder, model_stub, tntp_matrix.index)
 
 
 @pytest.fixture(scope="module")
@@ -131,10 +137,7 @@ def load_tntp_matrix(folder: Path, model_stub: str) -> AequilibraeMatrix:
     return mat
 
 
-def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Graph:
-    header = parse_tntp_header(folder, model_stub)
-    first_thru_node = header.get("FIRST THRU NODE", 2)
-
+def load_tntp_network(folder: Path, model_stub: str, centroids: np.ndarray) -> Network:
     net = pd.read_csv(folder / f"{model_stub}_net.tntp", skiprows=7, sep="\t")
     cols = [
         "init_node",
@@ -164,19 +167,9 @@ def load_tntp_graph(folder: Path, model_stub: str, centroids: np.ndarray) -> Gra
     network["link_id"] = network.index + 1
     network["free_flow_time"] = network["free_flow_time"].astype(np.float64)
 
-    g = Graph()
-    g.cost = net["free_flow_time"].values
-    g.capacity = net["capacity"].values
-    g.free_flow_time = net["free_flow_time"].values
-
-    g.network = network
-    g.network.loc[g.network["power"] < 1, "power"] = 1
-    g.network.loc[g.network["free_flow_time"] == 0, "free_flow_time"] = 0.01
-    g.prepare_graph(centroids)
-    g.set_graph("free_flow_time")
-    g.set_skimming(["free_flow_time"])
-    g.set_blocked_centroid_flows(first_thru_node > 1)
-    return g
+    network.loc[network["power"] < 1, "power"] = 1
+    network.loc[network["free_flow_time"] == 0, "free_flow_time"] = 0.01
+    return Network(network, centroids=centroids)
 
 
 def load_known_results(folder: Path, model_stub: str) -> pd.DataFrame:
@@ -254,12 +247,13 @@ def save_flow_results_with_nodes(results_with_nodes: pd.DataFrame, model_name: s
 
 def run_validation(
     benchmark,
-    graph,
+    network: Network,
     matrix,
     reference,
     stub,
     algorithm,
     *,
+    block_centroid_flows: bool,
     heap: str = "4ary",
     known_pass=None,
 ):
@@ -298,34 +292,37 @@ def run_validation(
 
     # --- factory for a clean TrafficAssignment per trial ---
     def _make_assignment():
-        tc = TrafficClass("car", graph, matrix)
-        tc.set_heap(heap)
-        if "toll" in graph.network.columns:
-            tc.set_fixed_cost("toll")
-            tc.set_vot(1.0)
-
-        a = TrafficAssignment()
-        a.set_classes([tc])
-        a.set_vdf(bpr, {"alpha": "b", "beta": "power"})
-        a.set_capacity_field("capacity")
-        a.set_time_field("free_flow_time")
-        a.max_iter = ITERATIONS
-        a.rgap_target = RGAP_TARGET
-        a.set_algorithm(algorithm)
-        return a
+        tc = TrafficClass(
+            name="car",
+            mode="c",
+            cost="free_flow_time",
+            demand=matrix,
+            heap=heap,
+            fixed_cost_field="toll" if "toll" in network.links else None,
+            graph_options={"block_centroid_flows": block_centroid_flows},
+        )
+        return TrafficAssignment(
+            network=network,
+            classes=[tc],
+            vdf=bpr,
+            algorithm=algorithm,
+            time_field="free_flow_time",
+            capacity_field="capacity",
+            name_mapping={"alpha": "b", "beta": "power"},
+        )
 
     trials: list[pd.DataFrame] = []
 
     def _benchmarked():
         assig: TrafficAssignment = _make_assignment()
-        assig.execute()
+        assig.execute(max_iterations=ITERATIONS, rgap=RGAP_TARGET)
         trials.append(assig.report())
         return assig
 
     assig: TrafficAssignment = benchmark(_benchmarked)
     assert isinstance(assig, TrafficAssignment)
 
-    link_lookup = graph.network[["link_id", "a_node", "b_node"]].set_index("link_id")
+    link_lookup = network.links[["link_id", "a_node", "b_node"]].set_index("link_id")
     results_with_nodes = (
         assig.results()[["PCE_AB"]].join(link_lookup).merge(reference, on=["a_node", "b_node"], how="right")
     )

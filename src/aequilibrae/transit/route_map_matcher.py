@@ -9,7 +9,7 @@ from shapely import LineString
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
-from aequilibrae.paths import Graph
+from aequilibrae.paths import Network
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -44,8 +44,9 @@ class RouteMapMatcher(WorkerThread):
         self.node_corresp = []
         self.__all_links = {}
 
-        self.graph: Graph = Graph()
-        self.reverse_graph: Graph = Graph()
+        self.graph = None
+        self.reverse_graph = None
+        self._network_links = None
         self.crs: str = utm_zone
 
         self.stop_ids: gpd.GeoDataFrame = self.stops[["stop_id", "real_stop_id"]]
@@ -123,18 +124,23 @@ class RouteMapMatcher(WorkerThread):
         self.__graph_from_broken_net(net_gdf)
 
     def __graph_from_broken_net(self, net_data: pd.DataFrame):
-        self.graph.network: pd.DataFrame = net_data
+        self._network_links = net_data.copy()
+        # Links are already filtered for the transit mode; connectors have no mode.
+        routing_links = net_data.drop(columns="modes", errors="ignore")
         centroids = np.array(self.stops.stop_id.values)
-        all_nodes = np.unique(np.hstack([self.graph.network.a_node.to_numpy(), self.graph.network.b_node.to_numpy()]))
+        all_nodes = np.unique(np.hstack([net_data.a_node.to_numpy(), net_data.b_node.to_numpy()]))
         centroids = centroids[np.isin(centroids, all_nodes)]
-        self.graph.prepare_graph(centroids)
+        network = Network(routing_links, centroids=centroids)
+        self._routing_network = network
+        self.graph = network.build_graph("map_match", cost="distance", skimming=["distance", "time"], compact=False)
+        # Swap endpoints only, preserving the original directional attributes on each reversed arc.
+        reverse_links = routing_links.copy()
+        reverse_links["a_node"], reverse_links["b_node"] = routing_links.b_node, routing_links.a_node
+        self._reverse_network = Network(reverse_links, centroids=centroids)
+        self.reverse_graph = self._reverse_network.build_graph(
+            "map_match", cost="distance", skimming=["distance", "time"], compact=False
+        )
         self.available_stops = self.stop_ids["real_stop_id"][self.stop_ids.stop_id.isin(centroids)].to_numpy()
-
-        self.graph.set_graph("distance")
-        self.graph.set_skimming(["distance", "time"])
-        self.graph.set_blocked_centroid_flows(True)
-
-        self.reverse_graph = self.graph.reverse()
 
     def _build_full_path_on_broken_links(
         self, route_stops: gpd.GeoDataFrame, route_shape: Optional[LineString] = None
@@ -156,25 +162,31 @@ class RouteMapMatcher(WorkerThread):
             return [], []
 
         # We discount the likely links for this route to favor them in the map-matching
-        self.graph.cost = np.array(self.graph.graph[self.graph.cost_field])
         likely_links = self.__graph_discount(route_shape)
-        for g in [self.graph, self.reverse_graph]:
-            g.cost[(g.graph.link_id.isin(likely_links)) & (g.graph.is_connector == 0)] *= 0.1
+        likely_links = np.asarray(likely_links, dtype=np.int64)
+        is_road_link = self._network_links.set_index("link_id").loc[likely_links, "is_connector"].to_numpy() == 0
+        discounted_links = likely_links[is_road_link]
+        discounted = self._routing_network.field_values("distance").copy()
+        discounted[np.isin(self._routing_network.link_ids, discounted_links)] *= 0.1
+        self.graph.set_costs(discounted)
+        reverse_costs = self._reverse_network.field_values("distance").copy()
+        reverse_costs[np.isin(self._reverse_network.link_ids, discounted_links)] *= 0.1
+        self.reverse_graph.set_costs(reverse_costs)
 
         current_stop = int(route_stops.stop_id.iat[0])
 
         res: PathResults = self.graph.compute_path(current_stop, int(route_stops.stop_id.iat[-1]), early_exit=True)
-        assert res.path is not None
-        assert res.path_link_directions is not None
+        network_path = res.get_network_links()
+        if network_path is None:
+            return [], []
 
         if route_stops.shape[0] == 2:
-            if res.milepost is None:
-                return [], []
-            plnks = list(res.path[1:-1])
-            pdirecs = list(res.path_link_directions[1:-1])
+            link_ids, directions = network_path
+            plnks = list(link_ids[1:-1])
+            pdirecs = list(directions[1:-1])
             return pdirecs, plnks
 
-        access_links = self.graph.network[self.graph.network.a_node.isin(route_stops.stop_id.values)]
+        access_links = self._network_links[self._network_links.a_node.isin(route_stops.stop_id.values)]
         path_links, path_directions = [], []
 
         is_first = True
@@ -194,8 +206,12 @@ class RouteMapMatcher(WorkerThread):
             # If this is the last stop, then we just compute the path directly
             if not is_not_last:
                 res.compute_path(current_stop, next_stop, early_exit=True)
-                path_links.extend(list(res.path[idx_:-1]))
-                path_directions.extend(list(res.path_link_directions[idx_:-1]))
+                network_path = res.get_network_links()
+                if network_path is None:
+                    return [], []
+                link_ids, directions = network_path
+                path_links.extend(list(link_ids[idx_:-1]))
+                path_directions.extend(list(directions[idx_:-1]))
                 continue
 
             # Let's see if we can reach the following stop while going through the next one
@@ -236,8 +252,12 @@ class RouteMapMatcher(WorkerThread):
 
             # Determine how many links to include
             # Skip connectors at start and (if not last stop) at end
-            path_links.extend(list(res.path[idx_:]))
-            path_directions.extend(list(res.path_link_directions[idx_:]))
+            network_path = res.get_network_links()
+            if network_path is None:
+                return [], []
+            link_ids, directions = network_path
+            path_links.extend(list(link_ids[idx_:]))
+            path_directions.extend(list(directions[idx_:]))
 
             current_stop = best_access_node
 
@@ -250,9 +270,8 @@ class RouteMapMatcher(WorkerThread):
         - Filter out short back-and-forth movements
 
         Args:
-            graph: AequilibraE graph with network correspondence
             path_directions: List of link traversal directions
-            path_links: List of internal link IDs
+            path_links: List of broken-network road link IDs, with stop connectors already removed
 
         Returns:
             DataFrame with columns ['link_id', 'dir']
@@ -261,14 +280,14 @@ class RouteMapMatcher(WorkerThread):
         if not path_links:
             return pd.DataFrame({"link_id": [], "dir": []})
 
-        corresp = pd.DataFrame(self.graph.network[["link_id", "original_id", "distance"]])
+        corresp = pd.DataFrame(self._network_links[["link_id", "original_id", "distance"]])
 
-        # Build initial result, skipping the first (connector) link
+        # Stop connectors were already removed while collecting the path legs.
         result = pd.DataFrame(
             {
-                "link_id": path_links[1:],
-                "direction": path_directions[1:],
-                "sequence": np.arange(len(path_links) - 1),
+                "link_id": path_links,
+                "direction": path_directions,
+                "sequence": np.arange(len(path_links)),
             }
         )
 
@@ -325,7 +344,7 @@ class RouteMapMatcher(WorkerThread):
         Returns:
             List of link_ids that intersect the buffered route shape
         """
-        geolinks = self.graph.network[["link_id", "geometry"]]
+        geolinks = self._network_links[["link_id", "geometry"]]
 
         # Create a 20-meter buffer around the route shape
         buff = gpd.GeoSeries(route_shape, crs=geolinks.crs).buffer(20)

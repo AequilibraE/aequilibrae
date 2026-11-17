@@ -1,12 +1,32 @@
 """Test setup and path walks, kept outside the internal routing interface."""
 
 import numpy as np
-
-from aequilibrae.paths.cython.dijkstra import dijkstra
+import pandas as pd
 from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.paths.cython.dijkstra import dijkstra
 from aequilibrae.paths.cython.search_query import SearchQuery
 from aequilibrae.paths.cython.search_results import SearchResults
 from aequilibrae.paths.cython.workspaces import SearchWorkspace
+
+from aequilibrae.paths import Network
+
+
+def diamond_graph(turn=False):
+    """Build a small graph with two routes and optional turn costs for path tests."""
+    links = pd.DataFrame(
+        {
+            "link_id": [71, 12, 55, 24],
+            "a_node": [10, 20, 10, 30],
+            "b_node": [20, 40, 30, 40],
+            "direction": [1, 1, 1, 1],
+            "time": [1.0, 1.0, 2.0, 2.0],
+            "distance": [3.0, 4.0, 5.0, 6.0],
+        }
+    )
+    turns = pd.DataFrame({"from_node": [10], "via_node": [20], "to_node": [40], "penalty": [0.5]}) if turn else None
+    return Network(links, centroids=[10, 20, 30, 40], turn_restrictions=turns).build_graph(
+        "c", cost="time", skimming=["time", "distance"], block_centroid_flows=False
+    )
 
 
 def make_context(fs, heads, costs, turns=None, *, turn=False, **options):

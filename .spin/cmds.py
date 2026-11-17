@@ -27,6 +27,8 @@ def doctest(*, parent_callback, pytest_args, **kwargs):
         "src/aequilibrae/parameters.py",
         "src/aequilibrae/transit",
         "docs/source/aequilibrae_project/project_components",
+        "docs/source/path_computation/aequilibrae_graph.rst",
+        "docs/source/network_manipulation/turn_restrictions.rst",
         "docs/source/traffic_assignment",
         "docs/source/public_transport",
     )

@@ -9,6 +9,7 @@ exts = [
     'aon',
     'demand',
     'graph_building',
+    'mapping',
     'parallel_numpy',
     'public_transport',
     'route_choice_link_loading_results',

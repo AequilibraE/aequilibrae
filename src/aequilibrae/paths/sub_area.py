@@ -28,14 +28,14 @@ class SubAreaAnalysis:
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
 
         This class aims to provide a semi-automated method for constructing the sub-area matrix.
-        The user should provide the Graph object, demand matrix, and a GeoDataFrame whose geometry
+        The user should provide a graph, demand matrix, and a GeoDataFrame whose geometry
         union represents the desired sub-area. Perform a route choice assignment, then call the
         ``post_process`` method to obtain a sub-area matrix.
 
         Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
 
         :Arguments:
-            **graph** (:obj:`Graph`): AequilibraE graph object to use
+            **graph** (:obj:`Graph`): Graph object.
 
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union
             represents the sub-area.
@@ -44,28 +44,49 @@ class SubAreaAnalysis:
             provide to the route choice assignment.
         """
         project = project if project is not None else get_active_project()
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
         self.graph = graph
         self.sub_area_demand = None
 
         links = gpd.GeoDataFrame(project.network.links.data)
-        self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
-
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
+        if subarea.crs != links.crs or nodes.crs != links.crs:
+            raise ValueError("Sub-area, project links and project nodes must use the same CRS")
+        self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
 
-        self.interior_graph = (
-            self.graph.graph.set_index("link_id")
-            .loc[self.interior_links.link_id]
-            .drop(self.graph.dead_end_links, errors="ignore")
-            .reset_index()
-            .set_index(["link_id", "direction"])
+        mapping = graph.mapping
+        network = mapping.network
+        retained = mapping.network_link_to_graph >= 0
+        # Boundary endpoints belong to source links, including those inside contracted chains.
+        edges = pd.DataFrame(
+            {
+                "link_id": network.link_ids[retained],
+                "direction": network.directions[retained],
+                "a_node": network.node_ids[network.link_tails[retained]],
+                "b_node": network.node_ids[network.link_heads[retained]],
+            }
+        )
+        self.interior_graph = edges.loc[edges.link_id.isin(self.interior_links.link_id)].set_index(
+            ["link_id", "direction"]
         )
 
-        self.edge_pairs = {x: (x,) for x in itertools.permutations(self.interior_graph.index, r=2)}
+        entering = [
+            edge
+            for edge, link in self.interior_graph.iterrows()
+            if link.a_node not in self.interior_nodes.index and link.b_node in self.interior_nodes.index
+        ]
+        exiting = [
+            edge
+            for edge, link in self.interior_graph.iterrows()
+            if link.a_node in self.interior_nodes.index and link.b_node not in self.interior_nodes.index
+        ]
+        self.edge_pairs = {pair: (pair,) for pair in itertools.product(entering, exiting)}
         self.single_edges = {x: ((x,),) for x in self.interior_graph.index}
         logger.info(f"Created: {len(self.edge_pairs)} edge pairs from {len(self.single_edges)} edges")
 
-        self.rc = RouteChoice(self.graph)
+        self.rc = RouteChoice(self.graph, project=project)
         self.rc.set_demand(demand)
         self.rc.set_select_links(self.single_edges | self.edge_pairs, link_loading=False)
 
@@ -109,9 +130,9 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if o_inside and not d_inside:
-                        exited[(o, self.graph.all_nodes[link.b_node]) + original_ods] += load
+                        exited[(o, link.b_node) + original_ods] += load
                     elif not o_inside and d_inside:
-                        entered[(self.graph.all_nodes[link.a_node], d) + original_ods] += load
+                        entered[(link.a_node, d) + original_ods] += load
                     elif not o_inside and not d_inside:
                         pass
 
@@ -128,9 +149,7 @@ class SubAreaAnalysis:
 
                     original_ods = (o, d) if keep_original_ods else ()
                     if not o_inside and not d_inside:
-                        through[
-                            (self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]) + original_ods
-                        ] += load
+                        through[(link1.a_node, link2.b_node) + original_ods] += load
 
             subarea_od_keys = list(entered) + list(exited) + list(through)
             subarea_od_values = list(entered.values()) + list(exited.values()) + list(through.values())
@@ -146,6 +165,7 @@ class SubAreaAnalysis:
                     subarea_od_values,
                     index=pd.MultiIndex.from_arrays(id_columns, names=id_names),
                     columns=[col],
+                    dtype=np.float64,
                 )
             )
 
@@ -182,4 +202,12 @@ class SubAreaAnalysis:
             )
 
         self.sub_area_demand = pd.concat([self.sub_area_demand, interior]).sort_index()
+        # Boundary nodes and demand centroids can have different integer dtypes.
+        self.sub_area_demand.index = pd.MultiIndex.from_arrays(
+            [
+                self.sub_area_demand.index.get_level_values(name).to_numpy(dtype="uint64")
+                for name in self.sub_area_demand.index.names
+            ],
+            names=self.sub_area_demand.index.names,
+        )
         return self.sub_area_demand

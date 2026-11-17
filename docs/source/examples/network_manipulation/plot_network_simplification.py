@@ -40,36 +40,29 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "nauru")
 
 # %%
-# To simplify the network, we need to create a graph. As Nauru doesn't have any centroid in its network
-# we have to create a centroid from an arbitrary node, otherwise we cannot create a graph.
+# To simplify the network, we need to create a compact graph, which requires centroids.
+# As Nauru doesn't have any centroids, we use an arbitrary node as a graph-only centroid.
 
-nodes = project.network.nodes
-centroid_count = nodes.data.query("is_centroid == 1").shape[0]
-
-if centroid_count == 0:
-    arbitrary_node = nodes.data["node_id"][0]
-    nodes.update(arbitrary_node, is_centroid=1)
+network = project.network.build()
+centroids = network.centroids
+if centroids is None:
+    centroids = network.mapping.node_ids[:1]
 
 # %%
 
-# Let's analyze the mode car or 'c' in our model
+# Let's analyse the mode car or 'c' in our model
 mode = "c"
 
 # %%
 
 # Let's set the graph for computation
-network = project.network
-network.build_graphs(modes=[mode])
-graph = network.graphs[mode]
-graph.set_graph("distance")
-graph.set_skimming("distance")
-graph.set_blocked_centroid_flows(False)
+graph = network.build_graph(
+    mode, "distance", centroids=centroids, skimming=["distance"], compact=True, block_centroid_flows=False
+)
 
 # %%
 
-# Let's revert to setting up that node as centroid in case we had to do it
-if centroid_count == 0:
-    nodes.update(arbitrary_node, is_centroid=0)
+# No centroid changes need reverting: the graph-only centroid was not written to the project.
 
 # %%
 # We check the number of links and nodes our project has initially.
