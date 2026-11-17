@@ -11,6 +11,120 @@ in the API and changes in software behaviour, in addition to a series of new fea
 New Algorithms and features
 ---------------------------
 
+Routing and network workflows
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Independent ``Network`` objects separate source data from routing graphs and remain usable after a project closes.
+  Graphs have fixed topology, explicit network-to-graph mappings and costs that can be updated without rebuilding.
+* Link contraction and dead-end removal can be selected independently. Path results can expand contracted paths
+  back to physical link IDs and directions more easily.
+* A* supports Euclidean and Haversine heuristics with explicit distance-to-cost scaling, including for non-distance
+  costs. Priority queues are selectable, and connected-component diagnostics identify disconnected network nodes.
+
+Turn restrictions and penalties
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Mode-specific prohibited turns, turn penalties and configurable U-turn permission are supported in path finding,
+  skimming, traffic assignment and route choice, including A* searches.
+* Turn restrictions can be supplied in memory or edited through a dedicated project table. Database triggers validate
+  movements and maintain their geometry as the network changes. Utilities list turns and find inapplicable restrictions.
+
+Traffic assignment
+~~~~~~~~~~~~~~~~~~
+
+* Traffic classes are configured independently of graphs. Assignment builds each class's graph internally, allowing
+  different mode-specific topologies while keeping congestion and results aligned to the same physical network.
+* Improved conjugate and biconjugate Frank-Wolfe calculations now use total class flows with PCE weighting. BFW offers
+  approximate and exact conjugacy options, additional diagnostics and safer fallbacks for unstable directions.
+* Line search uses the Beckmann objective's directional derivative, including fixed and turn costs. Convergence
+  reporting is aligned with the accepted flow, with improved handling of preloads and numerical edge cases.
+
+Custom volume-delay functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* VDFs can be defined as Python functions or NumExpr expressions, or loaded from project parameters, without
+  recompiling AequilibraE. Derivatives can be supplied explicitly or estimated numerically.
+* Parameter specifications support bounds and missing-value defaults. A validation helper checks free-flow behaviour,
+  monotonicity and convexity. Akcelik travel times and derivatives now consistently include link length.
+
+Dense and sparse matrices
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Dictionary-like matrix collections separate in-memory calculations from OMX storage. Dense and sparse collections
+  share zone indexing, metadata, named subsets and selection by matrix attributes.
+* Label-based and positional indexers simplify matrix access. Constructors accept arrays, dictionaries and OD tables,
+  including repeated OD pairs, while OMX stores support partial dense reads and writes.
+* Sparse demand is supported in road assignment, transit assignment, route choice and sub-area analysis. Sparse OMX
+  storage and sparse select-link OD outputs avoid unnecessarily creating dense matrices.
+* Project matrix files are discovered directly, with metadata stored in OMX rather than a separate database catalogue.
+
+Route choice and sub-area analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Link penalisation and BFS-LE can use A* as well as Dijkstra, with turn-aware route costs and path-size logit results.
+* Route filtering uses an additive and multiplicative cost threshold relative to the cheapest route, replacing the
+  probability-based cutoff. Imported routes can be validated and have costs, overlap and probabilities recomputed.
+* Result-table construction is compiled to reduce Python overhead. Sub-area processing supports the new graph mappings
+  and sparse demand while preserving original OD identifiers when requested.
+
+Network import and simplification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A shared importer supports OpenStreetMap downloads, local OSM PBF extracts and Overture Maps cloud data, alongside
+  GMNS imports. Mode filtering covers cars, transit, bicycles and walking.
+* OSM and Overture imports offer optional OSMnx or neatnet simplification and configurable intersection consolidation.
+  Unsimplified networks are retained by default.
+* Downloaded source data is cached with manifests, import provenance is recorded, and additional source attributes
+  are preserved as JSON. Import and simplification benchmarks document performance and trade-offs.
+
+Project tables and database editing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A consistent table API provides immutable records, direct insert/update/delete methods and atomic bulk operations
+  for network tables, zones, periods, turns and result metadata. Spatial tables accept Shapely geometry.
+* Nested transactions use savepoints, allowing a failed batch to roll back without discarding unrelated outer edits.
+  Database migrations use the same managed connections.
+* Network triggers improve endpoint lookup and cascading updates, keeping link geometry, node attributes and turn
+  restrictions consistent during editing. Trigger suspension is available within managed transactions.
+
+Project organisation and saved results
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Projects support context-managed opening and creation. Explicit project ownership and parameter selection make
+  multi-project workflows less dependent on global state, including project run modules and CLI execution.
+* Public imports are organised by workflow. ``project.tables`` handles database editing, ``project.road`` builds road
+  networks and graphs, and ``project.transit`` provides transit workflows and builders.
+* Result data and metadata are kept together in the results database. Creation and deletion manage both, named
+  DataFrame index columns are preserved, and reconciliation helpers repair stale or missing metadata entries.
+
+GTFS and public transport
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* GTFS import handles frequency-based services, extended route types, repeated stops on loop routes and parent stations.
+  Scheduled dwell, midnight crossings, Unicode text and published fare values are preserved more accurately.
+* Malformed or incomplete feed records receive more robust handling and warnings. Maximum-speed checks use consistent
+  distance units, and map matching handles extended route types and reverse-direction searches correctly.
+* GTFS export writes zipped feeds using imported identifiers, with optional prefixes to distinguish agencies and dates.
+  It retains parent stations and exports frequency-based services as individual trips.
+
+Runtime performance and feedback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Routing, skimming, all-or-nothing loading, select-link processing and path-file writing use reworked Cython/C++
+  kernels and OpenMP rather than Python thread pools or multiprocessing, with improved buffer reuse and memory locality.
+* Separate thread settings and workload thresholds reduce overhead for small, memory-bound array operations.
+* Standard Python logging supports scenario-aware file output and progress-friendly terminal output. Compiled workers
+  can report progress and logs safely, and route choice and transit assignment support interruption.
+
+Development and documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Meson-Python replaces setuptools, with a ``src`` package layout and incremental native builds. Spin provides shared
+  build, test, lint, documentation and debugging commands.
+* Expanded regression tests, assignment validation, benchmarks and native-code checks improve coverage of numerical
+  correctness and performance. Updated examples, API migration guides, internals and profiling guides document 2.0.
+* DataFrame operations have been updated for pandas copy-on-write behaviour.
+
 
 Performance improvements
 ------------------------
