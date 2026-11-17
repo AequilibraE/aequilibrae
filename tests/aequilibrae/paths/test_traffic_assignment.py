@@ -15,7 +15,7 @@ def configuration(sioux_falls_example):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     return {
-        "network": project.tables.build(),
+        "network": project.road.build_network(),
         "classes": [
             TrafficClass(
                 name="car",

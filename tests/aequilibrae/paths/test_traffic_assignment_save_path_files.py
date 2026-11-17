@@ -14,7 +14,7 @@ def assignment(sioux_falls_single_class):
     project = sioux_falls_single_class
     matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     result = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[TrafficClass(name="car", mode="c", cost="free_flow_time", demand=matrix)],
         time_field="free_flow_time",
         capacity_field="capacity",

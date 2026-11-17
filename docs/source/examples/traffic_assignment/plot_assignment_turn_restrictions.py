@@ -74,7 +74,7 @@ project = create_example(fldr, "sioux_falls")
 
 # %%
 # Load the network and demand matrix.
-network = replace(project.tables.build(), allow_uturns=True)
+network = replace(project.road.build_network(), allow_uturns=True)
 
 matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 

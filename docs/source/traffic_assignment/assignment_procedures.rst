@@ -85,7 +85,7 @@ It is also possible to set the common assignment parameters during class definit
     >>> from aequilibrae.traffic import TrafficAssignment
     >>> from aequilibrae.traffic.vdf import bpr
 
-    >>> network = project.tables.build()
+    >>> network = project.road.build_network()
     >>> assignment = TrafficAssignment(
     ...     network=network,
     ...     project=project,

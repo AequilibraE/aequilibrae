@@ -63,7 +63,7 @@ def test_path_file_assignment_recosts_routes(route_choice_setup, tmp_path):
     before = source.get_results()
     source.save_path_files(path)
 
-    graph.set_costs(project.tables.build(fields=["free_flow_time"]).field_values("free_flow_time"))
+    graph.set_costs(project.road.build_network(fields=["free_flow_time"]).field_values("free_flow_time"))
     choice = configured_choice(graph)
     choice.set_demand(route_choice_setup["mat"])
     choice.execute_from_path_files(path, recompute_psl=True)

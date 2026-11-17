@@ -105,7 +105,7 @@ including when an operation raises an exception:
         links = project.tables.links.data
 
     with Project.open("/path/to/existing_project") as project:
-        network = project.tables.build()
+        network = project.road.build_network()
 
 Bare ``Project()``, ``Project.new()`` and ``Project.from_path()`` are not supported. Without a ``with`` block,
 call ``project.close()`` explicitly.
@@ -114,6 +114,9 @@ The database-backed ``Network`` gateway is named ``Tables`` and accessed through
 ``project.scenario.tables``. The independent, in-memory ``Network`` retains its name. Obtain individual tables
 through their owning project; table classes and extension infrastructure are not public re-exports.
 ``project.about``, ``project.matrices`` and ``project.results`` retain their accessors.
+Road network construction belongs to ``project.road`` or ``project.scenario.road``: use
+``build_network()`` to copy tables into an independent ``Network``, or ``build_graph()`` to build a graph directly.
+These build methods are not available on ``Tables``.
 
 Build the independent network explicitly before traffic assignment:
 
@@ -121,7 +124,7 @@ Build the independent network explicitly before traffic assignment:
 
     from aequilibrae.traffic import TrafficAssignment
 
-    network = project.tables.build()
+    network = project.road.build_network()
     assignment = TrafficAssignment(network=network, project=project, **assignment_options)
 
 ``TrafficAssignment`` accepts only the built ``Network``, not ``Tables``. The explicit ``project`` argument
@@ -129,7 +132,7 @@ supplies project parameters and ownership for saving results. Results can also b
 project in the saving method. DataFrame and result-container interfaces are unchanged.
 
 Network import/export remains available through ``project.tables.importer.source()``, ``.osm()``, ``.overture()``
-and ``.gmns()``, and ``project.tables.export_to_gmns()``. ``project.tables.build_graph()`` remains the graph-building
+and ``.gmns()``, and ``project.tables.export_to_gmns()``. ``project.road.build_graph()`` is the graph-building
 convenience method. GTFS still uses ``new_gtfs_builder()``, ``load_date()``, optional map matching and
 ``save_to_disk()``. Direct construction of ``GTFSRouteSystemBuilder`` requires its owning ``project``.
 
@@ -259,7 +262,7 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
 .. doctest::
 
     >>> project = create_example(project_path)
-    >>> network = project.tables.build()
+    >>> network = project.road.build_network()
     >>> graph = network.build_graph('c', cost='distance')
 
     # Check for disconnected nodes

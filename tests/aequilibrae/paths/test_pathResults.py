@@ -11,7 +11,7 @@ dest = 13
 def p_results(sioux_falls_example):
     project = sioux_falls_example
 
-    graph = project.tables.build_graph(
+    graph = project.road.build_graph(
         mode="c", cost="free_flow_time", skimming=["free_flow_time"], block_centroid_flows=False
     )
 
@@ -76,7 +76,7 @@ def test_update_trace(p_results, heap):
 
 @pytest.fixture(scope="function")
 def triangle_blocking_setup(triangle_graph_blocking):
-    graph = triangle_graph_blocking.tables.build_graph(mode="c", cost="free_flow_time")
+    graph = triangle_graph_blocking.road.build_graph(mode="c", cost="free_flow_time")
     return {"project": triangle_graph_blocking, "g": graph}
 
 
@@ -155,5 +155,5 @@ def test_triangle_update_trace_full(triangle_blocking_setup):
 
 
 def test_compute_paths_centroid_last_node_id(st_varent):
-    graph = st_varent.tables.build_graph(mode="c", cost="distance", skimming=["distance"])
+    graph = st_varent.road.build_graph(mode="c", cost="distance", skimming=["distance"])
     PathResults(graph, 387, 1067)

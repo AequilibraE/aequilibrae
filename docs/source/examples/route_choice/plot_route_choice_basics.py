@@ -68,7 +68,7 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Let's load the source network snapshot
-network = project.tables.build()
+network = project.road.build_network()
 # Several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 

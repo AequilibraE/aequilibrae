@@ -25,7 +25,7 @@ def assignment_setup(sioux_falls_example):
             )
         )
     yield TrafficAssignment(
-        network=sioux_falls_example.tables.build(),
+        network=sioux_falls_example.road.build_network(),
         classes=classes,
         time_field="free_flow_time",
         capacity_field="capacity",

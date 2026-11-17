@@ -5,7 +5,7 @@ from aequilibrae.route_choice import RouteChoice
 
 @pytest.fixture(scope="function")
 def route_choice_setup(sioux_falls_single_class):
-    graph = sioux_falls_single_class.tables.build_graph(
+    graph = sioux_falls_single_class.road.build_graph(
         mode="c",
         cost="distance",
         fields=["distance", "free_flow_time"],

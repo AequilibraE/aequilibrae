@@ -60,7 +60,7 @@ basic_config()
 # ------------------
 
 # %%
-network = project.tables.build()
+network = project.road.build_network()
 
 # %%
 # Let's get the demand matrix directly from the project record, and inspect what matrices we have in the project.

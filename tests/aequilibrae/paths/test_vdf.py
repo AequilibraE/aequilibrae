@@ -26,7 +26,7 @@ def project(sioux_falls_example):
 def make_assignment(project):
     demand = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand)
-    network = project.tables.build()
+    network = project.road.build_network()
 
     def make(vdf, name_mapping):
         assignment = TrafficAssignment(

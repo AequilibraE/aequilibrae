@@ -14,7 +14,7 @@ from aequilibrae.traffic.vdf import bpr
 @pytest.fixture
 def select_link_setup(sioux_falls_single_class):
     project = sioux_falls_single_class
-    network = project.tables.build()
+    network = project.road.build_network()
     matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
     def make(links=None, algorithm="msa"):

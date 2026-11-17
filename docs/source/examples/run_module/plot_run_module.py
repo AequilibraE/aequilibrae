@@ -54,7 +54,7 @@ project.run["matrix_summary"]()
 mode = "c"
 
 # %%
-network = project.tables.build()
+network = project.road.build_network()
 graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%

@@ -7,7 +7,7 @@ from aequilibrae.routing.cython.outputs import SkimmingOutputs
 
 
 def test_network_skimming(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 
     # skimming results
@@ -112,7 +112,7 @@ def test_network_skimming_uses_routing_cost_and_turn_paths(compact, centroids, c
 
 
 def test_network_skimming_no_project(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
 
     graph = network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 

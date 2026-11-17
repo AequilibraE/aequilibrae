@@ -63,7 +63,7 @@ beta = 1.1  # PSL parameter
 
 # %%
 # Let's build all graphs
-network = project.tables.build()
+network = project.road.build_network()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 

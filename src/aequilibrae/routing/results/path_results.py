@@ -23,7 +23,7 @@ class PathResults:
 
         >>> from aequilibrae.routing import PathResults
         >>> project = create_example(project_path)
-        >>> graph = project.tables.build_graph(
+        >>> graph = project.road.build_graph(
         ...     'c', 'distance', skimming=['distance', 'free_flow_time']
         ... )
         >>> res = PathResults(graph, 1, 17)

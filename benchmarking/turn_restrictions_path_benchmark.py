@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae import Project
+from aequilibrae.routing import PathResults
 
 
 class ArcInfo(TypedDict):
@@ -42,25 +43,34 @@ def _sample_od_pairs(centroids: np.ndarray, sample_size: int, rng: np.random.Gen
 
 def _prepare_graph(model_path: Path, mode: str):
     project = Project.open(model_path)
-    project.tables.build_graphs(modes=[mode])
-    graph = project.tables.graphs[mode]
-
-    centroids = np.asarray(graph.centroids, dtype=np.int64)
-    if centroids.size == 0:
-        raise ValueError("Model has no centroids in this graph")
-
-    graph.set_graph("distance")
-    graph.set_blocked_centroid_flows(False)
-    graph.set_skimming(["distance"])
-    return project, graph, centroids, "distance"
+    try:
+        network = project.road.build_network(modes=[mode])
+        graph = network.build_graph(mode, "distance", skimming=["distance"], block_centroid_flows=False)
+        centroids = np.asarray(graph.centroids, dtype=np.int64)
+        if centroids.size < 2:
+            raise ValueError("Model needs at least two centroids in this graph")
+        return project, network, graph, centroids, "distance"
+    except BaseException:
+        project.close()
+        raise
 
 
 def _build_arc_index(graph):
-    graph_df = graph.graph[["id", "a_node", "b_node", "link_id", "direction", "distance"]].copy()
-    graph_df["a_node"] = graph.all_nodes[graph_df["a_node"].to_numpy(dtype=np.int64)]
-    graph_df["b_node"] = graph.all_nodes[graph_df["b_node"].to_numpy(dtype=np.int64)]
+    mapping = graph.mapping
+    source = mapping.network
+    retained = mapping.network_link_to_graph >= 0
+    graph_links = mapping.network_link_to_graph[retained]
+    graph_df = pd.DataFrame(
+        {
+            "id": graph_links,
+            "a_node": source.node_ids[source.link_tails[retained]],
+            "b_node": source.node_ids[source.link_heads[retained]],
+            "link_id": source.link_ids[retained],
+            "direction": source.directions[retained],
+            "distance": graph.cost[graph_links],
+        }
+    )
 
-    arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]] = {}
     arc_meta: ArcMeta = {}
     outgoing: Dict[int, List[int]] = defaultdict(list)
     incoming: Dict[int, List[int]] = defaultdict(list)
@@ -73,7 +83,6 @@ def _build_arc_index(graph):
         direction = int(row.direction)
         distance = float(row.distance)
 
-        arc_lookup[(a_node, b_node, link_id)] = (arc_id, direction, distance)
         arc_meta[arc_id] = {
             "a_node": a_node,
             "b_node": b_node,
@@ -84,13 +93,12 @@ def _build_arc_index(graph):
         outgoing[a_node].append(arc_id)
         incoming[b_node].append(arc_id)
 
-    return graph_df, arc_lookup, arc_meta, outgoing, incoming
+    return graph_df, arc_meta, outgoing, incoming
 
 
 def _build_turn_bans(
     graph,
     od_pairs: Sequence[Tuple[int, int]],
-    arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]],
     rng: np.random.Generator,
 ) -> Tuple[pd.DataFrame, int, int]:
     prohibited: set[DirectedTurn] = set()
@@ -103,7 +111,8 @@ def _build_turn_bans(
         except Exception:
             continue
 
-        directed, _ = _aeq_directed_path(res.path_nodes, res.path, arc_lookup)
+        if res.path is None:
+            continue
         computed += 1
 
         if len(res.path_nodes) < 3:
@@ -252,10 +261,10 @@ def run_benchmark(
     output_csv: Optional[Path],
 ) -> None:
     rng = np.random.default_rng(seed)
-    project, graph, centroids, chosen_cost = _prepare_graph(model_path, mode)
+    project, network, graph, centroids, chosen_cost = _prepare_graph(model_path, mode)
 
     try:
-        graph_df, arc_lookup, arc_meta, outgoing, incoming = _build_arc_index(graph)
+        graph_df, arc_meta, outgoing, incoming = _build_arc_index(graph)
 
         print(f"Loaded model: {model_path}")
         print(f"Mode: {mode}")
@@ -263,7 +272,7 @@ def run_benchmark(
         print(f"Cost field: {chosen_cost}")
 
         od_pairs_for_bans = _sample_od_pairs(centroids, turn_ban_sample, rng)
-        turn_bans_df, computed_paths, ban_candidates = _build_turn_bans(graph, od_pairs_for_bans, arc_lookup, rng)
+        turn_bans_df, computed_paths, ban_candidates = _build_turn_bans(graph, od_pairs_for_bans, rng)
 
         if turn_bans_df.empty:
             raise RuntimeError("Could not build any prohibited turn from sampled paths")
@@ -273,7 +282,9 @@ def run_benchmark(
         print(f"Paths eligible for turn-ban selection: {ban_candidates}")
         print(f"Prohibited turns inserted: {len(turn_bans_df)}")
 
-        graph.set_turn_restrictions(turn_bans_df, allow_path_uturns=allow_uturns)
+        graph = network.build_graph(
+            mode, chosen_cost, turn_restrictions=turn_bans_df, allow_uturns=allow_uturns, block_centroid_flows=False
+        )
 
         networkx_equivalent = _build_networkx_equivalent_digraph(graph_df)
         print(
@@ -297,7 +308,7 @@ def run_benchmark(
             outgoing=outgoing,
             penalty_lookup=penalty_lookup,
             prohibited=prohibited,
-            allow_path_uturns=allow_uturns,
+            allow_uturns=allow_uturns,
         )
 
         od_pairs_for_compare = _sample_od_pairs(centroids, comparison_sample, rng)
@@ -312,7 +323,7 @@ def run_benchmark(
 
             try:
                 aeq_res = graph.compute_path(origin, destination)
-                aeq_path, aeq_cost = _aeq_directed_path(aeq_res.path_nodes, aeq_res.path, arc_lookup)
+                aeq_path, aeq_cost = _aeq_directed_path(aeq_res)
             except Exception:
                 status = "aeq_failed"
 
@@ -416,20 +427,14 @@ def main() -> None:
     )
 
 
+def _aeq_directed_path(result: PathResults) -> Tuple[Optional[List[DirectedLink]], Optional[float]]:
+    links = result.get_network_links()
+    if links is None:
+        return None, None
+    link_ids, directions = links
+    directed = [(int(link), int(direction)) for link, direction in zip(link_ids, directions, strict=True)]
+    return directed, float(result.milepost[-1])
+
+
 if __name__ == "__main__":
     main()
-
-
-def _aeq_directed_path(
-    path_nodes: Sequence[int], path_links: Sequence[int], arc_lookup: Dict[Tuple[int, int, int], Tuple[int, int, float]]
-) -> Tuple[List[DirectedLink], float]:
-    directed: List[DirectedLink] = []
-    total_cost = 0.0
-
-    for a_node, b_node, link_id in zip(path_nodes[:-1], path_nodes[1:], path_links, strict=False):
-        key = (int(a_node), int(b_node), int(link_id))
-        _, direction, cost = arc_lookup[key]
-        directed.append((int(link_id), int(direction)))
-        total_cost += cost
-
-    return directed, total_cost

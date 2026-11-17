@@ -43,7 +43,7 @@ project = create_example(fldr, "nauru")
 # To simplify the network, we need to create a compact graph, which requires centroids.
 # As Nauru doesn't have any centroids, we use an arbitrary node as a graph-only centroid.
 
-network = project.tables.build()
+network = project.road.build_network()
 centroids = network.centroids
 if centroids is None:
     centroids = network.mapping.node_ids[:1]

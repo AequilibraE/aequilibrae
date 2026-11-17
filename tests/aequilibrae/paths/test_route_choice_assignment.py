@@ -24,7 +24,7 @@ from .route_choice_helpers import (
 def test_sioux_falls_assignment(route_choice_setup, cost, beta, algorithm):
     project = route_choice_setup["project"]
     graph = route_choice_setup["graph"]
-    graph.set_costs(project.tables.build().field_values(cost))
+    graph.set_costs(project.road.build_network().field_values(cost))
 
     choice = RouteChoice(graph)
     choice.set_cores(1)

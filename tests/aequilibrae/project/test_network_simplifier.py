@@ -21,7 +21,7 @@ def project_with_graph(nauru_example):
 
     mode = "c"
 
-    network = nauru_example.tables.build()
+    network = nauru_example.road.build_network()
     graph = network.build_graph(mode, "distance", skimming=["distance"], compact=True, block_centroid_flows=False)
 
     yield nauru_example, graph
@@ -58,7 +58,7 @@ def test_simplify_uses_ordered_network_expansions(empty_project):
         conn.execute("UPDATE nodes SET is_centroid=1 WHERE node_id IN (SELECT b_node FROM links)")
     empty_project.tables.refresh_schemas()
 
-    graph = empty_project.tables.build().build_graph("c", "distance", compact=True)
+    graph = empty_project.road.build_network().build_graph("c", "distance", compact=True)
     NetworkSimplifier(empty_project).simplify(graph)
 
     links = empty_project.tables.links.data

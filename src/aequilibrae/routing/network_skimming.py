@@ -23,7 +23,7 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.routing import NetworkSkimming
 
         >>> project = create_example(project_path)
-        >>> graph = project.tables.build_graph('c', 'distance', skimming=['distance'], compact=True)
+        >>> graph = project.road.build_graph('c', 'distance', skimming=['distance'], compact=True)
 
         >>> skm = NetworkSkimming(graph)
         >>> skm.execute()

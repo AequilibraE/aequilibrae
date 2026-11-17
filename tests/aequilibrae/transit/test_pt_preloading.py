@@ -16,7 +16,7 @@ def transit(coquimbo_example: Project):
 
 @pytest.fixture(scope="function")
 def graph(coquimbo_example: Project):
-    network = coquimbo_example.tables.build(fields=["distance"])
+    network = coquimbo_example.road.build_network(fields=["distance"])
     network.links["capacity"] = 500.0
     network.links["travel_time"] = network.links.distance / 50
     return network

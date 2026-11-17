@@ -377,7 +377,7 @@ attributes:
     from aequilibrae.traffic.vdf import bpr
 
     assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -392,7 +392,7 @@ attributes:
 
     # Parameters can reference field names in your network
     assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -469,7 +469,7 @@ Basic Usage
 
     # Setup traffic assignment with BPR
     assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -485,7 +485,7 @@ Using Different VDFs
 
     # Highway network - standard BPR
     highway_assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -496,7 +496,7 @@ Using Different VDFs
 
     # Urban network with signals - Akcelik
     signal_assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -507,7 +507,7 @@ Using Different VDFs
 
     # Network with strong capacity constraints - BPR2
     strong_capacity_assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -524,7 +524,7 @@ Link-Specific Parameters
     # Assume your network has fields 'alpha_field' and 'beta_field'
     # with values calibrated for each link
     variable_assignment = TrafficAssignment(
-        network=project.tables.build(),
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",

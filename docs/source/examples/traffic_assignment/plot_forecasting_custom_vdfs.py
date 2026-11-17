@@ -62,7 +62,7 @@ from aequilibrae.traffic import TrafficAssignment, TrafficClass, VDF
 
 # %%
 
-network = project.tables.build()
+network = project.road.build_network()
 
 # %%
 # Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.

@@ -32,7 +32,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-network = project.tables.build()
+network = project.road.build_network()
 
 
 # %%

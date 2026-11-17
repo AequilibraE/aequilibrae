@@ -51,7 +51,7 @@ class TrafficAssignment(AssignmentBase):
         >>> from aequilibrae.traffic import TrafficAssignment, TrafficClass
         >>> from aequilibrae.traffic.vdf import bpr
         >>> project = create_example(project_path)
-        >>> network = project.tables.build()
+        >>> network = project.road.build_network()
         >>> proj_matrices = project.matrices
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
@@ -118,7 +118,7 @@ class TrafficAssignment(AssignmentBase):
         Preload arrays use directed links in network mapping order.
         """
         if not isinstance(network, Network):
-            raise TypeError("network must be a built routing Network; call project.tables.build() first")
+            raise TypeError("network must be a built routing Network; call project.road.build_network() first")
         super().__init__(project=project)
         classes = tuple(classes)
         if not classes or any(not isinstance(cls, TrafficClass) for cls in classes):

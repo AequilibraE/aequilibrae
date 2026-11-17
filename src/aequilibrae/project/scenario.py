@@ -5,6 +5,7 @@ from contextlib import AbstractContextManager
 from aequilibrae.project.about import About
 from aequilibrae.project.data.matrices import Matrices
 from aequilibrae.project.data.results import Results
+from aequilibrae.project.road_network import RoadNetwork
 from aequilibrae.project.tables import Tables
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager
@@ -54,6 +55,7 @@ class Scenario:
         self.about = About(self.connections.db_connection)
         self.tables = Tables(self.connections, project)
         self.matrices = Matrices(self.base_path / "matrices")
+        self.road = RoadNetwork(self.tables)
 
         self._results: Results | None = None
 

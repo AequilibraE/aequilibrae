@@ -17,6 +17,7 @@ from aequilibrae.project.data.matrices import Matrices
 from aequilibrae.project.data.results import Results
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.project.road_network import RoadNetwork
 from aequilibrae.project.scenario import Scenario
 from aequilibrae.project.tables import Tables
 from aequilibrae.project.tools.migration_manager import MigrationManager
@@ -114,6 +115,11 @@ class Project:
     @property
     def tables(self) -> Tables:
         return self.scenario.tables
+
+    @property
+    def road(self) -> RoadNetwork:
+        """Road network and graph builder for the current scenario."""
+        return self.scenario.road
 
     @property
     def transit(self) -> Transit:

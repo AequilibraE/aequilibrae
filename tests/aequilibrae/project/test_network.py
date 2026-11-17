@@ -50,7 +50,7 @@ def test_build_with_polygons(sioux_falls_test):
 
     fields = ["distance"]
 
-    network = sioux_falls_test.tables
+    network = sioux_falls_test.road
 
     g = network.build_graph(mode="c", cost="distance", fields=fields, limit_to_area=polygon)
     assert g.num_nodes == 19
@@ -61,8 +61,8 @@ def test_build_with_polygons(sioux_falls_test):
 
 
 def test_build_without_polygons(sioux_falls_test):
-    network = sioux_falls_test.tables
-    assert len(network.list_modes()) == 3
+    network = sioux_falls_test.road
+    assert len(sioux_falls_test.tables.list_modes()) == 3
 
     g = network.build_graph(mode="c", cost="distance")
     assert g.num_nodes == 24
@@ -74,7 +74,7 @@ def test_build_applies_project_uturn_setting_without_turns(sioux_falls_example):
     assert len(sioux_falls_example.tables.turn_restrictions) == 0
     sioux_falls_example.about.update(infoname="allow_uturns", infovalue=1)
 
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     assert network.allow_uturns
     graph = network.build_graph("c", "distance")
     assert not graph.has_turn_restrictions
@@ -85,7 +85,7 @@ def test_build_filters_turns_by_mode(sioux_falls_example):
     kept = network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=5.0, modes="c")
     network.turn_restrictions.insert(from_node=1, via_node=2, to_node=6, penalty=9.0, modes="w")
 
-    source = network.build(modes=["c"])
+    source = sioux_falls_example.road.build_network(modes=["c"])
     graph = source.build_graph("c", "distance", block_centroid_flows=False)
 
     assert source.turn_restrictions.restriction_id.tolist() == [kept]
@@ -99,7 +99,7 @@ def test_build_filters_turns_by_area(sioux_falls_example):
     network.turn_restrictions.insert(from_node=4, via_node=5, to_node=9, penalty=9.0, modes="c")
     polygon = Polygon(((-96.75, 43.50), (-96.75, 43.55), (-96.70, 43.55), (-96.70, 43.50)))
 
-    source = network.build(modes=["c"], limit_to_area=polygon)
+    source = sioux_falls_example.road.build_network(modes=["c"], limit_to_area=polygon)
     graph = source.build_graph("c", "distance")
     assert source.turn_restrictions.restriction_id.tolist() == [kept]
     assert 1 not in graph.all_nodes
@@ -116,17 +116,17 @@ def network_with_mode_excluded_centroid(sioux_falls_example):
     with sioux_falls_example.db_connection as conn:
         conn.execute("UPDATE links SET modes = ? WHERE a_node = ? OR b_node = ?", (other_mode, 1, 1))
 
-    return network
+    return sioux_falls_example.road
 
 
 def test_build_preserves_centroids_across_modes(network_with_mode_excluded_centroid):
     network = network_with_mode_excluded_centroid
-    source = network.build(modes=["c"])
+    source = network.build_network(modes=["c"])
 
     assert source.centroids.tolist() == list(range(1, 25))
     assert source.build_graph("c", "distance").centroids.tolist() == list(range(1, 25))
-    source = network.build()
-    for mode in network.list_modes():
+    source = network.build_network()
+    for mode in source.modes:
         assert source.build_graph(mode, "distance").centroids.tolist() == list(range(1, 25))
 
 
@@ -136,7 +136,7 @@ def test_build_graph_remove_dead_ends_option(sioux_falls_example):
     with sioux_falls_example.db_connection as conn:
         conn.execute("UPDATE links SET modes = ?", ("c",))
 
-    graph = network.build_graph(empty_mode, "distance", compact=False, remove_dead_ends=True)
+    graph = sioux_falls_example.road.build_graph(empty_mode, "distance", compact=False, remove_dead_ends=True)
 
     assert graph.centroids.tolist() == list(range(1, 25))
     assert graph.num_links == 0
@@ -148,7 +148,7 @@ def test_build_preserves_explicit_mode_excluded_centroid(network_with_mode_exclu
 
 
 def test_assignment_reports_demand_at_mode_excluded_centroid_as_unassigned(network_with_mode_excluded_centroid):
-    source = network_with_mode_excluded_centroid.build(modes=["c"])
+    source = network_with_mode_excluded_centroid.build_network(modes=["c"])
     values = np.zeros((24, 24))
     values[0, 1], values[1, 0] = 5.0, 3.0
     demand = from_dict({"flow": values}, source.centroids)
@@ -189,11 +189,11 @@ def test_field_selection_preserves_directional_cost_precedence(sioux_falls_examp
         conn.execute("UPDATE links SET review_cost = ?, review_cost_ab = ?, review_cost_ba = ?", (1.0, 2.0, 3.0))
         conn.execute("UPDATE links SET direction = ? WHERE link_id = ?", (0, 1))
 
-    graph = project.tables.build_graph("c", "review_cost", fields=fields)
+    graph = project.road.build_graph("c", "review_cost", fields=fields)
     network_costs = np.where(graph.mapping.network.directions == 1, 2.0, 3.0)
     np.testing.assert_array_equal(graph.cost, graph.mapping.aggregate_costs(network_costs))
 
-    source = project.tables.build(fields=["review_cost"])
+    source = project.road.build_network(fields=["review_cost"])
     np.testing.assert_array_equal(source.field_values("review_cost"), np.where(source.directions == 1, 2.0, 3.0))
 
 
@@ -211,8 +211,8 @@ def test_selected_field_falls_back_to_base_per_direction(sioux_falls_example, di
             conn.execute("ALTER TABLE links ADD COLUMN review_cost_ba REAL")
             conn.execute("UPDATE links SET review_cost_ba = ?", (3.0,))
 
-    full = project.tables.build()
-    selected = project.tables.build(fields=["review_cost"])
+    full = project.road.build_network()
+    selected = project.road.build_network(fields=["review_cost"])
     expected = np.ones(full.mapping.link_count)
     if directional_column is not None:
         direction, value = (1, 2.0) if directional_column.endswith("_ab") else (-1, 3.0)
@@ -226,4 +226,4 @@ def test_build_rejects_nonexistent_directed_turn_leg(sioux_falls_example):
     network.turn_restrictions.insert(from_node=1, via_node=4, to_node=5, penalty=5.0, modes="c")
 
     with pytest.raises(ValueError, match="missing directed legs from_node -> via_node"):
-        network.build_graph("c", "distance")
+        sioux_falls_example.road.build_graph("c", "distance")

@@ -1107,7 +1107,7 @@ class _GraphBase(ABC):  # noqa: B024
 
             >>> project = create_example(project_path)
 
-            >>> network = project.tables.build()
+            >>> network = project.road.build_network()
             >>> graph = network.build_graph("c", centroids=np.arange(1, 25), compact=True, remove_dead_ends=True)
 
             >>> idx = graph.mapping.expansion_offsets

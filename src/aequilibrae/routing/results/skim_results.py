@@ -19,7 +19,7 @@ class SkimResults:
           # Mode c is car in this project
           # minimize travel time
           # Skims travel time and distance
-          >>> car_graph = project.tables.build_graph(
+          >>> car_graph = project.road.build_graph(
           ...     'c', 'free_flow_time', skimming=['free_flow_time', 'distance'], compact=True
           ... )
 

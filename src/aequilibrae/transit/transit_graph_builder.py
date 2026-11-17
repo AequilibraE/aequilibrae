@@ -1346,7 +1346,7 @@ class TransitGraphBuilder:
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.tables.build_graph(mode=graph_key, cost="distance")
+        graph = project.road.build_graph(mode=graph_key, cost="distance")
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []

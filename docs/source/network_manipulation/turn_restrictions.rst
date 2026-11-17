@@ -145,7 +145,7 @@ The U-turn setting is managed through the project's ``about`` table:
     >>> project.about.update("allow_uturns", infovalue="1")  # Allow U-turns
 
     # Rebuild network and build graphs to apply the change
-    >>> network = project.tables.build()
+    >>> network = project.road.build_network()
     >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
 Building Graphs with Turn Restrictions
@@ -155,7 +155,7 @@ When you build a network snapshot, turn restrictions are loaded from the databas
 
 .. code-block:: python
 
-    >>> network = project.tables.build()
+    >>> network = project.road.build_network()
     >>> graph = network.build_graph('c', cost='travel_time_seconds')
 
     # Check if a graph has turn restrictions
@@ -202,7 +202,7 @@ The turn penalties are applied as additional time costs during the equilibration
     >>> from aequilibrae.traffic import TrafficAssignment, TrafficClass
     >>> from aequilibrae.traffic.vdf import bpr
 
-    >>> network = project.tables.build()
+    >>> network = project.road.build_network()
     >>> demand_matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     >>> traffic_class = TrafficClass(
     ...     mode='c',

@@ -22,7 +22,7 @@ available for a passenger car may be different than those available for a heavy 
 in practice.
 
 For this reason, road path computation in AequilibraE happens through ``Graph`` objects built from a ``Network``.
-Users can load an independent network with ``project.tables.build()``, then select a mode and cost field
+Users can load an independent network with ``project.road.build_network()``, then select a mode and cost field
 with ``network.build_graph()``. Graph topology is fixed after construction, but routing costs can be updated
 in memory. Networks can also be created from link tables that are
 :ref:`NOT housed inside an AequilibraE model <plot_assignment_without_model>`.

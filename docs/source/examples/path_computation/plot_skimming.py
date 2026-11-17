@@ -63,7 +63,7 @@ import numpy as np
 
 # %%
 # Load the network snapshot
-network = project.tables.build()
+network = project.road.build_network()
 # Several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 

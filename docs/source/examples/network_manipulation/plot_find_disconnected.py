@@ -60,7 +60,7 @@ mode = "c"
 
 # We get the project nodes for reporting and load an independent network snapshot.
 nodes = project.tables.nodes
-network = project.tables.build()
+network = project.road.build_network()
 # No centroid changes need reverting: the project nodes have not been modified.
 
 # %%

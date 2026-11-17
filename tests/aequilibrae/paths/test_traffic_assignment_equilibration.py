@@ -17,7 +17,7 @@ def configuration(sioux_falls_test):
     project = sioux_falls_test
     demand = project.matrices.get_matrix("SiouxFalls2.omx", subset=["matrix"])
     return {
-        "network": project.tables.build(),
+        "network": project.road.build_network(),
         "classes": [
             TrafficClass(
                 name="car",
@@ -149,7 +149,7 @@ def test_execute_no_project(configuration):
     project = configuration.pop("project")
     with project.db_connection as conn:
         reference = pd.read_sql("select volume from links order by link_id", conn).volume
-    configuration["network"] = project.tables.build()
+    configuration["network"] = project.road.build_network()
     project.close()
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))
     assignment.execute(max_iterations=10, cores=1)

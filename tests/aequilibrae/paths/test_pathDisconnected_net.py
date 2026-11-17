@@ -10,7 +10,7 @@ def test_path_disconnected_delete_link(sioux_falls_example):
     with sioux_falls_example.db_connection as conn:
         conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
 
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph(mode="c", cost="free_flow_time", block_centroid_flows=False)
 
     lonlat = network.lonlat
@@ -37,7 +37,7 @@ def test_path_disconnected_delete_link(sioux_falls_example):
 def test_path_disconnected_penalize_link_in_memory(sioux_falls_example):
     links = [2, 4, 5, 14]
 
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph(mode="c", cost="free_flow_time", block_centroid_flows=False)
     costs = network.field_values("free_flow_time").copy()
     costs[np.isin(network.link_ids, links)] = np.inf

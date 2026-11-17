@@ -22,12 +22,12 @@ def sample_turn_from_path(graph, origin, destination):
 
 
 def test_prepare_graph(sioux_falls_example):
-    graph = sioux_falls_example.tables.build_graph("c", "distance", centroids=np.arange(5) + 1)
+    graph = sioux_falls_example.road.build_graph("c", "distance", centroids=np.arange(5) + 1)
     np.testing.assert_array_equal(graph.centroids, np.arange(5) + 1)
 
 
 def test_prepare_graph_no_centroids(sioux_falls_example):
-    network = Network(sioux_falls_example.tables.build().links)
+    network = Network(sioux_falls_example.road.build_network().links)
     graph = network.build_graph("c", "distance", skimming=["distance"])
     assert graph.num_zones == 0
     assert graph.skim_fields == ["distance"]
@@ -180,21 +180,21 @@ def test_compaction_keeps_real_self_loop_needed_to_avoid_turn_ban():
 
 
 def test_set_graph(sioux_falls_example):
-    graph = sioux_falls_example.tables.build_graph("c", "distance")
+    graph = sioux_falls_example.road.build_graph("c", "distance")
     assert graph.num_zones == 24, "Number of centroids not properly set"
     assert graph.num_links == 76, "Number of links not properly set"
     assert graph.num_nodes == 24, f"Number of nodes not properly set - {graph.num_nodes}"
 
 
 def test_available_skims(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     avail = network.fields
     data_fields = ["distance", "name", "lanes", "capacity", "speed", "b", "free_flow_time", "power", "modes"]
     assert all(i in avail for i in data_fields), "Skim availability with problems"
 
 
 def test_compute_path(sioux_falls_example):
-    graph = sioux_falls_example.tables.build().build_graph("c", cost="distance", block_centroid_flows=False)
+    graph = sioux_falls_example.road.build_graph("c", cost="distance", block_centroid_flows=False)
 
     res = graph.compute_path(1, 6)
     assert list(res.get_network_links()[0]) == [1, 4], "Number of path links is not correct"
@@ -202,7 +202,7 @@ def test_compute_path(sioux_falls_example):
 
 
 def test_set_turn_restrictions_rejects_negative_penalty(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
 
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
@@ -394,7 +394,7 @@ def test_prepare_graph_rejects_invalid_existing_turns(turn_network, turn):
 
 
 def test_a_star_with_turn_restrictions(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
     from_node, via_node, to_node = sample_turn_from_path(graph, 1, 6)
     turn_restrictions = pd.DataFrame(
@@ -413,7 +413,7 @@ def test_a_star_with_turn_restrictions(sioux_falls_example):
 
 
 def test_compute_skims(sioux_falls_example):
-    graph = sioux_falls_example.tables.build().build_graph(
+    graph = sioux_falls_example.road.build_graph(
         "c", cost="distance", skimming=["distance", "free_flow_time"], block_centroid_flows=False
     )
 
@@ -424,7 +424,7 @@ def test_compute_skims(sioux_falls_example):
 
 
 def test_exclude_links(sioux_falls_example):
-    network = sioux_falls_example.tables.build()
+    network = sioux_falls_example.road.build_network()
     graph = network.build_graph("c", cost="distance", block_centroid_flows=False)
     origin = 20
     destination = 21
@@ -505,7 +505,7 @@ def test_dead_end_removal(compressed_graph):
 def test_turn_restrictions_match_networkx(coquimbo_example):
     nx = pytest.importorskip("networkx")
 
-    network = coquimbo_example.tables.build()
+    network = coquimbo_example.road.build_network()
     graph = network.build_graph("c", "distance", block_centroid_flows=False)
     origin = 32343
     destination = 22041

@@ -44,7 +44,7 @@ basic_config()
 # %%
 # Load the network snapshot
 # We get warnings that several fields in the project are filled with ``NaN``s.
-network = project.tables.build()
+network = project.road.build_network()
 # This is true, but we won't use those fields.
 
 # %%

@@ -56,11 +56,12 @@ basic_config()
 # traffic assignment for the base-year.
 
 from dataclasses import replace
+
 from aequilibrae.traffic import TrafficAssignment, TrafficClass
 
 # %%
 
-network = project.tables.build()
+network = project.road.build_network()
 
 # %%
 # Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.
