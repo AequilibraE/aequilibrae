@@ -112,10 +112,101 @@ namespace rather than from the package root or an implementation module:
    * - ``aequilibrae.utils``
      - ``basic_config``, ``ensure_spatialite_binaries``, ``set_known_spatialite_folder``
 
-The ``aequilibrae.paths`` package is replaced by ``aequilibrae.routing``. Traffic assignment and route choice
-implementations live in their respective packages, and transit assignment lives in ``aequilibrae.transit``.
-There are no deprecated import aliases. The package version is available as ``aequilibrae.__version__`` rather
-than ``aequilibrae.version``. Upper-case VDF aliases are removed; import the lower-case VDF objects instead.
+The ``aequilibrae.paths`` package is replaced by
+``aequilibrae.routing``. Traffic assignment, transit assignment, and route
+choice implementations live in their respective packages. The package version
+is available as ``aequilibrae.__version__`` rather than
+``aequilibrae.version``.
+
+The main import replacements are:
+
+.. list-table:: Import migration
+   :header-rows: 1
+   :widths: 50 50
+
+   * - Previous import
+     - Replacement
+   * - ``from aequilibrae.project import Project``
+     - ``from aequilibrae import Project``
+   * - ``from aequilibrae import Parameters``
+     - ``from aequilibrae.project import Parameters``
+   * - ``from aequilibrae import Log`` or ``from aequilibrae.project import Log``
+     - Use ``project.log()``
+   * - ``from aequilibrae import Matrices`` or ``from aequilibrae.project import Matrices, Results``
+     - Use ``project.matrices`` and ``project.results``; do not construct their managers directly
+   * - ``from aequilibrae.project import Scenario``
+     - Use ``project.scenario`` and the project's scenario-management methods
+   * - ``from aequilibrae.project.network import Network`` or ``from aequilibrae.project import Tables``
+     - Use ``project.tables`` for database access;
+       ``from aequilibrae.routing import Network`` for an independent network
+   * - ``from aequilibrae import Graph, PathResults, SkimResults, NetworkSkimming``
+     - ``from aequilibrae.routing import Graph, PathResults, SkimResults, NetworkSkimming``
+   * - ``from aequilibrae.paths import available_heaps, estimate_heuristic_scale``
+     - ``from aequilibrae.routing import available_heaps, estimate_heuristic_scale``
+   * - ``from aequilibrae import TrafficClass, TrafficAssignment, AssignmentResults, AssignmentPaths, VDF``
+     - Import these names from ``aequilibrae.traffic``
+   * - ``from aequilibrae.paths import TransitClass, TransitAssignment, TransitGraph, TransitAssignmentResults``
+     - Import these names from ``aequilibrae.transit``
+   * - ``from aequilibrae.paths import RouteChoice, SubAreaAnalysis``
+     - ``from aequilibrae.route_choice import RouteChoice, SubAreaAnalysis``
+   * - ``from aequilibrae.transit import Transit``
+     - Use ``project.transit``; create its database first if needed
+   * - ``from aequilibrae.transit import TransitGraphBuilder`` or
+       ``from aequilibrae.builder import TransitGraphBuilder``
+     - Use ``project.transit.create_graph()``; reload saved builders with ``project.transit.load()``
+   * - Imports of ``Importer``, ``GMNSBuilder`` or ``GMNSExporter`` from ``aequilibrae.builder``
+     - Use ``project.tables.importer`` and ``project.tables.export_to_gmns()``
+   * - Imports of ``GTFSRouteSystemBuilder`` or ``export_gtfs`` from ``aequilibrae.builder``
+     - Use ``project.transit.new_gtfs_builder()`` and ``project.transit.export_gtfs()``
+   * - ``from aequilibrae.paths.vdf import BPR``
+     - ``from aequilibrae.traffic.vdf import bpr``
+   * - ``from aequilibrae import Ipf, GravityCalibration, GravityApplication, SyntheticGravityModel``
+     - Import these names from ``aequilibrae.distribution``
+   * - ``from aequilibrae import AequilibraeMatrix, AequilibraeSparseMatrix, MatrixStore``
+     - Import these names from ``aequilibrae.matrix``
+   * - ``from aequilibrae.utils.create_example import create_example, list_examples``
+     - ``from aequilibrae.examples import create_example, list_examples``
+
+Objects previously imported from ``aequilibrae.paths`` or its implementation
+modules follow a similar split: path computation and skimming now come from
+``routing``, traffic assignment from ``traffic``, public transport assignment
+from ``transit``, and route choice from ``route_choice``.
+
+Project-dependent objects should be obtained from the project rather than
+constructed directly. Use ``project.tables.importer`` for network imports,
+``project.tables.export_to_gmns()`` for GMNS export, and the methods on
+``project.transit`` for GTFS import/export and transit graph
+construction. Implementation-module imports are for internal code and isolated
+tests, not ordinary user workflows.
+
+``aequilibrae.project.network``, ``aequilibrae.project.data`` and ``aequilibrae.project.tools`` no longer
+re-export their implementation classes. Import ``MigrationManager`` and ``NetworkSimplifier`` from
+``aequilibrae.project``. ``Matrices``, ``Results``, ``Scenario``, ``Tables``, ``Log`` and ``Transit`` are
+project-owned objects, not public imports or objects users should construct. Obtain them through
+``project.matrices``, ``project.results``, ``project.scenario``, ``project.tables``, ``project.log()`` and
+``project.transit``. Create or select scenarios with
+``project.create_empty_scenario()``, ``project.clone_scenario()`` and ``project.use_scenario()``.
+Likewise, obtain table and record objects through the project rather than importing ``Links``, ``Nodes``,
+``Zones``, ``Periods`` or their record classes. ``About``,
+``FieldEditor`` and the project-table base classes are not public re-exports; use ``project.about`` and
+the relevant table's field editor for ordinary workflows.
+
+Logging and SpatiaLite helpers have public imports too:
+
+.. code-block:: python
+
+    import logging
+
+    from aequilibrae.utils import basic_config, ensure_spatialite_binaries, set_known_spatialite_folder
+
+    logger = logging.getLogger("aequilibrae")
+
+Use the standard logger instead of the removed ``aequilibrae.global_logger`` export. Low-level Cython modules,
+routing contexts and the shared ``aequilibrae._assignment`` infrastructure are implementation details, not
+additional public import namespaces.
+
+Project creation and lifetime
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create or open a ready-to-use project with class methods. A context manager closes the project's connections,
 including when an operation raises an exception:
@@ -131,7 +222,13 @@ including when an operation raises an exception:
         network = project.road.build_network()
 
 Bare ``Project()``, ``Project.new()`` and ``Project.from_path()`` are not supported. Without a ``with`` block,
-call ``project.close()`` explicitly.
+call ``project.close()`` explicitly. Opening a project is no longer a second initialisation step on an empty
+object: replace ``project = Project(); project.open(path)`` with ``project = Project.open(path)``, and
+``project = Project(); project.new(path)`` with ``project = Project.create(path)``.
+``create_example()`` also returns an open project and can be used as a context manager.
+
+Project tables, road networks and scenarios
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The database-backed ``Network`` gateway is named ``Tables`` and accessed through ``project.tables`` or
 ``project.scenario.tables``. The independent, in-memory ``Network`` retains its name. Obtain individual tables
@@ -140,6 +237,78 @@ through their owning project; table classes and extension infrastructure are not
 Road network construction belongs to ``project.road`` or ``project.scenario.road``: use
 ``build_network()`` to copy tables into an independent ``Network``, or ``build_graph()`` to build a graph directly.
 These build methods are not available on ``Tables``.
+
+The project object layout separates persistent data from routing inputs and prepared graphs:
+
+.. code-block:: text
+
+    project
+    ├── tables                 Database-backed table access and editing
+    │   ├── links, nodes, zones
+    │   ├── modes, link_types, periods
+    │   ├── turn_restrictions
+    │   └── importer
+    ├── road                   Builds independent road networks and graphs
+    ├── transit                Transit data and graph-building workflows
+    ├── matrices               Project matrix files
+    ├── results                Saved results and their metadata
+    └── about                  Project metadata
+
+.. list-table:: Project accessor migration
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Previous access
+     - Replacement
+   * - ``project.network.links`` (and other network tables)
+     - ``project.tables.links`` (and the corresponding table accessor)
+   * - ``project.scenario.network``
+     - ``project.scenario.tables`` for table access; ``project.scenario.road`` for road-network building
+   * - ``project.network.build_graphs()`` followed by ``project.network.graphs[mode]``
+     - ``graph = project.road.build_graph(mode, cost)``
+   * - ``project.network.importer``
+     - ``project.tables.importer``
+   * - ``project.network.export_to_gmns(path)``
+     - ``project.tables.export_to_gmns(path)``
+
+``project.network`` is removed, not an alias for either ``tables`` or ``road``. In particular, there is no
+project-owned road ``graphs`` dictionary: keep the graph returned by a build method yourself.
+``project.tables`` and ``project.road`` follow the current scenario. A network or graph already built is an
+independent snapshot; switching scenarios or editing tables does not update it. Build a new one to use the
+changed data. ``project.scenario.tables`` and ``project.scenario.road`` expose the same split on a scenario.
+
+This separation concerns the Python object layout, not a renaming of project files. ``Tables`` still accesses
+``project_database.sqlite``; matrices remain in ``matrices/``, saved results in ``results_database.sqlite``,
+and transit data in ``public_transport.sqlite``. Do not rename databases or create a ``road/`` directory for
+these accessors. See :ref:`aeq_project_structure` for the on-disk project and scenario layout.
+
+Independent routing and assignment objects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A routing ``Network`` owns copies of the source link data and its configuration. It can be constructed from
+in-memory data with ``Network(links, ...)``, without a project, or copied from project tables. A ``Graph`` is
+built from that network for one mode and cost; it does not own database connections or retain the source
+DataFrames. Source attributes belong to ``network.links``, while prepared graph data is organised under
+``graph.routing``, ``graph.mapping`` and ``graph.skimming`` rather than ``graph.network`` or ``graph.graph``.
+Keep the network as well as the graph if the workflow needs source attributes.
+
+.. code-block:: python
+
+    from aequilibrae.examples import create_example
+
+    with create_example("/path/to/example_project") as project:
+        links = project.tables.links.data
+        network = project.road.build_network()
+        graph = network.build_graph("c", cost="distance", skimming=["distance"])
+
+    # The network and graph remain usable after the project is closed.
+    path = graph.compute_path(1, 2)
+
+Use ``project.road.build_graph("c", "distance")`` when only a graph is needed. Cost, skimming and routing
+policies are supplied when building the graph, rather than configured through the old mutable graph-building
+sequence. Network configuration fields and graph topology are fixed after construction; build a new object
+for a different configuration. ``graph.set_costs()`` remains available to replace routing costs without
+changing topology. See :doc:`path_computation/aequilibrae_graph` for graph construction and mappings.
 
 Build the independent network explicitly before traffic assignment:
 
@@ -152,12 +321,28 @@ Build the independent network explicitly before traffic assignment:
 
 ``TrafficAssignment`` accepts only the built ``Network``, not ``Tables``. The explicit ``project`` argument
 supplies project parameters and ownership for saving results. Results can also be saved to an explicitly supplied
-project in the saving method. DataFrame and result-container interfaces are unchanged.
+project in the saving method. A ``TrafficClass`` is now a configuration independent of a graph, constructed
+with ``mode``, ``cost`` and ``demand``. ``TrafficAssignment`` receives the network and classes and builds their
+graphs internally; traffic-class results are available after execution through
+``assignment.class_results[class_name]`` rather than ``traffic_class.results``. See
+:doc:`traffic_assignment/assignment_procedures` for the complete assignment setup.
+
+Transit graph builders remain distinct from prepared transit graphs. Obtain a builder with
+``builder = project.transit.create_graph()`` and convert it with ``builder.to_transit_graph()``. The resulting
+``aequilibrae.transit.TransitGraph`` is used with ``TransitClass`` and ``TransitAssignment``, not the road
+``Graph``/``TrafficClass`` pair. Shared implementation infrastructure does not make these public types
+interchangeable. See :doc:`public_transport/hyperpath_routing` for transit assignment.
 
 Network import/export remains available through ``project.tables.importer.source()``, ``.osm()``, ``.overture()``
 and ``.gmns()``, and ``project.tables.export_to_gmns()``. ``project.road.build_graph()`` is the graph-building
-convenience method. GTFS still uses ``new_gtfs_builder()``, ``load_date()``, optional map matching and
-``save_to_disk()``. Direct construction of ``GTFSRouteSystemBuilder`` requires its owning ``project``.
+convenience method. GTFS still uses ``project.transit.new_gtfs_builder()``, ``load_date()``, optional map
+matching and ``save_to_disk()``. Use ``project.transit.export_gtfs()`` for GTFS export. For a scenario without
+a transit database, call ``project.scenario.create_transit_database()`` before accessing ``project.transit``.
+To reload saved transit graphs, call ``project.transit.load(period_ids=[period_id])`` and retrieve the builder
+from ``project.transit.graphs[period_id]`` rather than importing ``TransitGraphBuilder`` to call ``from_db()``.
+
+Explicit project ownership and parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Library workflows no longer infer ownership from the active project. Pass a project or connection explicitly to
 project-dependent operations, including result saving and network simplification. Database path/connection helpers
