@@ -181,6 +181,13 @@ configured arguments; the CLI also supplies it when ``--no-defaults`` is selecte
     def results_summary(project):
         return project.results.list()
 
+Existing projects may be using outdated ``run/__init__.py`` files, check their
+imports and function signatures and update them if appropriate. See the example
+projects for the new sample file.  See :doc:`run_module`.
+
+Removed compatibility entry points
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 ``Project.db_connection_spatial`` is removed; use ``Project.db_connection``. Deprecated trigger wrappers
 ``add_triggers`` and ``remove_triggers`` are removed. Internal callers suspending triggers use
 ``aequilibrae.utils.sqlite_utils.without_triggers`` within a managed transaction; it is not re-exported from
