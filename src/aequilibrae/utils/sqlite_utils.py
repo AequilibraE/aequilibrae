@@ -10,12 +10,15 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def without_triggers(conn: Connection) -> Iterator[None]:
-    """Temporarily remove installed triggers, then restore their exact SQL definitions.
+    """
+    Temporarily remove installed triggers, then restore their exact SQL definitions.
 
-    The caller is responsible for running this context within a managed transaction.
+    The caller is responsible for running this context within a managed
+    transaction.
     """
     triggers = conn.execute(
-        "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND sql IS NOT NULL ORDER BY name"
+        "SELECT name, sql FROM sqlite_master WHERE type='trigger' "
+        "AND name LIKE 'aequilibrae_%' AND sql IS NOT NULL ORDER BY name"
     ).fetchall()
     try:
         for name, _ in triggers:
