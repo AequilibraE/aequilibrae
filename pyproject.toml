@@ -8,7 +8,7 @@ setup = ['--vsenv']
 [project]
 authors = [{ name = "Pedro Camargo", email = "pedro@outerloop.io" }]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Intended Audience :: End Users/Desktop",
@@ -195,7 +195,7 @@ show_missing = true
 directory = "coverage_html_report"
 
 [tool.cibuildwheel]
-build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
+build = ["cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 
 # We do not build wheels for old versions of Python, for 32-bit in either Linux or Windows, or for macOS
 skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*", "*-macosx*"]
@@ -207,7 +207,7 @@ manylinux-pypy_aarch64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
 archs = ["auto"]
-build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
+build = ["cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} "
 
 [tool.cibuildwheel.macos]
