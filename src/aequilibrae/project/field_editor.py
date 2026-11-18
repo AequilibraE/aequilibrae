@@ -32,7 +32,8 @@ class FieldEditor:
 
         >>> project.close()
 
-    Field descriptions are kept in the table *attributes_documentation*
+    Field descriptions are kept in the table *attributes_documentation* and
+    are accessible as lowercase attributes on the editor.
     """
 
     _allowed_characters = ALLOWED_CHARACTERS
@@ -40,20 +41,23 @@ class FieldEditor:
     def __init__(self, connection, table_name: str) -> None:
         self._transaction_manager = connection
         self._table = table_name.lower()
-        self._table_fields = []
+        self._table_fields = {}
         self._original_values = {}
+        # Keep the stored spelling for metadata writes, even though editor attributes are lowercase.
+        self._attribute_names = {}
         self.__update_table_fields()
         self._populate()
         self._check_completeness()
 
     def _populate(self) -> None:
         self._original_values.clear()
-        qry = f'Select attribute, description from attributes_documentation where name_table="{self._table}"'
-        dt = self.__run_query_fetch_all(qry)
-
-        for attr, descr in dt:
-            self.__dict__[attr.lower()] = descr
-            self._original_values[attr.lower()] = descr
+        self._attribute_names.clear()
+        qry = "SELECT attribute, description FROM attributes_documentation WHERE name_table=?"
+        for attribute, description in self.__run_query_fetch_all(qry, (self._table,)):
+            field_key = attribute.lower()
+            self.__dict__[field_key] = description
+            self._original_values[field_key] = description
+            self._attribute_names[field_key] = attribute
 
     def add(self, field_name: str, description: str, data_type="NUMERIC") -> None:
         """Adds new field to the data table
@@ -65,9 +69,10 @@ class FieldEditor:
 
             **data_type** (:obj:`str`, *Optional*): Valid SQLite Data type. Default: "NUMERIC"
         """
-        if field_name.lower() in self._original_values.keys():
+        field_key = field_name.lower()
+        if field_key in self._original_values:
             raise ValueError("attribute_name already exists")
-        if field_name in self.__dict__.keys():
+        if field_key in self.__dict__:
             raise ValueError("attribute_name not allowed")
 
         has_forbidden = [letter for letter in field_name if letter not in self._allowed_characters]
@@ -79,14 +84,16 @@ class FieldEditor:
 
         self.__update_table_fields()
 
-        if field_name not in self._table_fields:
+        if field_key in self._table_fields:
+            field_name = self._table_fields[field_key]
+        else:
             self.__run_query_commit(f"Alter table {self._table} add column {field_name} {data_type};")
         self.__adds_to_attribute_table(field_name, description)
 
     def __update_table_fields(self) -> None:
-        qry = f"pragma table_info({self._table})"
-        dt = self.__run_query_fetch_all(qry)
-        self._table_fields = [x[1] for x in dt if x[1] != "ogc_fid"]
+        qry = "SELECT name FROM pragma_table_info(?)"
+        rows = self.__run_query_fetch_all(qry, (self._table,))
+        self._table_fields = {name.lower(): name for (name,) in rows if name.lower() != "ogc_fid"}
 
     def remove(self, field_name: str) -> NoReturn:
         raise NotImplementedError
@@ -98,11 +105,11 @@ class FieldEditor:
         This is required for new fields to appear in applications like QGIS.
         """
 
-        qry = 'update attributes_documentation set description="{}" where attribute="{}" and name_table="{}"'
+        qry = "UPDATE attributes_documentation SET description=? WHERE attribute=? AND name_table=?"
         for key, val in self._original_values.items():
             new_val = self.__dict__[key]
             if new_val != val:
-                self.__run_query_commit(qry.format(new_val, key, self._table))
+                self.__run_query_commit(qry, (new_val, self._attribute_names[key], self._table))
                 logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
         logger.info(f"Updating layer statistics for {self._table}, this may take a moment")
@@ -116,34 +123,37 @@ class FieldEditor:
         return list(self._original_values.keys())
 
     def _check_completeness(self) -> None:
-        raw_fields = self._table_fields
-
+        fields = self._table_fields
         if self._table == "links":
-            fields = list({re.sub("_ab", "", re.sub("_ba", "", f)) for f in raw_fields})
-        else:
-            fields = raw_fields
+            fields = {}
+            for column in self._table_fields.values():
+                field = re.sub("_ba", "", column, flags=re.IGNORECASE)
+                field = re.sub("_ab", "", field, flags=re.IGNORECASE)
+                fields.setdefault(field.lower(), field)
 
-        for field in fields:
-            if field not in self._original_values.keys():
+        for field_key, field in fields.items():
+            if field_key not in self._original_values:
                 self.__adds_to_attribute_table(field, "not provided")
 
-        original_fields = list(self._original_values.keys())
-        for field in original_fields:
-            if field not in fields:
-                qry = f'DELETE FROM attributes_documentation where attribute="{field}" and name_table="{self._table}"'
-                self.__run_query_commit(qry)
-                del self.__dict__[field]
-                del self._original_values[field]
+        for field_key in list(self._original_values):
+            if field_key not in fields:
+                qry = "DELETE FROM attributes_documentation WHERE attribute=? AND name_table=?"
+                self.__run_query_commit(qry, (self._attribute_names[field_key], self._table))
+                del self.__dict__[field_key]
+                del self._original_values[field_key]
+                del self._attribute_names[field_key]
 
     def __adds_to_attribute_table(self, attribute_name: str, attribute_value: str) -> None:
-        self.__dict__[attribute_name] = attribute_value
-        self._original_values[attribute_name] = attribute_value
         qry = "insert into attributes_documentation VALUES(?,?,?)"
         vals = (self._table, attribute_name, attribute_value)
         self.__run_query_commit(qry, vals)
+        field_key = attribute_name.lower()
+        self.__dict__[field_key] = attribute_value
+        self._original_values[field_key] = attribute_value
+        self._attribute_names[field_key] = attribute_name
 
-    def __run_query_fetch_all(self, qry: str):
-        return self._transaction_manager._connection.execute(qry).fetchall()
+    def __run_query_fetch_all(self, qry: str, values=()):
+        return self._transaction_manager._connection.execute(qry, values).fetchall()
 
     def __run_query_commit(self, qry: str, values=None) -> None:
         with self._transaction_manager.transaction() as conn:

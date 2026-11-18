@@ -86,3 +86,31 @@ def test_save(empty_project, table_name, attribute):
     table.save()
     table2 = FieldEditor(empty_project.db_connection, table_name)
     assert getattr(table2, attribute) == random_val, "Did not save values properly"
+
+
+@pytest.mark.parametrize("add_through_editor", [True, False])
+def test_reopen_zones_fields_with_mixed_case_column(empty_project, add_through_editor):
+    zones = empty_project.tables.zones
+    if add_through_editor:
+        first = zones.fields
+        first.add("Parking_Spots", "Public parking spots", "INTEGER")
+        description = "Public parking spots"
+    else:
+        with empty_project.db_connection.transaction() as conn:
+            conn.execute('ALTER TABLE zones ADD COLUMN "Parking_Spots" INTEGER')
+        first = zones.fields
+        description = "not provided"
+
+    second = zones.fields
+    assert first.parking_spots == second.parking_spots == description
+    assert "Parking_Spots" in zones.columns
+
+    second.parking_spots = "Total licensed parking spots"
+    second.save()
+    with empty_project.db_connection as conn:
+        rows = conn.execute(
+            "SELECT attribute, description FROM attributes_documentation "
+            "WHERE name_table=? AND attribute=? COLLATE NOCASE",
+            ("zones", "parking_spots"),
+        ).fetchall()
+    assert rows == [("Parking_Spots", "Total licensed parking spots")]
