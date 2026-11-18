@@ -33,6 +33,26 @@ class Graph:
     mode: str
     cost_field: str | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"Graph(nodes={self.num_nodes}, links={self.num_links}, zones={self.num_zones}, "
+            f"mode={self.mode!r}, cost_field={self.cost_field!r}, skim_fields={self.skim_fields!r}, "
+            f"compact={self.compact}, remove_dead_ends={self.remove_dead_ends}, "
+            f"allow_uturns={self.allow_uturns}, block_centroid_flows={self.block_centroid_flows}, "
+            f"turn_restrictions={self.has_turn_restrictions})"
+        )
+
+    def __str__(self) -> str:
+        return (
+            "Graph\n"
+            f"  Nodes: {self.num_nodes}; links: {self.num_links}; zones: {self.num_zones}\n"
+            f"  Mode: {self.mode}, cost: {self.cost_field!r}, skim fields: {self.skim_fields!r}\n"
+            f"  Compact: {self.compact}, remove dead ends: {self.remove_dead_ends}, "
+            f"allow U-turns: {self.allow_uturns}\n"
+            f"  Block centroid flows: {self.block_centroid_flows}, "
+            f"turn restrictions: {self.has_turn_restrictions}"
+        )
+
     def __post_init__(self) -> None:
         if not isinstance(self.routing, GraphContext) or not isinstance(self.mapping, GraphMapping):
             raise ValueError("Graph requires a routing context and a GraphMapping")

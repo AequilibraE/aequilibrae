@@ -48,6 +48,30 @@ class Network:
     mapping: NetworkMapping = field(init=False, repr=False)
     _link_rows: NDArray[np.intp] = field(init=False, repr=False)
 
+    def __repr__(self) -> str:
+        modes = repr(self.modes)
+        centroids = "not supplied" if self.centroids is None else str(len(self.centroids))
+        turn_restrictions = 0 if self.turn_restrictions is None else len(self.turn_restrictions)
+        coordinate_nodes = 0 if self.lonlat is None else len(self.lonlat)
+        return (
+            f"Network(physical_links={len(self.links)}, directed_links={self.mapping.link_count}, "
+            f"nodes={self.mapping.node_count}, centroids={centroids}, modes={modes}, "
+            f"turn_restrictions={turn_restrictions}, coordinate_nodes={coordinate_nodes}, "
+            f"allow_uturns={self.allow_uturns})"
+        )
+
+    def __str__(self) -> str:
+        centroids = "not supplied" if self.centroids is None else str(len(self.centroids))
+        turn_restrictions = 0 if self.turn_restrictions is None else len(self.turn_restrictions)
+        coordinate_nodes = 0 if self.lonlat is None else len(self.lonlat)
+        return (
+            "Network:\n"
+            f"  Links: {len(self.links)} physical, {self.mapping.link_count} directed\n"
+            f"  Nodes: {self.mapping.node_count}, centroids: {centroids}\n"
+            f"  Modes: {self.modes!r}, turn restrictions: {turn_restrictions}\n"
+            f"  Lon/lat nodes: {coordinate_nodes}, allow U-turns: {self.allow_uturns}"
+        )
+
     def __post_init__(self) -> None:
         self._validate_links(self.links)
         modes = self._normalise_modes(self.modes)
