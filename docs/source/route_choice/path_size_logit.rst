@@ -35,13 +35,14 @@ but those cases are arguably not reasonable to exist in practice.
     **AequilibraE uses cost to compute path overlaps rather than distance.**
     Finite turn penalties are included in route cost and path overlap.
 
-Binary logit filter
--------------------
+Route cost cutoff
+-----------------
 
-A binary logit filter is available to remove unfavourable routes from the route set before applying
-the path-sized logit assignment. This filters accepts a numerical parameter for the minimum demand 
-share acceptable for any path, which is approximated by the binary logit considering the shortest 
-path and each subsequent path.
+A cost cutoff is available to mask unfavourable routes before applying the
+path-size logit assignment. For each OD pair, it masks routes whose cost exceeds
+``disutility_cutoff_constant + disutility_cutoff_coefficient * cheapest_route_cost``.
+Set both parameters to apply the cutoff, or omit both for no cutoff. See
+:doc:`../route_choice_transit_api_migration` if you previously used ``cutoff_prob``.
 
 Full process overview
 ---------------------

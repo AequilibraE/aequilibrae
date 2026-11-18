@@ -1,5 +1,6 @@
-from aequilibrae.context import get_active_project
 import pytest
+
+from aequilibrae.context import get_active_project
 
 
 class TestMultipleProjects:

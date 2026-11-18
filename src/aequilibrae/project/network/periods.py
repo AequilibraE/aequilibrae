@@ -14,7 +14,7 @@ class Periods(NonSpatialProjectTable):
 
         >>> project = create_example(project_path, "coquimbo")
 
-        >>> periods = project.network.periods
+        >>> periods = project.tables.periods
 
         # We can get a single period as an immutable record
         >>> period = periods.get(1)

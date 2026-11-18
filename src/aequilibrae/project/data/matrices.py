@@ -7,7 +7,7 @@ from typing import Any, Sequence
 import openmatrix as omx
 import pandas as pd
 
-from aequilibrae.matrix import AequilibraeMatrix, MatrixStore, from_file
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, MatrixStore, from_file
 
 logger = logging.getLogger(__name__)
 

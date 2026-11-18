@@ -13,7 +13,7 @@ class LinkTypes(NonSpatialProjectTable):
 
         >>> project = create_example(project_path)
 
-        >>> link_types = project.network.link_types
+        >>> link_types = project.tables.link_types
 
         # We can get a link type as an immutable record
         >>> default_type = link_types.get('y')

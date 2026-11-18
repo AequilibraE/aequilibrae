@@ -3,7 +3,7 @@ from random import choice, randint
 
 import pytest
 
-from aequilibrae.transit.transit_elements import Trip
+from aequilibrae.transit.transit_elements.trip import Trip
 
 from .random_word import randomword
 

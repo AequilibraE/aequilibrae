@@ -27,8 +27,8 @@ In this example, we show how to perform network skimming for Coquimbo, a city in
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.network_skimming`
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.routing.network_skimming`
 
 # %%
 
@@ -36,8 +36,8 @@ In this example, we show how to perform network skimming for Coquimbo, a city in
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/skims.png'
 
@@ -63,7 +63,7 @@ import numpy as np
 
 # %%
 # Load the network snapshot
-network = project.network.build()
+network = project.road.build_network()
 # Several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
@@ -88,7 +88,7 @@ skm = graph.compute_skims()
 # Building network skims directly from the graph is more straightforward, though  
 # we could alternatively use the class ``NetworkSkimming`` to achieve the same result.
 
-# from aequilibrae.paths import NetworkSkimming
+# from aequilibrae.routing import NetworkSkimming
 
 # skm = NetworkSkimming(graph)
 # skm.execute()

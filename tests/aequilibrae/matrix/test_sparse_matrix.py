@@ -2,10 +2,10 @@ import gc
 
 import numpy as np
 import pytest
-from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 from scipy import sparse
 
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix
+from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 
 
 @pytest.fixture(params=[np.float32, np.float64])

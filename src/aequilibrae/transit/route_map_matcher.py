@@ -1,4 +1,3 @@
-from aequilibrae.paths.results.path_results import PathResults
 import logging
 from typing import Optional, Union
 
@@ -9,7 +8,8 @@ from shapely import LineString
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import linemerge
 
-from aequilibrae.paths import Network
+from aequilibrae.routing.network import Network
+from aequilibrae.routing.results.path_results import PathResults
 from aequilibrae.transit.functions.breaking_links_for_stop_access import split_links_at_stops
 from aequilibrae.utils.geo_utils import metre_crs_for_gdf
 from aequilibrae.utils.interface.worker_thread import WorkerThread

@@ -28,7 +28,7 @@ The relevant optional packages are:
 Importing from OpenStreetMap
 ----------------------------
 
-Use :func:`aequilibrae.project.network.importers.Importer.osm` to create
+Use ``project.tables.importer.osm()`` to create
 an AequilibraE network from OpenStreetMap. Exactly one source selector must be
 provided:
 
@@ -38,17 +38,17 @@ provided:
 
 Examples::
 
-    project.network.importer.osm(place_name="Nauru")
+    project.tables.importer.osm(place_name="Nauru")
 
     from shapely.geometry import box
 
-    project.network.importer.osm(
+    project.tables.importer.osm(
         model_area=box(-112.185, 36.59, -112.179, 36.60),
         modes=("car", "walk"),
         simplify=False,
     )
 
-    project.network.importer.osm(
+    project.tables.importer.osm(
         pbf_path="/path/to/extract.osm.pbf",
         modes=("car", "transit", "bicycle", "walk"),
         simplify="osmnx",
@@ -77,12 +77,12 @@ top result and logs a warning describing the substituted area.
 Importing from Overture Maps
 ----------------------------
 
-Use :func:`aequilibrae.project.network.importers.Importer.overture` to
+Use ``project.tables.importer.overture()`` to
 import the Overture Maps transportation network for an EPSG:4326 polygon::
 
     from shapely.geometry import box
 
-    project.network.importer.overture(
+    project.tables.importer.overture(
         model_area=box(-112.185, 36.59, -112.179, 36.60),
         modes=("car", "walk"),
         simplify="osmnx",
@@ -151,13 +151,13 @@ Import first, inspect, then decide whether to simplify.
 consolidation; for neatnet, where node consolidation is integral to the
 algorithm, ``None`` falls back to the default tolerance of 10 metres::
 
-    project.network.importer.osm(
+    project.tables.importer.osm(
         pbf_path="/path/to/extract.osm.pbf",
         simplify="osmnx",
         consolidate_tolerance=None,
     )
 
-    project.network.importer.overture(
+    project.tables.importer.overture(
         model_area=model_area,
         simplify=False,
     )
@@ -250,20 +250,20 @@ Public API summary
 
 The main entry points are:
 
-* :func:`aequilibrae.project.network.importers.Importer.osm`;
-* :func:`aequilibrae.project.network.importers.Importer.overture`;
-* :func:`aequilibrae.project.network.importers.Importer.source` for explicit
+* ``project.tables.importer.osm()``;
+* ``project.tables.importer.overture()``;
+* ``project.tables.importer.source()`` for explicit
   source names: ``"osm-overpass"``, ``"osm-pbf"`` and ``"overture-cloud"``;
-* :func:`aequilibrae.project.network.importers.Importer.gmns`;
-* :func:`aequilibrae.project.network.network.Network.export_to_gmns`.
+* ``project.tables.importer.gmns()``;
+* ``project.tables.export_to_gmns()`` through :attr:`aequilibrae.Project.tables`.
 
 Import methods share one namespace on the network object::
 
-    project.network.importer.osm(...)
-    project.network.importer.overture(...)
-    project.network.importer.gmns(...)
+    project.tables.importer.osm(...)
+    project.tables.importer.overture(...)
+    project.tables.importer.gmns(...)
 
-    project.network.export_to_gmns(folder)
+    project.tables.export_to_gmns(folder)
 
 .. note::
 
@@ -336,8 +336,8 @@ specification.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.importers.Importer.gmns`
-        Function documentation
+    * :attr:`aequilibrae.Project.tables`
+        Access to ``project.tables.importer.gmns()``
     * :ref:`import_from_gmns`
         Usage example
 
@@ -378,7 +378,7 @@ You can find the GMNS specification
 
 .. seealso::
 
-    * :func:`aequilibrae.project.network.network.Network.export_to_gmns`
+    * ``project.tables.export_to_gmns()`` through :attr:`aequilibrae.Project.tables`
         Function documentation
     * :ref:`export_to_gmns`
         Usage example

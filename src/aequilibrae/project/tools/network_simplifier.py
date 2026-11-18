@@ -4,7 +4,7 @@ from math import ceil
 from typing import TYPE_CHECKING, List, Literal, Optional
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
 import numpy as np
 import numpy.typing as npt
@@ -12,8 +12,7 @@ import pandas as pd
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
-from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import Graph
+from aequilibrae.routing.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.interface.worker_thread import WorkerThread
@@ -27,9 +26,11 @@ class NetworkSimplifier(WorkerThread):
     def __init__(self, project: Optional["Project"] = None) -> None:
         super().__init__(None)
 
-        self.project: Project = project or get_active_project()
-        self.network = self.project.network
-        self.link_layer = self.network.links.data
+        if project is None:
+            raise ValueError("An explicit project is required")
+        self.project: Project = project
+        self.tables = self.project.tables
+        self.link_layer = self.tables.links.data
 
         logger.warning("This will alter your database in place. Make sure you have a backup.")
 
@@ -217,7 +218,7 @@ class NetworkSimplifier(WorkerThread):
         # Validate that we kept distances the same
         distance_crs = self.link_layer.estimate_utm_crs()
         old_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
-        self.link_layer = self.network.links.data
+        self.link_layer = self.tables.links.data
         new_dist = self.link_layer.geometry.to_crs(distance_crs).length.sum()
 
         logger.warning("Old distance: %s, new distance: %s. Difference: %s", old_dist, new_dist, old_dist - new_dist)
@@ -240,5 +241,5 @@ class NetworkSimplifier(WorkerThread):
                 conn.execute("UPDATE nodes SET geometry=GeomFromWKB(?, ?) WHERE node_id=?", [wkb, srid, link.b_node])
                 conn.commit()
 
-        self.link_layer = self.network.links.data
+        self.link_layer = self.tables.links.data
         logger.warning(f"{len(links)} links collapsed into nodes")

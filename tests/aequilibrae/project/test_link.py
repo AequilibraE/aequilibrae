@@ -8,12 +8,12 @@ from aequilibrae.utils.db_utils import read_and_close
 
 @pytest.fixture
 def links(sioux_falls_test):
-    return sioux_falls_test.network.links
+    return sioux_falls_test.tables.links
 
 
 @pytest.fixture
 def modes(sioux_falls_test):
-    return sioux_falls_test.network.modes
+    return sioux_falls_test.tables.modes
 
 
 @pytest.fixture
@@ -56,10 +56,10 @@ def test_save(sioux_falls_test, links, link_id, link):
     assert link2.name == name, "Failed to save the link name"
     assert link2.geometry.equals_exact(geo, 0.001), "Failed to save the link geometry"
 
-    tot_prev = sioux_falls_test.network.count_links()
+    tot_prev = sioux_falls_test.tables.count_links()
     links.insert(geometry=substring(link.geometry, 0, 0.88, normalized=True), modes="c")
 
-    assert sioux_falls_test.network.count_links() == tot_prev + 1, "Failed to save new link"
+    assert sioux_falls_test.tables.count_links() == tot_prev + 1, "Failed to save new link"
 
 
 def test_set_modes(sioux_falls_test, links, link_id):

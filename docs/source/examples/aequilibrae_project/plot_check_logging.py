@@ -20,9 +20,9 @@ you to go ahead and download a place of your choice and perform a traffic assign
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.paths import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.examples import create_example
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 # sphinx_gallery_thumbnail_path = '../source/_images/logs_image.png'
 
 # %%
@@ -32,7 +32,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-network = project.network.build()
+network = project.road.build_network()
 
 
 # %%

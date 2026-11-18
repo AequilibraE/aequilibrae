@@ -7,7 +7,7 @@ from typing import Optional
 
 import openmatrix as omx
 
-from aequilibrae.project.project_creation import add_triggers, initialize_tables
+from aequilibrae.project.project_creation import _add_triggers, initialize_tables
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ def move_results_table(project_conn: sqlite3.Connection, results_conn: Optional[
             # Possibly a previous run crashed after copying but before dropping.
             raise RuntimeError("results table exists in both the project and results databases")
         if dst_exists:
-            add_triggers(results_conn, "results")
+            _add_triggers(results_conn, "results")
         else:
             initialize_tables("results", results_conn)
 

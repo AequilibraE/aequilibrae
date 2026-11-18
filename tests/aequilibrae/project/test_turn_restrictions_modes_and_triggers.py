@@ -200,7 +200,7 @@ def test_turn_restriction_api_stores_infinite_penalty_as_prohibition(sioux_falls
         assert pair is not None
         from_node, via_node, to_node = pair
 
-    restriction_id = sioux_falls_example.network.turn_restrictions.insert(
+    restriction_id = sioux_falls_example.tables.turn_restrictions.insert(
         from_node=from_node, via_node=via_node, to_node=to_node, penalty=float("inf"), modes="c"
     )
 
@@ -220,7 +220,7 @@ def test_turn_restriction_api_rejects_negative_penalty(sioux_falls_example):
         from_node, via_node, to_node = pair
 
     with pytest.raises(ValueError, match="Negative turn penalties"):
-        sioux_falls_example.network.turn_restrictions.insert(
+        sioux_falls_example.tables.turn_restrictions.insert(
             from_node=from_node, via_node=via_node, to_node=to_node, penalty=-1.0, modes="c"
         )
 
@@ -231,7 +231,7 @@ def test_turn_restriction_api_update_can_set_prohibition(sioux_falls_example):
         assert pair is not None
         from_node, via_node, to_node = pair
 
-    turns = sioux_falls_example.network.turn_restrictions
+    turns = sioux_falls_example.tables.turn_restrictions
     restriction_id = turns.insert(from_node=from_node, via_node=via_node, to_node=to_node, penalty=8.0, modes="c")
 
     turns.update(restriction_id, penalty=None)

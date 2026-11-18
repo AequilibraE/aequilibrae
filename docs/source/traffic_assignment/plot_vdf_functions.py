@@ -1,20 +1,9 @@
 """
 Generate VDF comparison charts for documentation
 """
-from aequilibrae.paths.cython.vdf_core import (
-    akcelik,
-    bpr,
-    bpr2,
-    conical,
-    inrets,
-    delta_akcelik,
-    delta_bpr,
-    delta_bpr2,
-    delta_conical,
-    delta_inrets,
-)
+from aequilibrae.routing.cython.vdf_core import akcelik, bpr, bpr2, conical, inrets, delta_akcelik, delta_bpr, delta_bpr2, delta_conical, delta_inrets
 
-# from aequilibrae.paths.vdf import bpr, bpr2, conical, inrets, akcelik
+# from aequilibrae.traffic.vdf import bpr, bpr2, conical, inrets, akcelik
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rcParams

@@ -1,9 +1,10 @@
-import geopandas as gpd
 import logging
 import math
+import warnings
+
+import geopandas as gpd
 import numpy as np
 import shapely
-import warnings
 from shapely.geometry import Point
 
 from aequilibrae.project.network.importer.simplifiers.common import (

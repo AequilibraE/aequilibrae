@@ -7,8 +7,9 @@ import pandas as pd
 import pytest
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import Network, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.routing import Network
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 @pytest.fixture

@@ -24,7 +24,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_centroid_connector.png'
 
@@ -51,7 +51,7 @@ with project.db_connection as conn:
 print("Current number of centroids: ", centroids)
 
 # %%
-zones = project.network.zones
+zones = project.tables.zones
 
 # %%
 # This centroid connector creation is effective because it uses the existing
@@ -82,11 +82,11 @@ zones.connect_mode(mode_id=mode, connectors=1, limit_to_zone=False)
 # %%
 # Finally, let's plot our data!
 
-links = project.network.links.data
+links = project.tables.links.data
 centroids = links[links["link_type"] == "centroid_connector"]
 links = links[links["link_type"] != "centroid_connector"]
 
-nodes = project.network.nodes.data
+nodes = project.tables.nodes.data
 nodes = nodes[nodes["is_centroid"] == 1]
 
 # %%

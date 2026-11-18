@@ -1,12 +1,13 @@
-import geopandas as gpd
 import json
 import logging
-import numpy as np
-import pandas as pd
 from collections import Counter
 from itertools import count, pairwise
-from shapely.ops import substring
 from typing import Sequence
+
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+from shapely.ops import substring
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import to_jsonable

@@ -1,15 +1,13 @@
 import pytest
 
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae.project.project import Project
+from aequilibrae import Project
 from aequilibrae.utils.db_utils import read_and_close
 
 
 def test_opening_wrong_folder(tmp_path):
     not_a_project = str(tmp_path)
     with pytest.raises(FileNotFoundError):
-        proj = Project()
-        proj.open(not_a_project)
+        Project(not_a_project)
 
 
 @pytest.mark.parametrize(
@@ -27,11 +25,9 @@ def test_table_creation(table: str, exp_column: str, empty_project):
 
 
 def test_close(empty_no_triggers_project):
-    database_connection(db_type="network")
-
+    assert empty_no_triggers_project.db_connection.is_open()
     empty_no_triggers_project.close()
-    with pytest.raises(FileNotFoundError):
-        database_connection(db_type="network")
+    assert not empty_no_triggers_project.db_connection.is_open()
 
 
 def test_parameters_property_is_stable_across_accesses(empty_project):
@@ -46,7 +42,7 @@ def test_parameters_mutations_persist_via_write_back(empty_project):
     empty_project.parameters["osm"]["overpass_endpoint"] = "http://example.test/api"
     empty_project.project_parameters.write_back()
 
-    from aequilibrae.parameters import Parameters
+    from aequilibrae.project import Parameters
 
     reloaded = Parameters(path=empty_project.project_base_path)
     assert reloaded.parameters["osm"]["overpass_endpoint"] == "http://example.test/api"

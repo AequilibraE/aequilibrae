@@ -1,11 +1,12 @@
 import numpy as np
-from aequilibrae.paths.cython.parallel_numpy import (
+
+from aequilibrae.routing.cython.parallel_numpy import (
     copy_one_dimension,
-    sum_axis1,
+    copy_three_dimensions,
+    copy_two_dimensions,
     linear_combination,
     linear_combination_skims,
-    copy_two_dimensions,
-    copy_three_dimensions,
+    sum_axis1,
 )
 
 

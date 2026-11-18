@@ -24,7 +24,7 @@ and see what happens to the network.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 
@@ -36,8 +36,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-all_nodes = project.network.nodes
-links = project.network.links
+all_nodes = project.tables.nodes
+links = project.tables.links
 
 # %%
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom

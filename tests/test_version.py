@@ -10,7 +10,7 @@ def test_version_matches_meson_project():
     meson_file = Path(__file__).resolve().parents[1] / "meson.build"
     match = re.search(r"^\s*version:\s*'([^']+)'", meson_file.read_text(), re.MULTILINE)
     assert match is not None
-    assert aequilibrae.version == match.group(1)
+    assert aequilibrae.__version__ == match.group(1)
 
 
 def test_import_does_not_require_distribution_metadata():
@@ -29,9 +29,9 @@ importlib.metadata.version = version
 import aequilibrae
 from aequilibrae._version import version as generated_version
 
-assert aequilibrae.version == generated_version
-print(aequilibrae.version)
+assert aequilibrae.__version__ == generated_version
+print(aequilibrae.__version__)
 """
     result = subprocess.run([sys.executable, "-P", "-c", script], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == aequilibrae.version
+    assert result.stdout.strip() == aequilibrae.__version__

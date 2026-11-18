@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths.mapping import GraphMapping, NetworkMapping
+from aequilibrae.routing.mapping import GraphMapping, NetworkMapping
 
 BASE = 10**12
 

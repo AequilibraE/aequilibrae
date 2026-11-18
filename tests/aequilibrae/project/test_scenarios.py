@@ -5,14 +5,14 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae import MatrixStore, TrafficAssignment, TrafficClass
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
-from aequilibrae.paths.vdf import bpr
-from aequilibrae.transit import Transit
+from aequilibrae.matrix import AequilibraeMatrix, MatrixStore
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
+from aequilibrae.transit import TransitAssignment, TransitClass
+from aequilibrae.transit.transit import Transit
+from aequilibrae.utils.cython.bridge import Bridge
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def test_traffic_assignment_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    network = scenario_example.network
+    network = scenario_example.road.build_network()
 
     try:
         mat = scenario_example.matrices.get_matrix("demand.omx", subset=["matrix"])
@@ -76,7 +76,7 @@ def test_transit_assignment_scenarios(scenario_example, scenario):
     mat["pt"] = np.ones((zones_in_the_model, zones_in_the_model))
 
     assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
-    assig = TransitAssignment()
+    assig = TransitAssignment(project=scenario_example)
     assig.add_class(assigclass)
     assig.set_time_field("trav_time")
     assig.set_frequency_field("freq")
@@ -115,7 +115,7 @@ def test_matrices_scenarios(scenario_example, scenario):
 def test_route_choice_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    graph = scenario_example.network.build_graph(
+    graph = scenario_example.road.build_graph(
         mode="c", cost="distance", fields=["distance"], block_centroid_flows=False
     )
 
@@ -177,22 +177,22 @@ def test_results_scenarios(scenario_example, scenario):
 def test_network_scenarios(scenario_example, scenario):
     scenario_example.use_scenario(scenario)
 
-    network = scenario_example.network
+    network = scenario_example.tables
     links1 = network.links.data
     nodes1 = network.nodes.data
 
-    graph1 = network.build_graph(mode="c", cost="distance", fields=["distance"])
+    graph1 = scenario_example.road.build_graph(mode="c", cost="distance", fields=["distance"])
 
     other_scenarios = [s for s in ["root", "nauru", "coquimbo"] if s != scenario]
     if other_scenarios:
         other_scenario = other_scenarios[0]
         scenario_example.use_scenario(other_scenario)
-        network = scenario_example.network
+        network = scenario_example.tables
 
         links2 = network.links.data
         nodes2 = network.nodes.data
 
-        graph2 = network.build_graph(mode="c", cost="distance", fields=["distance"])
+        graph2 = scenario_example.road.build_graph(mode="c", cost="distance", fields=["distance"])
 
         # Pandas doesn't have a good way to assert frames not equal
         try:
@@ -280,8 +280,8 @@ def test_create_empty_scenario_from_different_scenarios(scenario_example, from_s
 
     # Switch to new scenario and verify it's empty
     scenario_example.use_scenario(new_scenario_name)
-    assert len(scenario_example.network.links.data) == 0
-    assert len(scenario_example.network.nodes.data) == 0
+    assert len(scenario_example.tables.links.data) == 0
+    assert len(scenario_example.tables.nodes.data) == 0
     assert len(scenario_example.matrices.list()) == 0
     assert len(scenario_example.results.list()) == 0
 
@@ -298,8 +298,8 @@ def test_clone_scenario_from_different_scenarios(scenario_example, from_scenario
     scenario_example.use_scenario(from_scenario)
 
     # Get source scenario data for comparison
-    source_links = scenario_example.network.links.data.copy()
-    source_nodes = scenario_example.network.nodes.data.copy()
+    source_links = scenario_example.tables.links.data.copy()
+    source_nodes = scenario_example.tables.nodes.data.copy()
     source_matrices = scenario_example.matrices.list().copy()
     source_results = scenario_example.results.list().copy()
 
@@ -319,8 +319,8 @@ def test_clone_scenario_from_different_scenarios(scenario_example, from_scenario
 
     # Switch to cloned scenario and verify data matches source
     scenario_example.use_scenario(new_scenario_name)
-    cloned_links = scenario_example.network.links.data
-    cloned_nodes = scenario_example.network.nodes.data
+    cloned_links = scenario_example.tables.links.data
+    cloned_nodes = scenario_example.tables.nodes.data
     cloned_matrices = scenario_example.matrices.list()
     cloned_results = scenario_example.results.list()
 

@@ -1,18 +1,17 @@
-from os.path import join
+import argparse
 import os
-
-from aequilibrae.transit import Transit
-from aequilibrae.project.project import Project
+import time
+from os.path import join
 
 import numpy as np
 import pandas as pd
+
+from aequilibrae import Project
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import TransitAssignment, TransitClass
-
-import time
+from aequilibrae.transit import TransitAssignment, TransitClass
 
 
-def run_example(from_model, zones):
+def run_example(from_model: str, zones: list[int]) -> dict[str, pd.DataFrame]:
     examples_dir = "temp_examples"
     time_results = []
 
@@ -20,7 +19,7 @@ def run_example(from_model, zones):
         path = join(examples_dir, f"{from_model}_{n_zones}")
 
         if os.path.isdir(path):
-            project = Project.from_path(path)
+            project = Project(path)
 
         else:
             print("example not created.")
@@ -28,7 +27,7 @@ def run_example(from_model, zones):
 
         print(path)
 
-        data = Transit(project)
+        data = project.transit
 
         graph = data.create_graph(
             with_outer_stop_transfers=False,
@@ -37,9 +36,7 @@ def run_example(from_model, zones):
             connector_method="overlapping_regions",
         )
 
-        project.network.build_graphs()
-
-        # c for All motorized vehicles
+        # c for all motorised vehicles; direct geometry does not require a road graph.
         graph.create_line_geometry(method="direct", graph="c")
 
         try:
@@ -49,28 +46,23 @@ def run_example(from_model, zones):
 
         data.load()
 
-        data = Transit(project)
+        data = project.transit
 
-        # pt_con = database_connection("transit")
-        # graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period.period_id)
+        # Reloaded graphs are available through the project's transit gateway.
+        # graph_db = data.graphs[project.tables.periods.default_period.period_id]
         # graph_db.vertices.drop(columns="geometry")
 
         transit_graph = graph.to_transit_graph()
 
         zones_in_the_model = len(transit_graph.centroids)
 
-        names_list = ["pt"]
-
-        mat = AequilibraeMatrix()
-        mat.create_empty(zones=zones_in_the_model, matrix_names=names_list, memory_only=True)
-        mat.index = transit_graph.centroids[:]
-        mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
-        mat.computational_view()
-        # mat.get_matrix('pt')
+        mat = AequilibraeMatrix(index=transit_graph.centroids)
+        mat["pt"] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
+        # mat["pt"] retrieves the demand array.
 
         transit_graph.graph["boardings"] = transit_graph.graph["link_type"].apply(lambda x: 1 if x == "boarding" else 0)
         transit_graph.graph["in_vehicle_trav_time"] = np.where(
-            transit_graph.graph["link_type"].isin(["on-board", "dwell"]), 0, transit_graph.graph["trav_time"]
+            transit_graph.graph["link_type"].isin(["on-board", "dwell"]), transit_graph.graph["trav_time"], 0
         )
         transit_graph.graph["egress_trav_time"] = np.where(
             transit_graph.graph["link_type"] != "egress_connector", 0, transit_graph.graph["trav_time"]
@@ -81,11 +73,11 @@ def run_example(from_model, zones):
 
         skim_cols = ["trav_time", "boardings", "in_vehicle_trav_time", "egress_trav_time", "access_trav_time"]
 
-        assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
-
         print(f"centroids: {transit_graph.centroids.shape[0]}")
-        for i in range(0, len(skim_cols)):
-            assig = TransitAssignment()
+        for i in range(len(skim_cols) + 1):
+            transit_graph.set_skimming_fields(skim_cols[:i])
+            assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
+            assig = TransitAssignment(project=project)
             assig.add_class(assigclass)
             assig.set_time_field("trav_time")
             assig.set_frequency_field("freq")
@@ -93,7 +85,6 @@ def run_example(from_model, zones):
             assig.set_skimming_fields(skim_cols[:i])
 
             assig.set_algorithm("os")
-            assigclass.set_demand_matrix_core("pt")
 
             start_time = time.perf_counter()
             # start_time = time.process_time()
@@ -107,8 +98,11 @@ def run_example(from_model, zones):
 
             print(f"{i} Skimming Cols Elapsed time: {elapsed_time} seconds")
 
-            if i != 0:
-                assert len(assig.get_skim_results()[0].matrix) == i
+            skims = assig.get_skim_results()["pt"]
+            if i:
+                assert set(skims) == set(skim_cols[:i])
+            else:
+                assert skims is None
 
             print(f"{len(assig.results())}")
 
@@ -119,6 +113,14 @@ def run_example(from_model, zones):
     return {from_model: pd.DataFrame(time_results, columns=["zones", "skim_cols", "elapsed_time"])}
 
 
-from_model = "lyon"
-results = run_example(from_model, [2000])
-results = pd.read_csv(f"{from_model}_performance_results.csv", index_col=0)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Benchmark transit assignment with varying numbers of skim fields")
+    parser.add_argument("--model", default="lyon")
+    parser.add_argument("--zones", nargs="+", type=int, default=[2000])
+    args = parser.parse_args()
+    results = run_example(args.model, args.zones)
+    results[args.model].to_csv(f"{args.model}_performance_results.csv", index=False)
+
+
+if __name__ == "__main__":
+    main()

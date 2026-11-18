@@ -3,8 +3,10 @@ import pathlib
 from contextlib import AbstractContextManager
 
 from aequilibrae.project.about import About
-from aequilibrae.project.data import Matrices, Results
-from aequilibrae.project.network import Network
+from aequilibrae.project.data.matrices import Matrices
+from aequilibrae.project.data.results import Results
+from aequilibrae.project.road_network import RoadNetwork
+from aequilibrae.project.tables import Tables
 from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager
 
@@ -51,8 +53,9 @@ class Scenario:
 
         (self.base_path / "matrices").mkdir(parents=True, exist_ok=True)
         self.about = About(self.connections.db_connection)
-        self.network = Network(self.connections, project)
+        self.tables = Tables(self.connections, project)
         self.matrices = Matrices(self.base_path / "matrices")
+        self.road = RoadNetwork(self.tables)
 
         self._results: Results | None = None
 
@@ -130,4 +133,5 @@ class Scenario:
     def close(self) -> None:
         """Close all database connections owned by this scenario."""
         self.connections.close()
+        self.log_handler.close()
         self.log_handler.close()

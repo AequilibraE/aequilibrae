@@ -1,9 +1,12 @@
 import numpy as np
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Network, Project, AequilibraeMatrix
-from aequilibrae.paths.vdf import bpr
-from aequilibrae.transit import Transit
+from aequilibrae import Project
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.routing import Network
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
+from aequilibrae.transit.transit import Transit
 
 
 @pytest.fixture(scope="function")
@@ -13,7 +16,7 @@ def transit(coquimbo_example: Project):
 
 @pytest.fixture(scope="function")
 def graph(coquimbo_example: Project):
-    network = coquimbo_example.network.build(fields=["distance"])
+    network = coquimbo_example.road.build_network(fields=["distance"])
     network.links["capacity"] = 500.0
     network.links["travel_time"] = network.links.distance / 50
     return network

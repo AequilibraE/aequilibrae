@@ -13,8 +13,6 @@ import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
-from aequilibrae.parameters import Parameters
-
 logger = logging.getLogger(__name__)
 
 
@@ -66,7 +64,7 @@ class GMNSBuilder:
         geom_path: str = "",
         srid: int = 4326,
     ) -> None:
-        self.p = Parameters()
+        self.p = net.project.project_parameters
         self.links = net.links
         self.nodes = net.nodes
         self.link_types = net.link_types

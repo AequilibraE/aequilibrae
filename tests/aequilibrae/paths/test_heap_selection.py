@@ -1,24 +1,23 @@
 import geopandas as gpd
 import numpy as np
-
-from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import PathResults, available_heaps, estimate_heuristic_scale
-from aequilibrae.paths.cython.aon import PreparedAoN
-from aequilibrae.paths.cython.a_star import EuclideanContext, a_star
-from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.results import path_results as path_results_module
-from aequilibrae.paths.cython.search_query import SearchQuery
-from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.routing import PathResults, available_heaps, estimate_heuristic_scale
+from aequilibrae.routing.cython.a_star import EuclideanContext, a_star
+from aequilibrae.routing.cython.aon import PreparedAoN
+from aequilibrae.routing.cython.dijkstra import dijkstra
+from aequilibrae.routing.cython.search_query import SearchQuery
+from aequilibrae.routing.cython.search_results import SearchResults
+from aequilibrae.routing.cython.workspaces import AStarWorkspace, SearchWorkspace
+from aequilibrae.routing.results import path_results as path_results_module
 
 from .routing_helpers import make_context
 
 
 def build_graph(project):
-    return project.network.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
+    return project.road.build_graph(mode="c", cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 
 @pytest.mark.parametrize("heap", available_heaps())
@@ -147,7 +146,7 @@ def test_path_results_remembers_selected_heap(sioux_falls_example, heap, monkeyp
 @pytest.mark.parametrize("heuristic", ["haversine", "euclidean"])
 def test_path_results_support_astar(sioux_falls_example, heuristic):
     graph = build_graph(sioux_falls_example)
-    lonlat = sioux_falls_example.network.nodes.lonlat.set_index("node_id")
+    lonlat = sioux_falls_example.tables.nodes.lonlat.set_index("node_id")
     points = gpd.GeoSeries(gpd.points_from_xy(lonlat.lon, lonlat.lat), index=lonlat.index, crs=4326)
     points = points.to_crs(points.estimate_utm_crs())
     coordinates = lonlat if heuristic == "haversine" else pd.DataFrame({"x": points.x, "y": points.y})

@@ -3,17 +3,12 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.a_star import (
-    EuclideanContext,
-    HaversineContext,
-    a_star,
-    estimate_context_scale,
-)
-from aequilibrae.paths.cython.search_query import SearchQuery
-from aequilibrae.paths.cython.workspaces import AStarWorkspace, SearchWorkspace
 
-from aequilibrae.paths import Network, PathResults, available_heaps, estimate_heuristic_scale
-from aequilibrae.paths.results import path_results as path_results_module
+from aequilibrae.routing import Network, PathResults, available_heaps, estimate_heuristic_scale
+from aequilibrae.routing.cython.a_star import EuclideanContext, HaversineContext, a_star, estimate_context_scale
+from aequilibrae.routing.cython.search_query import SearchQuery
+from aequilibrae.routing.cython.workspaces import AStarWorkspace, SearchWorkspace
+from aequilibrae.routing.results import path_results as path_results_module
 
 from .routing_helpers import allocate_results, assert_state_tree, diamond_graph, history_context, make_context, search
 
@@ -429,7 +424,7 @@ def test_scale_helper_bounds_and_no_automatic_clamping():
 
 
 def test_helper_is_not_called_by_path_results(monkeypatch):
-    from aequilibrae.paths import path_heuristics
+    from aequilibrae.routing import path_heuristics
 
     graph = diamond_graph()
     coordinates = coordinates_for()

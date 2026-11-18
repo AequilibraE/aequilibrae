@@ -5,7 +5,6 @@ import pytest
 
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
-
 MIGRATIONS = Path(__file__).parents[3] / "src" / "aequilibrae" / "project" / "database_specification"
 NETWORK_MIGRATIONS = sorted((MIGRATIONS / "network" / "migrations").glob("[0-9][0-9][0-9]_*.py"))
 TRANSIT_MIGRATIONS = sorted((MIGRATIONS / "transit" / "migrations").glob("[0-9][0-9][0-9]_*.py"))

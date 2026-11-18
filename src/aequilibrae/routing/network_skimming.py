@@ -1,0 +1,129 @@
+import logging
+from datetime import datetime
+from uuid import uuid4
+
+import numpy as np
+
+from aequilibrae.routing.cython.network_skimming_core import skimming_parallel
+from aequilibrae.routing.graph import Graph
+from aequilibrae.routing.results.skim_results import SkimResults
+from aequilibrae.utils.aeq_signal import SIGNAL
+from aequilibrae.utils.core_setter import clamp_cores
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+
+logger = logging.getLogger(__name__)
+
+
+class NetworkSkimming(WorkerThread):
+    """
+
+    .. code-block:: python
+
+        >>> from aequilibrae.routing import NetworkSkimming
+
+        >>> project = create_example(project_path)
+        >>> graph = project.road.build_graph('c', 'distance', skimming=['distance'], compact=True)
+
+        >>> skm = NetworkSkimming(graph)
+        >>> skm.execute()
+
+        # The skim report (if any error generated) is available here
+        >>> skm.report
+        []
+
+        # To access the in-memory skim matrix
+        >>> matrix = skm.results.skims
+
+        # Or you can save the results to disk
+        >>> matrix.save_as_omx(project_path / 'skimming_result.omx')
+
+        >>> project.close()
+    """
+
+    signal = SIGNAL(object)
+
+    def __init__(self, graph: Graph, origins=None, project=None):
+        if not isinstance(graph, Graph):
+            raise TypeError("graph must be a Graph built by Network.build_graph()")
+        WorkerThread.__init__(self, None)
+        self.project = project
+        self.origins = origins
+        self.graph = graph
+        self.cores = omp_get_max_threads()
+        self.results = SkimResults()
+        self.report = []
+        self.procedure_id = ""
+        self.procedure_date = ""
+        self.cumulative = 0
+
+    def doWork(self):
+        self.execute()
+
+    def execute(self):
+        """
+        Runs the skimming process as specified in the graph.
+        """
+        self.signal.emit(["start", self.graph.num_zones, ""])
+
+        self.results.cores = self.cores
+
+        if self.graph.num_zones == 0:
+            self.results.prepare(self.graph)
+            self.signal.emit(["update", 0, "0/0"])
+            self.procedure_id = uuid4().hex
+            self.procedure_date = str(datetime.today())
+            self.signal.emit(["set_text", "Saving Outputs"])
+            self.signal.emit(["finished"])
+            return
+
+        graph = self.graph
+        routing = graph.routing
+
+        # The routing objective includes turn penalties. Other fields are plain
+        # graph link sums.
+        inputs = graph.skimming
+        output = inputs.make_outputs(graph.num_zones, origin_count=graph.num_zones)
+        # Keep the requested field order and centroid index while sharing the
+        # origin-major output buffer with the public AequilibraeMatrix.
+        self.results.prepare(graph, output=output)
+
+        origins = []
+        # Centroids occupy the graph-node prefix in the supplied demand order.
+        for node, orig in enumerate(graph.centroids):
+            if routing.fs[node] == routing.fs[node + 1]:
+                self.report.append(f"Centroid {orig} has no outgoing edges")
+            else:
+                origins.append((node, node))
+
+        skimming_parallel(
+            routing,
+            inputs,
+            output,
+            np.asarray(origins, dtype=np.uintp).reshape(-1, 2),
+            self.results.cores,
+            self.results._heap,
+        )
+
+        self.signal.emit(["update", self.graph.num_zones, f"{self.graph.num_zones}/{self.graph.num_zones}"])
+
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
+
+        self.signal.emit(["set_text", "Saving Outputs"])
+        self.signal.emit(["finished"])
+
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
+        """
+        self.cores = clamp_cores(cores)

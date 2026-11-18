@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.routing import Network
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 @pytest.fixture
@@ -14,7 +15,7 @@ def configuration(sioux_falls_example):
     project = sioux_falls_example
     demand = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     return {
-        "network": project.network,
+        "network": project.road.build_network(),
         "classes": [
             TrafficClass(
                 name="car",
@@ -64,7 +65,7 @@ def test_classes_require_common_centroids(configuration, change):
     demand = from_dict({"flow": np.zeros((len(centroids), len(centroids)))}, centroids)
 
     other = replace(first, name="other", demand=demand)
-    source = configuration["network"].build()
+    source = configuration["network"]
     configuration["network"] = Network(source.links)
 
     with pytest.raises(ValueError, match="same centroid order"):
@@ -118,23 +119,19 @@ def test_empty_mode_reports_all_nonintrazonal_demand_as_unassigned():
     assert np.isinf(results.skims.matrices["time"][1, 0])
 
 
-def test_old_assignment_interface_is_removed(configuration):
-    with pytest.raises(TypeError):
-        TrafficAssignment()
+def test_constructor_retains_class_configuration(configuration):
     assignment = TrafficAssignment(**configuration)
-    for method in (
-        "set_classes",
-        "add_class",
-        "set_vdf",
-        "set_algorithm",
-        "set_time_field",
-        "set_capacity_field",
-        "set_cores",
-        "add_preload",
-        "set_bfw_conjugacy",
-    ):
-        assert not hasattr(assignment, method)
     assert assignment.classes == tuple(configuration["classes"])
+
+
+def test_explicit_project_supplies_thread_parameters(configuration, monkeypatch):
+    monkeypatch.delenv("AEQ_THREADING_THRESHOLD", raising=False)
+    monkeypatch.delenv("AEQ_ELEMENTWISE_CPUS", raising=False)
+    configuration["project"].parameters["system"].update(threading_threshold=4321, elementwise_cpus=1)
+    assignment = TrafficAssignment(**configuration)
+    assignment.execute(max_iterations=1, cores=1)
+    assert assignment.threading_threshold == 4321
+    assert assignment.elementwise_cores == 1
 
 
 def test_skim_after(configuration):
@@ -186,7 +183,7 @@ def test_frank_wolfe_alias(configuration, algorithm):
 
 
 def test_vdf_defaults_do_not_depend_on_matching_network_fields(configuration):
-    configuration["network"] = Network(configuration["network"].links.data.assign(alpha=0.8, beta=2.0))
+    configuration["network"] = Network(configuration["network"].links.assign(alpha=0.8, beta=2.0))
     assignment = TrafficAssignment(**(configuration | {"name_mapping": None}))
     assignment.execute(max_iterations=1, cores=1)
     np.testing.assert_array_equal(assignment.vdf_parameters["alpha"], 0.15)

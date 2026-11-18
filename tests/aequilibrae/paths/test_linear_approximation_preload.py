@@ -34,8 +34,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import aequilibrae.paths.linear_approximation as linear_approximation
-from aequilibrae.paths.linear_approximation import LinearApproximation
+import aequilibrae.traffic.linear_approximation as linear_approximation
+from aequilibrae.traffic.linear_approximation import LinearApproximation
 
 
 class DummyVDF:

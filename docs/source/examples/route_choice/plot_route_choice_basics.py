@@ -16,8 +16,8 @@ Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.graph`
-#     * :func:`aequilibrae.paths.route_choice`
+#     * :func:`aequilibrae.routing.graph`
+#     * :func:`aequilibrae.route_choice.route_choice`
 #     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 
 # %%
@@ -27,8 +27,8 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_route_choice_assignment.png'
 
@@ -68,7 +68,7 @@ nodes_of_interest = (71645, 74089, 77011, 79385)
 
 # %%
 # Let's load the source network snapshot
-network = project.network.build()
+network = project.road.build_network()
 # Several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
@@ -104,7 +104,7 @@ def plot_results(link_loads):
 
     link_loads = link_loads[link_loads["demand_tot"] > 0]
     max_load = link_loads["demand_tot"].max()
-    links = project.network.links.data
+    links = project.tables.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
     loads_lyr = folium.FeatureGroup("link_loads")
@@ -125,7 +125,7 @@ def plot_results(link_loads):
 # Route Choice class
 # ------------------
 # Here we'll construct and use the Route Choice class to generate our route sets
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 # %%
 # Graph construction has already prepared the compressed-link to network-link mapping.

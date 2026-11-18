@@ -6,12 +6,13 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.route_choice_set_results import RouteChoiceSetResults
-from aequilibrae.utils.cython.bridge import Bridge
 
 from aequilibrae.matrix import AequilibraeSparseMatrix, from_dict
-from aequilibrae.paths import Network, RouteChoice
+from aequilibrae.route_choice import RouteChoice
+from aequilibrae.routing import Network
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.routing.cython.route_choice_set_results import RouteChoiceSetResults
+from aequilibrae.utils.cython.bridge import Bridge
 
 from .route_choice_helpers import compressed_graph, configured_choice, diamond, single_od_demand
 
@@ -62,7 +63,7 @@ def test_path_file_assignment_recosts_routes(route_choice_setup, tmp_path):
     before = source.get_results()
     source.save_path_files(path)
 
-    graph.set_costs(project.network.build(fields=["free_flow_time"]).field_values("free_flow_time"))
+    graph.set_costs(project.road.build_network(fields=["free_flow_time"]).field_values("free_flow_time"))
     choice = configured_choice(graph)
     choice.set_demand(route_choice_setup["mat"])
     choice.execute_from_path_files(path, recompute_psl=True)
@@ -72,7 +73,7 @@ def test_path_file_assignment_recosts_routes(route_choice_setup, tmp_path):
     identity = ["origin id", "destination id", "route set", "route directions"]
     pd.testing.assert_frame_equal(before[identity], after[identity], check_like=True)
 
-    costs = project.network.links.data.set_index("link_id")["free_flow_time"]
+    costs = project.tables.links.data.set_index("link_id")["free_flow_time"]
     expected_costs = [costs.loc[route].sum() for route in after["route set"]]
     np.testing.assert_allclose(after["cost"], expected_costs)
     np.testing.assert_allclose(after.groupby(["origin id", "destination id"])["probability"].sum(), 1.0)
@@ -93,8 +94,8 @@ def test_save_project_results(route_choice_setup):
     loads = choice.get_load_results()
     selected = choice.get_select_link_loading_results()
 
-    choice.save_link_flows("ll")
-    choice.save_select_link("sl")
+    choice.save_link_flows("ll", project=project)
+    choice.save_select_link("sl", project=project)
     metadata = project.matrices.get_available_matrices_and_metadata()["sl.omx"]
     assert metadata["procedure"] == "Route choice OD select link"
     assert metadata["procedure_id"] == choice.procedure_id

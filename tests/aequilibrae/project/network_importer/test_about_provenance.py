@@ -5,7 +5,7 @@ import pytest
 
 
 def _import(empty_project, pbf_path):
-    empty_project.network.importer.osm(pbf_path=pbf_path, modes=("car",), simplify=False)
+    empty_project.tables.importer.osm(pbf_path=pbf_path, modes=("car",), simplify=False)
 
 
 def _about(path):

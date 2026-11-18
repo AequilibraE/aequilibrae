@@ -5,12 +5,12 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.a_star import EuclideanContext, a_star
-from aequilibrae.paths.cython.dijkstra import dijkstra
-from aequilibrae.paths.cython.search_query import SearchQuery
-from aequilibrae.paths.cython.search_results import SearchResults
-from aequilibrae.paths.cython.workspaces import SearchWorkspace, AStarWorkspace
 
+from aequilibrae.routing.cython.a_star import EuclideanContext, a_star
+from aequilibrae.routing.cython.dijkstra import dijkstra
+from aequilibrae.routing.cython.search_query import SearchQuery
+from aequilibrae.routing.cython.search_results import SearchResults
+from aequilibrae.routing.cython.workspaces import AStarWorkspace, SearchWorkspace
 from aequilibrae.utils.list_all_turns import list_left_turns
 
 TURN_PENALTY_MODELS = {"Anaheim", "ChicagoRegional", "SiouxFalls"}

@@ -5,7 +5,6 @@ pyfiles = [
     'aeq_signal.py',
     'core_setter.py',
     'create_delaunay_network.py',
-    'create_example.py',
     'db_utils.py',
     'find_non_applicable_turn_restrictions.py',
     'geo_index.py',
@@ -20,6 +19,7 @@ pyfiles = [
     'qgis_utils.py',
     'resolve_cysignals.py',
     'spatialite_utils.py',
+    'sqlite_utils.py',
 ]
 
 pkgs = [

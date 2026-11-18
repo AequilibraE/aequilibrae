@@ -15,7 +15,7 @@ A project network can supply the source tables:
 .. code-block:: python
 
     >>> project = create_example(project_path, "coquimbo")
-    >>> network = project.network.build()
+    >>> network = project.road.build_network()
     >>> graph = network.build_graph('c', cost='distance')
 
 The source tables do not retain project connections. Later changes to project data
@@ -28,7 +28,7 @@ To restrict the source data to an area, supply a polygon:
     >>> from shapely.geometry import Polygon
 
     >>> polygon = Polygon([(-71.35, -29.95), (-71.35, -29.90), (-71.30, -29.90), (-71.30, -29.95), (-71.35, -29.95)])
-    >>> network = project.network.build(limit_to_area=polygon)  # doctest: +SKIP
+    >>> network = project.road.build_network(limit_to_area=polygon)  # doctest: +SKIP
 
 The area filter uses a spatial index. It does not clip links to the polygon boundary.
 
@@ -144,6 +144,6 @@ Use ``block_centroid_flows=False`` to permit those routes.
 
 .. seealso::
 
-    * :class:`aequilibrae.paths.network.Network`
-    * :class:`aequilibrae.paths.graph.Graph`
-    * :class:`aequilibrae.paths.graph.TransitGraph`
+    * :class:`aequilibrae.routing.Network`
+    * :class:`aequilibrae.routing.Graph`
+    * :class:`aequilibrae.transit.TransitGraph`

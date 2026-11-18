@@ -1,7 +1,7 @@
 import pytest
 
-from aequilibrae.project.project import Project
-from aequilibrae.transit import Transit
+from aequilibrae import Project
+from aequilibrae.transit.transit import Transit
 
 
 @pytest.fixture(scope="function")

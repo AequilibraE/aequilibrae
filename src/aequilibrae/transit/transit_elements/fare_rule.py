@@ -1,5 +1,5 @@
-from sqlite3 import Connection
 import logging
+from sqlite3 import Connection
 
 logger = logging.getLogger(__name__)
 

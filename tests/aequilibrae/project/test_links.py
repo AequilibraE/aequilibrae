@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 
 
 def test_get(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
     with pytest.raises(ValueError, match="links has no record with link_id=123456"):
         _ = links.get(123456)
 
@@ -15,7 +15,7 @@ def test_get(sioux_falls_test):
 
 
 def test_new(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
     new_id = links.copy(1)
 
     with sioux_falls_test.db_connection as conn:
@@ -25,7 +25,7 @@ def test_new(sioux_falls_test):
 
 
 def test_copy_link(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
 
     with pytest.raises(ValueError, match="links has no record with link_id=11111"):
         _ = links.copy(11111)
@@ -44,7 +44,7 @@ def test_copy_link(sioux_falls_test):
 
 
 def test_delete(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
 
     _ = links.get(10)
 
@@ -64,7 +64,7 @@ def test_delete(sioux_falls_test):
 
 
 def test_spatial_table_interfaces(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
     assert isinstance(links.data, gpd.GeoDataFrame)
     assert isinstance(links.extent(), Polygon)
     assert 1 in links
@@ -72,7 +72,7 @@ def test_spatial_table_interfaces(sioux_falls_test):
 
 
 def test_fields(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
     f_editor = links.fields
 
     fields = sorted(f_editor.all_fields())
@@ -84,7 +84,7 @@ def test_fields(sioux_falls_test):
 
 
 def test_refresh(sioux_falls_test):
-    links = sioux_falls_test.network.links
+    links = sioux_falls_test.tables.links
 
     link1 = links.get(1)
     val = randint(1, 99999999)

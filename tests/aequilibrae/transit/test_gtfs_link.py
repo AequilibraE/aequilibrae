@@ -5,7 +5,8 @@ import pytest
 from shapely.geometry import LineString
 
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.transit_elements import Link
+from aequilibrae.transit.transit_elements.link import Link
+
 from .random_word import randomword
 
 

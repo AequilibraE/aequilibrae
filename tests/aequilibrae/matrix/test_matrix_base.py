@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+
 from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
 from aequilibrae.matrix.cython.sparse_matrix import SparseMatrix
 from aequilibrae.matrix.cython.sparse_matrix_builder import SparseMatrixBuilder

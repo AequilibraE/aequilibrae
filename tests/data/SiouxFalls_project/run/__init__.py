@@ -8,24 +8,20 @@ within `parameters.yml` under the `run` heading will have their arguments partia
 Not all objects within this module must be named `parameters.yml`. If an object is named within
 `parameters.yml`, then it must exist within this module otherwise a `RuntimeError` will be raised.
 
-Functions should use the `get_active_project()` function to obtain a reference to the current
-project.
+Functions must accept an explicit `project` argument, supplied by `Project.run`.
 
 State within this module should be avoided as this file may be run multiple times.
 """
 
 import numpy as np
 
-from aequilibrae.context import get_active_project
 
-
-def matrix_summary():
+def matrix_summary(project):
     """
-    Compute summary statistics about the matrix files in the active project.
+    Compute summary statistics about the matrix files in the supplied project.
 
     If no matrix files are present an empty dictionary will be returned.
     """
-    project = get_active_project()
     mats = project.matrices
     mats_to_metadata = mats.get_available_matrices_and_metadata()
 
@@ -45,14 +41,13 @@ def matrix_summary():
     return res
 
 
-def graph_summary():
+def graph_summary(project):
     """
-    Compute summary statistics about the graphs built within the active project.
+    Compute summary statistics about the graphs built within the supplied project.
 
     If no graphs have been built an empty dictionary will be returned.
     """
-    project = get_active_project()
-    graphs = project.network.graphs
+    graphs = project.tables.graphs
 
     return {
         k: {
@@ -66,16 +61,15 @@ def graph_summary():
     }
 
 
-def results_summary():
+def results_summary(project):
     """
     Read the metadata table from the results database.
     """
-    project = get_active_project()
 
     return project.results.list()
 
 
-def example_function_with_kwargs(arg1: str = None, **kwargs):
+def example_function_with_kwargs(project, arg1: str = None, **kwargs):
     """
     An example function to demonstrate the argument application via parameters.yml.
     """

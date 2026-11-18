@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from aequilibrae import TrafficClass
 from aequilibrae.matrix import from_dict
+from aequilibrae.traffic import TrafficClass
 
 from .test_assignment_integration import assignment_for, diamond, matrix_for
 

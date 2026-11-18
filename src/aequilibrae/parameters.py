@@ -2,11 +2,9 @@ import logging
 from copy import deepcopy
 from os import PathLike
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import yaml
-
-from aequilibrae.context import get_active_project
 
 
 class Parameters:
@@ -14,7 +12,7 @@ class Parameters:
 
     Parameters are used in many procedures, and are often defined in the ``parameters.yml`` file ONLY.
 
-    Parameters are organized in the following groups:
+    Parameters are organised in the following groups:
 
     * assignment
     * distribution
@@ -31,12 +29,11 @@ class Parameters:
 
     .. code-block:: python
 
-        >>> from aequilibrae.parameters import Parameters
+        >>> from aequilibrae.project import Parameters
 
-        >>> project = Project()
-        >>> project.new(project_path)
+        >>> project = Project.create(project_path)
 
-        >>> p = Parameters()
+        >>> p = project.project_parameters
 
         >>> p.parameters['system']['logging_directory'] =  "/path_to/other_logging_directory"
         >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
@@ -52,15 +49,9 @@ class Parameters:
     file_default: Path = Path(__file__).parent / "parameters.yml"
     _default: dict
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: PathLike | str | None = None) -> None:
         """Loads parameters from file."""
-        self.file: PathLike | str = None
-        if path is not None:
-            self.file = path / "parameters.yml"
-        else:
-            proj = get_active_project(must_exist=False)
-            if proj is not None:
-                self.file = proj.project_base_path / "parameters.yml"
+        self.file: Path | None = Path(path) / "parameters.yml" if path is not None else None
 
         if self.file is not None and self.file.is_file():
             with open(self.file, "r") as yml:
@@ -71,8 +62,13 @@ class Parameters:
 
             self.parameters = deepcopy(self._default)
 
-    def write_back(self):
-        """Writes the parameters back to file"""
+    def write_back(self) -> None:
+        """Write the parameters back to file.
+
+        :raises ValueError: If no project folder was supplied.
+        """
+        if self.file is None:
+            raise ValueError("An explicit path is required to write parameters")
         with open(self.file, "w") as stream:
             yaml.dump(self.parameters, stream, default_flow_style=False)
 
@@ -115,7 +111,7 @@ class Parameters:
             or a built in preset, if a "spec" contains keys not present in the preset's default
             spec, or if an entry defines neither "function" nor "functional_form".
         """
-        from aequilibrae.paths.vdf import builtin_vdfs, load_from_parameters
+        from aequilibrae.traffic.vdf import builtin_vdfs, load_from_parameters
 
         vdfs = self.parameters.get("vdfs", None)
         if vdfs is None:

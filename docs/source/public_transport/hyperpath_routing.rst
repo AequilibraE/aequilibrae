@@ -114,8 +114,8 @@ The code below allows you to reproduce the same experiment that resulted in the 
     import pandas as pd
 
     from aequilibrae.matrix import from_dict
-    from aequilibrae.paths.cython.demand import assignment_demand
-    from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+    from aequilibrae.routing.cython.demand import assignment_demand
+    from aequilibrae.routing.cython.public_transport import HyperpathGenerating
     from numba import jit
 
     RANDOM_SEED = 124  # random seed

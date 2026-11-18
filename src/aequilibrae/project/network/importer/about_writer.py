@@ -4,10 +4,10 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Sequence
 
-from aequilibrae import version as _aequilibrae_version
+from aequilibrae._version import version as _aequilibrae_version
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
 logger = logging.getLogger(__name__)
 

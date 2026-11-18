@@ -4,6 +4,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
+from types import TracebackType
 from typing import NoReturn
 
 import pandas as pd
@@ -12,14 +13,16 @@ from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
-from aequilibrae.project.data import Matrices, Results
-from aequilibrae.project.network import Network
+from aequilibrae.project.data.matrices import Matrices
+from aequilibrae.project.data.results import Results
 from aequilibrae.project.project_cleaning import clean
 from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.project.road_network import RoadNetwork
 from aequilibrae.project.scenario import Scenario
-from aequilibrae.project.tools import MigrationManager
+from aequilibrae.project.tables import Tables
+from aequilibrae.project.tools.migration_manager import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
-from aequilibrae.transit import Transit
+from aequilibrae.transit.transit import Transit
 from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager, commit_and_close
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
@@ -33,8 +36,7 @@ class Project:
     .. code-block:: python
         :caption: Create Project
 
-        >>> new_project = Project()
-        >>> new_project.new(project_path)
+        >>> new_project = Project.create(project_path)
 
         # Safely closes the project
         >>> new_project.close()
@@ -42,31 +44,17 @@ class Project:
     .. code-block:: python
         :caption: Open Project
 
-        >>> existing_project = Project()
-        >>> existing_project.open(project_path)
+        >>> existing_project = Project(project_path)
 
         >>> existing_project.close()
     """
 
-    def __init__(self):
-        self.root_scenario: Scenario
-        self.scenario: Scenario
+    def __init__(self, project_path: os.PathLike | str) -> None:
+        """Load a ready-to-use project from disk.
 
-    @classmethod
-    def from_path(cls, project_folder: str):
-        project = cls()
-        project.open(project_folder)
-        return project
-
-    def open(self, project_path: os.PathLike | str) -> None:
+        :param project_path: Full path to the project data folder.
+        :raises FileNotFoundError: If the project database does not exist.
         """
-        Loads project from disk
-
-        :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
-            not exist, it will fail.
-        """
-
         base_path = Path(project_path)
         file_name = base_path / "project_database.sqlite"
 
@@ -82,18 +70,32 @@ class Project:
         self.scenario = self.root_scenario
         self.__transit = None
 
-        # project_parameters is a cached_property - drop any value cached from a prior
-        # new()/open() on this same Project instance before it's reloaded below, or it
-        # would keep pointing at the previous project's parameters.yml.
-        self.__dict__.pop("project_parameters", None)
+        # project_parameters is a cached_property, loaded for the current scenario on first access.
 
-        # Log outputs could interleave if two projects were open at once, but only one open project is supported.
+        # Log outputs can interleave if two projects are open at once; only one project can be active.
         default_log_file_config(self.scenario.log_handler)
 
         self.activate()
 
         logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
+
+    @classmethod
+    def open(cls, project_path: os.PathLike | str) -> "Project":
+        return cls(project_path)
+
+    def __enter__(self) -> "Project":
+        if not self.db_connection.is_open():
+            raise RuntimeError("This project is closed")
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
 
     @property
     def project_base_path(self) -> Path:
@@ -108,8 +110,13 @@ class Project:
         return self.scenario.about
 
     @property
-    def network(self) -> Network:
-        return self.scenario.network
+    def tables(self) -> Tables:
+        return self.scenario.tables
+
+    @property
+    def road(self) -> RoadNetwork:
+        """Road network and graph builder for the current scenario."""
+        return self.scenario.road
 
     @property
     def transit(self) -> Transit:
@@ -144,17 +151,6 @@ class Project:
         return self.scenario.db_connection
 
     @property
-    def db_connection_spatial(self) -> NestedTransactionManager:
-        """Deprecated alias for ``db_connection``, which is now a spatial connection."""
-        warnings.warn(
-            "'db_connection_spatial' is deprecated and will be removed in version 2.1. "
-            "Use 'db_connection' instead, which is now a spatial connection.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.db_connection
-
-    @property
     def results_connection(self) -> NestedTransactionManager:
         return self.scenario.results_connection
 
@@ -162,13 +158,15 @@ class Project:
     def transit_connection(self) -> NestedTransactionManager:
         return self.scenario.transit_connection
 
-    def new(self, project_path: os.PathLike | str) -> None:
-        """Creates a new project
+    @classmethod
+    def create(cls, project_path: os.PathLike | str) -> "Project":
+        """Create a ready-to-use project.
 
-        :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
+        :param project_path: Full path to a new project data folder.
+        :returns: The open project, usable as a context manager.
+        :raises FileExistsError: If the destination already exists.
         """
-
+        self = object.__new__(cls)
         base_path = Path(project_path)
 
         if base_path.exists():
@@ -184,15 +182,14 @@ class Project:
         )
         self.scenario = self.root_scenario
 
-        # See the matching comment in open(): drop any parameters cached from a prior
-        # new()/open() on this same Project instance before it's reloaded below.
-        self.__dict__.pop("project_parameters", None)
+        # Parameters are loaded for this project's scenario on first access.
 
         default_log_file_config(self.scenario.log_handler)
 
         self.activate()
 
         logger.info(f"Created project on {base_path}")
+        return self
 
     def close(self) -> None:
         """Safely closes the project"""
@@ -212,6 +209,8 @@ class Project:
 
         finally:
             self.scenario.close()
+            if self.root_scenario is not self.scenario:
+                self.root_scenario.close()
             self.deactivate()
 
     def activate(self) -> None:
@@ -271,7 +270,7 @@ class Project:
     def run(self) -> dict[str, functools.partial]:
         """
         Load and return the AequilibraE run module with the default arguments from
-        ``parameters.yml`` partially applied.
+        ``parameters.yml`` partially applied, along with an explicit ``project`` argument.
 
         Refer to ``run/__init__.py`` file within the project folder for documentation.
         """
@@ -289,7 +288,7 @@ class Project:
             elif not callable(attr):
                 raise RuntimeError(f"found symbol '{name}' in the run module but it is not callable")
 
-            func = functools.partial(attr, **(kwargs if kwargs is not None else {}))
+            func = functools.partial(attr, project=self, **(kwargs if kwargs is not None else {}))
             res[name] = func
 
         return res

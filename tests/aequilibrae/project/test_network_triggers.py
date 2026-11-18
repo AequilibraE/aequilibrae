@@ -72,16 +72,16 @@ def _assert_network_consistent(conn):
 
 
 def test_delete_links_delete_nodes(sioux_falls_example):
-    items = sioux_falls_example.network.count_nodes()
+    items = sioux_falls_example.tables.count_nodes()
     assert items == 24, "Wrong number of nodes found"
-    links = sioux_falls_example.network.links
-    nodes = sioux_falls_example.network.nodes
+    links = sioux_falls_example.tables.links
+    nodes = sioux_falls_example.tables.nodes
 
     nodes.update(1, is_centroid=0)
 
     for i in [1, 2, 3, 4, 5, 14]:
         links.delete(i)
-    items = sioux_falls_example.network.count_nodes()
+    items = sioux_falls_example.tables.count_nodes()
     assert items == 23, "Wrong number of nodes found"
 
 
@@ -93,7 +93,7 @@ def test_add_regular_link(sioux_falls_example):
 
 
 def test_add_regular_node_change_centroid_id(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     nodes_count = network.count_nodes()
     data = [987654, 1, Point(0, 0).wkb]
 
@@ -109,7 +109,7 @@ def test_add_regular_node_change_centroid_id(sioux_falls_example):
 
 
 def test_link_direction(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.tables
     links_count = network.count_links()
 
     with sioux_falls_example.db_connection as conn:

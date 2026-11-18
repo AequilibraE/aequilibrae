@@ -3,7 +3,8 @@ from random import randint
 
 import pytest
 
-from aequilibrae.transit.transit_elements import Service
+from aequilibrae.transit.transit_elements.service import Service
+
 from .random_word import randomword
 
 

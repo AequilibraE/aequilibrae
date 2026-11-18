@@ -5,16 +5,16 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.demand import assignment_demand
-from aequilibrae.paths.cython.outputs import LoadingOutputs, SkimmingOutputs
 
-from aequilibrae import Network, TrafficAssignment, TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import available_heaps
-from aequilibrae.paths.assignment_context import AssignmentInputs
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.matrix.cython.dense_matrix import DenseMatrix
+from aequilibrae.routing import Network, available_heaps
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.routing.cython.demand import assignment_demand
+from aequilibrae.routing.cython.outputs import LoadingOutputs, SkimmingOutputs
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.assignment_context import AssignmentInputs, PreparedTrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 def diamond(turn=False):
@@ -287,8 +287,9 @@ def test_assignment_classes_build_independent_graphs_and_cost_buffers():
         demand=matrix_for(network),
         graph_options={"block_centroid_flows": False},
     )
-    prepared = network._assignment_graph(configuration)
-    second_graph = network._assignment_graph(replace(configuration, name="trucks"))
+    fields = network._field_arrays(["time", "distance"])
+    prepared = PreparedTrafficClass(configuration, network, fields).graph
+    second_graph = PreparedTrafficClass(replace(configuration, name="trucks"), network, fields).graph
     assert second_graph is not prepared
     assert second_graph.mapping is not prepared.mapping
     first, second = [

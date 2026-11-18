@@ -14,9 +14,9 @@ for a city in La Serena Metropolitan Area in Chile.
 .. seealso::
     Several functions, methods, classes and modules are used in this example:
 
-    * :func:`aequilibrae.paths.graph`
-    * :func:`aequilibrae.paths.route_choice`
-    * :func:`aequilibrae.paths.sub_area`
+    * :func:`aequilibrae.routing.graph`
+    * :func:`aequilibrae.route_choice.route_choice`
+    * :func:`aequilibrae.route_choice.sub_area`
     * :func:`aequilibrae.matrix.aequilibrae_matrix`
 """
 
@@ -32,8 +32,8 @@ import folium
 import numpy as np
 import pandas as pd
 
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.logging_utils import basic_config
+from aequilibrae.examples import create_example
+from aequilibrae.utils import basic_config
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_subarea_analysis.png'
 
@@ -63,7 +63,7 @@ beta = 1.1  # PSL parameter
 
 # %%
 # Let's build all graphs
-network = project.network.build()
+network = project.road.build_network()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
@@ -99,7 +99,7 @@ mat["demand"] = np.full((graph.num_zones, graph.num_zones), 10.0)
 # quadratically with the number of links cut.
 
 zones_of_interest = [29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 49, 50, 51, 52, 57, 58, 59, 60]
-zones = project.network.zones.data.set_index("zone_id")
+zones = project.tables.zones.data.set_index("zone_id")
 zones = zones.loc[zones_of_interest]
 zones.head()
 
@@ -122,9 +122,9 @@ zones.head()
 # origin and destination IDs for each entry we could use `subarea.post_process(keep_original_ods=True)` instead. This
 # will attach the true ODs from the select link OD matrix as part of the index. However, this will create a
 # significantly larger, but more flexible matrix.
-from aequilibrae.paths import SubAreaAnalysis
+from aequilibrae.route_choice import SubAreaAnalysis
 
-subarea = SubAreaAnalysis(graph, zones, mat)
+subarea = SubAreaAnalysis(graph, zones, mat, project=project)
 subarea.rc.set_choice_set_generation("lp", max_routes=3, penalty=1.02, store_results=False)
 subarea.rc.execute(perform_assignment=True)
 demand = subarea.post_process()
@@ -138,7 +138,7 @@ new_centroids
 
 # %%
 # We can then perform an assignment using our new demand matrix on the limited graph
-from aequilibrae.paths import RouteChoice
+from aequilibrae.route_choice import RouteChoice
 
 demand_matrix = from_df(
     demand.reset_index(),
@@ -176,7 +176,7 @@ subarea_zone = folium.Polygon(
 def plot_results(link_loads):
     link_loads = link_loads[link_loads["demand_tot"] > 0]
     max_load = link_loads[["demand_tot"]].max()
-    links = project.network.links.data
+    links = project.tables.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
     factor = 10 / max_load
 
@@ -201,13 +201,13 @@ map
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # It's useful later on to know which links from the network cross our polygon.
-links = project.network.links.data
+links = project.tables.links.data
 inner_links = links[links.crosses(poly.boundary)].sort_index()
 inner_links.head()
 
 # %%
 # As well as which nodes are interior.
-nodes = project.network.nodes.data.set_index("node_id")
+nodes = project.tables.nodes.data.set_index("node_id")
 inside_nodes = nodes.sjoin(zones, how="inner").sort_index()
 inside_nodes.head()
 

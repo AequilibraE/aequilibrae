@@ -16,7 +16,7 @@ marked as such in the ``migrations`` table of ``project_database.sqlite``. On fi
 
 Database downgrades are not supported. Previous versions of AequilibraE are not guaranteed to work with newer databases.
 
-If skipping a specific migration is required, use the ``aequilibrae.project.tools.MigrationManager`` object
+If skipping a specific migration is required, use the ``aequilibrae.project.MigrationManager`` object
 directly. Consult its documentation page for details. Take care when skipping migrations.
 
 All database upgrades are applied within a single transaction.

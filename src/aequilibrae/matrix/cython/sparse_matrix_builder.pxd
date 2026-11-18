@@ -2,7 +2,7 @@ from libc.stddef cimport size_t
 from libcpp.memory cimport unique_ptr
 from libcpp.vector cimport vector
 cimport cython
-from .matrix_base cimport _MatrixBase
+from aequilibrae.matrix.cython.matrix_base cimport _MatrixBase
 
 cdef extern from "sparse_matrix_builder.hpp" namespace "aequilibrae::matrix::cpp" nogil:
     cdef cppclass COOStorage[T]:

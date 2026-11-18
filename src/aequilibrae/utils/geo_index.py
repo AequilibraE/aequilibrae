@@ -1,14 +1,14 @@
 import warnings
-from typing import Union, List
+from typing import List, Union
 
-from shapely.geometry import Point, Polygon, LineString, MultiPoint, MultiPolygon, MultiLineString
+from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon
 from shapely.wkb import loads
 
 from aequilibrae.utils.qgis_utils import inside_qgis, rtree_avail
 
 if inside_qgis:
+    from qgis.core import QgsFeature, QgsGeometry
     from qgis.core import QgsSpatialIndex as Index
-    from qgis.core import QgsGeometry, QgsFeature
 else:
     from rtree import Index
 

@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 
-from aequilibrae import version as release_version
+from aequilibrae import __version__ as release_version
 
 npth = Path(__file__).parent.parent.parent
 if npth not in sys.path:

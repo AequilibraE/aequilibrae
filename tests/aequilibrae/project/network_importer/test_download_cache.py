@@ -7,7 +7,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import Point
 
-from aequilibrae.project.network.importer import DownloadCache
+from aequilibrae.project.network.importer.download_cache import DownloadCache
 
 
 def test_cache_is_lazy(tmp_path):

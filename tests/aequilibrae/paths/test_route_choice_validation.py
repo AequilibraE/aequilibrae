@@ -3,10 +3,11 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae.paths import Network, RouteChoice
+from aequilibrae.route_choice import RouteChoice
+from aequilibrae.routing import Network
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.utils.cython.bridge import Bridge
 
 from .route_choice_helpers import (
     chain_graph,

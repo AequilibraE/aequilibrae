@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.matrix import from_df
-from aequilibrae.paths import Network, RouteChoice
+from aequilibrae.route_choice import RouteChoice
+from aequilibrae.routing import Network
 
 
 def junction(penalty, *, lonlat=None):

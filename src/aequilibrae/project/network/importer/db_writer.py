@@ -6,16 +6,15 @@ from typing import TYPE_CHECKING
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.project.project_creation import without_triggers
-from aequilibrae.utils.db_utils import list_columns
-
 from aequilibrae.project.network.importer.exceptions import ImporterError
 from aequilibrae.project.network.importer.schema.attributes import JSON_COL, split_attributes
 from aequilibrae.project.network.importer.schema.link_types import LinkTypeAllocator
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
+from aequilibrae.utils.db_utils import list_columns
+from aequilibrae.utils.sqlite_utils import without_triggers
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
 logger = logging.getLogger(__name__)
 

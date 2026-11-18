@@ -20,13 +20,13 @@ from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_spatialite.png'
 
 # %%
-from aequilibrae.utils.spatialite_utils import set_known_spatialite_folder, ensure_spatialite_binaries
+from aequilibrae.utils import set_known_spatialite_folder, ensure_spatialite_binaries
 
 # First we prevent Windows from downloading spatialite binaries during this session
 # THIS VALUE MUST BE UPPER CASE TO BE EFFECTIVE

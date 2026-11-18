@@ -26,7 +26,7 @@ import sqlite3
 from tempfile import gettempdir
 from geopandas import read_postgis
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 from aequilibrae.utils.create_delaunay_network import DelaunayAnalysis
 
 # %%

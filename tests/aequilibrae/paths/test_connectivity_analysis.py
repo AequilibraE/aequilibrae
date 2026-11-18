@@ -2,18 +2,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae.paths import Network
-from aequilibrae.paths.connectivity_analysis import disconnected_analysis
+from aequilibrae.routing import Network
+from aequilibrae.routing.connectivity_analysis import disconnected_analysis
 
 
 def test_connectivity_analysis(sioux_falls_example):
-    network = sioux_falls_example.network
+    network = sioux_falls_example.road
     graph = network.build_graph(mode="c", cost="distance", block_centroid_flows=False)
 
     disconnected = graph.disconnected_nodes()
     assert disconnected.shape[0] == 0
 
-    source = network.build()
+    source = network.build_network()
     costs = source.field_values("distance").copy()
     costs[np.isin(source.link_ids, [5, 12, 19])] = np.inf  # Disconnect nodes 1, 2, and 6 from the rest of the graph
     graph.set_costs(costs)

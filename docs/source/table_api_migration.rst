@@ -11,7 +11,7 @@ The same table workflow is used by ``links``, ``nodes``, ``modes``,
 ``link_types``, ``periods``, ``turn_restrictions``, ``zones``, and
 ``results``. Matrix files use the separate workflow described under `Matrices
 and results`_. The zones table has moved from ``project.zoning`` to
-``project.network.zones``.  The table class is now ``Zones`` in
+``project.tables.zones``.  The table class is now ``Zones`` in
 ``aequilibrae.project.network.zones``.
 
 In general, create rows with ``insert()``, change them with ``update()``, and
@@ -27,7 +27,7 @@ row count:
 
 .. code-block:: python
 
-    links = project.network.links
+    links = project.tables.links
 
     if 42 in links:
         link = links.get(42)
@@ -68,7 +68,7 @@ Previously, a record was changed in memory and then persisted with ``save()``:
 .. code-block:: python
 
     # Previous API
-    link = project.network.links.get(42)
+    link = project.tables.links.get(42)
     link.speed_ab = 80
     link.name = "Main Street"
     link.save()
@@ -86,8 +86,8 @@ key does not exist. To remove a row, replace ``record.delete()`` with
 
 .. code-block:: python
 
-    project.network.nodes.delete(17)
-    project.network.zones.delete(5)
+    project.tables.nodes.delete(17)
+    project.tables.zones.delete(5)
 
 ``delete()`` also raises ``ValueError`` when no row has the requested key.
 
@@ -100,14 +100,14 @@ call. It returns the explicit or generated key:
 .. code-block:: python
 
     # Previous API
-    mode = project.network.modes.new("k")
+    mode = project.tables.modes.new("k")
     mode.mode_name = "freight"
-    project.network.modes.add(mode)
+    project.tables.modes.add(mode)
     mode.description = "Freight vehicles"
     mode.save()
 
     # Table API
-    mode_id = project.network.modes.insert(
+    mode_id = project.tables.modes.insert(
         mode_id="k",
         mode_name="freight",
         description="Freight vehicles",
@@ -121,12 +121,12 @@ Shapely object when the row is read:
 
     from shapely.geometry import LineString, Point, Polygon
 
-    nodes = project.network.nodes
+    nodes = project.tables.nodes
     nodes.insert(node_id=1001, is_centroid=0, geometry=Point(-43.20, -22.90))
     nodes.insert(node_id=1002, is_centroid=0, geometry=Point(-43.19, -22.90))
 
     link_geometry = LineString([(-43.20, -22.90), (-43.19, -22.90)])
-    link_id = project.network.links.insert(
+    link_id = project.tables.links.insert(
         a_node=1001,
         b_node=1002,
         modes="c",
@@ -142,7 +142,7 @@ Shapely object when the row is read:
             (-43.21, -22.91),
         ]
     )
-    project.network.zones.insert(zone_id=1001, name="Downtown", geometry=zone_polygon)
+    project.tables.zones.insert(zone_id=1001, name="Downtown", geometry=zone_polygon)
 
 For scalar insertion, ``links`` supplies defaults for omitted endpoints,
 direction, and link type. Other omitted columns use their SQLite defaults or
@@ -154,8 +154,8 @@ its new ID:
 
 .. code-block:: python
 
-    copied_link_id = project.network.links.copy(link_id)
-    copied_link = project.network.links.get(copied_link_id)
+    copied_link_id = project.tables.links.copy(link_id)
+    copied_link = project.tables.links.get(copied_link_id)
 
 Insert, update, or delete many rows
 -----------------------------------
@@ -180,7 +180,7 @@ non-numeric-keys, the keys must be provided:
             "geometry": [first_geometry.wkb, second_geometry.wkb],
         }
     )
-    new_ids = project.network.links.insert_from(new_links)
+    new_ids = project.tables.links.insert_from(new_links)
 
 Bulk insertion uses the columns in the DataFrame and any defaults. It does
 not apply the scalar ``insert()`` conversions. Values must therefore
@@ -202,7 +202,7 @@ return value is the number of submitted rows:
             "capacity_ab": [1800.0, 1200.0],
         }
     )
-    submitted = project.network.links.update_from(changes)
+    submitted = project.tables.links.update_from(changes)
     assert submitted == 2
 
 Neither method mutates the caller's DataFrame. Use scalar ``insert()`` or
@@ -216,7 +216,7 @@ of submitted rows, but it accepts a list of keys instead:
 .. code-block:: python
 
     removals = [new_ids[0], new_ids[1]]
-    submitted = project.network.links.delete_from(removals)
+    submitted = project.tables.links.delete_from(removals)
     assert submitted == 2
 
 None of these methods mutate the caller's DataFrame or List.
@@ -231,15 +231,15 @@ Collection methods that returned dictionaries are gone. Replace
 
     modes_by_id = {
         mode.mode_id: mode
-        for mode in project.network.modes
+        for mode in project.tables.modes
     }
     link_types_by_id = {
         link_type.link_type_id: link_type
-        for link_type in project.network.link_types
+        for link_type in project.tables.link_types
     }
     zones_by_id = {
         zone.zone_id: zone
-        for zone in project.network.zones
+        for zone in project.tables.zones
     }
 
 Use ``data`` instead of iteration when you know you need all the
@@ -253,8 +253,8 @@ default, pass ``full_list`` to provide a custom set of candidate IDs:
 
 .. code-block:: python
 
-    available_mode_ids = project.network.modes.available_ids()
-    available_link_type_ids = project.network.link_types.available_ids(
+    available_mode_ids = project.tables.modes.available_ids()
+    available_link_type_ids = project.tables.link_types.available_ids(
         full_list=list(string.ascii_uppercase)
     )
 
@@ -292,8 +292,8 @@ the previous row method did:
 .. code-block:: python
 
     zone_id = 1001
-    zone = project.network.zones.get(zone_id)
-    project.network.nodes.connect_mode(
+    zone = project.tables.zones.get(zone_id)
+    project.tables.nodes.connect_mode(
         zone_id,
         "c",
         connectors=2,
@@ -304,7 +304,7 @@ To connect every zone that has a centroid, use the table-wide operation:
 
 .. code-block:: python
 
-    project.network.zones.connect_mode("c", connectors=2, limit_to_zone=True)
+    project.tables.zones.connect_mode("c", connectors=2, limit_to_zone=True)
 
 ``nodes.new_centroid(node_id, geometry)`` remains as a convenience method, but
 it now requires the geometry and inserts the centroid immediately:
@@ -312,19 +312,19 @@ it now requires the geometry and inserts the centroid immediately:
 .. code-block:: python
 
     # Previous API
-    centroid = project.network.nodes.new_centroid(1001)
+    centroid = project.tables.nodes.new_centroid(1001)
     centroid.geometry = Point(-43.195, -22.900)
     centroid.save()
 
     # Table API
-    project.network.nodes.new_centroid(1001, Point(-43.195, -22.900))
+    project.tables.nodes.new_centroid(1001, Point(-43.195, -22.900))
 
 ``periods.new_period(...)`` likewise inserts immediately and returns the period
 ID:
 
 .. code-block:: python
 
-    project.network.periods.new_period(
+    project.tables.periods.new_period(
         2,
         start=7 * 60 * 60,
         end=9 * 60 * 60,

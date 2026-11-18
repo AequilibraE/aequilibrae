@@ -10,8 +10,9 @@ from time import perf_counter
 import numpy as np
 import pandas as pd
 
-from aequilibrae.distribution.gravity_application import GravityApplication, SyntheticGravityModel
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.distribution.gravity_application import GravityApplication
+from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.parameters import Parameters
 
 
@@ -58,7 +59,7 @@ class GravityCalibration:
             **function** (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
 
             **project** (:obj:`Project`, *Optional*): The Project to connect to.
-            By default, uses the currently active project
+            Defaults to no project ownership
 
             **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
@@ -261,7 +262,7 @@ class GravityCalibration:
         return np.nansum(impedance * gravity) / np.nansum(gravity)
 
     def __get_parameters(self):
-        par = Parameters().parameters
+        par = self.project.parameters if self.project is not None else Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para

@@ -1,14 +1,15 @@
-import geopandas as gpd
 import logging
 import math
-import numpy as np
-import pandas as pd
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Sequence
+
+import geopandas as gpd
+import numpy as np
+import pandas as pd
 from requests.exceptions import RequestException
 from shapely.geometry import MultiPolygon, Point, Polygon, box
-from typing import Sequence
 
 from aequilibrae.project.network.importer.download_cache import DownloadCache
 from aequilibrae.project.network.importer.exceptions import ImporterError

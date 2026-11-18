@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
 AGENCY_MULTIPLIER = 10_000_000_000
 ROUTE_ID_MULTIPLIER = 1000000

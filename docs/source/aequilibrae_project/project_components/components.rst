@@ -10,13 +10,13 @@ then we'll go over the project components without geo-spatial information.
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from aequilibrae.utils.create_example import create_example
+    from aequilibrae.examples import create_example
 
     _component_docs_tmp = TemporaryDirectory()
     my_folder_path = Path(_component_docs_tmp.name)
     project_path = my_folder_path / "project"
 
-``project.network.links``
+``project.tables.links``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'links' table.
@@ -28,7 +28,7 @@ Each item in the 'links' table is an immutable ``LinkRecord``.
 
     >>> project = create_example(project_path, "coquimbo")
 
-    >>> project_links = project.network.links
+    >>> project_links = project.tables.links
 
     # Let's add a new field to our 'links' table
     >>> project_links.fields.add("my_field", "This is an example", "TEXT")
@@ -62,7 +62,7 @@ Each item in the 'links' table is an immutable ``LinkRecord``.
     * :ref:`editing_network_splitting_link`
         Usage example
 
-``project.network.nodes``
+``project.tables.nodes``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'nodes' table.
@@ -72,7 +72,7 @@ Each item in the 'nodes' table is an immutable ``NodeRecord``.
 
     >>> from shapely.geometry import Point
 
-    >>> project_nodes = project.network.nodes
+    >>> project_nodes = project.tables.nodes
 
     # To get one node record
     >>> node = project_nodes.get(10070)
@@ -122,7 +122,7 @@ Each item in the 'nodes' table is an immutable ``NodeRecord``.
 
 .. _project_zones:
 
-``project.network.zones``
+``project.tables.zones``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'zones' table.
@@ -132,7 +132,7 @@ Each item in the 'zones' table is an immutable ``ZoneRecord``.
 
     >>> from shapely.geometry import Point, Polygon
 
-    >>> project_zones = project.network.zones
+    >>> project_zones = project.tables.zones
 
     # Let's start this example by adding a new field to the 'zones' table
     >>> project_zones.fields.add("parking_spots", "Number of public parking spots", "INTEGER")
@@ -235,7 +235,7 @@ This class is directly accessed from within the corresponding module one wants t
     >>> project = create_example(my_folder_path / "field_editor", "nauru")
 
     # We'll edit the fields in the 'nodes' table
-    >>> node_fields = project.network.nodes.fields
+    >>> node_fields = project.tables.nodes.fields
 
     # To add a new field to the 'nodes' table
     >>> node_fields.add("my_new_field", "this is an example of AequilibraE's functionalities", "TEXT")
@@ -287,8 +287,8 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. seealso::
     
-    * :func:`aequilibrae.log.Log`
-        Class documentation
+    * :meth:`aequilibrae.Project.log`
+        Project log access
     * :ref:`useful-log-tips`
         Usage example
     
@@ -344,10 +344,10 @@ otherwise, provide ``index_name`` explicitly.
 
 .. seealso::
 
-    * :func:`aequilibrae.project.data.matrices.Matrices`
-        Class documentation
+    * :attr:`aequilibrae.Project.matrices`
+        Project matrix manager
 
-``project.network.link_types``
+``project.tables.link_types``
 ------------------------------
 
 This method allows you to access the API resources to manipulate the 'link_types' table.
@@ -357,7 +357,7 @@ Each item in the 'link_types' table is an immutable ``LinkTypeRecord``.
 
     >>> project = create_example(my_folder_path / "link_types", "coquimbo")
 
-    >>> link_types = project.network.link_types
+    >>> link_types = project.tables.link_types
 
     # Create a new LinkType with ID 'A'    
     >>> link_types.insert(link_type_id="A", link_type="Arterial")  
@@ -392,7 +392,7 @@ Each item in the 'link_types' table is an immutable ``LinkTypeRecord``.
     * :ref:`tables_link_types`
         Table documentation
 
-``project.network.modes``
+``project.tables.modes``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'modes' table.
@@ -402,7 +402,7 @@ Each item in 'modes' table is an immutable ``ModeRecord``.
 
     >>> project = create_example(my_folder_path / "modes", "coquimbo")
 
-    >>> modes = project.network.modes
+    >>> modes = project.tables.modes
 
     # We create a new mode
     >>> modes.insert(mode_id="k", mode_name="flying_car")
@@ -433,7 +433,7 @@ Each item in 'modes' table is an immutable ``ModeRecord``.
     * :ref:`tables_modes`
         Table documentation
 
-``project.network.periods``
+``project.tables.periods``
 ---------------------------
 
 This method allows you to access the API resources to manipulate the 'periods' table.
@@ -443,7 +443,7 @@ Each item in the 'periods' table is a ``Period`` object.
 
     >>> project = create_example(my_folder_path / "periods", "coquimbo")
 
-    >>> periods = project.network.periods
+    >>> periods = project.tables.periods
 
     # Let's add a new field to our 'periods' table
     >>> periods.fields.add("my_field", "This is field description", "TEXT")

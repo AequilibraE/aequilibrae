@@ -32,8 +32,8 @@ The required information is:
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficClass
-    >>> from aequilibrae.utils.create_example import create_example
+    >>> from aequilibrae.traffic import TrafficClass
+    >>> from aequilibrae.examples import create_example
 
     >>> project = create_example(project_path)
 
@@ -82,10 +82,10 @@ It is also possible to set the common assignment parameters during class definit
 
 .. doctest::
 
-    >>> from aequilibrae.paths import TrafficAssignment
-    >>> from aequilibrae.paths.vdf import bpr
+    >>> from aequilibrae.traffic import TrafficAssignment
+    >>> from aequilibrae.traffic.vdf import bpr
 
-    >>> network = project.network.build()
+    >>> network = project.road.build_network()
     >>> assignment = TrafficAssignment(
     ...     network=network,
     ...     project=project,
@@ -229,8 +229,6 @@ network.
 To create a preload for public transport vehicles operating between 8 AM to 10 AM, do the following:
 
 .. doctest::
-
-    >>> from aequilibrae.transit import Transit
 
     # Times are specified in seconds from midnight
     >>> transit = project.scenario.create_transit_database()

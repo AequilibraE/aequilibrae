@@ -1,10 +1,10 @@
 import dataclasses
 from sqlite3 import Connection
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from shapely.geometry import Point
 
-from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER, Constants
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 

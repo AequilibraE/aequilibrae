@@ -27,8 +27,8 @@ from uuid import uuid4
 import branca
 import folium
 
-from aequilibrae.project.tools.network_simplifier import NetworkSimplifier
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.project import NetworkSimplifier
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_net_simplifier.png'
 
@@ -43,7 +43,7 @@ project = create_example(fldr, "nauru")
 # To simplify the network, we need to create a compact graph, which requires centroids.
 # As Nauru doesn't have any centroids, we use an arbitrary node as a graph-only centroid.
 
-network = project.network.build()
+network = project.road.build_network()
 centroids = network.centroids
 if centroids is None:
     centroids = network.mapping.node_ids[:1]
@@ -67,8 +67,8 @@ graph = network.build_graph(
 # %%
 # We check the number of links and nodes our project has initially.
 
-links_before = project.network.links.data
-nodes_before = project.network.nodes.data
+links_before = project.tables.links.data
+nodes_before = project.tables.nodes.data
 
 print("This project initially has {} links and {} nodes".format(links_before.shape[0], nodes_before.shape[0]))
 
@@ -86,8 +86,8 @@ net.simplify(graph)
 # %%
 # Let's plot the previous and actual networks!
 
-links_after = net.network.links.data
-nodes_after = net.network.nodes.data
+links_after = net.tables.links.data
+nodes_after = net.tables.nodes.data
 
 # %%
 fig = branca.element.Figure()
@@ -118,8 +118,8 @@ net.collapse_links_into_nodes([903])
 # %%
 # Let's plot the network once again and check the modifications!
 
-links_after = net.network.links.data
-nodes_after = net.network.nodes.data
+links_after = net.tables.links.data
+nodes_after = net.tables.nodes.data
 
 # %%
 fig = branca.element.Figure()

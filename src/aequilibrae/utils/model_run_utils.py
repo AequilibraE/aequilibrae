@@ -1,6 +1,6 @@
-import sys
-import pathlib
 import importlib.util
+import pathlib
+import sys
 
 
 def import_file_as_module(file: pathlib.Path, module_name, force: bool = False):

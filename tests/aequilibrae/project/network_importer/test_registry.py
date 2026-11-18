@@ -1,9 +1,8 @@
 import pytest
 
-from aequilibrae.project.network.importer import SOURCES, SIMPLIFIERS
 from aequilibrae.project.network.importer.exceptions import SourceResolutionError
-from aequilibrae.project.network.importer.sources.base import resolve_source
-from aequilibrae.project.network.importer.simplifiers.base import resolve_simplifier
+from aequilibrae.project.network.importer.simplifiers.base import SIMPLIFIERS, resolve_simplifier
+from aequilibrae.project.network.importer.sources.base import SOURCES, resolve_source
 
 
 def test_supported_sources_are_explicit():

@@ -1,8 +1,9 @@
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
 import geopandas as gpd
 import numpy as np
-from dataclasses import dataclass, field
 from shapely.geometry import LineString
-from typing import TYPE_CHECKING
 
 from aequilibrae.project.network.importer.exceptions import StagedNetworkValidationError
 from aequilibrae.project.network.importer.utils import NODE_ID_START

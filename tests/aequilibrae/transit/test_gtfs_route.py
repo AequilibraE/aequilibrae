@@ -4,9 +4,9 @@ import pytest
 from numpy import array
 from shapely.geometry import MultiLineString
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.transit_elements import Route
+from aequilibrae.transit.transit_elements.route import Route
+
 from .random_word import randomword
 
 
@@ -51,7 +51,7 @@ def test_save_to_database(data_dict, build_gtfs_project):
     r.shape = MultiLineString([array(((0.0, 0.0), (1.0, 2.0)))])
 
     sql = "Select agency_id, shortname, longname, description, route_type from routes where route=?"
-    with database_connection("transit") as transit_conn:
+    with build_gtfs_project.project.transit_connection as transit_conn:
         r.save_to_database(transit_conn)
         result = list(transit_conn.execute(sql, [data["route_id"]]).fetchone())
 

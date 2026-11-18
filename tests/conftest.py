@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from aequilibrae import Project
+from aequilibrae.examples import create_example
 from aequilibrae.project.project_creation import _remove_triggers
-from aequilibrae.transit import Transit
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
+from aequilibrae.transit.transit import Transit
+from aequilibrae.utils import ensure_spatialite_binaries
 
 faulthandler.enable()
 
@@ -56,7 +56,7 @@ def no_index_omx(test_data_path, tmp_path):
 def cached_model(model_name, cache_pth, test_folder) -> Project:
     source = cache_pth / model_name
     shutil.copytree(source, test_folder, dirs_exist_ok=True)
-    return Project.from_path(test_folder)
+    return Project(test_folder)
 
 
 @pytest.fixture(scope="session")
@@ -104,8 +104,7 @@ def build_gtfs_project(cached_coquimbo_example, cache_path, tmp_path) -> Project
 
 @pytest.fixture
 def empty_project(tmp_path) -> Project:
-    project = Project()
-    project.new(tmp_path / "p")
+    project = Project.create(tmp_path / "p")
     yield project
     project.close()
 

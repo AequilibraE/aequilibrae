@@ -1,7 +1,8 @@
 import json
-import pytest
 import sqlite3
 from pathlib import Path
+
+import pytest
 from shapely import to_wkb
 from shapely.geometry import LineString, Point, box
 
@@ -50,6 +51,7 @@ class _FakeReader:
 
 def _install_mock(monkeypatch):
     import overturemaps
+
     from aequilibrae.project.network.importer.sources.overture import impl
 
     monkeypatch.setattr(impl, "get_latest_overture_version", lambda: "2025-01-01.0")
@@ -68,7 +70,7 @@ def _install_mock(monkeypatch):
 @pytest.fixture
 def overture_project(empty_project, monkeypatch):
     _install_mock(monkeypatch)
-    empty_project.network.importer.overture(
+    empty_project.tables.importer.overture(
         model_area=box(-0.0005, -0.0005, 0.0015, 0.0015),
         modes=("car",),
         simplify=False,

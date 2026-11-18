@@ -1,7 +1,7 @@
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
-
 import numpy as np
-from aequilibrae.paths.cython.vdf_core import akcelik, delta_akcelik
+
+from aequilibrae.routing.cython.vdf_core import akcelik, delta_akcelik
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 def test_akcelik_function():

@@ -2,10 +2,7 @@
 
 import pytest
 
-from aequilibrae.project.network.importer.sources.osm.tags_to_ir import (
-    directional_lanes,
-    parse_speed,
-)
+from aequilibrae.project.network.importer.sources.osm.tags_to_ir import directional_lanes, parse_speed
 
 
 @pytest.mark.parametrize(

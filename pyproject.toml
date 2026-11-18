@@ -132,7 +132,7 @@ Introspection = ["spin.cmds.meta.introspect"]
 ".spin/cmds.py:doctest" = { n_jobs = "1", pytest_args = [] }
 
 [tool.ruff]
-lint.select = ["B", "C", "E", "F", "W"]
+lint.select = ["B", "C", "E", "F", "I", "RUF022", "TID252", "W"]
 lint.ignore = ["B017"]
 exclude = [
     ".idea",
@@ -172,6 +172,17 @@ exclude = [
 ]
 line-length = 120
 target-version = "py311"
+src = ["src"]
+extend-exclude = ["build-install"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aequilibrae"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["TID252"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20

@@ -28,7 +28,7 @@ project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
-from aequilibrae import version as release_version
+from aequilibrae import __version__ as release_version
 
 # -- Project information -----------------------------------------------------
 
@@ -113,7 +113,7 @@ suppress_warnings = [
 # Mock setup modules that invoke setup() when imported during autodoc.
 autodoc_mock_imports = [
     "aequilibrae.distribution.setup_ipf",
-    "aequilibrae.paths.setup_assignment",
+    "aequilibrae.routing.setup_assignment",
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -186,6 +186,8 @@ autodoc_member_order = "groupwise"
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
+# Generate the API from curated public exports rather than implementation packages.
+autosummary_ignore_module_all = False
 
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,

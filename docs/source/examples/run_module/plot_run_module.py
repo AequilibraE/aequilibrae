@@ -17,7 +17,7 @@ In this example we demonstrate how to use AequilibraE's run module using Sioux F
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :attr:`aequilibrae.project.project.Project.run`
+#     * :attr:`aequilibrae.Project.run`
 
 # %%
 
@@ -26,7 +26,7 @@ from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/data_pipeline.png'
 
@@ -54,7 +54,7 @@ project.run["matrix_summary"]()
 mode = "c"
 
 # %%
-network = project.network.build()
+network = project.road.build_network()
 graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], block_centroid_flows=False)
 
 # %%
@@ -74,9 +74,8 @@ graph = network.build_graph(mode=mode, cost="distance", skimming=["distance"], b
 #
 # This function replicates the example in which we :ref:`create Delaunay lines <creating_delaunay_lines>`.
 func_string = """
-def create_delaunay(source: str, name: str, matrix_core: str, result_name: str, overwrite: bool=False):\n
+def create_delaunay(project, source: str, name: str, matrix_core: str, result_name: str, overwrite: bool=False):\n
 \tfrom aequilibrae.utils.create_delaunay_network import DelaunayAnalysis\n
-\tproject = get_active_project()\n
 \tmatrix = project.matrices\n
 \tmat = matrix.get_matrix(name, subset=[matrix_core])\n
 \tda = DelaunayAnalysis(project)\n

@@ -1,7 +1,7 @@
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.traffic import TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 
 @pytest.fixture(scope="function")
@@ -25,7 +25,7 @@ def assignment_setup(sioux_falls_example):
             )
         )
     yield TrafficAssignment(
-        network=sioux_falls_example.network,
+        network=sioux_falls_example.road.build_network(),
         classes=classes,
         time_field="free_flow_time",
         capacity_field="capacity",

@@ -39,7 +39,7 @@ deps = [openmp, cysignals]
 
 incdir = include_directories(
     'src/aequilibrae/matrix/cpp/',
-    'src/aequilibrae/paths/cpp/',
+    'src/aequilibrae/routing/cpp/',
     'src/aequilibrae/utils/cpp/',
 )
 

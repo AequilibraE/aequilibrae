@@ -52,16 +52,21 @@ def _extract_target_call(args: dict):
     return target_function, {**args, **var_keywords}
 
 
-def add_subcommand_from_function(subparsers, func, defaults: dict):
+def add_subcommand_from_function(subparsers, func, defaults: dict, *, project=None):
     """
     Create a sub-command from a function's signature.
     """
+    if project is not None:
+        defaults = {**defaults, "project": project}
     doc = inspect.getdoc(func)
     parser = subparsers.add_parser(func.__name__, description=doc, help=doc.split("\n")[0] if doc else None)
     parser.set_defaults(_aeq_internal_target_func=functools.partial(func, **defaults) if defaults else func)
 
     var_keyword = None
     for param_name, param in inspect.signature(func).parameters.items():
+        # Project ownership is supplied by the run command, not parsed as a CLI argument.
+        if param_name == "project" and project is not None:
+            continue
         if param.kind is inspect.Parameter.POSITIONAL_ONLY:
             raise ValueError(f"positional-only parameters ('{param_name}') are not supported by the aeq CLI")
         elif param.kind is inspect.Parameter.VAR_KEYWORD:
@@ -109,13 +114,12 @@ def list_functions(parser, args, unparsed_args):
     """
     from pprint import pprint
 
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
     # We attempt to parse the remaining arguments to provide a good error message in case something was provided.
     args = parser.parse_args(args=unparsed_args, namespace=args)
 
-    project = Project()
-    project.open(args.project)
+    project = Project(args.project)
 
     pprint(list(project.parameters["run"].keys()))
 
@@ -128,10 +132,9 @@ def run(args, unparsed_args):
     """
     from pprint import pprint
 
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
-    project = Project()
-    project.open(args.project)
+    project = Project(args.project)
 
     try:
         run_module = project.run
@@ -145,7 +148,9 @@ def run(args, unparsed_args):
         # POSITIONAL_ONLY and VAR_POSITIONAL arguments are not supported because we supply everything as keyword
         # arguments. VAR_KEYWORD arguments are accepted as trailing 'key=value' pairs.
         for func in run_module.values():
-            add_subcommand_from_function(subparsers, func.func, func.keywords if not args.no_defaults else {})
+            add_subcommand_from_function(
+                subparsers, func.func, func.keywords if not args.no_defaults else {}, project=project
+            )
 
         # The parsed arguments contain internal bookkeeping entries from the .set_defaults trick: the run module
         # function to call and its **kwargs handling. _extract_target_call() separates those from the real keyword
@@ -175,7 +180,7 @@ def cli(argv=None):
     )
 
     try:
-        from aequilibrae import version as aeq_version
+        from aequilibrae._version import version as aeq_version
     except Exception:
         aeq_version = "unknown"
     parser.add_argument("--version", action="version", version=f"aeq (AequilibraE {aeq_version})")

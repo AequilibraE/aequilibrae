@@ -8,7 +8,7 @@ def test_new_gtfs_builder(build_gtfs_project):
     c = Constants()
     c.agencies["agencies"] = 0
 
-    conn = database_connection("transit")
+    conn = database_connection("transit", build_gtfs_project.project.project_base_path)
     existing = conn.execute("SELECT COALESCE(MAX(DISTINCT(agency_id)), 0) FROM agencies;").fetchone()[0]
 
     transit = build_gtfs_project.new_gtfs_builder(

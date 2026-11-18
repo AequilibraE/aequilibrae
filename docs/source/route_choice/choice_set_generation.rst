@@ -34,7 +34,8 @@ Both methods use Dijkstra by default. To use A*, supply coordinates when constru
 
 .. code-block:: python
 
-    from aequilibrae.paths import RouteChoice, estimate_heuristic_scale
+    from aequilibrae.route_choice import RouteChoice
+    from aequilibrae.routing import estimate_heuristic_scale
 
     # coordinates is a DataFrame with planar x/y columns indexed by external node ID.
     scale = estimate_heuristic_scale(graph, coordinates)

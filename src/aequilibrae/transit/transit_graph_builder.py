@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -27,8 +26,8 @@ from pandas.api.types import is_integer_dtype
 from pandas.core.frame import DataFrame
 from scipy.spatial import KDTree
 
-from aequilibrae.paths import PathResults
-from aequilibrae.paths.graph import TransitGraph
+from aequilibrae.routing.results.path_results import PathResults
+from aequilibrae.routing.transit_graph import TransitGraph
 from aequilibrae.utils.geo_utils import haversine
 
 logger = logging.getLogger(__name__)
@@ -70,12 +69,6 @@ class TransitGraphBuilder:
         **num_threads** (:obj:`int`): Number of threads to be used where possible.
         Defaults to ``-1`` (using all available threads).
 
-        **seed** (:obj:`int`): Deprecated. No longer in use.
-
-        **geometry_noise** (:obj:`bool`): Deprecated. No longer in use.
-
-        **noise_coef** (:obj:`float`): Deprecated. No longer in use.
-
         **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within
         parent stations. Defaults to ``False``.
 
@@ -102,9 +95,6 @@ class TransitGraphBuilder:
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
         num_threads: int = -1,
-        seed: int | None = None,
-        geometry_noise: bool | None = None,
-        noise_coef: float | None = None,
         with_inner_stop_transfers: bool = False,
         with_outer_stop_transfers: bool = False,
         with_walking_edges: bool = True,
@@ -161,14 +151,6 @@ class TransitGraphBuilder:
         self.transformer_p_to_g = pyproj.Transformer.from_crs(
             self.__projected_crs, self.__global_crs, always_xy=True
         ).transform
-
-        if seed is not None or geometry_noise is not None or noise_coef is not None:
-            warnings.warn(
-                "the 'seed', 'geometry_noise', and 'noise_coef' arguments are depreciated and no longer in use. "
-                "Duplicate geometries are allowed within the public transport database.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
         # graph parameters
         self.uniform_dwell_time = 30
@@ -524,7 +506,7 @@ class TransitGraphBuilder:
         if "zones" not in self.__dict__:
             self.add_zones(
                 pd.DataFrame(
-                    [(zone.zone_id, zone.geometry) for zone in self.project.network.zones],
+                    [(zone.zone_id, zone.geometry) for zone in self.project.tables.zones],
                     columns=["zone_id", "geometry"],
                 )
             )
@@ -1305,8 +1287,8 @@ class TransitGraphBuilder:
                 "a while for large networks."
             )
 
-            nodes = self.project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
-            links = self.project.network.links.data[["link_id", "geometry"]].set_index("link_id")
+            nodes = self.project.tables.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = self.project.tables.links.data[["link_id", "geometry"]].set_index("link_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1364,7 +1346,7 @@ class TransitGraphBuilder:
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.network.build_graph(mode=graph_key, cost="distance")
+        graph = project.road.build_graph(mode=graph_key, cost="distance")
 
         # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []
@@ -1456,26 +1438,14 @@ class TransitGraphBuilder:
                 ],
             )
 
-    def save_vertices(self, robust=None, conn: sqlite3.Connection | None = None):
+    def save_vertices(self, conn: sqlite3.Connection | None = None):
         """
         Write the vertices DataFrame to the public transport database.
 
-        Within the database nodes may not exist at the exact same point in space, provide
-        ``robust=True`` to move the nodes slightly.
+        Duplicate node geometries are allowed within the database.
 
-        :Arguments:
-            **robust** (:obj:`bool`): Deprecated. No longer in use.
-
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
+        :param conn: Optional PT connection to use.
         """
-        if robust is not None:
-            warnings.warn(
-                "the 'robust' argument is depreciated and no longer in use. Duplicate "
-                "geometries are allowed within the public transport database.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         with conn or self.project.transit_connection as conn:
             if conn.execute("SELECT node_id FROM nodes WHERE period_id=? LIMIT 1;", (self.period_id,)).fetchall():
                 raise ValueError(
@@ -1581,27 +1551,14 @@ class TransitGraphBuilder:
 
     def save(
         self,
-        robust=None,
         pt_conn: sqlite3.Connection | None = None,
         project_conn: sqlite3.Connection | None = None,
     ):
         """Save the current graph to the public transport database.
 
-        :Arguments:
-            **robust** (:obj:`bool`): Deprecated. No longer in use.
-
-            **pt_conn** (:obj:`sqlite.Connection`): Optional PT connection to use
-
-            **project_conn** (:obj:`sqlite.Connection`): Optional project connection to use
+        :param pt_conn: Optional PT connection to use.
+        :param project_conn: Optional project connection to use.
         """
-        if robust is not None:
-            warnings.warn(
-                "the 'robust' argument is deprecated and no longer in use. Duplicate geometries are allowed "
-                "within the public transport database.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         self.create_additional_db_fields(conn=pt_conn)
         self.save_vertices(conn=pt_conn)
         self.save_edges(conn=pt_conn)

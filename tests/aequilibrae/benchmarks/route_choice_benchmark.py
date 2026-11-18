@@ -8,11 +8,11 @@ import hashlib
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.cython.context import NodeBasedContext, TurnBasedContext
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.utils.cython.bridge import Bridge
 
-from aequilibrae.paths import estimate_heuristic_scale
+from aequilibrae.routing import estimate_heuristic_scale
+from aequilibrae.routing.cython.context import NodeBasedContext, TurnBasedContext
+from aequilibrae.routing.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.utils.cython.bridge import Bridge
 
 from .path_finding_benchmark import OD_RANDOM_SEED, left_turn_restrictions, load_node_coordinates
 from .skimming_benchmark import MIN_CENTROID_BANS, MIN_LEFT_TURNS, zero_cost_road_turn

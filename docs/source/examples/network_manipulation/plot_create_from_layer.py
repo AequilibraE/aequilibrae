@@ -47,8 +47,7 @@ from aequilibrae import Project
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = Project()
-project.new(fldr)
+project = Project.create(fldr)
 
 # %%
 # Now we obtain the link data for our example (in this case from a link layer
@@ -67,7 +66,7 @@ link_types = df.link_type.unique()
 
 # %%
 # And the existing link types are
-lt = project.network.link_types
+lt = project.tables.link_types
 existing_types = [link_type.link_type for link_type in lt]
 
 # %%
@@ -93,7 +92,7 @@ for i, ltype in enumerate(types_to_add):
 
 # %%
 # We need to use a similar process for modes
-md = project.network.modes
+md = project.tables.modes
 existing_modes = {mode.mode_id: mode.mode_name for mode in md}
 
 # %%
@@ -120,7 +119,7 @@ for mode_id in modes_to_add:
 # %%
 # We cannot use the existing link_id, so we create a new field to not loose
 # this information
-links = project.network.links
+links = project.tables.links
 link_data = links.fields
 
 # Create the field and add a good description for it
@@ -132,7 +131,7 @@ links.insert_from(df.assign(source_id=df["link_id"]))
 
 # %%
 # We grab all the links data as a geopandas GeoDataFrame so we can process it easier
-links = project.network.links.data
+links = project.tables.links.data
 
 # %%
 # Let's plot our network!

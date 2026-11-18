@@ -6,8 +6,9 @@ import pytest
 from scipy import sparse
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import Network, TrafficClass
-from aequilibrae.paths.assignment_context import AssignmentInputs, PreparedTrafficClass
+from aequilibrae.routing import Network
+from aequilibrae.traffic import TrafficClass
+from aequilibrae.traffic.assignment_context import AssignmentInputs, PreparedTrafficClass
 
 
 @pytest.fixture

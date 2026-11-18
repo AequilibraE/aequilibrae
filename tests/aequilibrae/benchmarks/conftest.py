@@ -10,10 +10,9 @@ import pytest as pytest
 from scipy.stats import linregress
 
 from aequilibrae.matrix import AequilibraeMatrix, from_file
-from aequilibrae.paths import Network, TrafficAssignment
-from aequilibrae.paths.results.assignment_results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.routing import Network
+from aequilibrae.traffic import AssignmentResults, TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 # pytest .\tests\aequilibrae\benchmarks\* -- benchmark
 

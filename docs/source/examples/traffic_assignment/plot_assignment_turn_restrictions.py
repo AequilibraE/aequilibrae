@@ -23,9 +23,9 @@ All turn directions are 1 and node-based U-turn transitions are allowed.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.paths.network.Network.build_graph`
-#     * :func:`aequilibrae.paths.traffic_class.TrafficClass`
-#     * :func:`aequilibrae.paths.traffic_assignment.TrafficAssignment`
+#     * :func:`aequilibrae.routing.Network.build_graph`
+#     * :func:`aequilibrae.traffic.TrafficClass`
+#     * :func:`aequilibrae.traffic.TrafficAssignment`
 
 # %%
 # Imports
@@ -38,10 +38,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import TrafficAssignment
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.vdf import bpr
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.traffic import TrafficAssignment
+from aequilibrae.traffic import TrafficClass
+from aequilibrae.traffic.vdf import bpr
+from aequilibrae.examples import create_example
 
 
 def run_assignment(network, matrix):
@@ -74,7 +74,7 @@ project = create_example(fldr, "sioux_falls")
 
 # %%
 # Load the network and demand matrix.
-network = replace(project.network.build(), allow_uturns=True)
+network = replace(project.road.build_network(), allow_uturns=True)
 
 matrix = project.matrices.get_matrix("demand.omx", subset=["matrix"])
 
@@ -86,7 +86,7 @@ base_flows = run_assignment(network, matrix)
 # Apply turn controls in memory as node triples equivalent to:
 # - a turn penalty from link 7 to link 36 (dir=1)
 # - a turn prohibition from link 24 to link 19 (dir=1)
-links = project.network.links.data.set_index("link_id")
+links = project.tables.links.data.set_index("link_id")
 turn_restrictions = pd.DataFrame(
     {
         "from_node": [int(links.loc[7, "a_node"]), int(links.loc[24, "a_node"])],
@@ -104,7 +104,7 @@ restricted_flows = run_assignment(network, matrix)
 
 # %%
 # Plot flows for both cases and the difference.
-links = project.network.links.data.set_index("link_id")
+links = project.tables.links.data.set_index("link_id")
 
 plot_df = (
     links[["geometry"]]

@@ -373,11 +373,11 @@ attributes:
 
 .. code-block:: python
 
-    from aequilibrae.paths import TrafficAssignment, TrafficClass
-    from aequilibrae.paths.vdf import bpr
+    from aequilibrae.traffic import TrafficAssignment, TrafficClass
+    from aequilibrae.traffic.vdf import bpr
 
     assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -392,7 +392,7 @@ attributes:
 
     # Parameters can reference field names in your network
     assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -459,8 +459,8 @@ Basic Usage
 
 .. code-block:: python
 
-    from aequilibrae.paths import TrafficAssignment, TrafficClass
-    from aequilibrae.paths.vdf import bpr, bpr2, akcelik, builtin_vdfs
+    from aequilibrae.traffic import TrafficAssignment, TrafficClass
+    from aequilibrae.traffic.vdf import bpr, bpr2, akcelik, builtin_vdfs
 
     # Check available VDF functions
     vdfs = builtin_vdfs()
@@ -469,7 +469,7 @@ Basic Usage
 
     # Setup traffic assignment with BPR
     assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -485,7 +485,7 @@ Using Different VDFs
 
     # Highway network - standard BPR
     highway_assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -496,7 +496,7 @@ Using Different VDFs
 
     # Urban network with signals - Akcelik
     signal_assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -507,7 +507,7 @@ Using Different VDFs
 
     # Network with strong capacity constraints - BPR2
     strong_capacity_assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -524,7 +524,7 @@ Link-Specific Parameters
     # Assume your network has fields 'alpha_field' and 'beta_field'
     # with values calibrated for each link
     variable_assignment = TrafficAssignment(
-        network=project.network,
+        network=project.road.build_network(),
         classes=[traffic_class],
         time_field="free_flow_time",
         capacity_field="capacity",
@@ -733,7 +733,7 @@ For example, the built-in INRETS VDF is non-convex:
 
 .. code-block:: python
 
-    from aequilibrae.paths.vdf import inrets
+    from aequilibrae.traffic.vdf import inrets
 
     num_points = 300
     link_attributes = {"alpha": np.full(num_points, 0.9, dtype=np.float64)}

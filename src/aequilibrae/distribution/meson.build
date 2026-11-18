@@ -5,7 +5,6 @@ pyfiles = [
   'gravity_application.py',
   'gravity_calibration.py',
   'ipf.py',
-  'ipf_core.py',
   'synthetic_gravity_model.py',
 ]
 

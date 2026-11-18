@@ -6,9 +6,11 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import Delaunay
 
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import Network, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import bpr
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.routing.network import Network
+from aequilibrae.traffic.traffic_assignment import TrafficAssignment
+from aequilibrae.traffic.traffic_class import TrafficClass
+from aequilibrae.traffic.vdf import bpr
 
 DELAUNAY_TABLE = "delaunay_network"
 

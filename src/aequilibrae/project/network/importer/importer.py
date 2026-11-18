@@ -9,7 +9,7 @@ from aequilibrae.project.network.importer.sources.base import resolve_source
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 if TYPE_CHECKING:
-    from aequilibrae.project import Project
+    from aequilibrae.project.project import Project
 
 logger = logging.getLogger(__name__)
 

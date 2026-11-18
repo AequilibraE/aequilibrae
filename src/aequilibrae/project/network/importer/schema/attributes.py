@@ -1,10 +1,11 @@
 """Route staged-network attributes into table columns or ``other_attributes``."""
 
-import geopandas as gpd
 import json
 import math
-import pandas as pd
 from typing import Iterable
+
+import geopandas as gpd
+import pandas as pd
 
 PROT_COLS = {"ogc_fid", "geometry"}
 JSON_COL = "other_attributes"

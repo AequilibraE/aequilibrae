@@ -3,7 +3,7 @@ from dataclasses import FrozenInstanceError, replace
 import numpy as np
 import pytest
 
-from aequilibrae.paths import TrafficClass
+from aequilibrae.traffic import TrafficClass
 
 
 @pytest.fixture

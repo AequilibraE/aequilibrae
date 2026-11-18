@@ -12,8 +12,8 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # .. seealso::
 #     Several functions, methods, classes and modules are used in this example:
 #
-#     * :func:`aequilibrae.transit.transit`
-#     * :func:`aequilibrae.transit.lib_gtfs`
+#     * :attr:`aequilibrae.Project.transit`
+#     * ``project.transit.new_gtfs_builder()``
 
 # %%
 
@@ -27,7 +27,8 @@ import folium
 import geopandas as gpd
 import pandas as pd
 
-from aequilibrae.utils.create_example import create_example
+from aequilibrae import Project
+from aequilibrae.examples import create_example
 
 # sphinx_gallery_thumbnail_path = '../source/_images/plot_import_gtfs.png'
 
@@ -44,7 +45,7 @@ project = create_example(fldr, "coquimbo")
 # the database, then reopen the project and create a fresh transit database.
 project.close()
 remove(join(fldr, "public_transport.sqlite"))
-project.open(fldr)
+project = Project(fldr)
 
 # %%
 # Let's import the GTFS feed.

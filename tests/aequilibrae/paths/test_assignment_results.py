@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 import pytest
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 from aequilibrae.matrix import from_dict
-from aequilibrae.paths import Network
-from aequilibrae.paths.assignment_context import AssignmentInputs
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.routing import Network
+from aequilibrae.traffic import AssignmentResults
+from aequilibrae.traffic.assignment_context import AssignmentInputs
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 
 def test_set_cores():

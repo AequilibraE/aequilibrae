@@ -6,7 +6,7 @@ npth = os.path.abspath(".")
 if npth not in sys.path:
     sys.path.append(npth)
 
-from aequilibrae import version as release_version
+from aequilibrae import __version__ as release_version
 
 version = f"V.{release_version}"
 

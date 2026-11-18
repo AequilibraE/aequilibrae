@@ -3,15 +3,10 @@ import re
 import numpy as np
 import pytest
 
-from aequilibrae import VDF, TrafficAssignment, TrafficClass
-from aequilibrae.paths.vdf import (
-    AKCELIK,
-    BPR,
-    BPR2,
-    CONICAL,
+from aequilibrae.traffic import VDF, TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import (
     DEFAULT_PRESET_SPECS,
     FUNCTION_MAP,
-    INRETS,
     akcelik,
     bpr,
     bpr2,
@@ -31,7 +26,7 @@ def project(sioux_falls_example):
 def make_assignment(project):
     demand = project.matrices.get_matrix("demand.omx", subset=["matrix"])
     traffic = TrafficClass(name="car", mode="c", cost="free_flow_time", demand=demand)
-    network = project.network
+    network = project.road.build_network()
 
     def make(vdf, name_mapping):
         assignment = TrafficAssignment(
@@ -113,7 +108,6 @@ def test_make_preset_vdfs():
 
     assert vdfs.keys() == FUNCTION_MAP.keys()
     assert vdfs == {"bpr": bpr, "bpr2": bpr2, "conical": conical, "inrets": inrets, "akcelik": akcelik}
-    assert {"bpr": BPR, "bpr2": BPR2, "conical": CONICAL, "inrets": INRETS, "akcelik": AKCELIK} == vdfs
 
 
 def test_vdf_as_parsed_string():
