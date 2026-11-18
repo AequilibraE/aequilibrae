@@ -8,6 +8,52 @@ public transport modelling capabilities, the change from 1.X to 2.0 includes a w
 in the API and changes in software behaviour, in addition to a series of new features and performance improvements.
 
 
+Before upgrading from 1.x
+-------------------------
+
+1. **Back up the whole project.** Keep a copy of the project folder, including
+   its scenarios, databases, matrices, parameters and ``run/`` modules. Keep
+   the backup for use with 1.x, database downgrades are not supported.
+2. **Apply all 1.7.2 migrations.** Install AequilibraE 1.7.2, the final 1.x
+   release. Open the project in 1.7.2 and run ``project.upgrade()`` on the
+   root scenario, then select and upgrade each scenario you plan to keep.
+   In 1.7.2, ``upgrade()`` acts on the current scenario. AequilibraE 2.0 only
+   supports upgrades from 1.7.2 with all its migrations applied.
+3. **Check legacy matrices while you still have 1.x.** Convert any ``.aem``
+   files you want to keep to OMX using the 1.x API. Check that the 1.x project
+   matrix catalogue points to the new ``.omx`` filenames and that the listed
+   files exist. The 2.0 migrations transfer matrix metadata to the OMX files
+   and move result metadata to ``results_database.sqlite``. If an OMX file
+   already has an attribute that conflicts with the catalogue, resolve the
+   conflict before upgrading. Keep ``results_database.sqlite`` for any scenario
+   with saved result metadata. A database rollback cannot restore replaced OMX
+   files, so keep the original backup. Update any scripts that query the old
+   ``matrices`` or ``results`` tables in ``project_database.sqlite``. See
+   :doc:`matrix_api_migration` for the conversion and the new file access
+   patterns.
+4. **Keep a baseline.** Save representative paths, skims, assignment outputs
+   and convergence reports from 1.x. Compare them with the results of your
+   rewritten workflows before replacing production outputs. For GTFS models,
+   also check whether to re-import the feed. See `Changes in Behaviour`_.
+   Close the project in 1.7.2 before applying the 2.0 migrations.
+
+When beginning the process of upgrading code, start with rewriting scripts with
+`Public imports and package structure`_ and `Project creation and lifetime`_.
+Then update project access and table writes using :doc:`table_api_migration`,
+and update demand and skim handling using :doc:`matrix_api_migration`. Use
+`Independent routing and assignment objects`_ for path computation and
+skimming, :doc:`traffic_api_migration` for road assignment, and
+:doc:`route_choice_transit_api_migration` for route choice and public transport
+assignment.  Check custom ``run/__init__.py`` files as well as scripts and
+notebooks. See `Project run modules`_.
+
+If you pin dependencies, update your environment before installing 2.0. It
+requires Shapely 2.1 or newer and OpenMatrix 0.4.0b1 or newer, and adds
+``cysignals`` and ``numexpr`` as runtime dependencies. See
+:doc:`useful_links/installation` for installation and source build
+instructions.
+
+
 New Algorithms and features
 ---------------------------
 
@@ -110,7 +156,7 @@ GTFS and public transport
 Runtime performance and feedback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Routing, skimming, all-or-nothing loading, select-link processing and path-file writing use reworked Cython/C++
+* Routing, skimming, all-or-nothing loading and select-link processing use reworked Cython/C++
   kernels and OpenMP rather than Python thread pools or multiprocessing, with improved buffer reuse and memory locality.
 * Separate thread settings and workload thresholds reduce overhead for small, memory-bound array operations.
 * Standard Python logging supports scenario-aware file output and progress-friendly terminal output. Compiled workers
@@ -210,7 +256,7 @@ namespace rather than from the package root or an implementation module:
      - ``Network``, ``Graph``, ``PathResults``, ``SkimResults``, ``NetworkSkimming``,
        ``available_heaps``, ``estimate_heuristic_scale``
    * - ``aequilibrae.traffic``
-     - ``TrafficClass``, ``TrafficAssignment``, ``AssignmentResults``, ``AssignmentPaths``, ``VDF``
+     - ``TrafficClass``, ``TrafficAssignment``, ``AssignmentResults``, ``VDF``
    * - ``aequilibrae.traffic.vdf``
      - ``bpr``, ``bpr2``, ``conical``, ``inrets``, ``akcelik``, ``builtin_vdfs``
    * - ``aequilibrae.transit``
@@ -257,7 +303,7 @@ The main import replacements are:
      - ``from aequilibrae.routing import Graph, PathResults, SkimResults, NetworkSkimming``
    * - ``from aequilibrae.paths import available_heaps, estimate_heuristic_scale``
      - ``from aequilibrae.routing import available_heaps, estimate_heuristic_scale``
-   * - ``from aequilibrae import TrafficClass, TrafficAssignment, AssignmentResults, AssignmentPaths, VDF``
+   * - ``from aequilibrae import TrafficClass, TrafficAssignment, AssignmentResults, VDF``
      - Import these names from ``aequilibrae.traffic``
    * - ``from aequilibrae.paths import TransitClass, TransitAssignment, TransitGraph, TransitAssignmentResults``
      - Import these names from ``aequilibrae.transit``
@@ -272,8 +318,8 @@ The main import replacements are:
      - Use ``project.tables.importer`` and ``project.tables.export_to_gmns()``
    * - Imports of ``GTFSRouteSystemBuilder`` or ``export_gtfs`` from ``aequilibrae.builder``
      - Use ``project.transit.new_gtfs_builder()`` and ``project.transit.export_gtfs()``
-   * - ``from aequilibrae.paths.vdf import BPR``
-     - ``from aequilibrae.traffic.vdf import bpr``
+   * - ``assignment.set_vdf("BPR")``
+     - ``from aequilibrae.traffic.vdf import bpr`` and pass ``vdf=bpr`` to ``TrafficAssignment``
    * - ``from aequilibrae import Ipf, GravityCalibration, GravityApplication, SyntheticGravityModel``
      - Import these names from ``aequilibrae.distribution``
    * - ``from aequilibrae import AequilibraeMatrix, AequilibraeSparseMatrix, MatrixStore``
@@ -312,8 +358,10 @@ Logging and SpatiaLite helpers have public imports too:
 
     logger = logging.getLogger("aequilibrae")
 
-Use the standard logger instead of the removed ``aequilibrae.global_logger``
-export.
+Use the standard logger instead of ``project.logger`` or the removed
+``aequilibrae.global_logger`` export. Call ``basic_config()`` if you want
+progress-friendly terminal output. Use ``project.log()`` to read the current
+scenario's log file rather than to emit log messages.
 
 Project creation and lifetime
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -403,8 +451,8 @@ Independent routing and assignment objects
 A routing ``Network`` owns copies of the source link data and its
 configuration. It can be constructed from in-memory data with ``Network(links,
 ...)``, without a project. A ``Graph`` is built from that network for one mode
-and cost. The graph no longer stores a similar dataframe to ``network.links``,
-it stores a prepared graph data and is organised under ``graph.routing``,
+and cost. The graph no longer stores a DataFrame like ``network.links``.
+It stores prepared graph data under ``graph.routing``,
 ``graph.mapping`` and ``graph.skimming`` rather than ``graph.network`` or
 ``graph.graph``.  Keep the network as well as the graph if the workflow needs
 source attributes, using ``graph.mapping`` to map between the network and
@@ -420,7 +468,9 @@ prepared graph.
         graph = network.build_graph("c", cost="distance", skimming=["distance"])
 
     # The network and graph remain usable after the project is closed.
-    path = graph.compute_path(1, 2)
+    origin, destination = map(int, graph.centroids[:2])
+    path = graph.compute_path(origin, destination)
+    network_links = path.get_network_links()  # (link IDs, directions), or None if no path
 
 Use ``project.road.build_graph("c", "distance")`` when a graph is needed, most
 of the time the ``Network`` should be enough. Cost, skimming and routing
@@ -429,39 +479,77 @@ options can be supplied when building the graph or configuring a
 with a sequence of ``graph.set_`` calls. Network configuration fields and graph
 topology are fixed after construction, you should build a new object for a
 different configuration. For quick cost updates, use ``graph.set_costs()`` to
-replace routing costs without changing topology. See
-:doc:`path_computation/aequilibrae_graph` for graph construction and mappings.
+replace routing costs without changing topology. Standalone graphs do not
+contract links or remove dead ends by default. Set ``compact=True`` and/or
+``remove_dead_ends=True`` at build time when needed. By default both are
+enabled for traffic assignment.
 
-Build the independent network explicitly before traffic assignment:
+.. list-table:: Routing API replacements
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Previous workflow
+     - Replacement
+   * - Construct ``PathResults()``, call ``prepare(graph)`` and then
+       ``compute_path(origin, destination)``
+     - Call ``graph.compute_path(origin, destination)`` to get a ``PathResults``.
+   * - ``graph.exclude_links(link_ids)``
+     - Set the costs for the relevant directed network links to ``np.inf`` and
+       pass the full cost array to ``graph.set_costs()``. Build a new
+       ``Network`` and graph for topology changes.
+   * - ``Graph.save_to_disk()`` and ``Graph.load_from_disk()``
+     - Keep the source tables and graph options and rebuild the road graph
+       instead of loading a 1.x graph file.
+
+``PathResults.path`` contains local graph-link indices, not physical link IDs.
+Use ``get_network_links()`` before joining a path to the project links table.
+For A*, pass ``coordinates`` and an explicit ``heuristic_scale`` when computing
+the path. See :ref:`example_usage_path_computation` for Euclidean and Haversine
+examples, and :ref:`network_graph_mapping` for examples of mapping nodes,
+links, costs and loads between the network and the graph.
+
+Replace ``NetworkSkimming.save_to_project()`` with a call to the project matrix
+manager after skimming a graph built with centroids and skim fields:
 
 .. code-block:: python
 
-    from aequilibrae.traffic import TrafficAssignment
+    skimmer = graph.compute_skims()
+    project.matrices.save_matrix(
+        "base_skims.omx",
+        skimmer.results.skims,
+        procedure="Network skimming",
+        procedure_id=skimmer.procedure_id,
+        timestamp=skimmer.procedure_date,
+    )
 
-    network = project.road.build_network()
-    assignment = TrafficAssignment(network=network, project=project, **assignment_options)
-
-``TrafficAssignment`` accepts a ``Network`` and will be the appropriate graphs
-for each ``TrafficClass``. The explicit ``project`` argument supplies project
-parameters and ownership for saving results. Results can also be saved to an
-explicitly supplied project in the saving method. A ``TrafficClass`` is now a
-configuration independent of a graph, constructed with ``mode``, ``cost`` and
-``demand``. ``TrafficAssignment`` should receive the network and classes and
-builds their graphs internally, traffic-class results are available after
-execution through ``assignment.class_results[class_name]`` rather than
-``traffic_class.results``. See :doc:`traffic_assignment/assignment_procedures`
-for the complete assignment setup.
+For road assignment, pass the independent ``Network`` and graph-independent
+``TrafficClass`` configurations to ``TrafficAssignment``, which builds the
+class graphs internally. See :doc:`traffic_api_migration` for the constructor,
+execution options and results.
 
 Transit graph builders remain distinct from prepared transit graphs. Obtain a
 builder with ``builder = project.transit.create_graph()`` and convert it with
 ``builder.to_transit_graph()``. The resulting
 ``aequilibrae.transit.TransitGraph`` is used with ``TransitClass`` and
 ``TransitAssignment``, not the road ``Graph`` / ``TrafficClass`` pair. See
-:doc:`public_transport/hyperpath_routing` for transit assignment.
+:doc:`route_choice_transit_api_migration` for changes to transit assignment and
+route choice.
 
 Network import/export are available through
 ``project.tables.importer.source()``, ``.osm()``, ``.overture()`` and
-``.gmns()``, and ``project.tables.export_to_gmns()``. GTFS still uses
+``.gmns()``, and ``project.tables.export_to_gmns()``. Replace
+``project.network.create_from_osm(place_name=...)`` with
+``project.tables.importer.osm(place_name=...)`` and
+``project.network.create_from_gmns(...)`` with
+``project.tables.importer.gmns(...)``. The OSM importer no longer takes
+``clean``. It also no longer reads the ``network.osm`` mode and link-type
+settings or the per-field ``osm_source`` and ``osm_behaviour`` settings in
+``parameters.yml``. Review the new mode filters and imported attributes before
+rebuilding a network. The top-level ``osm`` section still configures downloads.
+Install the optional dependencies for OSM and Overture Maps with
+``pip install "aequilibrae[create]"``. See
+:doc:`network_manipulation/import_and_export_network` for source options and
+:ref:`parameters_osm` for the download settings. GTFS still uses
 ``project.transit.new_gtfs_builder()``, ``load_date()``, optional map matching
 and ``save_to_disk()``. Use ``project.transit.export_gtfs()`` for GTFS
 export. For a scenario without a transit database, call
@@ -481,15 +569,24 @@ require an explicit project folder.
 
 Use ``project.project_parameters`` for the project's parameters, or
 ``Parameters(path=project_folder)`` for an explicit folder. GMNS import/export
-through ``project.tables`` uses that project's parameters.
+through ``project.tables`` uses that project's parameters. Without a path,
+``Parameters()`` loads package defaults, not the active project's settings.
+
+For ``Ipf`` and ``GravityApplication``, replace
+``save_to_project(name, file_name)`` with ``save_to_project(file_name)`` using
+an OMX filename, including ``.omx``. Supply the project to the procedure or
+pass ``project=project`` when saving. See :ref:`distribution_matrix_migration`
+for selecting input matrices and saving distribution results.
 
 Project run modules
 ~~~~~~~~~~~~~~~~~~~
 
 Run-module functions must accept an explicit ``project``
 argument. ``Project.run`` supplies it along with the configured arguments. The
-CLI also supplies it when ``--no-defaults`` is selected. Update custom project
-``run/__init__.py`` files accordingly:
+CLI also supplies it when ``--no-defaults`` is selected. ``project.run`` now
+returns a dictionary. Replace ``project.run.results_summary()`` with
+``project.run["results_summary"]()``. Update custom project ``run/__init__.py``
+files accordingly:
 
 .. code-block:: python
 
@@ -517,6 +614,8 @@ arguments, and its saving methods no longer accept ``robust``.
 
    table_api_migration
    matrix_api_migration
+   traffic_api_migration
+   route_choice_transit_api_migration
 
 Changes in Behaviour
 --------------------
@@ -591,13 +690,14 @@ stations are written with ``location_type`` 1.
 Connectivity Analysis
 ~~~~~~~~~~~~~~~~~~~~~
 
-The Connectivity Analysis procedure returns a Numpy array with the nodes that
-are not connected to the main portion of the network.  It uses a *Connected
-Components* algorithm, which runs in a few seconds even for very large networks
-and is not limited to centroid connectivity, which is substantially more useful
-for network diagnostics and editing.
+``graph.disconnected_nodes()`` returns a NumPy array of node IDs that cannot
+reach or be reached from the main portion of the graph. It uses the largest
+strongly connected component and is not limited to centroids. It does not
+consider individual turn restrictions.
 
-The connectivity analysis is also a feature of the AequilibraE graph, making it substantially easier to use.
+This is not a direct replacement for ``ConnectivityAnalysis.disconnected_pairs``.
+If a workflow needs disconnected OD pairs, check reachability for those pairs
+rather than treating the node IDs as an OD report.
 
 .. testsetup::
 
@@ -611,17 +711,34 @@ The connectivity analysis is also a feature of the AequilibraE graph, making it 
 
 .. doctest::
 
-    >>> project = create_example(project_path)
-    >>> network = project.road.build_network()
-    >>> graph = network.build_graph('c', cost='distance')
+    >>> with create_example(project_path) as project:
+    ...     network = project.road.build_network()
+    >>> graph = network.build_graph('c', cost='distance', block_centroid_flows=False)
 
-    # Check for disconnected nodes
-    >>> graph.disconnected_nodes()
-    array([], dtype=int64)
+    # Check connectivity without blocking paths through centroids.
+    >>> graph.disconnected_nodes().size
+    0
+
+Road assignment convergence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Road assignment now checks the relative gap against the accepted flow using
+its updated costs. A terminal report row can have ``NaN`` for ``alpha`` because
+the solver checks convergence without taking another step. Biconjugate
+Frank-Wolfe uses approximate conjugacy by default and also supports
+``execute(bfw_conjugacy="exact")``.
+
+Do not expect 2.0 to reproduce the 1.7.2 convergence report row by
+row. Significant improvements to the line search and solver have been made.
+Compare the final link flows, skims and achieved relative gap with your 1.7.2
+baseline. See :doc:`traffic_api_migration` for how to read these results.
 
 Akcelik derivative
 ~~~~~~~~~~~~~~~~~~
-The derivative of the Akcelik volume-delay function now includes the link length, as the function itself does.
-In 1.X it was computed as if every link had unit length, and it returned the free-flow time on links without flow.
-Both errors distorted the search directions of the conjugate and biconjugate Frank-Wolfe algorithms, so
-assignments that use the Akcelik function with these algorithms converge differently than they did in 1.X.
+
+The derivative of the Akcelik volume-delay function now includes the link
+length, as the function itself does.  In 1.X it was computed as if every link
+had unit length, and it returned the free-flow time on links without flow.
+Both errors distorted the search directions of the conjugate and biconjugate
+Frank-Wolfe algorithms, so assignments that use the Akcelik function with these
+algorithms converge differently than they did in 1.X.

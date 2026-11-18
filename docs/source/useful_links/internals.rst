@@ -246,6 +246,94 @@ origin writes a different row. We clear the worker totals at the start of each
 run. The same workers must not be shared by concurrent runs.
 
 
+.. _network_graph_mapping:
+
+Network and graph mappings
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+AequilibraE 2.0 keeps three kinds of identifiers separate: external node and
+physical link IDs, zero-based network indices, and zero-based graph indices. A
+physical link is one source row. A directed network link is one permitted
+direction of that row: ``+1`` for a-to-b and ``-1`` for b-to-a. The network
+mapping follows source row order, with ``+1`` before ``-1`` for a bidirectional
+link. A graph is specific to one mode and may remove links or contract a chain
+of directed network links into one graph link. Do not use an external ID as an
+array index or transfer local indices from one graph to another.
+
+``network.mapping`` holds the shared network mapping while ``graph.mapping``
+holds this graph's correspondence with it. Use ``graph_node()`` and
+``network_node()`` to translate between external node IDs and graph
+indices. Use ``graph_link()`` with an external link ID and an explicit
+direction to find a local link.  The lookups raise ``KeyError`` if a node or
+link is absent from the graph. For bulk work, the inverse arrays
+``network_node_to_graph`` and ``network_link_to_graph`` use ``-1`` for unmapped
+entries; filter those entries before indexing.
+
+The following example contracts a two-link chain. Both physical links map to
+one local graph link, but expanding it recovers the directed network links in
+traversal order:
+
+.. code-block:: python
+
+    import numpy as np
+    import pandas as pd
+
+    from aequilibrae.routing import Network
+
+    links = pd.DataFrame(
+        {
+            "link_id": [101, 102],
+            "a_node": [10, 20],
+            "b_node": [20, 30],
+            "direction": [1, 1],
+            "modes": ["c", "c"],
+            "distance": [5.0, 7.0],
+        }
+    )
+    network = Network(links, centroids=[10, 30])
+    graph = network.build_graph("c", cost="distance", compact=True)
+    mapping = graph.mapping
+
+    local_node = mapping.graph_node(10)
+    assert mapping.network_node(local_node) == 10
+    local_link = mapping.graph_link(101, +1)
+    assert local_link == mapping.graph_link(102, +1)
+    link_ids, directions = mapping.expand_links(local_link)
+    assert link_ids.tolist() == [101, 102]
+    assert directions.tolist() == [1, 1]
+
+    path = graph.compute_path(10, 30)
+    path_links, path_directions = path.get_network_links()
+    assert path_links.tolist() == [101, 102]
+
+Use ``PathResults.get_network_links()`` to obtain physical link IDs and travel
+directions rather than treating ``PathResults.path`` as link IDs.  For other
+graph-link arrays, ``expand_links()`` returns external IDs and directions,
+while ``expand_link_indices()`` returns indices into arrays in directed network
+order. Underneath, ``expansion_offsets`` and ``expansion_links`` store the
+ordered chain for each graph link.
+
+For mapping a field on the network down to the graph, users should use the
+``aggregate_costs()`` function which sums additive fields along each graph
+link's expansion. For projecting a graph field (such as link loads) to the
+next, ``project_loads()`` should be used map to each directed network link in
+that expansion and fill unmapped rows with zero.  Graph objects allow replacing
+the cost function without rebuilding by passing directed network costs to
+``graph.set_costs()`` without aggregating them first.
+
+.. code-block:: python
+
+    network_distances = network.field_values("distance")
+    graph_distances = mapping.aggregate_costs(network_distances)
+    assert graph_distances[local_link] == 12.0
+
+    graph_loads = np.zeros(mapping.link_count)
+    graph_loads[local_link] = 15.0
+    network_loads = mapping.project_loads(graph_loads)
+    assert network_loads.tolist() == [15.0, 15.0]
+
+    graph.set_costs(network_distances * 2)
+
 Search results and operation outputs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

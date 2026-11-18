@@ -3,7 +3,6 @@ thisdir = 'aequilibrae/traffic'
 pyfiles = [
     '__init__.py',
     'assignment_context.py',
-    'assignment_paths.py',
     'assignment_results.py',
     'linear_approximation.py',
     'traffic_assignment.py',

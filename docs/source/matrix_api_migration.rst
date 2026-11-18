@@ -82,6 +82,36 @@ OMX file when there is exactly one. If there are several indices,
 ``main_index`` is used when present, otherwise, specify ``index_name``. Project
 matrix loading uses the same ``from_file()`` index selection.
 
+.. _distribution_matrix_migration:
+
+Select matrices for distribution
+--------------------------------
+
+``Ipf``, ``GravityApplication`` and ``GravityCalibration`` take single-matrix
+collections for their seed, impedance or observed inputs. Replace
+``computational_view()`` on a multi-matrix input with ``subset()`` and pass the
+returned collection to the procedure. For example, with ``vectors`` indexed
+in the same order as the seed matrix:
+
+.. code-block:: python
+
+    from aequilibrae.distribution import Ipf
+
+    ipf = Ipf(
+        matrix=demand.subset(["car"]),
+        vectors=vectors,
+        row_field="productions",
+        column_field="attractions",
+        project=project,
+    )
+    ipf.fit()
+    ipf.save_to_project("balanced_demand.omx")
+
+For gravity, pass the selected skim as ``impedance=skims.subset(["time"])``.
+``Ipf.fit()`` keeps its result in memory as ``ipf.output`` and no longer uses
+an ``output=`` filename. To save outside a project, call
+``ipf.output.save_as_omx("balanced_demand.omx")``.
+
 Replace empty-matrix creation
 -----------------------------
 
@@ -307,7 +337,7 @@ which retain the demand's zone index as well as its field names and order:
 
 .. code-block:: python
 
-    selected = traffic_class.results.select_link_od.matrices
+    selected = assignment.class_results["car"].select_link_od.matrices
     car = selected["screenline"]["car"]
     print(car[0, 1], car.sum())
 
@@ -336,3 +366,10 @@ files with the previous API before moving to the new objects:
     legacy.load("legacy.aem")
     legacy.export("converted.omx")
     legacy.close()
+
+For a project matrix, export the OMX file into the same scenario's ``matrices``
+folder. In 1.x, retrieve the existing record with
+``project.matrices.get_record(matrix_name)``, set its ``file_name`` to the new
+OMX filename and call ``record.save()`` to preserve the catalogue metadata.
+The 2.0 migration cannot migrate a catalogue entry that still points to an
+``.aem`` file.
