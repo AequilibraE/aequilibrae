@@ -29,16 +29,16 @@ Installation
 
   The Windows App Store ships a version of Python that contains an sqlite dll that does not support the loading of extensions. This means that Spatialite will not be loaded, and therefore AequilibraE will not work properly.
 
-Installing the 2.0 beta
-^^^^^^^^^^^^^^^^^^^^^^^
+Installing the 2.0 release candidate
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To try AequilibraE 2.0.0b1 without replacing your 1.x installation, run this command in a separate virtual environment:
+To try AequilibraE 2.0.0rc1 without replacing your 1.x installation, run this command in a separate virtual environment:
 
 .. code-block:: console
 
-   python -m pip install "aequilibrae==2.0.0b1"
+   python -m pip install "aequilibrae==2.0.0rc1"
 
-The 2.0 beta introduces breaking changes. Read the :doc:`2.0 migration guide <../aequilibrae2_0>` before opening
+The 2.0 release candidate introduces breaking changes. Read the :doc:`2.0 migration guide <../aequilibrae2_0>` before opening
 an existing project, and use a copy of the project for testing.
 
 .. _macos_compilation:

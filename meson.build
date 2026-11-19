@@ -4,7 +4,7 @@ project(
     'cpp',
     'cython',
     default_options: ['cpp_std=c++17', 'cython_language=cpp'],
-    version: '2.0.0b1',
+    version: '2.0.0rc1',
     license: 'LicenseRef-AequilibraE',
     license_files: ['LICENSE.TXT'],
 )
