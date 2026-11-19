@@ -235,6 +235,15 @@ def test_two_way_links_are_not_doubled_by_simplification():
     assert float(out.links["distance"].sum()) == pytest.approx(before, rel=0.02)
 
 
+def test_simplify_osmnx_handles_unnamed_links():
+    net = _linear_net(direction=0, name=[None, None])
+
+    out = run_osmnx_simplify(net)
+
+    assert len(out.links) == 1
+    assert out.links["name"].isna().all()
+
+
 def test_one_way_links_are_unaffected_by_recombination():
     net = _linear_net(direction=1)
     before = float(net.links["distance"].sum())

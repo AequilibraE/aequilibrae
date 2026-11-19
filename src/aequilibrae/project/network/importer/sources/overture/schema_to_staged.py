@@ -167,6 +167,10 @@ def _segment_to_links(
     speed_ab, speed_ba = _speeds_for_segment(seg, direction)
     link_type = str(seg["class"] or "unknown")
     sid = str(seg["id"] or "")
+    names = seg.get("names")
+    name = names.get("primary") if isinstance(names, dict) else None
+    if not isinstance(name, str) or not name:
+        name = seg.get("primary_name")
     free_attrs = _free_attrs(seg)
     rows = []
 
@@ -183,7 +187,7 @@ def _segment_to_links(
                 "direction": direction,
                 "modes": filtered_modes,
                 "link_type": link_type,
-                "name": seg.get("primary_name"),
+                "name": name,
                 "speed_ab": speed_ab,
                 "speed_ba": speed_ba,
                 "lanes_ab": None,
