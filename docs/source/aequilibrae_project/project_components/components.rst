@@ -138,7 +138,7 @@ Each item in the 'zones' table is an immutable ``ZoneRecord``.
     >>> project_zones.fields.add("parking_spots", "Number of public parking spots", "INTEGER")
 
     # We can check if the new field was indeed created
-    >>> project_zones.fields.all_fields() # doctest: +ELLIPSIS
+    >>> sorted(project_zones.fields.all_fields()) # doctest: +ELLIPSIS
     ['area', 'employment', 'geometry', 'name', 'parking_spots', 'population', 'zone_id']
 
     # Now let's get a zone and modify it
@@ -225,7 +225,7 @@ records or update existing values.
 
 The ``FieldEditor`` allows the user to edit the project data tables, and it has two different purposes:
 
-* Managing data tables, through the addition/deletion of fields
+* Managing data tables by adding fields
 * Editing the tables' metadata (aka the description of each field)
 
 This class is directly accessed from within the corresponding module one wants to edit.
@@ -240,23 +240,41 @@ This class is directly accessed from within the corresponding module one wants t
     # To add a new field to the 'nodes' table
     >>> node_fields.add("my_new_field", "this is an example of AequilibraE's functionalities", "TEXT")
 
-    # Don't forget to save these modifications
-    >>> node_fields.save()
-
     # To edit the description of a field
-    >>> node_fields.osm_id = "number of the osm node_id"
+    >>> node_fields.set_description("osm_id", "number of the osm node_id")
 
     # Or just to access the description of a field
-    >>> node_fields.modes
+    >>> node_fields.get_description("modes")
     'Modes connected to the node'
 
     # One can also check all the fields in the 'nodes' table.
     >>> node_fields.all_fields() # doctest: +ELLIPSIS
-    ['is_centroid', ..., 'my_new_field']
+    [..., 'my_new_field']
+
+    # Add two directional columns that share one description
+    >>> link_fields = project.tables.links.fields
+    >>> link_fields.add("sample_cost", "Cost of traversing the link", "REAL", directional=True)
+    >>> link_fields.get_description("sample_cost_ab")
+    'Cost of traversing the link'
+    >>> link_fields.get_description("sample_cost_ba")
+    'Cost of traversing the link'
+
+    # Add several fields and edit several descriptions
+    >>> link_fields.add_many([
+    ...     ("survey_note", "Survey note", "TEXT"),
+    ...     ("survey_year", "Year of survey", "INTEGER"),
+    ... ])
+    >>> link_fields.set_descriptions([
+    ...     ("sample_cost_*", "Cost per vehicle"),
+    ...     ("survey_note", "Note from the field survey"),
+    ... ])
 
     >>> project.close()
 
-All field descriptions are kept in the table 'attributes_documentation'.
+Field additions and description edits take effect immediately. All field descriptions are kept in the table
+'attributes_documentation'. To refer to a shared directional description, use a directional column name or
+``name_*``. The base name also works when there is no unsuffixed column of that name.
+Each ``add_many()`` or ``set_descriptions()`` call applies the entire batch in one transaction.
 
 .. seealso::
 
