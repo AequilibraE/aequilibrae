@@ -28,26 +28,12 @@ def add_stop(tables: dict, stop_id: str, lat: float, lon: float, **columns) -> N
     tables["stops.txt"].append({"stop_id": stop_id, "stop_name": stop_id, "stop_lat": lat, "stop_lon": lon, **columns})
 
 
-def add_shape(tables: dict, shape_id: str, points: list[tuple[float, float]]) -> None:
-    """Add a shape through ``(lat, lon)`` points to ``shapes.txt``, created if missing."""
-    rows = [{"shape_id": shape_id, "shape_pt_lat": lat, "shape_pt_lon": lon} for lat, lon in points]
-    tables.setdefault("shapes.txt", []).extend(row | {"shape_pt_sequence": i} for i, row in enumerate(rows, start=1))
-
-
-def add_trip(
-    tables: dict,
-    route_id: str,
-    trip_id: str,
-    events: list[tuple[str, int, int]],
-    route_type: int = 3,
-    shape_id: str | None = None,
-):
+def add_trip(tables: dict, route_id: str, trip_id: str, events: list[tuple[str, int, int]], route_type: int = 3):
     """Add a trip from ``(stop_id, arrival, departure)`` events, in seconds, and its route if new."""
     if not any(route["route_id"] == route_id for route in tables["routes.txt"]):
         route = {"route_id": route_id, "route_short_name": route_id, "route_long_name": route_id}
         tables["routes.txt"].append(route | {"route_type": route_type})
-    trip = {"route_id": route_id, "service_id": "all", "trip_id": trip_id, "direction_id": 0}
-    tables["trips.txt"].append(trip | ({"shape_id": shape_id} if shape_id else {}))
+    tables["trips.txt"].append({"route_id": route_id, "service_id": "all", "trip_id": trip_id, "direction_id": 0})
     for seq, (stop, arrival, departure) in enumerate(events, start=1):
         row = {"arrival_time": hms(arrival), "departure_time": hms(departure), "stop_id": stop, "stop_sequence": seq}
         tables["stop_times.txt"].append({"trip_id": trip_id} | row)
