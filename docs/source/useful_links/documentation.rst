@@ -196,9 +196,9 @@ To upload AequilibraE docs to S3, the steps are:
 3. Upload the home page
 
 If you look at the ``documentation.yml``, you notice conditional steps for link preparation.
-By default, all external links for the AequilibraE webpage refer to LATEST. When uploading
-docs to DEV or DEVELOP, these links are changed in one of 'prepare links for DEV' or
-'prepare links for DEVELOP' steps.
+By default, all external links for the AequilibraE webpage refer to LATEST. Every published
+release, including prereleases, updates LATEST. When uploading docs to DEV or DEVELOP, these
+links are changed in one of 'prepare links for DEV' or 'prepare links for DEVELOP' steps.
 
 When preparing links for DEV, each pull request has its own documentation page, so changes
 in the documentation from different PR's won't overwrite the one in the branch you're working.

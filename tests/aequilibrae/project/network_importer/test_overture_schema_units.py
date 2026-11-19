@@ -58,6 +58,31 @@ def test_missing_connector_is_synthesized_from_segment_geometry():
     assert (round(synth.x, 6), round(synth.y, 6)) == (0.0, 0.001)
 
 
+@pytest.mark.parametrize(
+    "names, legacy_name, expected",
+    [
+        ({"primary": "Main Street"}, "Old Name", "Main Street"),
+        ({"primary": None}, "Legacy Street", "Legacy Street"),
+        (None, "Legacy Street", "Legacy Street"),
+    ],
+)
+def test_segment_name_uses_overture_schema(names, legacy_name, expected):
+    connectors = _connectors([("c0", Point(0, 0)), ("c1", Point(0, 0.001))])
+    segments = _segments(
+        [
+            {
+                "id": "seg-0",
+                "geometry": LineString([(0, 0), (0, 0.001)]),
+                "connectors": [{"connector_id": "c0", "at": 0.0}, {"connector_id": "c1", "at": 1.0}],
+                "names": names,
+                "primary_name": legacy_name,
+            }
+        ]
+    )
+    net = build_staged_from_overture(connectors=connectors, segments=segments, modes=("car",), source_meta=_META)
+    assert net.links["name"].tolist() == [expected]
+
+
 def test_segments_reuse_synthetic_connectors_without_optional_fields():
     connectors = _connectors([("c0", Point(0, 0))])
     segments = _segments(

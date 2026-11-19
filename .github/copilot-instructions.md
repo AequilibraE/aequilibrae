@@ -72,7 +72,7 @@ spin test -j 1 -- tests/ -x
 spin test -j 2 -- tests/aequilibrae/paths -k graph
 ```
 
-Arguments after `--` go to pytest and replace the configured default pytest argument list, rather than extending it. Use `-j` to control worker count.
+Arguments after `--` go to pytest and replace the configured default pytest argument list, rather than extending it. Use `-j` to control worker count. For quick runtime smoke checks outside pytest, use `spin run COMMAND` (for example, `spin run python -c '...'`) to run against the staged build.
 
 ```bash
 spin test --coverage

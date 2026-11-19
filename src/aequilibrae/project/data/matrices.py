@@ -2,12 +2,12 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Sequence, overload
 
 import openmatrix as omx
 import pandas as pd
 
-from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix, MatrixStore, from_file
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeSparseMatrix, MatrixStore, from_file
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +64,31 @@ class Matrices:
         with omx.open_file(path, mode="r") as matrix:
             return len(matrix.list_matrices()) + len(matrix["/"].get("sparse", {}))
 
+    @overload
+    def get_matrix(
+        self,
+        file_name: str,
+        index_name: str | None = None,
+        subset: None = None,
+        **kwargs: Any,
+    ) -> MatrixStore: ...
+
+    @overload
+    def get_matrix(
+        self,
+        file_name: str,
+        index_name: str | None = None,
+        subset: Sequence[str | dict[str, Any]] = ...,
+        **kwargs: Any,
+    ) -> AequilibraeMatrix | AequilibraeSparseMatrix: ...
+
     def get_matrix(
         self,
         file_name: str,
         index_name: str | None = None,
         subset: Sequence[str | dict[str, Any]] | None = None,
         **kwargs,
-    ) -> AequilibraeMatrix | MatrixStore:
+    ) -> AequilibraeMatrix | AequilibraeSparseMatrix | MatrixStore:
         """
         Load a matrix file, optionally selecting an in-memory subset.
 

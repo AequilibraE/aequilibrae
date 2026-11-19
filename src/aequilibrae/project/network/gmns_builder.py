@@ -119,17 +119,15 @@ class GMNSBuilder:
         l_fields.add("notes", description="More information about the link", data_type="TEXT")
 
         if "toll" in self.link_df.columns.to_list():
-            l_fields.add("toll_ab", description="Toll", data_type="NUMERIC")
-            l_fields.add("toll_ba", description="Toll", data_type="NUMERIC")
+            l_fields.add("toll", description="Toll", data_type="NUMERIC", directional=True)
 
         if self.l_equiv["lanes"] in self.link_df.columns.to_list():
-            l_fields.add("lanes_ab", description="Lanes", data_type="NUMERIC")
-            l_fields.add("lanes_ba", description="Lanes", data_type="NUMERIC")
+            l_fields.add("lanes", description="Lanes", data_type="NUMERIC", directional=True)
 
         other_ldict = {}
         other_lfields = [x for x in gmns_l_fields if not gmns_l_fields[x]["required"]]
         for fld in other_lfields:
-            if fld in self.link_df.columns.to_list() and fld not in l_fields.all_fields():
+            if fld in self.link_df.columns.to_list() and fld not in self.links.columns:
                 l_fields.add(
                     f"{fld}",
                     description=f"{gmns_l_fields[fld]['description']}",
@@ -140,8 +138,6 @@ class GMNSBuilder:
                     other_ldict.update({"toll_ba": toll_ba})
 
                 other_ldict.update({f"{fld}": self.link_df[fld]})
-
-        l_fields.save()
 
         all_fields = list(gmns_l_fields)
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
@@ -159,15 +155,13 @@ class GMNSBuilder:
         other_ndict = {}
         other_nfields = [x for x in gmns_n_fields if not gmns_n_fields[x]["required"]]
         for fld in other_nfields:
-            if fld in self.node_df.columns.to_list() and fld not in l_fields.all_fields():
+            if fld in self.node_df.columns.to_list() and fld not in self.nodes.columns:
                 n_fields.add(
                     f"{fld}",
                     description=f"{gmns_n_fields[fld]['description']}",
                     data_type=f"{gmns_n_fields[fld]['type']}",
                 )
                 other_ndict.update({f"{fld}": self.node_df[fld]})
-
-        n_fields.save()
 
         all_fields = list(gmns_n_fields)
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]

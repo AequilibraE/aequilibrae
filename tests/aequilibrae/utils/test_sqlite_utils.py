@@ -12,7 +12,7 @@ def test_without_triggers_restores_exact_definition(fail):
             """
             CREATE TABLE source (value INTEGER);
             CREATE TABLE audit (value INTEGER);
-            CREATE TRIGGER "audit ""quoted"" name" AFTER INSERT ON source
+            CREATE TRIGGER "aequilibrae_audit ""quoted"" name" AFTER INSERT ON source
             BEGIN
                 INSERT INTO audit VALUES (NEW.value);
             END;

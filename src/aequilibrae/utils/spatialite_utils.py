@@ -83,6 +83,8 @@ def load_spatialite_extension(conn: Connection):
                 return
             except OperationalError as e2:
                 raise e2 from e
+        else:
+            raise
 
 
 _pinned_connections: dict[tuple[str], Connection] = {}

@@ -73,7 +73,6 @@ def test_mode_constraints_and_fields_interface(modes):
         modes.insert(mode_id="x", mode_name="car")
 
     editor = modes.fields
-    assert editor._table == "modes"
     assert set(editor.all_fields()) == set(modes.columns)
 
     editor.add("fare", "Typical fare", "NUMERIC")

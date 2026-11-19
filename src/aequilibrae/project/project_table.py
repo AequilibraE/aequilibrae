@@ -69,12 +69,11 @@ def _python_type(column: str, declared_type: str, nullable: bool) -> type[Any]:
     return hint | None if nullable and hint is not Any else hint
 
 
-def guess_record_type(connection: NestedTransactionManager, table: str, record_name: str) -> type[Any]:
+def _record_type_from_schema(table: str, record_name: str, schema: list[tuple]) -> type[Any]:
     """Build a frozen record type from the table's current schema."""
-    schema = connection._connection.execute(_TABLE_INFO_SQL.format(table=table)).fetchall()
     record_fields = []
     for _, column, declared_type, required, _, primary_key in schema:
-        if column == "ogc_fid":
+        if column.lower() == "ogc_fid":
             continue
         record_fields.append((column, _python_type(column, declared_type, not required and not primary_key)))
 
@@ -108,18 +107,18 @@ class ProjectTable(ABC):
     """
     Common implementation for a database table.
 
-    Subclasses declare the table name, key, and generated-record name. During construction, ``record_type`` a frozen
-    dataclass matching the SQLite schema, including user-added fields, is created. Children must inherit from either
-    :class:`NonSpatialProjectTable` or :class:`SpatialProjectTable`.
+    Subclasses declare the table name, key, and generated-record name. During
+    construction, ``record_type`` is created as a frozen dataclass matching the
+    SQLite schema, including user-added fields. Children must inherit from
+    either :class:`NonSpatialProjectTable` or :class:`SpatialProjectTable`.
 
-    Bulk operations create a new transaction, single inserts or updates use a no-op transaction if one is already open,
-    other they create one.
+    Bulk operations create a new transaction. Single inserts or updates use a
+    no-op transaction if one is already open, otherwise they create one.
     """
 
     name: str = ""
     key: str = ""
     record_name: str = ""
-    record_type: type[Any]
     defaults: Mapping[str, Any] = {}
     _geometry_placeholder: str | None = None
     has_numeric_key = False
@@ -141,6 +140,7 @@ class ProjectTable(ABC):
 
         self._connection = connection
         self._record_schema_version = -1
+        self._uncommitted_record_schema: list[tuple] | None = None
         self._table_info_sql = _TABLE_INFO_SQL.format(table=self.name)
         self._count_sql = _COUNT_SQL.format(table=self.name)
         self._contains_sql = _CONTAINS_SQL.format(table=self.name, key=self.key)
@@ -153,30 +153,53 @@ class ProjectTable(ABC):
 
     def _refresh_record_type(self) -> None:
         """Refresh the generated record type after a schema change."""
-        schema_version = self._connection._connection.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
-        if schema_version == self._record_schema_version:
+        conn = self._connection._connection
+        schema_version = conn.execute(_SCHEMA_VERSION_SQL).fetchone()[0]
+        same_version = schema_version == self._record_schema_version
+
+        # SQLite can reuse a schema version after rolling back a transaction or savepoint.
+        # If we built the cached record type in a transaction, verify the schema itself.
+        if same_version and self._uncommitted_record_schema is None:
             return
-        self.record_type = guess_record_type(self._connection, self.name, self.record_name)
-        self._record_fields = tuple(field.name for field in dataclass_fields(self.record_type))
-        record_columns = ",".join(self._select_column(column) for column in self._record_fields)
-        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=record_columns)
-        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=record_columns)
+
+        schema = conn.execute(self._table_info_sql).fetchall()
+        if same_version and schema == self._uncommitted_record_schema:
+            if not conn.in_transaction:
+                self._uncommitted_record_schema = None
+            return
+
+        record_type = _record_type_from_schema(self.name, self.record_name, schema)
+        record_fields = tuple(field.name for field in dataclass_fields(record_type))
+        select_columns = ",".join(self._select_column(column) for column in record_fields)
+
+        self._record_type = record_type
+        self._record_fields = record_fields
+        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=select_columns)
+        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=select_columns)
         self._record_schema_version = schema_version
+        self._uncommitted_record_schema = schema if conn.in_transaction else None
+
+    @property
+    def record_type(self) -> type[Any]:
+        """Return the record type for the current schema."""
+        self._refresh_record_type()
+        return self._record_type
 
     @property
     def columns(self) -> tuple[str, ...]:
         """Return the current writable table columns, including user fields."""
         rows = self._connection._connection.execute(self._table_info_sql).fetchall()
-        return tuple(row[1] for row in rows if row[1] != "ogc_fid")
+        return tuple(row[1] for row in rows if row[1].lower() != "ogc_fid")
 
     @property
     def fields(self) -> FieldEditor:
         """Return the metadata editor for this table's fields."""
-        return FieldEditor(self._connection, self.name)
+        return FieldEditor(self)
 
     @property
     def data(self) -> pd.DataFrame:
         """Return all table data."""
+        self._refresh_record_type()
         return pd.read_sql(self._select_all_sql, self._connection._connection)
 
     def get(self, key: Any, column: str | None = None, default: Any = MISSING) -> Any:
@@ -196,7 +219,7 @@ class ProjectTable(ABC):
             self._refresh_record_type()
             row = self._connection._connection.execute(self._select_one_sql, [key]).fetchone()
         else:
-            # FIXME: See note at top for as to why we don't use self._select_column(column) here
+            # Keep this as an unquoted expression so SQLite rejects unknown column names.
             row = self._connection._connection.execute(
                 _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=column),
                 [key],
@@ -384,7 +407,7 @@ class ProjectTable(ABC):
         values = []
         for column, value in zip(self._record_fields, row, strict=True):
             values.append(self._record_value(column, value))
-        return self.record_type(*values)
+        return self._record_type(*values)
 
     def _prepare_insert(self, values: Mapping[str, Any]) -> dict[str, Any]:
         """Layer supplied values over defaults."""
@@ -455,9 +478,11 @@ class ProjectTable(ABC):
         """Non-fallible hook for invalidating derived in-memory state."""
         return None
 
-    @abstractmethod
     def _select_column(self, column: str) -> str:
         """Format a record field for a SELECT list."""
+        # Qualify the column so SQLite cannot treat an unknown double-quoted identifier as a string literal.
+        # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
+        return f"{escape_identifier(self.name)}.{escape_identifier(column)}"
 
     @abstractmethod
     def _record_value(self, column: str, value: Any) -> Any:
@@ -473,13 +498,6 @@ class ProjectTable(ABC):
 
 class NonSpatialProjectTable(ProjectTable):
     """Base class for project tables without a geometry column."""
-
-    def _select_column(self, column: str) -> str:
-        # FIXME: Can't use escape_identifier because sqlite allows double quoted identifiers to be string
-        # literals when the identifier doesn't exist and a string literal is allowed. In >=3.12 we can use
-        # connection.setconfig to disallow this.
-        # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
-        return column
 
     def _record_value(self, column: str, value: Any) -> Any:
         return value
@@ -509,6 +527,7 @@ class SpatialProjectTable(ProjectTable):
     @property
     def data(self) -> gpd.GeoDataFrame:
         """Return all table data."""
+        self._refresh_record_type()
         return gpd.GeoDataFrame.from_postgis(
             self._select_all_sql, self._connection._connection, geom_col="geometry", crs=self.srid
         )
@@ -516,7 +535,7 @@ class SpatialProjectTable(ProjectTable):
     def _select_column(self, column: str) -> str:
         if column == "geometry":
             return _GEOMETRY_COLUMN
-        return column
+        return super()._select_column(column)
 
     def _record_value(self, column: str, value: Any) -> Any:
         if column == "geometry" and value is not None:

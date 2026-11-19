@@ -85,6 +85,8 @@ def _graph_to_staged(net: StagedNetwork, graph) -> StagedNetwork:
         for sids, m in zip(df["_source_ids"], df["modes"], strict=True)
     ]
     for column, default in (("link_type", "unknown"), ("name", None)):
+        if column not in df:
+            df[column] = default
         df[column] = [
             _first_non_missing((src_attrs.get(sid, {}).get(column) for sid in sids), fallback=edge_val, default=default)
             for sids, edge_val in zip(df["_source_ids"], df[column], strict=True)
