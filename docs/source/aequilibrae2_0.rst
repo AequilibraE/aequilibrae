@@ -645,6 +645,11 @@ Changes in behaviour and corrections include:
 - **Loop routes** keep the pairs of stops they serve more than once, in ``trips_schedule`` and ``route_links``, and
   the links to a stop visited a second time follow the shape rather than a straight line.
 
+- **Consecutive stops at the same coordinates**, such as two platforms of a station, no longer stop the import with a
+  ``ZeroDivisionError``. The route link between them follows the straight line between the stops rather than the
+  shape. When the link before it also ends at those coordinates, or the trip starts there, it has a ``distance`` of
+  zero and a geometry of length zero, which GEOS reports as invalid, as no valid line has length zero.
+
 - **Patterns** are told apart by delimited stop IDs, so stop sequences such as ``1, 23`` and ``12, 3`` on one route are
   no longer the same pattern. Pattern IDs of routes with several patterns may differ from those of earlier imports.
 
