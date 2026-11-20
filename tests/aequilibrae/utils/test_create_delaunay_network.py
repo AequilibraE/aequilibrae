@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from aequilibrae.utils.create_delaunay_network import DelaunayAnalysis
@@ -30,7 +32,8 @@ def test_assign_matrix(sioux_falls_example):
 
     # Create network and assign matrix
     da.create_network()
-    da.assign_matrix(demand, "delaunay_test")
+    record = da.assign_matrix(demand, "delaunay_test")
+    assert list(json.loads(record.procedure_report)) == ["setup"]
 
 
 def test_create_network_with_invalid_overwrite_flag(sioux_falls_example):

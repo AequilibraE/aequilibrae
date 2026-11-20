@@ -1,7 +1,8 @@
 import csv
-import json
 import math
 from pathlib import Path
+
+from aequilibrae.project.data.results import decode_procedure_report
 
 
 def pretty_round(value, direction="up"):
@@ -131,16 +132,9 @@ def parse_convergence_json(json_string):
         json_string = json_string.encode().decode("unicode_escape")
 
     try:
-        data = json.loads(json_string)
-    except (TypeError, json.JSONDecodeError, ValueError):
+        data = decode_procedure_report(json_string)
+    except (TypeError, ValueError):
         return [], []
-
-    # double encoded json case
-    if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except (json.JSONDecodeError, ValueError):
-            return [], []
 
     if not isinstance(data, dict):
         return [], []

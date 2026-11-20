@@ -68,7 +68,8 @@ class Results(NonSpatialProjectTable):
             **procedure_id** (:obj:`str`, *Optional*): Producing procedure ID.
 
             **procedure_report** (:obj:`dict`, *Optional*): JSON-serialisable
-            procedure report.
+            procedure report. It is encoded as JSON when stored, so pass the report itself rather than
+            JSON text. Read it back with :meth:`get_report`.
 
             **timestamp** (:obj:`str`, *Optional*): Result timestamp.
 
@@ -87,6 +88,8 @@ class Results(NonSpatialProjectTable):
         """
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
+        if isinstance(procedure_report, str):
+            raise TypeError("procedure_report must be the report itself, not JSON text; it is encoded when stored")
         if table_name in self or self.table_exists(table_name):
             raise ValueError(f"A result record or table named {table_name!r} already exists")
 
@@ -146,6 +149,19 @@ class Results(NonSpatialProjectTable):
         """
         record = self.get(table_name)
         return pd.read_sql_query(f"SELECT * FROM {escape_identifier(record.table_name)}", self._connection._connection)
+
+    def get_report(self, table_name: str) -> Any:
+        """Read the procedure report of a result.
+
+        Reports that earlier versions stored encoded twice are read the same way as current ones.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Registered table name.
+
+        :Returns:
+            **report** (:obj:`Any`): The report, usually a :obj:`dict`, or ``None`` when the result has none.
+        """
+        return decode_procedure_report(self.get(table_name).procedure_report)
 
     def delete_result(self, table_name: str) -> None:
         """Delete result metadata and its table.
@@ -214,6 +230,31 @@ class Results(NonSpatialProjectTable):
             ).fetchone()
             is not None
         )
+
+
+def decode_procedure_report(text: str | None) -> Any:
+    """Decode the ``procedure_report`` stored in a result record.
+
+    Versions 1.5 to 1.7 and 2.0.0rc1 encoded the report's JSON text a second time, storing a JSON string whose
+    value is the report. Such a string is decoded once more, so records written by those versions read like
+    current ones.
+
+    :Arguments:
+        **text** (:obj:`str`): The stored ``procedure_report`` value.
+
+    :Returns:
+        **report** (:obj:`Any`): The report, usually a :obj:`dict`, or ``None`` when the record has none.
+    """
+    if text is None:
+        return None
+
+    report = json.loads(text)
+    if isinstance(report, str):
+        try:
+            report = json.loads(report)
+        except json.JSONDecodeError:
+            pass  # A report that is a plain string
+    return report
 
 
 def format_dataframe(data: pd.DataFrame, include_index: bool) -> tuple[pd.DataFrame, list[str]]:

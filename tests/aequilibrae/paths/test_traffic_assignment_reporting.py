@@ -1,5 +1,6 @@
 """Assignment reporting follows the shared network, not a class's reduced graph."""
 
+import json
 from dataclasses import replace
 
 import numpy as np
@@ -101,6 +102,19 @@ def test_combined_results_keep_demand_names_and_save(reporting_configuration):
     assignment.save_results("unique_core_results")
     stored = assignment.project.results.get_results("unique_core_results")
     pd.testing.assert_frame_equal(stored, frame.reset_index(), check_dtype=False)
+
+
+def test_saved_report_is_json_encoded_once(reporting_configuration):
+    assignment = TrafficAssignment(**reporting_configuration)
+    assignment.execute(cores=1, elementwise_cores=1)
+    record = assignment.save_results("reported_assignment")
+
+    report = json.loads(record.procedure_report)
+    convergence = assignment.assignment.convergence_report
+    assert set(report["convergence"]) == set(convergence)
+    assert report["convergence"]["iteration"] == convergence["iteration"]
+    assert report["setup"]["Algorithm"] == "all-or-nothing"
+    assert set(report["setup"]["Classes"]) == {"cars", "trucks"}
 
 
 @pytest.mark.parametrize("names", [("flow", "flow"), ("flow", "FLOW"), ("PCE", "other"), ("Preload", "other")])

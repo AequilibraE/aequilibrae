@@ -4,9 +4,11 @@ import sqlite3
 import pandas as pd
 import pytest
 
-from aequilibrae.project.data.results import Results, format_dataframe
+from aequilibrae.project.data.results import Results, decode_procedure_report, format_dataframe
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.utils.db_utils import ConnectionClosure
+
+REPORT = {"convergence": {"iteration": [1, 2], "rgap": [float("inf"), 0.01]}, "setup": {"Algorithm": "bfw"}}
 
 
 @pytest.fixture
@@ -53,6 +55,47 @@ def test_create_get_update_and_container_interfaces(results):
     assert record.description == "Base assignment"
     assert table.get(record.table_name).description == "Updated"
     assert table.list().loc[0, "table_name"] == record.table_name
+
+
+def test_create_stores_the_report_as_json_once(results):
+    table, results_connection = results
+    table.create("flows", assignment_frame(), procedure_report=REPORT)
+    table.create("no_report", assignment_frame())
+
+    stored = results_connection.execute("SELECT procedure_report FROM results WHERE table_name='flows'").fetchone()[0]
+    assert json.loads(stored) == REPORT
+    assert table.get_report("flows") == REPORT
+    assert table.get_report("no_report") is None
+
+
+def test_create_rejects_a_report_that_is_already_json(results):
+    table, _ = results
+    with pytest.raises(TypeError, match="procedure_report"):
+        table.create("flows", assignment_frame(), procedure_report=json.dumps(REPORT))
+
+    assert "flows" not in table
+    assert not table.table_exists("flows")
+
+
+# Versions 1.5 to 1.7 and 2.0.0rc1 stored the report's JSON text encoded again as a JSON string.
+@pytest.mark.parametrize(
+    "stored", [json.dumps(REPORT), json.dumps(json.dumps(REPORT))], ids=["single-encoded", "double-encoded"]
+)
+def test_reports_read_back_from_current_and_older_rows(results, stored):
+    table, results_connection = results
+    table.create("flows", assignment_frame())
+    results_connection.execute("UPDATE results SET procedure_report=? WHERE table_name='flows'", [stored])
+
+    assert table.get_report("flows") == REPORT
+    assert decode_procedure_report(table.get("flows").procedure_report) == REPORT
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [(None, None), ("null", None), (json.dumps("plain text"), "plain text"), (json.dumps([1, 2]), [1, 2])],
+)
+def test_decode_procedure_report_keeps_reports_that_are_not_objects(stored, expected):
+    assert decode_procedure_report(stored) == expected
 
 
 def test_create_validates_input_and_does_not_replace_resources(results):

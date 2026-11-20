@@ -1,4 +1,3 @@
-import json
 import logging
 import socket
 from os import path
@@ -455,7 +454,7 @@ class TrafficAssignment(AssignmentBase):
             data=df,
             procedure="traffic assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=self.description,
         )
@@ -643,7 +642,7 @@ class TrafficAssignment(AssignmentBase):
             data=df,
             procedure="traffic select link",
             procedure_id=f"{self.procedure_id}_sl",
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=description,
         )
