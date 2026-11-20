@@ -50,7 +50,11 @@ class Link:
     def build_geo(
         self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point, start: float = 0
     ) -> float:
-        """Builds link geometry along the shape after ``start``, as loops visit stops again, and returns its end"""
+        """Builds link geometry along the shape after ``start``, as loops visit stops again, and returns its end.
+
+        The link follows the straight line between its stops instead when the shape between them is more than twice
+        as long, or when the stops are at the same coordinates.
+        """
         geo = LineString([from_point, to_point])
         if gtfs_shape is not None:
             fpos = gtfs_shape.project(from_point)
@@ -61,7 +65,8 @@ class Link:
                 tpos = fpos + substring(gtfs_shape, fpos, gtfs_shape.length).project(to_point)
             if fpos < tpos:
                 geo2 = substring(gtfs_shape, fpos, tpos)
-                if geo2.length / geo.length <= 2:
+                # Rounding can leave a piece of shape between stops at the same coordinates
+                if geo.length > 0 and geo2.length / geo.length <= 2:
                     geo, start = geo2, tpos
 
         self.geo = geo if geo.touches(previous_end) else LineString([previous_end] + list(geo.coords))

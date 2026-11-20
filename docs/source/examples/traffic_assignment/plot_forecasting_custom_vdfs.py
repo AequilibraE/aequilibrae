@@ -1,80 +1,51 @@
 """
 .. _example_usage_forecasting_custom_vdfs:
 
-Forecasting
-===========
+Forecasting with a custom VDF
+=============================
 
-In this example, we present a full forecasting workflow for the Sioux Falls example model.
+In this example, we use the built-in BPR volume-delay function (VDF) for the
+base-year assignment in Sioux Falls. We then estimate future demand and use a
+custom quadratic VDF for the future-year assignment with select link analysis.
 
-We start creating the skim matrices, running the assignment for the base-year, and then
-distributing these trips into the network. Later, we estimate a set of future demand vectors
-which are going to be the input of a future year assignment with select link analysis.
+See the :ref:`original forecasting example <example_usage_forecasting>` for the
+full model setup, including gravity model calibration and trip length frequency
+plots.
 """
-# %%
-# .. seealso::
-#     Several functions, methods, classes and modules are used in this example:
-#
-#     * :func:`aequilibrae.routing.graph`
-#     * :func:`aequilibrae.traffic.TrafficClass`
-#     * :func:`aequilibrae.traffic.TrafficAssignment`
-#     * :func:`aequilibrae.distribution.ipf`
-#     * :func:`aequilibrae.distribution.gravity_calibration`
-#     * :func:`aequilibrae.distribution.gravity_application`
-#     * :func:`aequilibrae.distribution.synthetic_gravity_model`
 
-# %%
-
-# Imports
+from dataclasses import replace
 from os.path import join
 from tempfile import gettempdir
 from uuid import uuid4
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
+from aequilibrae.distribution import Ipf
 from aequilibrae.examples import create_example
+from aequilibrae.traffic import VDF, TrafficAssignment, TrafficClass
+from aequilibrae.traffic.vdf import bpr
 from aequilibrae.utils import basic_config
 
-# sphinx_gallery_thumbnail_number = 3
 # %%
+# Base-year assignment with the built-in BPR VDF
+# ----------------------------------------------
+# We use the built-in BPR VDF to run the base-year assignment with skims for
+# ``free_flow_time`` and ``distance``.
 
-# We create the example project inside our temp folder
+# We create the example project inside our temp folder.
 fldr = join(gettempdir(), uuid4().hex)
-
 project = create_example(fldr)
-fldr
-
-# %%
 
 # We'll also apply a basic logging configuration.
-
 basic_config()
 
-project.parameters
-
-# %%
-# Traffic assignment with skimming
-# --------------------------------
-# In this step, we'll set the skims for the variable ``free_flow_time``, and execute the
-# traffic assignment for the base-year.
-
-from dataclasses import replace
-from aequilibrae.traffic import TrafficAssignment, TrafficClass, VDF
-
-# %%
-
 network = project.road.build_network()
-
-# %%
-# Let's get the demand matrix directly from its file, and inspect what matrices we have in the project.
 proj_matrices = project.matrices
-proj_matrices.get_available_matrices_and_metadata()
 
-# %%
 # Load the demand matrix core for computation.
 demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
-
-# %%
-# Let's perform the traffic assignment
 
 # Create the assignment class
 assigclass = TrafficClass(
@@ -87,21 +58,12 @@ assigclass = TrafficClass(
     graph_options={"block_centroid_flows": False},
 )
 
-
-from aequilibrae.routing.cython.vdf_core import akcelik, bpr, bpr2, conical, delta_akcelik, delta_bpr, delta_bpr2, delta_conical, delta_inrets, inrets
-
-bpr_spec = {
-    "alpha": {"fill_NA": 0.15, "bounds": (0.0, float("inf"))},
-    "beta": {"fill_NA": 4.0, "bounds": (1.0, float("inf"))},
-}
-vdf = VDF("bpr_example", bpr, bpr_spec, delta_bpr)
-
 # Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(
     network=network,
     project=project,
     classes=[assigclass],
-    vdf=vdf,
+    vdf=bpr,
     name_mapping={"alpha": "b", "beta": "power"},
     time_field="free_flow_time",
     capacity_field="capacity",
@@ -109,222 +71,45 @@ assig = TrafficAssignment(
 )
 assig.execute(max_iterations=1000, rgap=0.001)
 
-# %%
-# After finishing the assignment, we can easily see the convergence report.
-convergence_report = assig.report()
-convergence_report.head()
-
-# %%
-# And we can also see the results of the assignment
-results = assig.results()
-results.head()
-
-# %%
-# We can export our results to CSV or get a Pandas DataFrame, but let's put it directly into the results database
+# Save the results to the project database and the skims to OMX.
 assig.save_results("base_year_assignment")
-
-# %%
-# And save the skims
 assig.save_skims("base_year_assignment_skims", which_ones="all", format="omx")
 
 # %%
-# Trip distribution
-# -----------------
-# First, let's have a function to plot the Trip Length Frequency Distribution.
-from math import floor, log10
+# Future-year demand with IPF
+# ---------------------------
+# We apply random growth factors to the base-year origins and destinations, then
+# balance their totals. We use iterative proportional fitting (IPF) to fit the base-year
+# demand matrix to these future-year vectors.
 
-import matplotlib.pyplot as plt
-
-
-# %%
-def plot_tlfd(demand, skim, name):
-    plt.clf()
-    b = floor(log10(skim.shape[0]) * 10)
-    n, bins, patches = plt.hist(
-        np.nan_to_num(skim.flatten(), 0),
-        bins=b,
-        weights=np.nan_to_num(demand.flatten()),
-        density=False,
-        facecolor="g",
-        alpha=0.75,
-    )
-
-    plt.xlabel("Trip length")
-    plt.ylabel("Probability")
-    plt.title(f"Trip-length frequency distribution for {name}")
-    return plt
-
-
-# %%
-# Calibration
-# ~~~~~~~~~~~
-# We will calibrate synthetic gravity models using the skims for ``free_flow_time`` that we just generated
-
-import numpy as np
-
-from aequilibrae.distribution import GravityCalibration
-
-# %%
-# Load the demand matrix core for computation.
-demand = proj_matrices.get_matrix("demand.omx", subset=["matrix"])
-
-# %%
-# We also need the skims we just saved into our project. We select the congested-time core.
-imped_core = "free_flow_time_final"
-imped = proj_matrices.get_matrix("base_year_assignment_skims_car.omx", subset=[imped_core])
-
-# Where ``free_flow_time_final`` is the congested time for the last iteration.
-# Use 75% of the closest zone for intrazonal impedance.
-impedance_values = imped[imped_core].copy()
-np.fill_diagonal(impedance_values, 0)
-intrazonals = np.amin(
-    impedance_values, where=impedance_values > 0, initial=impedance_values.max(), axis=1
-)
-intrazonals *= 0.75
-np.fill_diagonal(impedance_values, intrazonals)
-
-# Store the prepared core as a separate project matrix.
-del imped[imped_core]
-imped["final_time_with_intrazonals"] = impedance_values
-proj_matrices.save_matrix(
-    "base_year_assignment_skims_car_intrazonals.omx",
-    matrix=imped,
-)
-
-# %%
-# Let's calibrate our Gravity Model
-for function in ["power", "expo"]:
-    gc = GravityCalibration(matrix=demand, impedance=imped, function=function, nan_as_zero=True)
-    gc.calibrate()
-    model = gc.model
-    # We save the model
-    model.save(join(fldr, f"{function}_model.mod"))
-
-    result_core = next(iter(gc.result_matrix))
-    _ = plot_tlfd(
-        gc.result_matrix[result_core], imped["final_time_with_intrazonals"], f"{function} model"
-    )
-
-    # We can save the result of applying the model as well
-    # We can also save the calibration report
-    with open(join(fldr, f"{function}_convergence.log"), "w") as otp:
-        for r in gc.report:
-            otp.write(r + "\n")
-
-# %%
-# And let's plot a trip length frequency distribution for the demand itself
-plt = plot_tlfd(demand["matrix"], imped["final_time_with_intrazonals"], "demand")
-plt.show()
-
-# %%
-# Forecast
-# --------
-# We create a set of 'future' vectors using some random growth factors.
-# We apply the model for inverse power, as the trip frequency length distribution
-# (TFLD) seems to be a better fit for the actual one.
-
-# %%
-from aequilibrae.distribution import GravityApplication, Ipf, SyntheticGravityModel
-
-# %%
-# Compute future vectors
-# ~~~~~~~~~~~~~~~~~~~~~~
-#
-# First thing to do is to compute the future vectors from our matrix.
 origins = np.sum(demand["matrix"], axis=1)
 destinations = np.sum(demand["matrix"], axis=0)
 
-# Then grow them with some random growth between 0 and 10%, and balance them
+# Then grow them by up to 10% and balance the totals.
 orig = origins * (1 + np.random.rand(origins.shape[0]) / 10)
 dest = destinations * (1 + np.random.rand(origins.shape[0]) / 10)
 dest *= orig.sum() / dest.sum()
 
 vectors = pd.DataFrame({"origins": orig, "destinations": dest}, index=demand.index[:])
-# %%
-# IPF for the future vectors
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Let's balance the future vectors. The output of this step is going to be used later
-# in the traffic assignment for future year.
-
-args = {
-    "matrix": demand,
-    "vectors": vectors,
-    "column_field": "destinations",
-    "row_field": "origins",
-    "nan_as_zero": True,
-}
-
-ipf = Ipf(project=project, **args)
+ipf = Ipf(
+    project=project,
+    matrix=demand,
+    vectors=vectors,
+    column_field="destinations",
+    row_field="origins",
+    nan_as_zero=True,
+)
 ipf.fit()
 
-# %%
-# Save the balanced matrix into the project's matrix folder
+# Save the balanced matrix into the project's matrix folder.
 ipf.save_to_project(file_name="demand_ipfd.omx")
 
 # %%
-# Impedance
-# ~~~~~~~~~
-#
-# Let's get the base-year assignment skim for car we created before and prepare it for computation
-imped = proj_matrices.get_matrix(
-    "base_year_assignment_skims_car_intrazonals.omx", subset=["final_time_with_intrazonals"]
-)
-
-# %%
-# If we wanted the main diagonal to not be considered...
-
-# np.fill_diagonal(imped["final_time_with_intrazonals"], np.nan)
-
-# %%
-# Now we apply the Synthetic Gravity model
-for function in ["power", "expo"]:
-    model = SyntheticGravityModel()
-    model.load(join(fldr, f"{function}_model.mod"))
-
-    args = {
-        "impedance": imped,
-        "vectors": vectors,
-        "row_field": "origins",
-        "model": model,
-        "column_field": "destinations",
-        "nan_as_zero": True,
-    }
-
-    gravity = GravityApplication(project=project, **args)
-    gravity.apply()
-
-    # We get the output matrix and save it to OMX too,
-    gravity.save_to_project(file_name=f"demand_{function}_modeled.omx")
-
-# %%
-# We inspect the matrix files and verify that the new matrices are indeed there
-proj_matrices.get_available_matrices_and_metadata()
-
-# %%
-# Traffic assignment with Select Link Analysis
-# --------------------------------------------
-# We'll perform traffic assignment for the future year.
-# Let's get our future demand matrix, which corresponds to the IPF result we just saved,
-# and see what is the core we ended up getting. It should be ``matrix``.
-demand = proj_matrices.get_matrix("demand_ipfd.omx", subset=["matrix"])
-list(demand)
-
-# %%
-# The selected matrix core is ready for computation.
-
-# %%
-# The future year assignment is quite similar to the one we did for the base-year.
-
-# So, let's create the assignment class
-assigclass = TrafficClass(
-    name="car",
-    mode="c",
-    cost="free_flow_time",
-    demand=demand,
-    skimming=["free_flow_time", "distance"],
-    # Every node in Sioux Falls is a centroid, so paths must pass through centroids.
-    graph_options={"block_centroid_flows": False},
-)
+# Define a custom quadratic VDF
+# -----------------------------
+# The VDF and its derivative write directly to their output arrays, ``congested_time``
+# and ``delta``. See :ref:`creating_custom_vdfs` for the callable signatures and other
+# ways to define a custom VDF.
 
 
 def quadratic(congested_time, link_flows, fftime, capacity, cores, a, b):
@@ -342,9 +127,11 @@ vdf = VDF(
     quadratic_derivative,
 )
 
-
 # %%
-# Now we select two sets of links to execute select link analysis.
+# Future-year assignment with the custom VDF
+# ------------------------------------------
+# We use the demand matrix from IPF and select two sets of links for select link analysis.
+future_demand = proj_matrices.get_matrix("demand_ipfd.omx", subset=["matrix"])
 select_links = {
     "Leaving node 1": [(1, 1), (2, 1)],
     "Random nodes": [(3, 1), (5, 1)],
@@ -354,8 +141,8 @@ select_links = {
 # .. note::
 #
 #    As we are executing the select link analysis on a particular ``TrafficClass``, we should set the
-#    links we want to analyze. The input is a dictionary with string as keys and a list of tuples as
-#    values, so that each entry represents a separate set of selected links to compute.
+#    links we want to analyse. The input is a dictionary with strings as keys and lists of tuples
+#    as values, so that each entry represents a separate set of selected links to compute.
 #
 #    ``select_link_dict = {"set_name": [(link_id1, direction1), ..., (link_id, direction)]}``
 #
@@ -365,9 +152,10 @@ select_links = {
 #    Direction can be one of 0, 1, or -1, where 0 denotes bi-directionality.
 
 # %%
-
-# We call this command on the class we are analyzing with our dictionary of values
-assigclass = replace(assigclass, select_link_sets=select_links)
+# We reuse the base-year traffic class settings with the future-year demand and select link sets.
+# Unlike the base-year BPR assignment, which maps its parameters to network fields,
+# this assignment uses the same values of ``a`` and ``b`` on every link.
+assigclass = replace(assigclass, demand=future_demand, select_link_sets=select_links)
 
 # Configure the VDF, network fields, and assignment algorithm.
 assig = TrafficAssignment(

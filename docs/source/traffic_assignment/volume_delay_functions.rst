@@ -533,8 +533,13 @@ Link-Specific Parameters
         name_mapping={"alpha": "alpha_field", "beta": "beta_field"},
     )
 
+.. _creating_custom_vdfs:
+
 Creating Custom VDFs
 --------------------
+
+For a complete workflow that uses a custom quadratic VDF in a future-year assignment, see
+:ref:`example_usage_forecasting_custom_vdfs`.
 
 Custom VDFs can be created in three different ways. When using the python constructor of the VDF object, the VDF function and its derivative can be input as either a ``Callable``, or as a string to be interpreted by NumExpr. Alternatively, the string representation and other data can be placed in a project's yaml file. In all cases, if the derivative is not supplied, then it will be computed numerically using the central difference scheme. 
 

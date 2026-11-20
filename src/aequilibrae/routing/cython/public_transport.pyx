@@ -1,14 +1,16 @@
 # cython: language_level=3
 
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
-import socket
+from datetime import datetime
+from uuid import uuid4
 import logging
+import socket
 
 import numpy as np
 import pandas as pd
 
 from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix
 from aequilibrae.routing.cython.demand import validate_demand, choose_origins
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 from aequilibrae.utils.cython.bridge cimport Bridge
 
@@ -52,6 +54,10 @@ class HyperpathGenerating:
             d_vert_ids=np.array([], dtype=np.int64),
             nodes_to_indices,
     ):
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
+        self.description = ""
+
         skim_cols = self.check_skim_cols(skim_cols)
 
         # Take a copy as to not modify the users dataframe
@@ -353,8 +359,6 @@ class HyperpathGenerating:
         df = self._edges
         if not keep_zero_flows:
             df = df[df.volume > 0]
-
-        project = self._resolve_project(project)
 
         rep = {"setup": self.info()}
         project.results.create(

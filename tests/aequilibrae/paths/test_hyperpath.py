@@ -596,3 +596,17 @@ def test_SF_skimming_02(network_setup, packed_demand):
 
     # Only board once
     np.testing.assert_allclose(mats["boardings"], mats["alightings"])
+
+
+@pytest.mark.parametrize("network_setup", [{"network": "SF"}], indirect=True)
+def test_save_results(network_setup, sioux_falls_example):
+    hp = HyperpathGenerating(
+        network_setup["edges"],
+        o_vert_ids=network_setup["centroids"],
+        d_vert_ids=network_setup["centroids"],
+        nodes_to_indices=network_setup["nodes_to_indices"],
+    )
+
+    hp.save_results("hyperpath_results", project=sioux_falls_example)
+
+    assert sioux_falls_example.results.get("hyperpath_results").procedure_id == hp.procedure_id
