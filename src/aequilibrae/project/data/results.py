@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import uuid
 from typing import Any
 
@@ -118,7 +119,7 @@ class Results(NonSpatialProjectTable):
                 table_name=table_name,
                 procedure=procedure,
                 procedure_id=procedure_id,
-                procedure_report=json.dumps(procedure_report),
+                procedure_report=json.dumps(_non_finite_to_none(procedure_report), allow_nan=False),
                 timestamp=timestamp,
                 description=description,
                 scenario=scenario,
@@ -242,3 +243,13 @@ def format_dataframe(data: pd.DataFrame, include_index: bool) -> tuple[pd.DataFr
     frame.index = frame.index.set_names(names)
 
     return frame.reset_index(), names
+
+
+def _non_finite_to_none(value):
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _non_finite_to_none(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_non_finite_to_none(item) for item in value]
+    return value
