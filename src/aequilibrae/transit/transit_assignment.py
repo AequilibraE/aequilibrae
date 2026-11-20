@@ -1,4 +1,3 @@
-import json
 import logging
 import socket
 
@@ -165,7 +164,7 @@ class TransitAssignment(AssignmentBase):
             data=df,
             procedure="transit assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=self.description,
         )

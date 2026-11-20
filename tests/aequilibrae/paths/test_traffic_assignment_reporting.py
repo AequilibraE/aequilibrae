@@ -1,5 +1,6 @@
 """Assignment reporting follows the shared network, not a class's reduced graph."""
 
+import json
 from dataclasses import replace
 
 import numpy as np
@@ -98,9 +99,10 @@ def test_combined_results_keep_demand_names_and_save(reporting_configuration):
     for results in assignment.class_results.values():
         class_frame = results.get_load_results()
         pd.testing.assert_frame_equal(frame[class_frame.columns], class_frame.rename_axis("link_id"))
-    assignment.save_results("unique_core_results")
+    record = assignment.save_results("unique_core_results")
     stored = assignment.project.results.get_results("unique_core_results")
     pd.testing.assert_frame_equal(stored, frame.reset_index(), check_dtype=False)
+    assert isinstance(json.loads(record.procedure_report), dict)
 
 
 @pytest.mark.parametrize("names", [("flow", "flow"), ("flow", "FLOW"), ("PCE", "other"), ("Preload", "other")])

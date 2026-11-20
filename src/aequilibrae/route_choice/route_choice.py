@@ -1,5 +1,4 @@
 import itertools
-import json
 import logging
 import pathlib
 import socket
@@ -682,7 +681,7 @@ class RouteChoice:
             data=df,
             procedure=method_name,
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=self.procedure_date,
             description=description,
         )

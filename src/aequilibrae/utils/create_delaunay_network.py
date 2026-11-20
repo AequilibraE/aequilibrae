@@ -1,4 +1,3 @@
-import json
 import uuid
 from itertools import combinations
 
@@ -124,7 +123,7 @@ class DelaunayAnalysis:
             data=df,
             procedure="Delaunay assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(report),
+            procedure_report=report,
             timestamp=ta.procedure_date,
             description="",
         )

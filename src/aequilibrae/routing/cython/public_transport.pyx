@@ -3,7 +3,6 @@
 from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 import socket
 import logging
-import json
 
 import numpy as np
 import pandas as pd
@@ -363,7 +362,7 @@ class HyperpathGenerating:
             data=df,
             procedure="Hyperpath assignment",
             procedure_id=self.procedure_id,
-            procedure_report=json.dumps(rep),
+            procedure_report=rep,
             timestamp=self.procedure_date,
             description=self.description,
         )
