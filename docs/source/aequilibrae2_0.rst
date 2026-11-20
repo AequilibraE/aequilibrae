@@ -184,7 +184,7 @@ in use by transportation planning agencies in 2026.
 
 Before: 1.7.2. After: 2.0.0rc1. Both using Python 3.12.13 and 16 threads.
 
-.. list-table::
+.. list-table:: Network skimming benchmarks
    :header-rows: 1
 
     - Model
