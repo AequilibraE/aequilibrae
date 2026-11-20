@@ -182,55 +182,63 @@ The parallelisation of the network skimming procedure was re-implemented in Cyth
 improvements for small and medium networks, which cover a significant amount of the real-world networks
 in use by transportation planning agencies in 2026.
 
-TODO: RUN THESE BENCHMARKS
+Before: 1.7.2. After: 2.0.0rc1. Both using Python 3.12.13 and 16 threads.
 
 .. list-table:: Network skimming benchmarks
-   :header-rows: 1
+     :header-rows: 1
 
-   * - Network
-     - Links
-     - Graph Links
-     - Nodes
-     - Centroids
-     - AequilibraE 2.0 speed-up
-   * - Arkansas
-     - 300,146
-     - 591,489
-     - 243,059
-     - 6,445
-     - 0%
-   * - Australia wide
-     - 4,113,479
-     - 7,760,714
-     - 30,000,000
-     - 60,000
-     - 0%
-   * - Chicago
-     - 39,018
-     - 39,018
-     - 12,979
-     - 1,790
-     - 12%
-   * - Coquimbo
-     - 19,983
-     - 34,546
-     - 15,724
-     - 133
-     - 31%
-   * - Lyon
-     - 253,305
-     - 468,761
-     - 179,940
-     - 4,617
-     - 0%
+     * - Model
+       - Network links
+       - Network nodes
+       - Zones
+       - Before (s)
+       - After (s)
+       - Time reduction
+       - Speedup
+     * - Arkansas
+       - 300,146
+       - 245,398
+       - 6,445
+       - 8.259560
+       - 4.923539
+       - 40.39%
+       - 1.68x
+     * - Australia truck freight model
+       - 3,552,750
+       - 2,684,505
+       - 88
+       - 1.380562
+       - 1.174751
+       - 14.91%
+       - 1.18x
+     * - Chicago
+       - 39,018
+       - 12,979
+       - 1,790
+       - 0.298032
+       - 0.144500
+       - 51.52%
+       - 2.06x
+     * - Lyon
+       - 253,305
+       - 191,877
+       - 4,617
+       - 2.892290
+       - 1.886773
+       - 34.77%
+       - 1.53x
+     * - Coquimbo
+       - 19,983
+       - 15,724
+       - 133
+       - 0.024008
+       - 0.010696
+       - 55.45%
+       - 2.24x
 
-The following conditions apply to this benchmark:
-
-- The skimming procedure was run for a single mode and a single cost variable (i.e. "distance" for cars).
-- It does not include the time taken to build the graph or to save the result to disk.
-- The benchmarking was run on a desktop PC equipped with a intel i9 285K with 192GB of RAM, and
-using 8 threads for the parallelisation (this CPU's *performance cores*).
-- The speed-up procedure considers the ratio between the median time for 10 runs.
+Times are medians of three measured executions after one untimed warmup, run
+sequentially on an AMD Ryzen 9 6900HX (8 physical cores, 16 logical CPUs),
+Windows.
 
 
 API Changes
