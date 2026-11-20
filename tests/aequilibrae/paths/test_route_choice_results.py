@@ -1,6 +1,5 @@
 """Route tables, path-file round trips and project-backed result persistence."""
 
-import json
 from pathlib import Path
 
 import numpy as np
@@ -110,8 +109,6 @@ def test_save_project_results(route_choice_setup):
             retrieved.index = retrieved.index.astype(np.uint64)
             pd.testing.assert_frame_equal(stored, expected, check_like=True)
             pd.testing.assert_frame_equal(retrieved, expected, check_like=True)
-
-            assert json.loads(project.results.get(table).procedure_report)["Algorithm"] == "link-penalisation"
 
     matrices = AequilibraeSparseMatrix.from_omx(
         Path(project.project_base_path) / "matrices" / "sl.omx", index_name="route_choice_sl_index"

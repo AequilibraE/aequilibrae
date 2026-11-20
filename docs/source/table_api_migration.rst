@@ -435,15 +435,11 @@ which makes a link-indexed result straightforward to retrieve:
 
     stored_data = project.results.get_results(result.table_name)
     assert set(stored_data["link_id"]) == {42, 43}
-    assert project.results.get_report(result.table_name) == {"converged": True}
 
     project.results.delete_result(result.table_name)
 
 ``create()`` raises an error rather than replacing an existing metadata record
-or data table. It encodes ``procedure_report`` as JSON, so pass the report
-itself, not JSON text. ``get_report()`` decodes it, including the reports that
-versions 1.5 to 1.7 and 2.0.0rc1 stored encoded twice.
-``delete_result()`` removes both metadata and its data table.
+or data table. ``delete_result()`` removes both metadata and its data table.
 The more generic ``results.delete(name)`` removes metadata only after the data
 table has been removed.
 

@@ -14,9 +14,7 @@
 --@ The **procedure_id** field holds an unique UUID identifier for this procedure,
 --@ which is created at runtime.
 --@
---@ The **procedure_report** field holds the output of the complete procedure report,
---@ encoded as JSON. Versions 1.5 to 1.7 and 2.0.0rc1 encoded that JSON text a second
---@ time, storing a JSON string whose value is the report.
+--@ The **procedure_report** field holds the output of the complete procedure report. 
 --@
 --@ The **timestamp** field holds the information when the procedure was executed.
 --@

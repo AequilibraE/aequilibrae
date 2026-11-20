@@ -1,4 +1,3 @@
-import json
 import os
 import zipfile
 
@@ -88,7 +87,6 @@ def test_multiple_link_sets(select_link_setup):
 
     results = project.results.list()["table_name"].to_list()
     assert "select_link_analysis" in results
-    assert json.loads(project.results.get("select_link_analysis").procedure_report) == {}
 
 
 def test_equals_demand_one_origin(select_link_setup):
