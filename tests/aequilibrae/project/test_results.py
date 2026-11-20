@@ -55,6 +55,15 @@ def test_create_get_update_and_container_interfaces(results):
     assert table.list().loc[0, "table_name"] == record.table_name
 
 
+def test_create_stores_non_finite_report_values_as_null(results):
+    table, _ = results
+    report = {"convergence": {"rgap": [float("inf"), 0.5], "alpha": (0.25, float("nan"))}}
+
+    record = table.create("flows", assignment_frame(), procedure_report=report)
+
+    assert record.procedure_report == '{"convergence": {"rgap": [null, 0.5], "alpha": [0.25, null]}}'
+
+
 def test_create_validates_input_and_does_not_replace_resources(results):
     table, results_connection = results
     table.create("existing", assignment_frame())

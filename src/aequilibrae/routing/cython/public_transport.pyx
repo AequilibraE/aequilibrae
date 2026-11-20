@@ -1,16 +1,16 @@
 # cython: language_level=3
 
-from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
-import socket
-import logging
 from datetime import datetime
 from uuid import uuid4
+import logging
+import socket
 
 import numpy as np
 import pandas as pd
 
 from aequilibrae.matrix.cython.dense_matrix cimport DenseMatrix
 from aequilibrae.routing.cython.demand import validate_demand, choose_origins
+from aequilibrae.utils.cython.openmp_helper import omp_get_max_threads
 
 from aequilibrae.utils.cython.bridge cimport Bridge
 
