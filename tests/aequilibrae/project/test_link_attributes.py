@@ -58,10 +58,19 @@ def _make_pre_split(project, links_ddl):
 
 
 def test_new_project_splits_links(empty_project):
-    """Test that a new project keeps only the mandatory link fields in links, behind a registered links_full view."""
+    """Test that a new project splits links into mandatory and default attribute fields, behind a links_full view."""
     with empty_project.db_connection as conn:
         assert _columns(conn, "links") == list(MANDATORY_LINK_FIELDS)
-        assert "speed_ab" in _columns(conn, "link_attributes")
+        assert _columns(conn, "link_attributes") == [
+            "link_id",
+            "name",
+            "lanes_ab",
+            "lanes_ba",
+            "speed_ab",
+            "speed_ba",
+            "travel_time_ab",
+            "travel_time_ba",
+        ]
         registration = conn.execute("SELECT view_rowid, f_table_name, read_only FROM views_geometry_columns").fetchall()
     assert registration == [("ogc_fid", "links", 0)]
     assert empty_project.tables.links._source == "links_full"
@@ -118,9 +127,9 @@ def test_links_full_updates_only_touch_their_own_columns(empty_project):
                 f"BEGIN INSERT INTO update_log VALUES ('{column}'); END"
             )
 
-        conn.execute("UPDATE links_full SET speed_ab = 50, capacity_ab = 900 WHERE link_id = 10")
+        conn.execute("UPDATE links_full SET speed_ab = 50, lanes_ab = 2 WHERE link_id = 10")
         assert conn.execute("SELECT * FROM update_log").fetchall() == []
-        assert conn.execute("SELECT speed_ab, capacity_ab FROM link_attributes").fetchone() == (50, 900)
+        assert conn.execute("SELECT speed_ab, lanes_ab FROM link_attributes").fetchone() == (50, 2)
 
         conn.execute("UPDATE links_full SET modes = 'ct' WHERE link_id = 10")
         assert conn.execute("SELECT * FROM update_log").fetchall() == [("modes",)]
@@ -133,10 +142,10 @@ def test_links_api_writes_through_links_full(empty_project):
     """Test that the links API reads and writes both tables, and raises for links that do not exist."""
     links = empty_project.tables.links
     links.insert(link_id=10, modes="c", speed_ab=50.0, geometry=LineString([(0, 0), (0.01, 0)]))
-    links.update(10, capacity_ab=900.0, modes="ct")
+    links.update(10, travel_time_ab=1.5, modes="ct")
 
     record = links.get(10)
-    assert (record.speed_ab, record.capacity_ab, record.modes) == (50.0, 900.0, "ct")
+    assert (record.speed_ab, record.travel_time_ab, record.modes) == (50.0, 1.5, "ct")
     with pytest.raises(ValueError, match="no record with link_id=99"):
         links.update(99, speed_ab=1.0)
     with pytest.raises(ValueError, match="no record with link_id=99"):
@@ -147,14 +156,14 @@ def test_new_link_fields_go_to_link_attributes(empty_project):
     """Test that fields added through the links API are created in link_attributes and shown by links_full."""
     links = empty_project.tables.links
     links.insert(link_id=10, modes="c", geometry=LineString([(0, 0), (0.01, 0)]))
-    links.fields.add("lanes", "number of lanes", "INTEGER", directional=True)
-    links.update(10, lanes_ab=3)
+    links.fields.add("capacity", "link capacity", "NUMERIC", directional=True)
+    links.update(10, capacity_ab=900)
 
     with empty_project.db_connection as conn:
-        assert "lanes_ab" not in _columns(conn, "links")
-        assert {"lanes_ab", "lanes_ba"} <= set(_columns(conn, "link_attributes"))
-        assert conn.execute("SELECT lanes_ab FROM links_full WHERE link_id = 10").fetchone() == (3,)
-    assert links.fields.get_description("lanes_*") == "number of lanes"
+        assert "capacity_ab" not in _columns(conn, "links")
+        assert {"capacity_ab", "capacity_ba"} <= set(_columns(conn, "link_attributes"))
+        assert conn.execute("SELECT capacity_ab FROM links_full WHERE link_id = 10").fetchone() == (900,)
+    assert links.fields.get_description("capacity_*") == "link capacity"
 
 
 def test_stale_links_full_is_rebuilt(empty_project):
@@ -183,7 +192,11 @@ def test_migration_splits_links(empty_project, links_ddl):
         index = conn.execute("SELECT tbl_name FROM sqlite_master WHERE name = 'idx_links_speed'").fetchone()
         assert index == ("link_attributes",)
         links_sql = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'links'").fetchone()[0]
+        attribute_columns = _columns(conn, "link_attributes")
 
     # Each table keeps its own constraints: none for the legacy one, the specification's for the other
     assert ("CHECK" in links_sql.upper()) == (links_ddl == CURRENT_SPEC_LINKS)
+    # and its own fields, without gaining those new projects get or losing those they no longer get
+    assert "lanes_ab" not in attribute_columns
+    assert ("other_attributes" in attribute_columns) == (links_ddl == CURRENT_SPEC_LINKS)
     assert empty_project.tables.links.get(101).speed_ab == 50.0

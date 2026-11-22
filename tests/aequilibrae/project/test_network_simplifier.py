@@ -41,18 +41,25 @@ def test_simplify(project_with_graph):
     assert nodes_before > net.tables.nodes.data.shape[0]
 
 
-def test_simplify_uses_ordered_network_expansions(empty_project):
+@pytest.mark.parametrize("with_capacity", [True, False], ids=["capacity", "no_capacity"])
+def test_simplify_uses_ordered_network_expansions(empty_project, with_capacity):
+    """Test that merged links average speeds, and capacities when links have them, in traversal order."""
     # Link IDs differ from traversal order; the first geometry opposes the chain.
-    empty_project.tables.links.fields.add("lanes", "lanes", "INTEGER", directional=True)
+    columns = ["link_id", "direction", "speed_ab", "speed_ba", "lanes_ab", "lanes_ba"]
+    rows = [[30, -1, 10.0, 40.0, 1, 2], [10, 1, 42.0, 10.5, 2, 1]]
+    if with_capacity:
+        empty_project.tables.links.fields.add("capacity", "capacity", "NUMERIC", directional=True)
+        columns += ["capacity_ab", "capacity_ba"]
+        rows[0] += [50.0, 100.0]
+        rows[1] += [300.0, 90.0]
+    rows[0].append(LineString([(0.02, 0), (0, 0)]).wkb)
+    rows[1].append(LineString([(0.02, 0), (0.03, 0)]).wkb)
+
     with empty_project.db_connection as conn:
         conn.executemany(
-            "INSERT INTO links_full (link_id, direction, modes, link_type, speed_ab, speed_ba, "
-            "lanes_ab, lanes_ba, capacity_ab, capacity_ba, geometry) "
-            "VALUES (?, ?, 'c', 'default', ?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326))",
-            [
-                (30, -1, 10.0, 40.0, 1, 2, 50.0, 100.0, LineString([(0.02, 0), (0, 0)]).wkb),
-                (10, 1, 42.0, 10.5, 2, 1, 300.0, 90.0, LineString([(0.02, 0), (0.03, 0)]).wkb),
-            ],
+            f"INSERT INTO links_full ({', '.join(columns)}, modes, link_type, geometry) "
+            f"VALUES ({', '.join('?' * len(columns))}, 'c', 'default', GeomFromWKB(?, 4326))",
+            rows,
         )
         conn.execute("UPDATE nodes SET is_centroid=1 WHERE node_id IN (SELECT b_node FROM links)")
     empty_project.tables.refresh_schemas()
@@ -67,8 +74,11 @@ def test_simplify_uses_ordered_network_expansions(empty_project):
     assert merged.direction == 1
     assert merged.speed_ab == pytest.approx((40 * 2 + 42) / 3)
     assert merged.speed_ba == pytest.approx((10 * 2 + 10.5) / 3)
-    assert merged.capacity_ab == pytest.approx((100 * 2 + 300) / 3)
-    assert merged.capacity_ba == pytest.approx((50 * 2 + 90) / 3)
+    if with_capacity:
+        assert merged.capacity_ab == pytest.approx((100 * 2 + 300) / 3)
+        assert merged.capacity_ba == pytest.approx((50 * 2 + 90) / 3)
+    else:
+        assert "capacity_ab" not in links.columns
 
 
 def test_collapse_links_into_nodes(project_with_graph):

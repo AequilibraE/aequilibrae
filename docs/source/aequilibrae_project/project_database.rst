@@ -42,8 +42,10 @@ Links are stored in two tables:
 
 * **links** holds each link's geometry and the fields the network topology depends on:
   *link_id*, *a_node*, *b_node*, *direction*, *distance*, *modes* and *link_type*.
-* **link_attributes** holds every other field, such as names, speeds, capacities and costs,
-  and all user-defined fields. It has exactly one record per link, matched on *link_id*.
+* **link_attributes** holds every other field. It has exactly one record per link, matched on
+  *link_id*. New projects create it with the street *name* and the directional *lanes_ab/ba*,
+  *speed_ab/ba* and *travel_time_ab/ba* fields. Anything else a model needs, such as capacities
+  or tolls, is added as a user-defined field.
 
 Triggers keep the two tables in sync: adding, renumbering or deleting a link creates,
 renumbers or deletes its attribute record, and attribute records cannot be deleted, or created
@@ -65,7 +67,9 @@ QGIS load and edit it like any other layer.
   QAequilibraE plugin reloads the links layer after each save that adds links.
 
 Projects created before this split keep all link fields in the **links** table until upgraded
-with ``project.upgrade()``, which moves every non-mandatory field to **link_attributes**.
+with ``project.upgrade()``, which moves every non-mandatory field to **link_attributes**. The
+upgrade neither adds nor removes fields, so upgraded projects keep the fields they had, such as
+capacities, even where new projects no longer create them.
 
 .. _links_nodes_consistency_triggers:
 

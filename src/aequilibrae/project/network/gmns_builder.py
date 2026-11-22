@@ -123,8 +123,11 @@ class GMNSBuilder:
         if "toll" in self.link_df.columns.to_list():
             l_fields.add("toll", description="Toll", data_type="NUMERIC", directional=True)
 
-        if self.l_equiv["lanes"] in self.link_df.columns.to_list():
-            l_fields.add("lanes", description="Lanes", data_type="NUMERIC", directional=True)
+        # New projects have lanes but no capacity fields, while older ones may have either
+        link_columns = {column.lower() for column in self.links.columns}
+        for base, description in (("lanes", "Lanes"), ("capacity", "Capacity")):
+            if self.l_equiv[base] in self.link_df.columns.to_list() and f"{base}_ab" not in link_columns:
+                l_fields.add(base, description=description, data_type="NUMERIC", directional=True)
 
         other_ldict = {}
         other_lfields = [x for x in gmns_l_fields if not gmns_l_fields[x]["required"]]
@@ -216,13 +219,14 @@ class GMNSBuilder:
             "name": name_list,
             "speed_ab": speed_ab,
             "speed_ba": speed_ba,
-            "capacity_ab": capacity_ab,
-            "capacity_ba": capacity_ba,
             "geometry": self.link_df.geometry,
-            "lanes_ab": lanes_ab,
-            "lanes_ba": lanes_ba,
             "notes": "from GMNS file",
         }
+
+        # Lanes and capacities are only written when the GMNS links have them
+        for base, values in (("lanes", (lanes_ab, lanes_ba)), ("capacity", (capacity_ab, capacity_ba))):
+            if self.l_equiv[base] in self.link_df.columns.to_list():
+                links_fields[f"{base}_ab"], links_fields[f"{base}_ba"] = values
 
         nodes_fields.update(other_ndict)
         links_fields.update(other_ldict)

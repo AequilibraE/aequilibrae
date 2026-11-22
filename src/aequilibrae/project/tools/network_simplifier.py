@@ -127,9 +127,11 @@ class NetworkSimplifier(WorkerThread):
             # The merged geometry follows traversal, any one-way link makes the whole chain one-way
             main_data["direction"] = int((candidates["direction"] != 0).any())
 
-            # Some values we will bring from the direction-aligned weighted average
+            # Some values we will bring from the direction-aligned weighted average. Capacity is a
+            # user-defined field, so it is only averaged when the links have it
             ordered_candidates = candidates.loc[self.link_sequence]
-            for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
+            averaged = ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]
+            for field in [field for field in averaged if field in candidates.columns]:
                 reverse_field = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
                 values = np.where(link_directions == 1, ordered_candidates[field], ordered_candidates[reverse_field])
                 main_data[field] = (values * ordered_candidates["distance"]).sum() / candidates["distance"].sum()

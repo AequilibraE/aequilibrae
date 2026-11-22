@@ -160,13 +160,13 @@ def test_bulk_field_edits(empty_project, monkeypatch):
         [
             ("notes", "Link notes", "TEXT"),
             ("toll", "Directional toll", "REAL", True),
-            ("lanes_AB", "Directional lanes"),
-            ("lanes_ba", "Keep the first description"),
+            ("capacity_AB", "Directional capacity"),
+            ("capacity_ba", "Keep the first description"),
         ]
     )
     assert schema_refreshes == [links.columns]
-    assert {"notes", "toll_ab", "toll_ba", "lanes_AB", "lanes_ba"} <= set(links.columns)
-    assert editor.get_description("lanes_ba") == "Directional lanes"
+    assert {"notes", "toll_ab", "toll_ba", "capacity_AB", "capacity_ba"} <= set(links.columns)
+    assert editor.get_description("capacity_ba") == "Directional capacity"
     assert editor.get_description("toll_*") == "Directional toll"
 
     schema_refreshes.clear()

@@ -9,16 +9,19 @@ from aequilibrae.project.network.importer.staged_network import StagedNetwork
 
 def _snapshot(path):
     with sqlite3.connect(path) as conn:
-        return {
+        tables = {
             r[0]: r[1]
             for r in conn.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('links','nodes')"
             )
         }
+        attributes = [r[1] for r in conn.execute("PRAGMA table_info(link_attributes)")]
+    return tables, attributes
 
 
 def test_no_alter_table_links_or_nodes(empty_project):
-    before = _snapshot(empty_project.path_to_file)
+    """Test that importing never alters links or nodes, and gives link attributes no field but other_attributes."""
+    before, attributes_before = _snapshot(empty_project.path_to_file)
 
     nodes = gpd.GeoDataFrame(
         {
@@ -49,5 +52,7 @@ def test_no_alter_table_links_or_nodes(empty_project):
 
     SpatialiteWriter(empty_project).write(StagedNetwork(nodes=nodes, links=links))
 
-    after = _snapshot(empty_project.path_to_file)
+    after, attributes_after = _snapshot(empty_project.path_to_file)
     assert before == after
+    # Attributes without a field all go to other_attributes, which new projects do not have
+    assert attributes_after == [*attributes_before, "other_attributes"]

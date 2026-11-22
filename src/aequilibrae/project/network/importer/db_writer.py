@@ -7,7 +7,7 @@ import geopandas as gpd
 import pandas as pd
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.schema.attributes import JSON_COL, split_attributes
+from aequilibrae.project.network.importer.schema.attributes import JSON_COL, extra_columns, split_attributes
 from aequilibrae.project.network.importer.schema.link_types import LinkTypeAllocator
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
 from aequilibrae.project.network.links_view import LINK_ATTRIBUTES_TABLE, has_link_attributes, links_source
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _OTHER_LINK_TYPE = "other_link_types"
+LINK_JSON_DESCRIPTION = "Other attributes of the link. Preferably in json format"
 
 
 class SpatialiteWriter:
@@ -28,10 +29,14 @@ class SpatialiteWriter:
 
     def write(self, net: StagedNetwork) -> None:
         with self.project.db_connection as conn:
+            if JSON_COL not in list_columns(conn, "nodes"):
+                raise ImporterError("You must create a new empty project to import a network from OSM/Overture")
+
+        self._add_link_json_field(net.links)
+
+        with self.project.db_connection as conn:
             link_cols = list_columns(conn, links_source(conn))
             node_cols = list_columns(conn, "nodes")
-            if JSON_COL not in link_cols or JSON_COL not in node_cols:
-                raise ImporterError("You must create a new empty project to import a network from OSM/Overture")
 
             existing = dict(conn.execute("SELECT link_type, link_type_id FROM link_types"))
             links = _fold_excess_link_types(net.links, existing)
@@ -48,6 +53,18 @@ class SpatialiteWriter:
             with without_triggers(conn):
                 _insert(conn, "nodes", net.nodes, node_cols)
                 _insert(conn, "links", links, link_cols, base_link_cols)
+
+    def _add_link_json_field(self, links: gpd.GeoDataFrame) -> None:
+        """Add the user-defined link field ``JSON_COL`` when links carry attributes without a field of their own.
+
+        New projects do not have it, and the field is added before writing anything, as adding a link field
+        rebuilds the links_full view and its triggers.
+        """
+        link_table = self.project.tables.links
+        if JSON_COL in link_table.columns:
+            return
+        if any(links[column].notna().any() for column in extra_columns(links, link_table.columns)):
+            link_table.fields.add(JSON_COL, LINK_JSON_DESCRIPTION, "TEXT")
 
 
 def _fold_excess_link_types(links: gpd.GeoDataFrame, existing: dict) -> gpd.GeoDataFrame:
@@ -76,7 +93,8 @@ def _fold_excess_link_types(links: gpd.GeoDataFrame, existing: dict) -> gpd.GeoD
 def _insert(conn, table: str, gdf: gpd.GeoDataFrame, table_cols: list, base_cols: set | None = None) -> None:
     """Insert a staged layer. When ``base_cols`` is given, the columns outside it go to link_attributes."""
     direct, extra_json = split_attributes(gdf, table_cols)
-    direct[JSON_COL] = extra_json
+    if JSON_COL in table_cols:  # Links without it have no attributes to keep there
+        direct[JSON_COL] = extra_json
     col_names = [c for c in direct.columns if c != "geometry"]
     if base_cols is None:
         _insert_rows(conn, table, direct, col_names, with_geometry=True)

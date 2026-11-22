@@ -61,6 +61,17 @@ def test_results_map_registers_extra_db_and_compute_range_default(sioux_falls_ex
     assert panel2._compute_data_range(prj, "this_column_does_not_exist") == [0, 1]
 
 
+@pytest.mark.parametrize("with_capacity", [True, False], ids=["capacity", "no_capacity"])
+def test_capacity_panels_need_a_capacity_field(empty_project, with_capacity):
+    """Test that the dashboard only styles links by capacity when they have a capacity field, as new ones do not."""
+    if with_capacity:
+        empty_project.tables.links.fields.add("capacity", "link capacity", directional=True)
+    gen = SimwrapperConfigGenerator(empty_project)
+
+    assert len(gen._capacity_map_row()) == int(with_capacity)
+    assert gen._delay_factor_row(["assignment"])[0].width_metric == ("capacity_ab" if with_capacity else None)
+
+
 def test_cli_writes_dashboard(sioux_falls_example, tmp_path):
     """CLI should generate the dashboard YAML inside the project."""
     from aequilibrae.utils.simwrapper.generate_simwrapper_config import main

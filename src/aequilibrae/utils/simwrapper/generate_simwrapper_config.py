@@ -389,11 +389,18 @@ class SimwrapperConfigGenerator:
 
         return [panel]
 
-    def _capacity_map_row(self):
-        """Builds a map styled by link capacity.
+    def _has_link_field(self, field):
+        """Whether the project links have ``field``. User-defined fields, such as capacity, may not exist."""
+        return field.lower() in {column.lower() for column in self.project.tables.links.columns}
 
-        This reads ``capacity_ab`` directly from the project ``links`` table.
+    def _capacity_map_row(self):
+        """Builds a map styled by link capacity, when the links have a ``capacity_ab`` field.
+
+        This reads ``capacity_ab`` directly from the project links.
         """
+        if not self._has_link_field("capacity_ab"):
+            return []
+
         _, non_centroid_filter = self._centroid_link_filters()
         panel = AequilibraEResultsMapPanel(
             title="Link Capacity",
@@ -410,15 +417,16 @@ class SimwrapperConfigGenerator:
         return [panel]
 
     def _delay_factor_row(self, results_tables):
-        """Builds delay factor comparison panels."""
+        """Builds delay factor comparison panels, with line widths following link capacity when available."""
 
+        width_metric = "capacity_ab" if self._has_link_field("capacity_ab") else None
         return [
             AequilibraEResultsMapPanel(
                 title=f"{table} Delay Factor",
                 project=self.project,
                 results_table=table,
                 colour_metric="Delay_factor_Max",
-                width_metric="capacity_ab",
+                width_metric=width_metric,
             )
             for table in results_tables
         ]

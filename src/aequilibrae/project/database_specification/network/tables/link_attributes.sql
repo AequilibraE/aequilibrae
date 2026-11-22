@@ -1,5 +1,7 @@
 --@ The link_attributes table holds every link attribute that is not mandatory for the
---@ network topology: names, speeds, capacities, costs and all user-defined fields.
+--@ network topology. New projects create it with the street **name** and the directional
+--@ **lanes**, **speed** and free-flow **travel_time** fields. Any other attribute, such as
+--@ capacities or tolls, is a user-defined field, added when a model needs it.
 --@ It has exactly one record for each record in the **links** table, matched on **link_id**.
 --@
 --@ Triggers keep the two tables in sync: a record is created when a link is added,
@@ -22,6 +24,8 @@ CREATE TABLE if not exists link_attributes (link_id           INTEGER PRIMARY KE
 
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
+--#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','lanes_*', 'Directional number of lanes');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
 --#

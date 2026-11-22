@@ -276,10 +276,11 @@ Import methods share one namespace on the network object::
 
 .. note::
 
-   The OSM/Overture importer writes source-specific attributes to the existing
-   ``other_attributes`` column on ``links`` and ``nodes``. New projects contain
-   these columns. Existing projects created with older schemas must be upgraded
-   or recreated before using the importer.
+   The OSM/Overture importer writes source-specific attributes to the
+   ``other_attributes`` field of links and nodes. New projects have it on nodes
+   only, and the importer adds it to links, as a user-defined field, when the
+   imported links carry attributes to keep in it. Existing projects created with
+   older schemas must be upgraded or recreated before using the importer.
 
 .. seealso::
 

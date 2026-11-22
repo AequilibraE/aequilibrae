@@ -135,6 +135,9 @@ Project tables and database editing
 * Links are split into the **links** table (geometry and mandatory fields) and **link_attributes** (all other
   fields), presented together by the editable **links_full** view. SQL that reads link attributes from ``links``
   should read ``links_full`` instead. See :ref:`links_and_link_attributes`.
+* New projects create links with *name*, *lanes*, *speed* and *travel_time* attributes only. Capacities, fixed
+  costs and ``other_attributes`` are no longer created by default: add them as user-defined fields when needed.
+  Existing projects keep their fields.
 
 Project organisation and saved results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -23,12 +23,13 @@ def migrate(
     Every non-mandatory column of links, including user-defined ones, moves to link_attributes with its
     declared type and default, and the two tables are presented together by the editable links_full view.
     Indexes covering only attribute columns move along with them. Descriptions in attributes_documentation
-    stay under the links table name.
+    stay under the links table name. No field is added or removed: projects keep exactly the link fields they
+    had, whether or not new projects get them.
 
     links keeps its own definition, constraints included, minus the attribute columns. The exception are
-    tables created from the current specification, which attaches its CHECK constraints to the
-    other_attributes column: dropping that column would silently drop them, so those tables are rebuilt
-    from the specification instead (which they already match), keeping each link's ogc_fid.
+    tables created from the specification that preceded the split, which attaches its CHECK constraints to
+    the other_attributes column: dropping that column would silently drop them, so those tables are rebuilt
+    from the current specification instead (which they already match), keeping each link's ogc_fid.
     """
     if project_conn is None:
         raise RuntimeError("Network migration 012 requires a project_conn connection")

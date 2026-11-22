@@ -1,5 +1,7 @@
 import pytest
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, MultiPolygon, Polygon
+
+from aequilibrae.project.network.connector_creation import INFINITE_CAPACITY
 
 
 def zones_setup(project):
@@ -28,6 +30,28 @@ def test_connect_mode(coquimbo_example, bulk):
     proj.tables.zones.connect_mode(mode_id="c", connectors=1, bulk=bulk)
     links_after = proj.tables.links.data.shape[0]
     assert links_after > links_before, "Centroid connectors should've been added."
+
+
+@pytest.mark.parametrize("bulk", [True, False])
+@pytest.mark.parametrize("with_capacity", [True, False], ids=["capacity", "no_capacity"])
+def test_connectors_get_capacities_only_if_links_have_them(empty_project, bulk, with_capacity):
+    """Test that new connectors get infinite capacities if links have capacity fields, which new projects lack."""
+    links = empty_project.tables.links
+    if with_capacity:
+        links.fields.add("capacity", "link capacity", directional=True)
+
+    zones = empty_project.tables.zones
+    zones.insert(zone_id=1, geometry=MultiPolygon([Polygon([(0, 0), (0.01, 0), (0.01, 0.01), (0, 0.01)])]))
+    zones.add_centroids()
+    links.insert(link_id=1, modes="c", geometry=LineString([(0.002, 0.002), (0.008, 0.002)]))
+    zones.connect_mode(mode_id="c", bulk=bulk)
+
+    connectors = links.data.query("link_type == 'centroid_connector'")
+    assert len(connectors) == 1
+    if with_capacity:
+        assert connectors[["capacity_ab", "capacity_ba"]].values.tolist() == [[INFINITE_CAPACITY] * 2]
+    else:
+        assert "capacity_ab" not in connectors.columns
 
 
 def test_coverage_and_spatial_table_interfaces(coquimbo_example):
