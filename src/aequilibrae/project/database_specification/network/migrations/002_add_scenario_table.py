@@ -1,11 +1,18 @@
 import logging
-import pathlib
 import sqlite3
 from typing import Optional
 
-from aequilibrae.project.project_creation import run_queries_from_sql_file
-
 logger = logging.getLogger(__name__)
+
+# The scenarios table as specified when this migration was written. Migration 012 moves its contents into the about
+# table of each scenario and drops it, so this migration no longer relies on a table specification file.
+ROOT_DESCRIPTION = (
+    'The default, and root, scenario for an AequilbraE project. The name "root" is treated as a special case.'
+)
+ATTRIBUTES = [
+    ("scenarios", "scenario_name", "The scenario folder name."),
+    ("scenarios", "description", "Description of the scenario"),
+]
 
 
 def migrate(
@@ -18,5 +25,8 @@ def migrate(
         raise RuntimeError("Network migration 002 requires a project_conn connection")
 
     logger.info("Beginning migration to add scenario support to the project database")
-    schema = pathlib.Path(__file__).parent.parent / "tables" / "scenarios.sql"
-    run_queries_from_sql_file(project_conn, schema)
+    project_conn.execute("CREATE TABLE IF NOT EXISTS scenarios (scenario_name TEXT UNIQUE NOT NULL, description TEXT)")
+    project_conn.execute("INSERT INTO scenarios (scenario_name, description) VALUES('root', ?)", (ROOT_DESCRIPTION,))
+    project_conn.executemany(
+        "INSERT INTO attributes_documentation (name_table, attribute, description) VALUES(?, ?, ?)", ATTRIBUTES
+    )

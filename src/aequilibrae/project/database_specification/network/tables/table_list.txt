@@ -9,4 +9,3 @@ turn_restrictions
 migrations
 periods
 transit_graph_configs
-scenarios

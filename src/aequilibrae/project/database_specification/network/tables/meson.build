@@ -9,7 +9,6 @@ pyfiles = [
   'modes.sql',
   'nodes.sql',
   'periods.sql',
-  'scenarios.sql',
   'table_list.txt',
   'transit_graph_configs.sql',
   'turn_restrictions.sql',

@@ -376,7 +376,11 @@ the new field is added, the underlying database is altered and the field will
 be present when the project is open during future use.
 
 This table, which can look something like the example from image below, is required
-to exist in AequilibraE but it is not currently actively used by any process.
+to exist in AequilibraE. Its **scenario_name** and **scenario_description** records
+hold the name and description of the scenario stored in the database. They are
+written when a project or scenario is created, and
+:func:`~aequilibrae.Project.list_scenarios` reads them from each scenario. The name
+of a scenario is the name of its folder, and the root scenario is named *root*.
 We strongly recommend not to edit the information on **projection** and
 **aequilibrae_version**, as these are fields that might or might not be used by
 the software to produce valuable information to the user with regards to

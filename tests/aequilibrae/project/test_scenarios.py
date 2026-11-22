@@ -455,3 +455,98 @@ def test_use_scenario_invalidates_project_parameters(scenario_example, child):
     back_to_root_path = scenario_example.project_parameters.file
 
     assert back_to_root_path == root_path
+
+
+def test_list_scenarios_reads_each_about_table(scenario_example):
+    """Test that list_scenarios reads every scenario's description from its own about table, from any scenario."""
+    scenario_example.use_scenario("nauru")
+    scenario_example.about.update("scenario_description", infovalue="Nauru from OpenStreetMap")
+    scenario_example.use_scenario("coquimbo")
+
+    scenarios = scenario_example.list_scenarios()
+    assert scenarios["scenario_name"].tolist() == ["root", "coquimbo", "nauru"]
+
+    descriptions = scenarios.set_index("scenario_name")["description"]
+    assert descriptions["nauru"] == "Nauru from OpenStreetMap"
+    assert pd.isna(descriptions["coquimbo"])
+
+
+@pytest.mark.parametrize("method", ["create_empty_scenario", "clone_scenario"])
+def test_new_scenarios_record_name_and_description_in_their_about_table(scenario_example, method):
+    """Test that new scenarios record their name and description in their own about table, not in the root's."""
+    getattr(scenario_example, method)("recorded", "Recorded in the about table")
+    assert scenario_example.about.get("scenario_name", "infovalue") == "root"
+
+    scenario_example.use_scenario("recorded")
+    assert scenario_example.about.get("scenario_name", "infovalue") == "recorded"
+    assert scenario_example.about.get("scenario_description", "infovalue") == "Recorded in the about table"
+
+
+def test_new_project_records_root_scenario_in_about_table(empty_project):
+    """Test that a new project records the root scenario in its about table and has no scenarios table."""
+    assert empty_project.about.get("scenario_name", "infovalue") == "root"
+    assert empty_project.list_scenarios()["scenario_name"].tolist() == ["root"]
+
+    with empty_project.db_connection as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name='scenarios'").fetchone() is None
+
+
+def test_clone_scenario_without_parameters_file(empty_project):
+    """Test that a project without a parameters file can be cloned, the clone using the default parameters too."""
+    assert not empty_project.project_parameters.file.exists()
+    empty_project.clone_scenario("clone", "Clone of a new project")
+
+    empty_project.use_scenario("clone")
+    assert not empty_project.project_parameters.file.exists()
+    assert empty_project.list_scenarios()["scenario_name"].tolist() == ["root", "clone"]
+
+
+@pytest.mark.parametrize("name", ["", ".", "..", "nested/scenario", "../outside"])
+def test_scenario_names_must_be_folder_names(empty_project, name):
+    """Test that scenario names which are not a single folder name are rejected."""
+    with pytest.raises(ValueError, match="invalid scenario name"):
+        empty_project.create_empty_scenario(name)
+
+    with pytest.raises(ValueError, match="invalid scenario name"):
+        empty_project.use_scenario(name)
+
+
+@pytest.mark.parametrize("method", ["create_empty_scenario", "clone_scenario"])
+def test_new_scenarios_do_not_reuse_existing_folders(empty_project, method):
+    """Test that a scenario is not created inside an existing folder that does not hold a scenario."""
+    folder = empty_project.project_base_path / "scenarios" / "taken"
+    folder.mkdir(parents=True)
+    (folder / "notes.txt").write_text("keep me")
+
+    with pytest.raises(FileExistsError):
+        getattr(empty_project, method)("taken")
+
+    assert [path.name for path in folder.iterdir()] == ["notes.txt"]
+    assert empty_project.list_scenarios()["scenario_name"].tolist() == ["root"]
+
+
+@pytest.mark.parametrize("method", ["create_empty_scenario", "clone_scenario"])
+def test_failed_scenario_creation_leaves_nothing_behind(empty_project, monkeypatch, method):
+    """Test that a scenario whose creation fails is removed, rather than left behind to be listed."""
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("recording the scenario failed")
+
+    monkeypatch.setattr("aequilibrae.project.project._record_scenario", fail)
+    with pytest.raises(RuntimeError, match="recording the scenario failed"):
+        getattr(empty_project, method)("broken")
+
+    assert not (empty_project.project_base_path / "scenarios" / "broken").exists()
+    assert empty_project.list_scenarios()["scenario_name"].tolist() == ["root"]
+
+
+def test_list_scenarios_warns_when_about_table_records_another_name(scenario_example, caplog):
+    """Test that scenarios are listed by folder name, with a warning if their about table records another name."""
+    scenario_example.use_scenario("nauru")
+    scenario_example.about.update("scenario_name", infovalue="renamed")
+
+    with caplog.at_level(logging.WARNING):
+        scenarios = scenario_example.list_scenarios()
+
+    assert scenarios["scenario_name"].tolist() == ["root", "coquimbo", "nauru"]
+    assert "Scenario 'nauru' records the name 'renamed' in its about table" in caplog.text

@@ -4,6 +4,10 @@
 --@ The **infoname** field holds the name of information being added
 --@
 --@ The **infovalue** field holds the information to add
+--@
+--@ The **scenario_name** and **scenario_description** records hold the name
+--@ and description of the scenario stored in the database. The name of a
+--@ scenario is the name of its folder, and the root scenario is named *root*.
 
 
 CREATE TABLE  if not exists about (infoname  TEXT UNIQUE NOT NULL,

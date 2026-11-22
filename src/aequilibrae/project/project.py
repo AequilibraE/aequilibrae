@@ -4,6 +4,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
+from sqlite3 import Connection
 from types import TracebackType
 from typing import NoReturn
 
@@ -23,11 +24,23 @@ from aequilibrae.project.tables import Tables
 from aequilibrae.project.tools.migration_manager import MigrationManager
 from aequilibrae.reference_files import demo_init_py, spatialite_database
 from aequilibrae.transit.transit import Transit
-from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager, commit_and_close
+from aequilibrae.utils.db_utils import ConnectionClosure, NestedTransactionManager, commit_and_close, read_and_close
 from aequilibrae.utils.logging_utils import default_log_file_config
 from aequilibrae.utils.model_run_utils import import_file_as_module
 
 logger = logging.getLogger(__name__)
+
+_ROOT_SCENARIO_DESCRIPTION = (
+    'The default, and root, scenario for an AequilibraE project. The name "root" is treated as a special case.'
+)
+_SCENARIO_ABOUT_SQL = "SELECT infoname, infovalue FROM about WHERE infoname IN ('scenario_name','scenario_description')"
+
+
+def _record_scenario(conn: Connection, scenario_name: str, description: str | None) -> None:
+    """Record a scenario's name and description in the about table of its project database."""
+    for infoname, infovalue in (("scenario_name", scenario_name), ("scenario_description", description)):
+        if conn.execute("UPDATE about SET infovalue=? WHERE infoname=?", (infovalue, infoname)).rowcount == 0:
+            conn.execute("INSERT INTO about (infoname, infovalue) VALUES(?, ?)", (infoname, infovalue))
 
 
 class Project:
@@ -316,16 +329,57 @@ class Project:
         with commit_and_close(base_path / "project_database.sqlite", spatial=True) as conn:
             conn.execute("PRAGMA foreign_keys = ON;")
             initialize_tables("network", conn=conn)
+            _record_scenario(conn, "root", _ROOT_SCENARIO_DESCRIPTION)
+
+    def _scenario_folder(self, scenario_name: str) -> Path:
+        """Return the folder of a scenario, which need not exist. Scenario names must be valid folder names."""
+        if scenario_name == "root":
+            return self.root_scenario.base_path
+        if scenario_name in ("", ".", "..") or Path(scenario_name).name != scenario_name:
+            raise ValueError(f"invalid scenario name: {scenario_name!r}")
+        return self.root_scenario.base_path / "scenarios" / scenario_name
+
+    def _scenario_folders(self) -> dict[str, Path]:
+        """Return the folder of every scenario, keyed by scenario name, starting with the root."""
+        folders = {"root": self.root_scenario.base_path}
+        scenarios_folder = self.root_scenario.base_path / "scenarios"
+        if scenarios_folder.is_dir():
+            for folder in sorted(scenarios_folder.iterdir()):
+                if folder.name != "root" and (folder / "project_database.sqlite").is_file():
+                    folders[folder.name] = folder
+        return folders
+
+    def _new_scenario_folder(self, scenario_name: str) -> Path:
+        """Return the folder for a new scenario, checking that no scenario or folder of that name exists."""
+        folder = self._scenario_folder(scenario_name)
+        if (folder / "project_database.sqlite").exists():
+            raise ValueError("a scenario of that name already exists")
+        if folder.exists():
+            raise FileExistsError(f"cannot create scenario '{scenario_name}', {folder} already exists")
+        return folder
 
     def list_scenarios(self) -> pd.DataFrame:
         """
         Lists the existing scenarios.
 
+        The root scenario is listed first, followed by every folder in the project's ``scenarios`` directory that
+        holds a project database. The name and description of each scenario are read from the ``about`` table of its
+        project database.
+
         :Returns:
-            **scenarios** (:obj:`pd.DataFrame`): Pandas DataFrame with existing scenarios
+            **scenarios** (:obj:`pd.DataFrame`): Pandas DataFrame with the name and description of each scenario
         """
-        with self.db_connection as conn:
-            return pd.read_sql("SELECT * FROM scenarios", conn)
+        rows = []
+        for name, folder in self._scenario_folders().items():
+            with read_and_close(folder / "project_database.sqlite") as conn:
+                about = dict(conn.execute(_SCENARIO_ABOUT_SQL).fetchall())
+
+            # A scenario is used through its folder name, which the about table should match
+            recorded_name = about.get("scenario_name")
+            if recorded_name not in (None, "", name):
+                logger.warning(f"Scenario '{name}' records the name '{recorded_name}' in its about table")
+            rows.append((name, about.get("scenario_description")))
+        return pd.DataFrame(rows, columns=["scenario_name", "description"])
 
     def use_scenario(self, scenario_name: str) -> None:
         """
@@ -335,9 +389,9 @@ class Project:
             **scenario_name** (:obj:`str`): name of the scenario to be activated
 
         """
-        with commit_and_close(self.root_scenario.path_to_file, spatial=False) as conn:
-            if conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone() is None:
-                raise ValueError(f"scenario '{scenario_name}' does not exist")
+        path = self._scenario_folder(scenario_name)
+        if not (path / "project_database.sqlite").is_file():
+            raise ValueError(f"scenario '{scenario_name}' does not exist")
 
         logging.getLogger("aequilibrae").removeHandler(self.scenario.log_handler)
 
@@ -345,7 +399,6 @@ class Project:
         if scenario_name == "root":
             self.scenario = self.root_scenario
         else:
-            path = self.root_scenario.base_path / "scenarios" / scenario_name
             self.scenario = Scenario(
                 name=scenario_name,
                 base_path=path,
@@ -362,25 +415,16 @@ class Project:
         """
         Creates an empty scenario, without any links, nodes, and zones.
 
+        The scenario's name and description are recorded in the ``about`` table of its project database.
+
         :Arguments:
-            **scenario_name** (:obj:`str`): scenario name
+            **scenario_name** (:obj:`str`): scenario name, also used as the name of its folder
 
             **description** (:obj:`str`): useful scenario description
         """
-        scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
-
-        current_scenario = self.scenario.name
-        self.use_scenario("root")
+        scenario_path = self._new_scenario_folder(scenario_name)
+        scenario_path.mkdir(parents=True)
         try:
-            with self.db_connection as conn:
-                if (
-                    conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
-                    is not None
-                ):
-                    raise ValueError("a scenario of that name already exists")
-
-            scenario_path.mkdir(parents=True, exist_ok=True)
-
             db = scenario_path / "project_database.sqlite"
             shutil.copyfile(spatialite_database, db)
 
@@ -393,69 +437,53 @@ class Project:
             with commit_and_close(db, spatial=True) as conn:
                 conn.execute("PRAGMA foreign_keys = ON;")
                 initialize_tables("network", conn=conn)
-                conn.execute("DROP TABLE IF EXISTS scenarios")
-
-            with self.db_connection as conn:
-                conn.execute(
-                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
-                )
-        finally:
-            self.use_scenario(current_scenario)
+                _record_scenario(conn, scenario_name, description)
+        except BaseException:
+            # A scenario exists once its folder holds a project database, so a partial scenario must not remain
+            shutil.rmtree(scenario_path, ignore_errors=True)
+            raise
 
     def clone_scenario(self, scenario_name: str, description: str = "") -> None:
         """
         Clones the active scenario.
 
+        The new scenario's name and description are recorded in the ``about`` table of its project database.
+
         :Arguments:
-            **scenario_name** (:obj:`str`): scenario name
+            **scenario_name** (:obj:`str`): scenario name, also used as the name of its folder
 
             **description** (:obj:`str`): useful scenario description
         """
-        scenario_path = self.root_scenario.base_path / "scenarios" / scenario_name
-
-        current_scenario = self.scenario.name
-        matrices_path = self.matrices.folder
-        project_db_path = self._project_database_path
-        transit_db_path = self._transit_database_path
-        results_db_path = self._results_database_path
+        scenario_path = self._new_scenario_folder(scenario_name)
         parameters_path = self.project_parameters.file
 
-        self.use_scenario("root")
+        scenario_path.mkdir(parents=True)
         try:
-            with self.db_connection as conn:
-                if (
-                    conn.execute("SELECT 1 FROM scenarios where scenario_name=?", (scenario_name,)).fetchone()
-                    is not None
-                ):
-                    raise ValueError("a scenario of that name already exists")
-
-            shutil.copytree(matrices_path, scenario_path / "matrices")
+            shutil.copytree(self.matrices.folder, scenario_path / "matrices")
 
             db = scenario_path / "project_database.sqlite"
-            shutil.copyfile(project_db_path, db)
+            shutil.copyfile(self._project_database_path, db)
 
             try:
-                shutil.copyfile(transit_db_path, scenario_path / "public_transport.sqlite")
+                shutil.copyfile(self._transit_database_path, scenario_path / "public_transport.sqlite")
             except FileNotFoundError:
                 pass
 
             try:
-                shutil.copyfile(results_db_path, scenario_path / "results_database.sqlite")
+                shutil.copyfile(self._results_database_path, scenario_path / "results_database.sqlite")
             except FileNotFoundError:
                 pass
 
-            if parameters_path is not None:
+            # Projects without a parameters file use the default parameters
+            if parameters_path is not None and parameters_path.is_file():
                 shutil.copy(parameters_path, scenario_path)
 
-            with commit_and_close(db, spatial=True) as conn:
-                conn.execute("DROP TABLE IF EXISTS scenarios")
-
-            with self.db_connection as conn:
-                conn.execute(
-                    "INSERT INTO scenarios (scenario_name, description) VALUES(?,?)", (scenario_name, description)
-                )
-        finally:
-            self.use_scenario(current_scenario)
+            with commit_and_close(db) as conn:
+                _record_scenario(conn, scenario_name, description)
+        except BaseException:
+            # A scenario exists once its folder holds a project database, so a partial scenario must not remain
+            shutil.rmtree(scenario_path, ignore_errors=True)
+            raise
 
     def __repr__(self):
         cls = self.__class__

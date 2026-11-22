@@ -103,7 +103,9 @@ storage of many AequilbraE models within one directory, however it is intended t
 modifications of some other project. The scenario system is built around a hierarchical
 structure where the "root" scenario represents the base model, and additional scenarios
 are created as branches from this foundation. Users can create entirely new scenarios with
-empty networks or clone existing scenarios to explore modifications. Scenarios are
+empty networks or clone existing scenarios to explore modifications. Each scenario is
+stored in a folder named after it, and records its name and description in the **about**
+table of its own project database. Scenarios are
 automatically isolated from each other, ensuring that changes made in one scenario do not
 affect others. The system integrates with all existing AequilibraE functionality,
 including traffic assignment, transit modelling, matrix operations, and results

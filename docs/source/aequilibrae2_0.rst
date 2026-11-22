@@ -28,9 +28,9 @@ Before upgrading from 1.x
    conflict before upgrading. Keep ``results_database.sqlite`` for any scenario
    with saved result metadata. A database rollback cannot restore replaced OMX
    files, so keep the original backup. Update any scripts that query the old
-   ``matrices`` or ``results`` tables in ``project_database.sqlite``. See
-   :doc:`matrix_api_migration` for the conversion and the new file access
-   patterns.
+   ``matrices``, ``results`` or ``scenarios`` tables in
+   ``project_database.sqlite``. See :doc:`matrix_api_migration` for the
+   conversion and the new file access patterns.
 4. **Keep a baseline.** Save representative paths, skims, assignment outputs
    and convergence reports from 1.x. Compare them with the results of your
    rewritten workflows before replacing production outputs. For GTFS models,
@@ -404,7 +404,14 @@ accessed through ``project.tables`` or ``project.scenario.tables``. More common
 and general attributes such as ``project.about``, ``project.matrices`` and
 ``project.results`` retain on the ``project``. ``project.results`` now uses the
 results database exclusively, and ``project.matrices`` no longer stores a
-``matrices`` table. Road network construction has been moved to
+``matrices`` table. Likewise, the root ``project_database.sqlite`` no longer
+has a ``scenarios`` table: each scenario records its name and description in
+the ``scenario_name`` and ``scenario_description`` records of the ``about``
+table in its own database, and ``project.list_scenarios()`` reads them from
+there. Upgrading the root scenario moves the name and description of every
+scenario into that scenario's database, so keep the ``scenarios`` folder in
+place when upgrading. Scenarios whose folder no longer exists are dropped.
+Road network construction has been moved to
 ``project.road`` or ``project.scenario.road``: use ``build_network()`` to load
 the applicable tables into an independent ``Network``, or ``build_graph()`` to
 build a graph directly for more advanced usages. The ``road`` attribute

@@ -13,6 +13,7 @@ pyfiles = [
     '009_add_turn_restrictions.py',
     '010_refresh_network_triggers.py',
     '011_move_results_table_to_results_database.py',
+    '012_move_scenarios_table_to_about_table.py',
     'migrations.py',
 ]
 

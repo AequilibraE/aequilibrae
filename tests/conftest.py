@@ -160,21 +160,14 @@ def triangle_graph_blocking(test_data_path, tmp_path) -> Project:
 
 @pytest.fixture(scope="session")
 def cached_scenario_example(cache_path):
-    sioux_falls = create_example(cache_path / "scenario_project", "sioux_falls")
-    nauru = create_example(cache_path / "scenario_project" / "scenarios" / "nauru", "nauru")
-    coquimbo = create_example(cache_path / "scenario_project" / "scenarios" / "coquimbo", "coquimbo")
+    create_example(cache_path / "scenario_project", "sioux_falls").close()
 
-    with sioux_falls.db_connection as conn:
-        conn.executemany("INSERT INTO scenarios (scenario_name) VALUES (?)", [("nauru",), ("coquimbo",)])
-
-    with nauru.db_connection as conn:
-        conn.execute("DROP TABLE IF EXISTS scenarios")
-
-    with coquimbo.db_connection as conn:
-        conn.execute("DROP TABLE IF EXISTS scenarios")
-
-    shutil.rmtree(nauru.project_base_path / "run")
-    shutil.rmtree(coquimbo.project_base_path / "run")
+    # The examples are created as root projects, so record them as scenarios of the Sioux Falls project
+    for name in ("nauru", "coquimbo"):
+        with create_example(cache_path / "scenario_project" / "scenarios" / name, name) as scenario:
+            scenario.about.update("scenario_name", infovalue=name)
+            scenario.about.update("scenario_description", infovalue=None)
+            shutil.rmtree(scenario.project_base_path / "run")
 
 
 @pytest.fixture(scope="function")

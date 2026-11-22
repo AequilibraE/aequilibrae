@@ -22,8 +22,10 @@ class Scenario:
     instantiated directly by users.
 
     The root scenario is special-cased and represents the original project
-    configuration. All other scenarios are stored in subdirectories and
-    reference their own database files.
+    configuration. All other scenarios are stored in subdirectories of the
+    project's ``scenarios`` folder, named after the scenario, and reference
+    their own database files. Each scenario records its name and description
+    in the ``about`` table of its project database.
     """
 
     name: str
