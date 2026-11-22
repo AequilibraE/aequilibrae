@@ -13,15 +13,16 @@
 
 CREATE TABLE if not exists link_attributes (link_id           INTEGER PRIMARY KEY,
                                             'name'            TEXT,
+                                            lanes_ab          INTEGER,
+                                            lanes_ba          INTEGER,
+                                            speed_ab          INTEGER,
+                                            speed_ba          INTEGER,
                                             fixed_cost_ab     NUMERIC,
                                             fixed_cost_ba     NUMERIC,
-                                            speed_ab          NUMERIC,
-                                            speed_ba          NUMERIC,
                                             travel_time_ab    NUMERIC,
                                             travel_time_ba    NUMERIC,
                                             capacity_ab       NUMERIC,
-                                            capacity_ba       NUMERIC,
-                                            other_attributes  TEXT);
+                                            capacity_ba       NUMERIC);
 
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
@@ -33,5 +34,3 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','other_attributes', 'Other attributes of the link. Preferably in json format');
