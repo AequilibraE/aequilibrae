@@ -17,20 +17,12 @@ CREATE TABLE if not exists link_attributes (link_id           INTEGER PRIMARY KE
                                             lanes_ba          INTEGER,
                                             speed_ab          INTEGER,
                                             speed_ba          INTEGER,
-                                            fixed_cost_ab     NUMERIC,
-                                            fixed_cost_ba     NUMERIC,
                                             travel_time_ab    NUMERIC,
-                                            travel_time_ba    NUMERIC,
-                                            capacity_ab       NUMERIC,
-                                            capacity_ba       NUMERIC);
+                                            travel_time_ba    NUMERIC);
 
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','fixed_cost_*', 'Directional fixed costs (if any). Tolls, for example');
---#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
