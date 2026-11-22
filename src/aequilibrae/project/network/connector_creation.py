@@ -8,6 +8,7 @@ import pandas as pd
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
+from aequilibrae.project.network.links_view import links_source
 from aequilibrae.utils.db_utils import NestedTransactionManager
 
 if TYPE_CHECKING:
@@ -229,7 +230,7 @@ def bulk_connector_creation(
 
     existing_connectors_sql = "UPDATE links SET modes=? WHERE link_id=?"
     new_connectors_sql = (
-        f"INSERT INTO links "
+        f"INSERT INTO {links_source(conn)} "
         f"(link_id, a_node, b_node, modes, direction, link_type, capacity_ab, capacity_ba, "
         f"name, geometry) "
         f"VALUES(?,?,?,?,0,'centroid_connector',{INFINITE_CAPACITY},{INFINITE_CAPACITY}, "

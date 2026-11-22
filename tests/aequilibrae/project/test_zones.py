@@ -4,7 +4,7 @@ from shapely.geometry import Polygon
 
 def zones_setup(project):
     with project.db_connection as conn:
-        conn.execute("DELETE FROM links WHERE name LIKE 'centroid connector%'")
+        conn.execute("DELETE FROM links_full WHERE name LIKE 'centroid connector%'")
         conn.execute("DELETE FROM nodes WHERE is_centroid=1;")
         conn.commit()
         centroids = conn.execute("SELECT COUNT(node_id) FROM nodes WHERE is_centroid=1;").fetchone()[0]

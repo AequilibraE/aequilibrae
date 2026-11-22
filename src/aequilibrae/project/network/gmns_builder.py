@@ -13,6 +13,8 @@ import shapely.wkt
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 
+from aequilibrae.project.network.links_view import links_source
+
 logger = logging.getLogger(__name__)
 
 
@@ -545,7 +547,7 @@ class GMNSBuilder:
         with self.__connections.db_connection as conn:
             conn.executemany(n_query, n_params_list)
 
-            l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"
+            l_query = f"insert into {links_source(conn)}(" + ", ".join(list(links_fields.keys())) + ")"
             l_query += (
                 " values("
                 + ", ".join(["GeomFromTEXT(?,4326)" if x == "geometry" else "?" for x in list(links_fields.keys())])

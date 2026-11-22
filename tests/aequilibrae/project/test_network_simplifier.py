@@ -43,11 +43,10 @@ def test_simplify(project_with_graph):
 
 def test_simplify_uses_ordered_network_expansions(empty_project):
     # Link IDs differ from traversal order; the first geometry opposes the chain.
+    empty_project.tables.links.fields.add("lanes", "lanes", "INTEGER", directional=True)
     with empty_project.db_connection as conn:
-        conn.execute("ALTER TABLE links ADD COLUMN lanes_ab INTEGER")
-        conn.execute("ALTER TABLE links ADD COLUMN lanes_ba INTEGER")
         conn.executemany(
-            "INSERT INTO links (link_id, direction, modes, link_type, speed_ab, speed_ba, "
+            "INSERT INTO links_full (link_id, direction, modes, link_type, speed_ab, speed_ba, "
             "lanes_ab, lanes_ba, capacity_ab, capacity_ba, geometry) "
             "VALUES (?, ?, 'c', 'default', ?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326))",
             [

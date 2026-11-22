@@ -8,6 +8,7 @@ pyfiles = [
     'importers.py',
     'link_types.py',
     'links.py',
+    'links_view.py',
     'modes.py',
     'nodes.py',
     'periods.py',

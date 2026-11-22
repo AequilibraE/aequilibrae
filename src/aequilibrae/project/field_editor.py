@@ -101,7 +101,10 @@ class FieldEditor:
                     raise TypeError("each field specification must be a tuple")
                 self._add_field(conn, columns_by_name, *field_spec)
 
-            if isinstance(self._table, SpatialProjectTable):
+            # e.g. links: fields go to link_attributes, then the links_full view is rebuilt to show them
+            self._table._after_fields_added(conn)
+
+            if isinstance(self._table, SpatialProjectTable) and self._table._fields_table() == table_name:
                 # Layer statistics need updating for new fields to appear in applications like QGIS.
                 logger.info(f"Updating layer statistics for {table_name}, this may take a moment")
                 conn.execute("SELECT InvalidateLayerStatistics(?)", (table_name,)).fetchone()
@@ -215,7 +218,7 @@ class FieldEditor:
         if directional:
             new_columns = tuple(base + direction for direction in _DIRECTION_SUFFIXES)
 
-        quoted_table = escape_identifier(table_name)
+        quoted_table = escape_identifier(self._table._fields_table())
         quoted_type = escape_identifier(data_type)
         if any(column.lower() in columns_by_name for column in new_columns):
             raise ValueError("attribute_name already exists")

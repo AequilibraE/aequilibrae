@@ -3,6 +3,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from aequilibrae.project.network.links_view import LINK_ATTRIBUTES_TABLE, LINKS_VIEW, links_source, refresh_links_view
 from aequilibrae.project.project_table import SpatialProjectTable
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 class Links(SpatialProjectTable):
     """
-    Object to manipulate the links table in the database.
+    Object to manipulate the links in the database.
+
+    Links are stored in two tables: ``links`` (geometry and mandatory fields) and
+    ``link_attributes`` (all other fields, including user-defined ones). This object reads
+    and writes both through the editable ``links_full`` view, and adds new fields to
+    ``link_attributes``.
 
     .. code-block:: python
 
@@ -44,6 +50,17 @@ class Links(SpatialProjectTable):
     defaults = {"a_node": -1, "b_node": -1, "direction": 0, "link_type": "default"}
     _copy_excluded_fields = frozenset(("a_node", "b_node"))
     has_numeric_key = True
+
+    def _resolve_source(self) -> str:
+        with self._connection as conn:
+            return links_source(conn)
+
+    def _fields_table(self) -> str:
+        return LINK_ATTRIBUTES_TABLE if self._source == LINKS_VIEW else self._source
+
+    def _after_fields_added(self, conn) -> None:
+        if self._source == LINKS_VIEW:
+            refresh_links_view(conn)
 
     def _prepare_insert(self, values: Mapping[str, Any]) -> dict[str, Any]:
         if not (("a_node" in values and "b_node" in values) or "geometry" in values):

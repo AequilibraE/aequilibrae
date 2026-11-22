@@ -33,6 +33,40 @@ other changes to the layers or preventing the changes.
    As of 2.0, AequilibraE supports turn penalties and bans for path computation, traffic
    assignment and route choice. See :ref:`turn_restrictions`.
 
+.. _links_and_link_attributes:
+
+Links and link attributes
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Links are stored in two tables:
+
+* **links** holds each link's geometry and the fields the network topology depends on:
+  *link_id*, *a_node*, *b_node*, *direction*, *distance*, *modes* and *link_type*.
+* **link_attributes** holds every other field, such as names, speeds, capacities and costs,
+  and all user-defined fields. It has exactly one record per link, matched on *link_id*.
+
+Triggers keep the two tables in sync: adding, renumbering or deleting a link creates,
+renumbers or deletes its attribute record, and attribute records cannot be deleted, or created
+for a link that does not exist, on their own.
+
+The **links_full** view presents both tables as a single layer, and it is the one to read and
+edit links with. It is editable: inserts, updates and deletes made on it are routed to the right
+table, and editing an attribute never touches the **links** table, so it does not fire the
+network triggers described below. It is registered as a spatial layer, so GIS platforms such as
+QGIS load and edit it like any other layer.
+
+* The table API (``project.tables.links``) reads and writes through **links_full**, and fields
+  added with ``project.tables.links.fields`` are created in **link_attributes**, after which
+  the view is rebuilt to show them.
+* Columns added to **link_attributes** by other means show up in **links_full** the next time
+  AequilibraE reads the links, which rebuilds the view when it is out of date.
+* After saving new links added through **links_full**, QGIS reports their feature ids wrongly
+  until the layer is reloaded, because the view's triggers perform the actual insert. The
+  QAequilibraE plugin reloads the links layer after each save that adds links.
+
+Projects created before this split keep all link fields in the **links** table until upgraded
+with ``project.upgrade()``, which moves every non-mandatory field to **link_attributes**.
+
 .. _links_nodes_consistency_triggers:
 
 Consistency triggers

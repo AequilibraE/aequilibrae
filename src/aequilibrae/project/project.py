@@ -258,6 +258,9 @@ class Project:
         rph = self._results_database_path if self._results_database_path.exists() and not ignore_results else None
         _upgrade(project_path=project_path, results_path=rph, transit_path=tph)
 
+        # Migrations can move table contents, e.g. links into links + link_attributes behind links_full
+        self.tables.refresh_schemas()
+
     @functools.cached_property
     def project_parameters(self) -> Parameters:
         return Parameters(path=self.project_base_path)

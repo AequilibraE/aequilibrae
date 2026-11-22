@@ -54,7 +54,7 @@ def test_known_columns_land_in_real_columns(empty_project):
     _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        names = {r[0] for r in conn.execute("SELECT name FROM links")}
+        names = {r[0] for r in conn.execute("SELECT name FROM links_full")}
         assert names == {"Street A", "Street B", "Avenue X"}
 
 
@@ -63,7 +63,9 @@ def test_unknown_columns_land_in_other_attributes(empty_project):
     _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        for link_id, other_attributes in conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"):
+        for link_id, other_attributes in conn.execute(
+            "SELECT link_id, other_attributes FROM links_full ORDER BY link_id"
+        ):
             payload = json.loads(other_attributes) if other_attributes else {}
             assert "surface" in payload
             assert "source_id" in payload
@@ -90,24 +92,24 @@ def test_underscore_prefixed_columns_are_stripped(empty_project):
     _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(links)")]
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(links_full)")]
         assert "_scratch" not in cols
-        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links"):
+        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links_full"):
             if other_attributes:
                 assert "_scratch" not in json.loads(other_attributes)
 
 
 def test_user_can_promote_attribute_by_adding_column(empty_project):
     with empty_project.db_connection as conn:
-        conn.execute("ALTER TABLE links ADD COLUMN surface TEXT")
+        conn.execute("ALTER TABLE link_attributes ADD COLUMN surface TEXT")
 
     nodes, links = _basic_inputs()
     _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        surfaces = {r[0] for r in conn.execute("SELECT surface FROM links")}
+        surfaces = {r[0] for r in conn.execute("SELECT surface FROM links_full")}
         assert surfaces == {"asphalt", "gravel"}
-        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links"):
+        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links_full"):
             payload = json.loads(other_attributes) if other_attributes else {}
             assert "surface" not in payload
 
@@ -119,7 +121,7 @@ def test_existing_other_attributes_is_merged_not_overwritten(empty_project):
     _write(empty_project, nodes, links)
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        rows = list(conn.execute("SELECT link_id, other_attributes FROM links ORDER BY link_id"))
+        rows = list(conn.execute("SELECT link_id, other_attributes FROM links_full ORDER BY link_id"))
         first = json.loads(rows[0][1])
         assert first["pre_existing"] == "yes"
         assert first["surface"] == "asphalt"
@@ -132,7 +134,7 @@ def test_existing_attribute_dict_preserves_nulls_and_is_not_mutated(empty_projec
     _write(empty_project, nodes, links)
 
     with empty_project.db_connection as conn:
-        payload = json.loads(conn.execute("SELECT other_attributes FROM links WHERE link_id = 2").fetchone()[0])
+        payload = json.loads(conn.execute("SELECT other_attributes FROM links_full WHERE link_id = 2").fetchone()[0])
     assert payload["nested"] == {"items": [1, None]}
     assert payload["bridge"] == "old"
     assert payload["surface"] == "gravel"

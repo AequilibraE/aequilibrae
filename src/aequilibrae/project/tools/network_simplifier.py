@@ -12,6 +12,7 @@ import pandas as pd
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
+from aequilibrae.project.network.links_view import links_source
 from aequilibrae.routing.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
@@ -206,11 +207,11 @@ class NetworkSimplifier(WorkerThread):
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
 
-        sql = (
-            f"INSERT INTO links({','.join(df.columns)}) "
-            f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
-        )
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+            sql = (
+                f"INSERT INTO {links_source(conn)}({','.join(df.columns)}) "
+                f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+            )
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])
             conn.commit()

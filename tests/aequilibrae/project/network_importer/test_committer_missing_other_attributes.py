@@ -11,7 +11,7 @@ def test_missing_other_attributes_raises(empty_project):
     from aequilibrae.utils.sqlite_utils import without_triggers
 
     with empty_project.db_connection as conn, without_triggers(conn):
-        conn.execute("ALTER TABLE links RENAME COLUMN other_attributes TO _dropped_other")
+        conn.execute("ALTER TABLE link_attributes RENAME COLUMN other_attributes TO _dropped_other")
 
     nodes = gpd.GeoDataFrame(
         {"node_id": [100000], "geometry": [Point(0, 0)], "modes": ["c"]},

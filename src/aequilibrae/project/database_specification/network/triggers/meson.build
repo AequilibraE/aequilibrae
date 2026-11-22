@@ -2,6 +2,7 @@ thisdir = 'aequilibrae/project/database_specification/network/triggers'
 
 pyfiles = [
   'link_type_table_triggers.sql',
+  'link_attributes_triggers.sql',
   'modes_table_triggers.sql',
   'network_triggers.sql',
   'periods_triggers.sql',

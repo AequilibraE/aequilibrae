@@ -72,7 +72,7 @@ def test_max_iterations_returns_the_iterate_with_reported_gap(configuration, pce
 def test_execute_and_save_results(configuration, file_logging):
     project = configuration["project"]
     with project.db_connection as conn:
-        results = pd.read_sql("select volume from links order by link_id", conn)
+        results = pd.read_sql("select volume from links_full order by link_id", conn)
 
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))
     assignment.execute(max_iterations=10, cores=1)
@@ -148,7 +148,7 @@ def test_execute_and_save_results(configuration, file_logging):
 def test_execute_no_project(configuration):
     project = configuration.pop("project")
     with project.db_connection as conn:
-        reference = pd.read_sql("select volume from links order by link_id", conn).volume
+        reference = pd.read_sql("select volume from links_full order by link_id", conn).volume
     configuration["network"] = project.road.build_network()
     project.close()
     assignment = TrafficAssignment(**(configuration | {"algorithm": "msa"}))

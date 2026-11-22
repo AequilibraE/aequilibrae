@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from sqlite3 import Connection
 
+from aequilibrae.project.network.links_view import refresh_links_view
 from aequilibrae.project.tools.migration_manager import MigrationManager, MigrationStatus
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
@@ -16,6 +17,8 @@ def initialize_tables(db_type: str, conn: Connection) -> None:
     with conn as conn:
         create_base_tables(conn, db_type)
         _add_triggers(conn, db_type)
+        if db_type == "network":
+            refresh_links_view(conn)
 
 
 def create_base_tables(conn: Connection, db_type: str) -> None:
