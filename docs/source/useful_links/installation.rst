@@ -32,11 +32,11 @@ Installation
 Installing the 2.0 release candidate
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To try AequilibraE 2.0.0rc1 without replacing your 1.x installation, run this command in a separate virtual environment:
+To try AequilibraE 2.0.0rc2 without replacing your 1.x installation, run this command in a separate virtual environment:
 
 .. code-block:: console
 
-   python -m pip install "aequilibrae==2.0.0rc1"
+   python -m pip install "aequilibrae==2.0.0rc2"
 
 The 2.0 release candidate introduces breaking changes. Read the :doc:`2.0 migration guide <../aequilibrae2_0>` before opening
 an existing project, and use a copy of the project for testing.
