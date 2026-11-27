@@ -44,17 +44,27 @@ def _row_to_json_dropping_nans(row: pd.Series):
     return json.dumps(payload, separators=(",", ":"), default=str)
 
 
+def _writable_columns(gdf: gpd.GeoDataFrame) -> list:
+    return [c for c in gdf.columns if c not in PROT_COLS and c != JSON_COL and not str(c).startswith("_")]
+
+
+def extra_columns(gdf: gpd.GeoDataFrame, table_cols: Iterable[str]) -> list:
+    """Return the columns of ``gdf`` without a table column, whose values are written to ``JSON_COL``."""
+    col_set = set(table_cols)
+    exts = [c for c in _writable_columns(gdf) if c not in col_set]
+    if JSON_COL in gdf.columns:
+        exts.append(JSON_COL)
+    return exts
+
+
 def split_attributes(
     gdf: gpd.GeoDataFrame,
     table_cols: Iterable[str],
 ) -> tuple[gpd.GeoDataFrame, pd.Series]:
     """Route the columns of ``gdf`` for write into a spatialite table."""
     col_set = set(table_cols)
-    cols = [c for c in gdf.columns if c not in PROT_COLS and c != JSON_COL and not str(c).startswith("_")]
-    direct = gdf[[c for c in cols if c in col_set] + ["geometry"]].copy()
-    exts = [c for c in cols if c not in col_set]
-    if JSON_COL in gdf.columns:
-        exts.append(JSON_COL)
+    direct = gdf[[c for c in _writable_columns(gdf) if c in col_set] + ["geometry"]].copy()
+    exts = extra_columns(gdf, col_set)
 
     if exts:
         extra_json = gdf[exts].apply(_row_to_json_dropping_nans, axis=1)

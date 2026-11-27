@@ -11,6 +11,7 @@ from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.importers import Importer
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.links_view import links_source
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.periods import Periods
@@ -55,7 +56,7 @@ class Tables(WorkerThread):
         self.importer = Importer(self)
 
     def refresh_schemas(self):
-        """Refresh the schemas of ProjectTable objects."""
+        """Refresh the sources and schemas of ProjectTable objects, e.g. after a project upgrade."""
         for obj in [
             self.modes,
             self.link_types,
@@ -65,7 +66,7 @@ class Tables(WorkerThread):
             self.zones,
             self.turn_restrictions,
         ]:
-            obj._refresh_record_type()
+            obj._configure_source()
 
     @property
     def project(self) -> "Project":
@@ -86,7 +87,7 @@ class Tables(WorkerThread):
         """
 
         with self.__connections.db_connection as conn:
-            field_names = conn.execute("PRAGMA table_info(links);").fetchall()
+            field_names = conn.execute(f"PRAGMA table_info({links_source(conn)});").fetchall()
 
         ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
         skimmable = [
@@ -159,13 +160,14 @@ class Tables(WorkerThread):
         from aequilibrae.routing.network import _field_columns
 
         with self.__connections.db_connection as conn:
+            source = links_source(conn)
             if fields is None:
-                field_names = conn.execute("PRAGMA table_info(links);").fetchall()
+                field_names = conn.execute(f"PRAGMA table_info({source});").fetchall()
 
                 ignore_fields = ["ogc_fid", "geometry"]
                 all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
             else:
-                available = {f[1] for f in conn.execute("PRAGMA table_info(links);").fetchall()}
+                available = {f[1] for f in conn.execute(f"PRAGMA table_info({source});").fetchall()}
                 requested = ["link_id", "a_node", "b_node", "direction", "modes", "link_type"]
                 for field in fields:
                     requested.extend(_field_columns(field, available))
@@ -173,11 +175,11 @@ class Tables(WorkerThread):
 
             if limit_to_area is not None:
                 load_spatialite_extension(conn)
-                spatial_add = """ WHERE links.rowid in (
+                spatial_add = f""" WHERE {source}.ogc_fid in (
                                         select rowid from SpatialIndex where f_table_name = 'links' and
                                        search_frame = GeomFromWKB(?, 4326))"""
 
-            sql = f"select {','.join(all_fields)} from links"
+            sql = f"select {','.join(all_fields)} from {source}"
 
             sql_centroids = "select node_id from nodes where is_centroid=1 order by node_id;"
             centroids = np.array([i[0] for i in conn.execute(sql_centroids).fetchall()], np.uint32)

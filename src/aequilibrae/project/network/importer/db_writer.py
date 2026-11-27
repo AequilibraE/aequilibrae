@@ -7,9 +7,10 @@ import geopandas as gpd
 import pandas as pd
 
 from aequilibrae.project.network.importer.exceptions import ImporterError
-from aequilibrae.project.network.importer.schema.attributes import JSON_COL, split_attributes
+from aequilibrae.project.network.importer.schema.attributes import JSON_COL, extra_columns, split_attributes
 from aequilibrae.project.network.importer.schema.link_types import LinkTypeAllocator
 from aequilibrae.project.network.importer.staged_network import StagedNetwork
+from aequilibrae.project.network.links_view import LINK_ATTRIBUTES_TABLE, has_link_attributes, links_source
 from aequilibrae.utils.db_utils import list_columns
 from aequilibrae.utils.sqlite_utils import without_triggers
 
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _OTHER_LINK_TYPE = "other_link_types"
+LINK_JSON_DESCRIPTION = "Other attributes of the link. Preferably in json format"
 
 
 class SpatialiteWriter:
@@ -27,10 +29,14 @@ class SpatialiteWriter:
 
     def write(self, net: StagedNetwork) -> None:
         with self.project.db_connection as conn:
-            link_cols = list_columns(conn, "links")
-            node_cols = list_columns(conn, "nodes")
-            if JSON_COL not in link_cols or JSON_COL not in node_cols:
+            if JSON_COL not in list_columns(conn, "nodes"):
                 raise ImporterError("You must create a new empty project to import a network from OSM/Overture")
+
+        self._add_link_json_field(net.links)
+
+        with self.project.db_connection as conn:
+            link_cols = list_columns(conn, links_source(conn))
+            node_cols = list_columns(conn, "nodes")
 
             existing = dict(conn.execute("SELECT link_type, link_type_id FROM link_types"))
             links = _fold_excess_link_types(net.links, existing)
@@ -42,9 +48,23 @@ class SpatialiteWriter:
             ]
             conn.executemany("INSERT INTO link_types (link_type_id, link_type, description) VALUES (?, ?, ?)", new_rows)
 
+            # Without triggers, so link attributes are written to their own table explicitly
+            base_link_cols = set(list_columns(conn, "links")) if has_link_attributes(conn) else None
             with without_triggers(conn):
                 _insert(conn, "nodes", net.nodes, node_cols)
-                _insert(conn, "links", links, link_cols)
+                _insert(conn, "links", links, link_cols, base_link_cols)
+
+    def _add_link_json_field(self, links: gpd.GeoDataFrame) -> None:
+        """Add the user-defined link field ``JSON_COL`` when links carry attributes without a field of their own.
+
+        New projects do not have it, and the field is added before writing anything, as adding a link field
+        rebuilds the links_full view and its triggers.
+        """
+        link_table = self.project.tables.links
+        if JSON_COL in link_table.columns:
+            return
+        if any(links[column].notna().any() for column in extra_columns(links, link_table.columns)):
+            link_table.fields.add(JSON_COL, LINK_JSON_DESCRIPTION, "TEXT")
 
 
 def _fold_excess_link_types(links: gpd.GeoDataFrame, existing: dict) -> gpd.GeoDataFrame:
@@ -70,13 +90,29 @@ def _fold_excess_link_types(links: gpd.GeoDataFrame, existing: dict) -> gpd.GeoD
     return links.assign(link_type=links["link_type"].where(~links["link_type"].isin(fold), _OTHER_LINK_TYPE))
 
 
-def _insert(conn, table: str, gdf: gpd.GeoDataFrame, table_cols: list) -> None:
+def _insert(conn, table: str, gdf: gpd.GeoDataFrame, table_cols: list, base_cols: set | None = None) -> None:
+    """Insert a staged layer. When ``base_cols`` is given, the columns outside it go to link_attributes."""
     direct, extra_json = split_attributes(gdf, table_cols)
-    direct[JSON_COL] = extra_json
+    if JSON_COL in table_cols:  # Links without it have no attributes to keep there
+        direct[JSON_COL] = extra_json
     col_names = [c for c in direct.columns if c != "geometry"]
-    placeholders = ",".join(["?"] * len(col_names))
-    sql = f"INSERT INTO {table} ({', '.join(col_names)}, geometry) VALUES ({placeholders}, GeomFromWKB(?, 4326))"
-    values = direct[col_names].astype(object).where(pd.notna(direct[col_names]), None)
+    if base_cols is None:
+        _insert_rows(conn, table, direct, col_names, with_geometry=True)
+        return
+
+    _insert_rows(conn, table, direct, [c for c in col_names if c in base_cols], with_geometry=True)
+    attribute_names = ["link_id"] + [c for c in col_names if c not in base_cols]
+    _insert_rows(conn, LINK_ATTRIBUTES_TABLE, direct, attribute_names, with_geometry=False)
+
+
+def _insert_rows(conn, table: str, frame: gpd.GeoDataFrame, col_names: list, with_geometry: bool) -> None:
+    columns = ", ".join(col_names + ["geometry"] if with_geometry else col_names)
+    placeholders = ",".join(["?"] * len(col_names) + (["GeomFromWKB(?, 4326)"] if with_geometry else []))
+    sql = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+    values = frame[col_names].astype(object).where(pd.notna(frame[col_names]), None)
     records = values.itertuples(index=False, name=None)
-    wkbs = direct.geometry.to_wkb(output_dimension=2)
+    if not with_geometry:
+        conn.executemany(sql, records)
+        return
+    wkbs = frame.geometry.to_wkb(output_dimension=2)
     conn.executemany(sql, (r + (wkb,) for r, wkb in zip(records, wkbs, strict=True)))

@@ -77,7 +77,7 @@ def test_fields(sioux_falls_test):
 
     fields = sorted(f_editor.all_fields())
     with sioux_falls_test.db_connection as conn:
-        dt = conn.execute("pragma table_info(links)").fetchall()
+        dt = conn.execute("pragma table_info(links_full)").fetchall()
 
     actual_fields = sorted({x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"})
     assert fields == actual_fields, "Table editor is weird for table links"

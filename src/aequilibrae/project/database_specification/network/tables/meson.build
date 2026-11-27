@@ -3,6 +3,7 @@ thisdir = 'aequilibrae/project/database_specification/network/tables'
 pyfiles = [
   'about.sql',
   'attributes_documentation.sql',
+  'link_attributes.sql',
   'link_types.sql',
   'links.sql',
   'migrations.sql',

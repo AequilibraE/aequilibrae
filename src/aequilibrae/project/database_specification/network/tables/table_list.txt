@@ -5,6 +5,7 @@ modes
 nodes
 zones
 links
+link_attributes
 turn_restrictions
 migrations
 periods

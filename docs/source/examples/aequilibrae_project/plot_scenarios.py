@@ -82,7 +82,9 @@ print(f"This scenario has {len(project.tables.links.data)} links")
 
 # Modify the network
 with project.db_connection as conn:
-    conn.execute("UPDATE links SET capacity_ab=capacity_ab/2, capacity_ba=capacity_ba/2 WHERE link_id > 20 AND link_id < 50")
+    conn.execute(
+        "UPDATE links_full SET capacity_ab=capacity_ab/2, capacity_ba=capacity_ba/2 WHERE link_id > 20 AND link_id < 50"
+    )
 
 # %%
 # Let's perform a traffic assignment in this scenario with lowered capacity

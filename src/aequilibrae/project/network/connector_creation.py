@@ -8,14 +8,25 @@ import pandas as pd
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
-from aequilibrae.utils.db_utils import NestedTransactionManager
+from aequilibrae.project.network.links_view import links_source
+from aequilibrae.utils.db_utils import NestedTransactionManager, list_columns
 
 if TYPE_CHECKING:
     from aequilibrae.project.network.links import Links
 
 INFINITE_CAPACITY = 99999
+_CAPACITY_FIELDS = ("capacity_ab", "capacity_ba")
 
 logger = logging.getLogger(__name__)
+
+
+def _connector_capacities(link_columns) -> dict[str, int]:
+    """Return the capacities of new connectors, for the capacity fields the links have.
+
+    Capacity is a user-defined link field, so new projects have none.
+    """
+    available = {column.lower() for column in link_columns}
+    return {field: INFINITE_CAPACITY for field in _CAPACITY_FIELDS if field in available}
 
 
 def connector_creation(
@@ -69,6 +80,7 @@ def connector_creation(
         "(a_node==@zone_id | b_node==@zone_id) & "
         "(a_node==@rec.node_id | b_node==@rec.node_id) & link_type=='centroid_connector'"
     )
+    capacities = _connector_capacities(links.columns)
     with project_connection.transaction():
         for _, rec in joined.iterrows():
             link_exist = proj_links.query(query)
@@ -79,8 +91,7 @@ def connector_creation(
                     direction=0,
                     link_type="centroid_connector",
                     name=f"centroid connector zone {zone_id}",
-                    capacity_ab=INFINITE_CAPACITY,
-                    capacity_ba=INFINITE_CAPACITY,
+                    **capacities,
                 )
             else:
                 links.add_mode(link_exist.link_id.values[0], mode_id)
@@ -227,13 +238,17 @@ def bulk_connector_creation(
     max_link_id = project_links.link_id.max()
     connectors["link_id"] = np.arange(max_link_id + 1, max_link_id + 1 + len(connectors))
 
+    source = links_source(conn)
+    capacities = _connector_capacities(list_columns(conn, source))
+    capacity_columns = "".join(f", {field}" for field in capacities)
+    capacity_values = "".join(f", {value}" for value in capacities.values())
+
     existing_connectors_sql = "UPDATE links SET modes=? WHERE link_id=?"
     new_connectors_sql = (
-        f"INSERT INTO links "
-        f"(link_id, a_node, b_node, modes, direction, link_type, capacity_ab, capacity_ba, "
-        f"name, geometry) "
-        f"VALUES(?,?,?,?,0,'centroid_connector',{INFINITE_CAPACITY},{INFINITE_CAPACITY}, "
-        f"'centroid connector zone ' || ?2,GeomFromWKB(?, 4326))"
+        f"INSERT INTO {source} "
+        f"(link_id, a_node, b_node, modes, direction, link_type, name{capacity_columns}, geometry) "
+        f"VALUES(?,?,?,?,0,'centroid_connector','centroid connector zone ' || ?2{capacity_values}, "
+        f"GeomFromWKB(?, 4326))"
     )
     conn.executemany(existing_connectors_sql, existing_connectors[["modes", "link_id"]].to_records(index=False))
     conn.executemany(

@@ -1,5 +1,10 @@
---@ The links table holds all the links available in the aequilibrae network model
---@ regardless of the modes allowed on it.
+--@ The links table holds the geometry and the mandatory fields of all links available in the
+--@ aequilibrae network model, regardless of the modes allowed on them. All other link attributes,
+--@ including every user-defined field, live in the **link_attributes** table.
+--@
+--@ The two tables are presented together as the **links_full** view, which is the layer to read
+--@ and edit links with (e.g. in QGIS). The view is editable: inserts, updates and deletes made on
+--@ it are routed to the right table by triggers. It is rebuilt whenever a link field is added.
 --@
 --@ All information on the fields a_node and b_node correspond to a entries in
 --@ the node_id field in the nodes table. They are automatically managed with
@@ -29,22 +34,12 @@ CREATE TABLE  if not exists links (ogc_fid           INTEGER PRIMARY KEY,
                                    distance          NUMERIC,
                                    modes             TEXT    NOT NULL,
                                    link_type         TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
-                                   'name'            TEXT,
-                                   fixed_cost_ab     NUMERIC,
-                                   fixed_cost_ba     NUMERIC,
-                                   speed_ab          NUMERIC,
-                                   speed_ba          NUMERIC,
-                                   travel_time_ab    NUMERIC,
-                                   travel_time_ba    NUMERIC,
-                                   capacity_ab       NUMERIC,
-                                   capacity_ba       NUMERIC,
-                                   other_attributes  TEXT
-                                   CHECK(TYPEOF(link_id) == 'integer')
-                                   CHECK(link_id > 0)
-                                   CHECK(TYPEOF(a_node) IN ('integer', 'null'))
-                                   CHECK(TYPEOF(b_node) IN ('integer', 'null'))
-                                   CHECK(TYPEOF(direction) == 'integer')
-                                   CHECK(LENGTH(modes)>0)
+                                   CHECK(TYPEOF(link_id) == 'integer'),
+                                   CHECK(link_id > 0),
+                                   CHECK(TYPEOF(a_node) IN ('integer', 'null')),
+                                   CHECK(TYPEOF(b_node) IN ('integer', 'null')),
+                                   CHECK(TYPEOF(direction) == 'integer'),
+                                   CHECK(LENGTH(modes)>0),
                                    CHECK(direction IN (-1, 0, 1)));
 
 --#
@@ -85,16 +80,3 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','fixed_cost_*', 'Directional fixed costs (if any). Tolls, for example');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','other_attributes', 'Other attributes of the link. Preferably in json format');
-

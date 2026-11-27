@@ -49,6 +49,25 @@ def test_create_from_gmns(empty_project, test_data_path):
             pytest.fail("At least one link is disconnected from its start/end nodes")
 
 
+def test_gmns_capacity_becomes_a_link_field(empty_project, test_data_path):
+    """Test that importing GMNS links adds a capacity field, which new projects lack, and fills it and the lanes."""
+    arlington = test_data_path / "GMNS" / "examples" / "Arlington_Signals"
+    empty_project.tables.importer.gmns(
+        link_file_path=arlington / "link.csv",
+        node_file_path=arlington / "node.csv",
+        use_group_path=arlington / "use_group.csv",
+        srid=32619,
+    )
+
+    # The GMNS links leave both empty for some links
+    with empty_project.db_connection as conn:
+        sql = "SELECT count(capacity_ab), count(lanes_ab), sum(capacity_ab) FROM links_full"
+        with_capacity, with_lanes, total_capacity = conn.execute(sql).fetchone()
+    assert with_capacity > 0 and with_lanes > 0
+    assert total_capacity > 0
+    assert empty_project.tables.links.fields.get_description("capacity_*") == "Capacity"
+
+
 def test_export_to_gmns(sioux_falls_example):
     output_path = sioux_falls_example.project_base_path
     sioux_falls_example.tables.export_to_gmns(output_path)

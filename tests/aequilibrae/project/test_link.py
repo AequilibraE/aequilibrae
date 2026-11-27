@@ -107,7 +107,7 @@ def test_data_fields(sioux_falls_test, links, link):
     fields = sorted(links.columns)
 
     with read_and_close(sioux_falls_test.path_to_file) as conn:
-        dt = conn.execute("pragma table_info(links)").fetchall()
+        dt = conn.execute("pragma table_info(links_full)").fetchall()
 
     data_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
 

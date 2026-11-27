@@ -132,6 +132,12 @@ Project tables and database editing
   Database migrations use the same managed connections.
 * Network triggers improve endpoint lookup and cascading updates, keeping link geometry, node attributes and turn
   restrictions consistent during editing. Trigger suspension is available within managed transactions.
+* Links are split into the **links** table (geometry and mandatory fields) and **link_attributes** (all other
+  fields), presented together by the editable **links_full** view. SQL that reads link attributes from ``links``
+  should read ``links_full`` instead. See :ref:`links_and_link_attributes`.
+* New projects create links with *name*, *lanes*, *speed* and *travel_time* attributes only. Capacities, fixed
+  costs and ``other_attributes`` are no longer created by default: add them as user-defined fields when needed.
+  Existing projects keep their fields.
 
 Project organisation and saved results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

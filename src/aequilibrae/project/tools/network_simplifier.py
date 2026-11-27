@@ -12,6 +12,7 @@ import pandas as pd
 from shapely.geometry.linestring import LineString
 from shapely.ops import linemerge, substring
 
+from aequilibrae.project.network.links_view import links_source
 from aequilibrae.routing.graph import Graph
 from aequilibrae.utils.aeq_signal import SIGNAL
 from aequilibrae.utils.db_utils import commit_and_close
@@ -126,9 +127,11 @@ class NetworkSimplifier(WorkerThread):
             # The merged geometry follows traversal, any one-way link makes the whole chain one-way
             main_data["direction"] = int((candidates["direction"] != 0).any())
 
-            # Some values we will bring from the direction-aligned weighted average
+            # Some values we will bring from the direction-aligned weighted average. Capacity is a
+            # user-defined field, so it is only averaged when the links have it
             ordered_candidates = candidates.loc[self.link_sequence]
-            for field in ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]:
+            averaged = ["speed_ab", "speed_ba", "capacity_ab", "capacity_ba"]
+            for field in [field for field in averaged if field in candidates.columns]:
                 reverse_field = field.replace("ab", "ba") if "ab" in field else field.replace("ba", "ab")
                 values = np.where(link_directions == 1, ordered_candidates[field], ordered_candidates[reverse_field])
                 main_data[field] = (values * ordered_candidates["distance"]).sum() / candidates["distance"].sum()
@@ -206,11 +209,11 @@ class NetworkSimplifier(WorkerThread):
         df = df[cols]
         data = df.assign(srid=self.link_layer.crs.to_epsg()).to_records(index=False)
 
-        sql = (
-            f"INSERT INTO links({','.join(df.columns)}) "
-            f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
-        )
         with commit_and_close(self.project.path_to_file, spatial=True) as conn:
+            sql = (
+                f"INSERT INTO {links_source(conn)}({','.join(df.columns)}) "
+                f"VALUES ({','.join(['?'] * (len(df.columns) - 1))},GeomFromWKB(?, ?))"
+            )
             conn.executemany(sql, data)
             conn.executemany("DELETE FROM links WHERE link_id=?", [[x] for x in links_to_delete])
             conn.commit()

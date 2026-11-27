@@ -54,7 +54,7 @@ def test_pbf_unknown_tags_land_in_other_attributes(empty_project, pbf_path):
     )
 
     with sqlite3.connect(empty_project.path_to_file) as conn:
-        sql = "SELECT other_attributes FROM links WHERE other_attributes IS NOT NULL LIMIT 50"
+        sql = "SELECT other_attributes FROM links_full WHERE other_attributes IS NOT NULL LIMIT 50"
         for (other_attributes,) in conn.execute(sql):
             payload = json.loads(other_attributes)
             if payload:

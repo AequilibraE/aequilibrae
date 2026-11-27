@@ -2,6 +2,7 @@ import sqlite3
 
 import numpy as np
 
+from aequilibrae.project.network.links_view import LINKS_VIEW, links_source
 from aequilibrae.utils.simwrapper.simwrapper_utils import pretty_round
 
 
@@ -272,7 +273,7 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
 
         # build the links layer; only add a `join` if results_table is provided
         layer = {
-            "table": "links",
+            "table": _links_relation(project),
             "geometry": "line",
             "style": self.colour_style | self.width_style,
         }
@@ -319,7 +320,8 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
             else:
                 # metric comes from the main project `links` table
                 with project.db_connection as conn:
-                    cursor = conn.execute(f"SELECT [{metric}] FROM links WHERE [{metric}] IS NOT NULL")
+                    relation = links_source(conn)
+                    cursor = conn.execute(f"SELECT [{metric}] FROM {relation} WHERE [{metric}] IS NOT NULL")
                     values = np.array([row[0] for row in cursor.fetchall()], dtype=float)
         except (sqlite3.OperationalError, sqlite3.DatabaseError, ValueError, TypeError):
             return [0, 1]
@@ -388,3 +390,11 @@ class AequilibraEResultsMapPanel(AequilibraEMapPanel):
             }
         else:
             self.width_style = {"lineWidth": 10}
+
+
+def _links_relation(project) -> str:
+    """Return the relation with every link field: links_full, or links on projects that predate the split."""
+    if project is None:
+        return LINKS_VIEW
+    with project.db_connection as conn:
+        return links_source(conn)

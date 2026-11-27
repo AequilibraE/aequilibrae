@@ -101,7 +101,7 @@ def test_overture_writes_raw_payload_to_download_cache(overture_project):
 
 def test_overture_speed_limit_parsed(overture_project):
     with sqlite3.connect(overture_project.path_to_file) as conn:
-        rows = list(conn.execute("SELECT speed_ab, speed_ba, link_type FROM links WHERE link_type='primary'"))
+        rows = list(conn.execute("SELECT speed_ab, speed_ba, link_type FROM links_full WHERE link_type='primary'"))
     assert rows
     for speed_ab, speed_ba, _link_type in rows:
         assert speed_ab == 50.0
@@ -118,7 +118,7 @@ def test_overture_direction_inferred_from_access_restrictions(overture_project):
 
 def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(overture_project):
     with sqlite3.connect(overture_project.path_to_file) as conn:
-        rows = list(conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"))
+        rows = list(conn.execute("SELECT other_attributes FROM links_full WHERE link_type='primary'"))
     assert rows
     for (other_attributes,) in rows:
         payload = json.loads(other_attributes) if other_attributes else {}
@@ -128,7 +128,7 @@ def test_overture_lanes_remain_unset_when_source_rows_have_no_lane_data(overture
 
 def test_overture_rule_arrays_land_in_other_attributes(overture_project):
     with sqlite3.connect(overture_project.path_to_file) as conn:
-        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links WHERE link_type='primary'"):
+        for (other_attributes,) in conn.execute("SELECT other_attributes FROM links_full WHERE link_type='primary'"):
             payload = json.loads(other_attributes)
             assert "speed_limits" in payload
 

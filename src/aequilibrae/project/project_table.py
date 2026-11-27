@@ -114,6 +114,10 @@ class ProjectTable(ABC):
 
     Bulk operations create a new transaction. Single inserts or updates use a
     no-op transaction if one is already open, otherwise they create one.
+
+    ``name`` is the table's logical name, used for field metadata and messages.
+    Records are read from and written to ``_source``, which defaults to ``name``
+    but can be an editable view (see :class:`~aequilibrae.project.network.links.Links`).
     """
 
     name: str = ""
@@ -139,17 +143,38 @@ class ProjectTable(ABC):
                 raise ValueError(f"default value of None found for {key=}")
 
         self._connection = connection
+        self._configure_source()
+
+    def _configure_source(self) -> None:
+        """Resolve where records live and pre-format the SQL statements reading and writing them."""
+        self._source = self._resolve_source()
+        sql = "SELECT type FROM sqlite_master WHERE name=?"
+        kind = self._connection._connection.execute(sql, [self._source]).fetchone()
+        # SQLite reports no changed rows for writes on views, so their keys are checked before writing
+        self._source_is_view = kind is not None and kind[0] == "view"
         self._record_schema_version = -1
         self._uncommitted_record_schema: list[tuple] | None = None
-        self._table_info_sql = _TABLE_INFO_SQL.format(table=self.name)
-        self._count_sql = _COUNT_SQL.format(table=self.name)
-        self._contains_sql = _CONTAINS_SQL.format(table=self.name, key=self.key)
-        self._delete_sql = _DELETE_SQL.format(table=self.name, key=self.key)
-        self._max_key_sql = _MAX_KEY_SQL.format(table=self.name, key=self.key)
-        self._change_key_sql = _CHANGE_KEY_SQL.format(table=self.name, key=self.key)
-        self._non_existant_id_sql = _NON_EXISTANT_ID_SQL.format(table=self.name, key=self.key)
+        self._table_info_sql = _TABLE_INFO_SQL.format(table=self._source)
+        self._count_sql = _COUNT_SQL.format(table=self._source)
+        self._contains_sql = _CONTAINS_SQL.format(table=self._source, key=self.key)
+        self._delete_sql = _DELETE_SQL.format(table=self._source, key=self.key)
+        self._max_key_sql = _MAX_KEY_SQL.format(table=self._source, key=self.key)
+        self._change_key_sql = _CHANGE_KEY_SQL.format(table=self._source, key=self.key)
+        self._non_existant_id_sql = _NON_EXISTANT_ID_SQL.format(table=self._source, key=self.key)
 
         self._refresh_record_type()
+
+    def _resolve_source(self) -> str:
+        """Return the table or view records are read from and written to."""
+        return self.name
+
+    def _fields_table(self) -> str:
+        """Return the table new fields are added to."""
+        return self._source
+
+    def _after_fields_added(self, conn) -> None:
+        """Hook run in the field editor's transaction, after new columns are added."""
+        return None
 
     def _refresh_record_type(self) -> None:
         """Refresh the generated record type after a schema change."""
@@ -168,14 +193,14 @@ class ProjectTable(ABC):
                 self._uncommitted_record_schema = None
             return
 
-        record_type = _record_type_from_schema(self.name, self.record_name, schema)
+        record_type = _record_type_from_schema(self._source, self.record_name, schema)
         record_fields = tuple(field.name for field in dataclass_fields(record_type))
         select_columns = ",".join(self._select_column(column) for column in record_fields)
 
         self._record_type = record_type
         self._record_fields = record_fields
-        self._select_all_sql = _SELECT_SQL.format(table=self.name, columns=select_columns)
-        self._select_one_sql = _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=select_columns)
+        self._select_all_sql = _SELECT_SQL.format(table=self._source, columns=select_columns)
+        self._select_one_sql = _SELECT_ONE_SQL.format(table=self._source, key=self.key, columns=select_columns)
         self._record_schema_version = schema_version
         self._uncommitted_record_schema = schema if conn.in_transaction else None
 
@@ -221,7 +246,7 @@ class ProjectTable(ABC):
         else:
             # Keep this as an unquoted expression so SQLite rejects unknown column names.
             row = self._connection._connection.execute(
-                _SELECT_ONE_SQL.format(table=self.name, key=self.key, columns=column),
+                _SELECT_ONE_SQL.format(table=self._source, key=self.key, columns=column),
                 [key],
             ).fetchone()
 
@@ -286,9 +311,7 @@ class ProjectTable(ABC):
             sql = self._update_statement(tuple(values))
             parameters = [self._database_value(value) for value in values.values()]
             parameters.append(key)
-
-            if conn.execute(sql, parameters).rowcount == 0:
-                raise self._missing_record(key)
+            self._execute_for_key(conn, sql, parameters, key)
 
         self._invalidate()
 
@@ -305,11 +328,18 @@ class ProjectTable(ABC):
             raise ValueError(f"table key ({self.key}) argument not provided")
 
         with self._connection as conn:
-            cursor = conn.execute(self._delete_sql, [key])
-            if cursor.rowcount == 0:
-                raise self._missing_record(key)
+            self._execute_for_key(conn, self._delete_sql, [key], key)
 
         self._invalidate()
+
+    def _execute_for_key(self, conn, sql: str, parameters: list[Any], key: Any) -> None:
+        """Run a write on one keyed record, raising if the record does not exist."""
+        if self._source_is_view:
+            if conn.execute(self._contains_sql, [key]).fetchone() is None:
+                raise self._missing_record(key)
+            conn.execute(sql, parameters)
+        elif conn.execute(sql, parameters).rowcount == 0:
+            raise self._missing_record(key)
 
     def insert_from(self, frame: pd.DataFrame) -> list[Any]:
         """Atomically insert records identified by a DataFrame key column.
@@ -425,11 +455,11 @@ class ProjectTable(ABC):
 
     def _insert_statement(self, columns: tuple[str, ...]) -> str:
         """Return the INSERT statement for a column shape."""
-        return _format_insert(self.name, columns, self._geometry_placeholder)
+        return _format_insert(self._source, columns, self._geometry_placeholder)
 
     def _update_statement(self, columns: tuple[str, ...]) -> str:
         """Return the UPDATE statement for a column shape."""
-        return _format_update(self.name, self.key, columns, self._geometry_placeholder)
+        return _format_update(self._source, self.key, columns, self._geometry_placeholder)
 
     def _next_key(self) -> Any:
         """Return the next numeric key available in the table."""
@@ -439,9 +469,7 @@ class ProjectTable(ABC):
     def _change_key(self, key: Any, new_key: Any) -> None:
         """Change a record key for tables exposing a renumber operation."""
         with self._connection as conn:
-            cursor = conn.execute(self._change_key_sql, [new_key, key])
-            if cursor.rowcount == 0:
-                raise self._missing_record(key)
+            self._execute_for_key(conn, self._change_key_sql, [new_key, key], key)
         self._invalidate()
 
     def find_missing(self, keys: list[Any], fetch_limit: int = -1) -> list[Any]:
@@ -482,7 +510,7 @@ class ProjectTable(ABC):
         """Format a record field for a SELECT list."""
         # Qualify the column so SQLite cannot treat an unknown double-quoted identifier as a string literal.
         # https://sqlite.org/quirks.html#double_quoted_string_literals_are_accepted
-        return f"{escape_identifier(self.name)}.{escape_identifier(column)}"
+        return f"{escape_identifier(self._source)}.{escape_identifier(column)}"
 
     @abstractmethod
     def _record_value(self, column: str, value: Any) -> Any:
